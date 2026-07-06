@@ -14,6 +14,9 @@
 | D4 | **3-Layer-Architektur** (Wissen / Daten / Module) + 2 Oberflächen (Workbench / Sales Room). | „Skills" = Wissens- & Analyse-Layer, keine getrennten Apps. |
 | D5 | **Pre-Launch- und Post-Launch-Regime trennen** (Cerebro/Potenzial vs. Amazon-Reports/Ist). | Zwei verschiedene Daten-Regime; getrennt sind beide stärker. |
 | D6 | **Eine Quelle der Wahrheit pro Fähigkeit.** | Fragmentierung über 4 Repos ist das Hauptrisiko. |
+| D7 | **Skill-vs-Tool aufgelöst: deterministische Logik = Tool-Modul; Skill = dünner Wissens-/Orchestrierungs-Layer darüber.** | Bestätigt durch marketplaceadpros-Analyse: deren NL-Prompt-Choreografie um ein NL→SQL-Interface ist fragil („~1/3 Calls droppt Rows"). Formeln/Definitionen/Queries/Rendering gehören in getestete Module. |
+| D8 | **Reporting/Dashboards nach „Datenkontrakt + geteiltem Template" bauen** (Logik befüllt deklarierte Daten, Template rendert deterministisch), Template als **geteilte Komponentenbibliothek**. | Übernahme des starken „Dashboard-als-Asset"-Musters, aber ohne dessen Copy-Paste-Design-System-Schwäche. |
+| D9 | **Operations-Domäne (FBA/Reorder/Inventory/Experiments) NICHT in Phase 1.** Wissen gesichert, im Backlog. | Andere Domäne als Listing-Optimierung; Aufnahme wäre Scope-Creep und Fragmentierungsrisiko. |
 
 ## Offene Fragen (zu klären, bevor Phase 1 startet)
 
@@ -33,3 +36,5 @@
 - Echtes kompetitives SOV mit Ranking-Tracking.
 - Sukzessive Kunden-Freischaltung einzelner Module.
 - A+-Erstellung als eigenes Modul (Nutzer erwähnt).
+- Operations-Domäne (Wissen aus marketplaceadpros gesichert): Reorder-Planung (inkl. AWD-Doppelzähl-Falle), FBA-Inventory-Risk (Effective-DOS), Experiment-State-Machine. Andere Domäne als Listing — später ggf. eigener Bereich.
+- Dünne Skill-Layer über den Tool-Modulen als spätere Bedien-/Routing-Option (Frontmatter-Trigger-Engineering beachten).

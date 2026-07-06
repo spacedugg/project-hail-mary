@@ -1,8 +1,8 @@
 # Salvage-Inventar — Was aus welchem Repo kommt
 
-> Ergebnis der Tiefenanalyse der 5 hochgeladenen Pakete (2026-07-06). Referenz für den Greenfield-Neubau: was portieren, was als Wissen übernehmen, was verwerfen.
+> Ergebnis der Tiefenanalyse der 6 hochgeladenen Pakete (2026-07-06). Referenz für den Greenfield-Neubau: was portieren, was als Wissen übernehmen, was verwerfen.
 
-## Übersicht der 5 Quellen
+## Übersicht der 6 Quellen
 
 | Quelle | Was es ist | Rolle im Neubau |
 |---|---|---|
@@ -11,6 +11,7 @@
 | **sales-room** | Produktives Outreach-Frontend (Temoa) | Presets + Showcase-Renderer + Tease-Konzept |
 | **reporting-main** | Tiefes Analyse-/Reporting-Tool (Temoa) | **Kronjuwel: SQP-Engine + Parser** |
 | **Temoa-Tools-Beta** | 4-Tools-Plattform; `apps/temoa-os/` ist das zentrale Tool | **Kronjuwel: buildPrompt + Review-Insights + Campaign-Builder** |
+| **marketplaceadpros-skills** | Gratis Claude-Skills-Paket aus dem Netz (11 Skills, MCP-gebunden) | Wissenstransfer + Architektur-Lehrstück (Skill-vs-Tool) |
 
 ---
 
@@ -79,6 +80,22 @@ Reine, unit-getestete Funktionen ohne DB-Kopplung → **1:1 portierbar**. Pfade 
 - **Reporting-Sub-App (`apps/reporting/src/lib/`):** überschneidet sich mit reporting-main → NICHT doppelt portieren. sqrBenchmark (sqrRatio = purchaseShare/clickShare; ≥1,0 Strong), campaignClassifier (verbindet mit Builder-Namenskonvention).
 - **Architektur-Prinzip (gut):** „Import-First, API-Ready" — Parser getrennt, reine Logik in `lib/`, dünne Pages, Zustand-Stores.
 - **Stack:** React 18 + Vite, Zustand, Supabase Auth, Claude claude-sonnet-4-6, Apify, Upstash Rate-Limit, Sentry, SheetJS. Server-Proxies für alle AI/Scrape-Calls (Keys nur in Env).
+
+## 6. marketplaceadpros-skills — Wissenstransfer + Architektur-Lehrstück
+
+11 Claude-Skills, alle **dünne Instruktions-Layer um einen proprietären MCP-Server** (MAP). Kein Skill rechnet selbst — er dirigiert Tool-Calls + trägt Domänenwissen. Die Ausführung (MCP-Tools, JSX-Assets) ist an MAP gebunden → **für uns wertlos; nur der Wissensinhalt + die Muster zählen.**
+
+- **Format-Lehre:** SKILL.md hat nur EIN Frontmatter-Feld (`description`, sehr trigger-lastig; Name = Ordnername). Body: Titel → Tools-Tabelle → Fachsektionen → „Common workflows" (wörtliche Prompt-Vorlagen) → „Pitfalls" + „Tips". ~120–185 Zeilen. Progressive Disclosure kaum genutzt (nur reorder-planning hat `references/`).
+- **⭐ Übernehmenswertes Fachwissen (→ Wissens-Layer / Hard-Specs), nicht die Ausführung:**
+  - **Listing/Titel:** RUFUS-3-Fragen für Bullets („Is this right for me? / What's different? / How do I use it?"). Banned-Claims-Liste + compliant-Ersatz („FDA approved" → „made in an FDA-registered facility"). 75-Zeichen-Titel + 14-Tage-Fenster (US; DE-Limit abweichend). 6 Kategorie-Titel-Playbooks (Priorisierungs-Reihenfolge, z.B. Supplements: Brand→Hero ingredient→Strength(mg)→Count→Benefit→Form). Prinzip „gekürzte Keywords umlagern statt löschen". Hijacking-Signal: CVR-Drop ohne Preisänderung/Stockout.
+  - **Ads:** 3–5× mehr Negatives als Positives; Term mit ≥20 Klicks & 0 Orders → negative exact; Bid = Revenue-per-Click × Ziel-ACoS (Floor/Cap); 80/20-Budget-Pyramide; Saison-Playbook (≥2 Orders/30d, 2 Wochen vorher, Floor +25%).
+  - **Waste-Definition:** purchases14d=0 AND clicks≥5; Kosten-Tiers ≥$100 CRITICAL / $60–100 HIGH / <$60 ELEVATED; Waste <2% gesund, >5% echtes Geld. Eigen-Marken-Terme mit 0 Conv = Listing-Problem, nicht Keyword-Problem.
+  - **Harvest:** BROAD/PHRASE (exclude EXACT), impressions≥100 & clicks≥3; PRIME (clicks≥30 & ACOS≤0.40) / STRONG (clicks≥10 & ACOS≤0.55).
+  - **DSP:** NTB% = newToBrandPurchases14d/totalPurchases14d; Prospecting NTB>40 %.
+- **⚠️ Anti-Patterns (bewusst NICHT übernehmen):** NL→SQL-Prompt-Choreografie um unzuverlässigen `ask_report_analyst` (gibt selbst zu: „~1 von 3 Calls droppt Rows"); Google-Fonts-Runtime-Injection (CSP-fragil); dreifach kopiertes Design-System in den JSX-Templates.
+- **⭐ Muster: „Dashboard-als-Datenkontrakt"** — Skill befüllt nur einen deklarierten `RAW`-Array + Masthead-Konstanten in ein styling-eingefrorenes Template („Do not modify the styling"). Fachlogik (Tiering, Effective-DOS) lebt im Template. **Bessere Version für uns: ein versioniertes Template als geteilte Komponentenbibliothek**, nicht pro-Feature kopiert.
+- **Lücke im Nutzer-Portfolio (Wissen sichern, NICHT Phase 1):** reorder-planning (Formeln inkl. AWD-`replenishment_quantity`-Doppelzähl-Falle: on-hand = FBA fulfillable + AWD onhand; inbound = FBA + AWD inbound; replenishment NICHT separat addieren), fba-inventory-risk (Effective-DOS = (fulfillable+inbound)/avg daily; Tiers <2 CRITICAL/<7 HIGH/<14 ELEVATED), experiments (State-Machine proposed→started→complete, ändert nie autom. in Amazon). **Domäne = Operations, nicht Listing → Ideen-Backlog.**
+- **Redundanz-Fazit:** listing-audit/title redundant im Zweck (aber fachlich detaillierter → Content übernehmen); ads/waste/harvest überlappend mit reporting-repo (dort haben wir echte Pipelines statt NL-Prompts → nur Schwellenwerte übernehmen); FBA/reorder/experiments neu (parken).
 
 ---
 
