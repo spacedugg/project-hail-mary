@@ -17,6 +17,10 @@
 | D7 | **Skill-vs-Tool aufgelöst: deterministische Logik = Tool-Modul; Skill = dünner Wissens-/Orchestrierungs-Layer darüber.** | Bestätigt durch marketplaceadpros-Analyse: deren NL-Prompt-Choreografie um ein NL→SQL-Interface ist fragil („~1/3 Calls droppt Rows"). Formeln/Definitionen/Queries/Rendering gehören in getestete Module. |
 | D8 | **Reporting/Dashboards nach „Datenkontrakt + geteiltem Template" bauen** (Logik befüllt deklarierte Daten, Template rendert deterministisch), Template als **geteilte Komponentenbibliothek**. | Übernahme des starken „Dashboard-als-Asset"-Musters, aber ohne dessen Copy-Paste-Design-System-Schwäche. |
 | D9 | **Operations-Domäne (FBA/Reorder/Inventory/Experiments) NICHT in Phase 1.** Wissen gesichert, im Backlog. | Andere Domäne als Listing-Optimierung; Aufnahme wäre Scope-Creep und Fragmentierungsrisiko. |
+| D10 | **Mission geschärft: Konsolidierung ist Pflicht, aber das Ziel ist ein höheres Qualitätsniveau als jedes Bestandsteil.** | Nutzer-Korrektur: Einzelteile sind auch für sich zu flach (z. B. Bild-Briefings mit USP-Wiederholung/falscher Reihenfolge). |
+| D11 | **Content-Generierung als 5-Baustein-Wissenssystem** (SPEC / RECIPE / REFERENCES / GENERATION / VALIDATION). Bestandstools haben nur GENERATION → Qualitätslücke = fehlende SPEC + VALIDATION. Siehe `content-knowledge-system.md`. | „LLM schlägt vor, Code erzwingt" auch für Bilder (Cross-Asset-USP-Regel, Reihenfolge). |
+| D12 | **Speicher-Split:** SPEC + RECIPE ins Repo (versioniert); REFERENCE-Bilder in Objektspeicher + DB (Metadaten, UI-pflegbar). | Binärdateien gehören nicht ins Git; nicht-technisches Team pflegt Referenzen via UI. Muster existiert schon (sales-room `referenceImages`). |
+| D13 | **Erste Layer-1-Arbeit: Blaupause am Hauptbild** — bestehenden Prompt + Referenzen dekomponieren, bevor App-Code entsteht. | Stärkster Conversion-Hebel, Rohmaterial vorhanden; wird Schablone für alle Content-Typen. |
 
 ## Offene Fragen (zu klären, bevor Phase 1 startet)
 
