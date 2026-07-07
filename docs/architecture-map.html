@@ -1,45 +1,25 @@
 <style>
   :root {
-    --ground: #eceef1;
-    --surface: #ffffff;
-    --surface-2: #f5f7f9;
-    --ink: #18212e;
-    --ink-soft: #52606f;
-    --ink-faint: #8894a2;
-    --hair: #d5dbe2;
-    --hair-strong: #c2cad3;
-    --accent: #1f7a7a;
-    --accent-ink: #135c5c;
-    --accent-soft: rgba(31,122,122,.10);
-    --port: #2f6d8a;
-    --port-soft: rgba(47,109,138,.12);
-    --build: #b5642a;
-    --build-soft: rgba(181,100,42,.13);
-    --know: #6a58a8;
-    --know-soft: rgba(106,88,168,.13);
+    --ground: #eceef1; --surface: #ffffff; --surface-2: #f5f7f9;
+    --ink: #18212e; --ink-soft: #52606f; --ink-faint: #8894a2;
+    --hair: #d5dbe2; --hair-strong: #c2cad3;
+    --accent: #1f7a7a; --accent-ink: #135c5c; --accent-soft: rgba(31,122,122,.10);
+    --port: #2f6d8a; --port-soft: rgba(47,109,138,.12);
+    --build: #b5642a; --build-soft: rgba(181,100,42,.13);
+    --know: #6a58a8; --know-soft: rgba(106,88,168,.13);
     --shadow: 0 1px 2px rgba(24,33,46,.05), 0 4px 16px rgba(24,33,46,.05);
     --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
     --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --ground: #0f131a;
-      --surface: #171e28;
-      --surface-2: #1e2732;
-      --ink: #e7ecf2;
-      --ink-soft: #9aa6b4;
-      --ink-faint: #6a7788;
-      --hair: #2a333f;
-      --hair-strong: #3a4552;
-      --accent: #3fabab;
-      --accent-ink: #7fd0d0;
-      --accent-soft: rgba(63,171,171,.14);
-      --port: #63a9cc;
-      --port-soft: rgba(99,169,204,.16);
-      --build: #dd9350;
-      --build-soft: rgba(221,147,80,.16);
-      --know: #a290df;
-      --know-soft: rgba(162,144,223,.17);
+      --ground: #0f131a; --surface: #171e28; --surface-2: #1e2732;
+      --ink: #e7ecf2; --ink-soft: #9aa6b4; --ink-faint: #6a7788;
+      --hair: #2a333f; --hair-strong: #3a4552;
+      --accent: #3fabab; --accent-ink: #7fd0d0; --accent-soft: rgba(63,171,171,.14);
+      --port: #63a9cc; --port-soft: rgba(99,169,204,.16);
+      --build: #dd9350; --build-soft: rgba(221,147,80,.16);
+      --know: #a290df; --know-soft: rgba(162,144,223,.17);
       --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.28);
     }
   }
@@ -65,126 +45,37 @@
   }
 
   * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: var(--ground);
-    color: var(--ink);
-    font-family: var(--sans);
-    line-height: 1.5;
-    -webkit-font-smoothing: antialiased;
-  }
-  .wrap { max-width: 1120px; margin: 0 auto; padding: clamp(20px, 4vw, 52px) clamp(16px, 4vw, 40px) 72px; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--sans); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: clamp(20px, 4vw, 52px) clamp(16px, 4vw, 40px) 72px; }
 
-  .eyebrow {
-    font-family: var(--mono); font-size: 11.5px; letter-spacing: .16em;
-    text-transform: uppercase; color: var(--accent-ink); margin: 0 0 14px;
-    display: flex; align-items: center; gap: 10px;
-  }
+  .eyebrow { font-family: var(--mono); font-size: 11.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent-ink); margin: 0 0 14px; display: flex; align-items: center; gap: 10px; }
   .eyebrow::before { content: ""; width: 26px; height: 2px; background: var(--accent); display: inline-block; }
   h1 { font-size: clamp(27px, 4.4vw, 44px); line-height: 1.08; letter-spacing: -.015em; margin: 0 0 16px; text-wrap: balance; font-weight: 680; }
-  .lede { font-size: clamp(15px, 1.7vw, 18px); color: var(--ink-soft); max-width: 66ch; margin: 0; }
+  .lede { font-size: clamp(15px, 1.7vw, 18px); color: var(--ink-soft); max-width: 68ch; margin: 0; }
   .lede strong { color: var(--ink); font-weight: 620; }
 
-  /* audiences */
-  .aud { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 34px 0 8px; }
-  @media (max-width: 620px) { .aud { grid-template-columns: 1fr; } }
-  .aud__card {
-    background: var(--surface); border: 1px solid var(--hair); border-radius: 12px;
-    padding: 16px 18px; box-shadow: var(--shadow); position: relative; overflow: hidden;
-  }
-  .aud__card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--accent); }
-  .aud__k { font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-ink); }
-  .aud__t { font-size: 16.5px; font-weight: 650; margin: 6px 0 3px; }
-  .aud__d { font-size: 13px; color: var(--ink-soft); margin: 0; }
+  .secttitle { display: flex; align-items: baseline; gap: 10px; margin: 40px 2px 14px; flex-wrap: wrap; }
+  .secttitle .num { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-ink); }
+  .secttitle .h { font-size: 19px; font-weight: 660; letter-spacing: -.01em; }
+  .secttitle .sub { font-size: 13px; color: var(--ink-soft); }
 
-  .stackhint {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
-    color: var(--ink-faint); margin: 26px 2px 10px;
-  }
-  .stackhint span { white-space: nowrap; }
-  .stackhint .line { flex: 1; height: 1px; background: linear-gradient(90deg, var(--hair), transparent); }
+  /* thesis: fragmentation -> cockpit */
+  .thesis { display: grid; grid-template-columns: 1fr auto 1.05fr; align-items: center; gap: 18px; margin-top: 30px; }
+  @media (max-width: 780px) { .thesis { grid-template-columns: 1fr; } }
+  .sources { display: flex; flex-direction: column; gap: 7px; }
+  .src { background: var(--surface); border: 1px solid var(--hair); border-radius: 8px; padding: 9px 12px; font-size: 13px; color: var(--ink-soft); box-shadow: var(--shadow); position: relative; }
+  .src b { color: var(--ink); font-weight: 600; display: block; font-size: 13.5px; }
+  .arrowcol { display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 26px; font-weight: 700; }
+  @media (max-width: 780px) { .arrowcol { transform: rotate(90deg); padding: 4px 0; } }
+  .cockpit { background: linear-gradient(160deg, var(--accent-soft), var(--surface) 65%); border: 1.5px solid var(--accent); border-radius: 14px; padding: 20px; box-shadow: var(--shadow); }
+  .cockpit .k { font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-ink); }
+  .cockpit .t { font-size: 18px; font-weight: 680; margin: 7px 0 5px; letter-spacing: -.01em; }
+  .cockpit .d { font-size: 13.5px; color: var(--ink-soft); margin: 0; }
 
-  /* bands */
-  .band {
-    display: grid; grid-template-columns: 168px 1fr; gap: 0;
-    background: var(--surface); border: 1px solid var(--hair); border-radius: 14px;
-    margin-bottom: 12px; box-shadow: var(--shadow); overflow: hidden;
-  }
-  @media (max-width: 720px) { .band { grid-template-columns: 1fr; } }
-  .band__label {
-    background: var(--surface-2); border-right: 1px solid var(--hair);
-    padding: 18px 16px; display: flex; flex-direction: column; gap: 6px;
-  }
-  @media (max-width: 720px) { .band__label { border-right: none; border-bottom: 1px solid var(--hair); } }
-  .band__label .tag { font-family: var(--mono); font-size: 10px; letter-spacing: .13em; text-transform: uppercase; color: var(--accent-ink); }
-  .band__label .name { font-size: 15.5px; font-weight: 660; letter-spacing: -.01em; }
-  .band__label .role { font-size: 12px; color: var(--ink-soft); }
-  .band__body { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
-
-  .group { display: flex; flex-direction: column; gap: 8px; }
-  .group__h { font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
-  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
-
-  .chip {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: var(--surface-2); border: 1px solid var(--hair);
-    border-left: 3px solid var(--ink-faint);
-    border-radius: 7px; padding: 6px 11px 6px 9px; font-size: 13px; color: var(--ink);
-    transition: opacity .18s ease, transform .18s ease, box-shadow .18s ease;
-  }
-  .chip small { font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); }
-  .chip[data-prov="port"] { border-left-color: var(--port); }
-  .chip[data-prov="build"] { border-left-color: var(--build); }
-  .chip[data-prov="know"] { border-left-color: var(--know); }
-  .chip[data-prov="port"] small { color: var(--port); }
-  .chip[data-prov="build"] small { color: var(--build); }
-  .chip[data-prov="know"] small { color: var(--know); }
-
-  /* foundation slab */
-  .foundation {
-    background: linear-gradient(180deg, var(--surface), var(--surface-2));
-    border: 1px solid var(--hair-strong); border-radius: 14px; padding: 18px;
-    margin-top: 6px; box-shadow: var(--shadow);
-  }
-  .foundation__h { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
-  .foundation__h .tag { font-family: var(--mono); font-size: 10px; letter-spacing: .13em; text-transform: uppercase; color: var(--accent-ink); }
-  .foundation__h .name { font-size: 15.5px; font-weight: 660; }
-  .foundation__h .role { font-size: 12.5px; color: var(--ink-soft); }
-  .foundation .chips .chip { background: var(--surface); }
-
-  /* workflow ribbon */
-  .flowsec { margin: 30px 0 4px; }
-  .flow {
-    display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding-bottom: 6px;
-    scrollbar-width: thin;
-  }
-  .flow__step {
-    flex: 1 0 auto; min-width: 120px; background: var(--surface); border: 1px solid var(--hair);
-    border-radius: 10px; padding: 11px 13px; position: relative; box-shadow: var(--shadow);
-  }
-  .flow__step:not(:last-child) { margin-right: 26px; }
-  .flow__step:not(:last-child)::after {
-    content: "→"; position: absolute; right: -20px; top: 50%; transform: translateY(-50%);
-    color: var(--accent); font-size: 16px; font-weight: 700;
-  }
-  .flow__n { font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
-  .flow__t { font-size: 13px; font-weight: 600; margin-top: 3px; }
-  .flow__d { font-size: 11.5px; color: var(--ink-soft); margin-top: 2px; }
-
-  /* legend + controls */
-  .legend {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-    margin: 22px 0 26px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--hair);
-    border-radius: 11px; box-shadow: var(--shadow);
-  }
+  /* legend / filter */
+  .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 26px 0 4px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--hair); border-radius: 11px; box-shadow: var(--shadow); }
   .legend__label { font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); margin-right: 4px; }
-  .lg {
-    display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink);
-    background: var(--surface-2); border: 1px solid var(--hair); border-radius: 999px;
-    padding: 5px 12px 5px 10px; cursor: pointer; font-family: inherit;
-    transition: background .15s ease, border-color .15s ease;
-  }
+  .lg { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--hair); border-radius: 999px; padding: 5px 12px 5px 10px; cursor: pointer; font-family: inherit; transition: background .15s ease, border-color .15s ease; }
   .lg:hover { border-color: var(--hair-strong); }
   .lg__dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
   .lg[data-k="port"] .lg__dot { background: var(--port); }
@@ -192,48 +83,86 @@
   .lg[data-k="know"] .lg__dot { background: var(--know); }
   .lg[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
   .lg:focus-visible, .lg-all:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .lg-all {
-    font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase;
-    background: none; border: 1px solid var(--hair); border-radius: 999px; padding: 5px 12px;
-    color: var(--ink-soft); cursor: pointer; margin-left: auto;
-  }
+  .lg-all { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; background: none; border: 1px solid var(--hair); border-radius: 999px; padding: 5px 12px; color: var(--ink-soft); cursor: pointer; margin-left: auto; }
   .lg-all:hover { border-color: var(--hair-strong); color: var(--ink); }
-
-  body.filtering .chip { opacity: .2; }
+  body.filtering .chip { opacity: .18; }
   body.filtering .chip.match { opacity: 1; box-shadow: 0 0 0 1px var(--hair-strong); }
 
-  .foot { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--hair); font-size: 12.5px; color: var(--ink-faint); font-family: var(--mono); letter-spacing: .04em; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  /* intelligence band */
+  .intel { border: 1.5px solid var(--accent); border-radius: 14px; padding: 18px; background: linear-gradient(180deg, var(--accent-soft), transparent 70%); box-shadow: var(--shadow); }
+  .intel__h { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+  .intel__h .tag { font-family: var(--mono); font-size: 10.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--accent-ink); }
+  .intel__h .name { font-size: 16px; font-weight: 670; }
+  .intel__note { font-size: 12.5px; color: var(--ink-soft); margin: 0 0 14px; }
+  .intel__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  @media (max-width: 720px) { .intel__grid { grid-template-columns: 1fr; } }
+  .icard { background: var(--surface); border: 1px solid var(--hair); border-radius: 10px; padding: 13px 14px; }
+  .icard .it { font-size: 14px; font-weight: 640; margin-bottom: 3px; }
+  .icard .id { font-size: 12.5px; color: var(--ink-soft); }
 
+  /* pillars grid */
+  .pillars { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  @media (max-width: 720px) { .pillars { grid-template-columns: 1fr; } }
+  .pillar { background: var(--surface); border: 1px solid var(--hair); border-radius: 13px; padding: 15px 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 11px; }
+  .pillar__h { display: flex; align-items: center; gap: 9px; }
+  .pillar__h .pn { font-family: var(--mono); font-size: 11px; color: var(--accent-ink); background: var(--accent-soft); border-radius: 6px; padding: 2px 7px; }
+  .pillar__h .pt { font-size: 15px; font-weight: 660; letter-spacing: -.01em; }
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; background: var(--surface-2); border: 1px solid var(--hair); border-left: 3px solid var(--ink-faint); border-radius: 7px; padding: 5px 10px 5px 9px; font-size: 12.5px; color: var(--ink); transition: opacity .18s ease, box-shadow .18s ease; }
+  .chip small { font-family: var(--mono); font-size: 9px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-faint); }
+  .chip[data-prov="port"] { border-left-color: var(--port); } .chip[data-prov="port"] small { color: var(--port); }
+  .chip[data-prov="build"] { border-left-color: var(--build); } .chip[data-prov="build"] small { color: var(--build); }
+  .chip[data-prov="know"] { border-left-color: var(--know); } .chip[data-prov="know"] small { color: var(--know); }
+
+  /* dimensions strip */
+  .dims { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 640px) { .dims { grid-template-columns: 1fr; } }
+  .dim { background: var(--surface); border: 1px dashed var(--hair-strong); border-radius: 12px; padding: 15px 16px; }
+  .dim .dk { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 8px; }
+  .dim .chain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .node { background: var(--surface-2); border: 1px solid var(--hair); border-radius: 6px; padding: 4px 9px; font-size: 12.5px; font-weight: 560; }
+  .node.first { border-color: var(--accent); color: var(--accent-ink); }
+  .sep { color: var(--ink-faint); font-size: 13px; }
+
+  /* under the hood bands */
+  .band { display: grid; grid-template-columns: 158px 1fr; background: var(--surface); border: 1px solid var(--hair); border-radius: 13px; margin-bottom: 10px; box-shadow: var(--shadow); overflow: hidden; }
+  @media (max-width: 680px) { .band { grid-template-columns: 1fr; } }
+  .band__label { background: var(--surface-2); border-right: 1px solid var(--hair); padding: 15px; display: flex; flex-direction: column; gap: 5px; }
+  @media (max-width: 680px) { .band__label { border-right: none; border-bottom: 1px solid var(--hair); } }
+  .band__label .tag { font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-ink); }
+  .band__label .name { font-size: 14.5px; font-weight: 640; }
+  .band__label .role { font-size: 11.5px; color: var(--ink-soft); }
+  .band__body { padding: 14px; }
+
+  .foundation { background: linear-gradient(180deg, var(--surface), var(--surface-2)); border: 1px solid var(--hair-strong); border-radius: 14px; padding: 17px; margin-top: 4px; box-shadow: var(--shadow); }
+  .foundation__h { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .foundation__h .tag { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-ink); }
+  .foundation__h .name { font-size: 15px; font-weight: 650; }
+  .foundation__h .role { font-size: 12px; color: var(--ink-soft); }
+  .foundation .chip { background: var(--surface); }
+
+  .foot { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--hair); font-size: 12px; color: var(--ink-faint); font-family: var(--mono); letter-spacing: .04em; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
 <div class="wrap">
-  <p class="eyebrow">Projekt Hail Mary · Plattform-Architektur</p>
-  <h1>Eine ganzheitliche Amazon-Plattform — als Infrastruktur gedacht</h1>
-  <p class="lede">Ein Tool für den gesamten Amazon-Kundenwert: <strong>Content bestellen, analysieren, Reporting erstellen, Wirtschaftlichkeit rechnen, Handlungen ableiten</strong>. Zwei Zugänge — intern für betreute Kunden, extern als Self-Service-Abo. Diese Karte zeigt die Schichten, die Bausteine und woher jeder Baustein kommt.</p>
+  <p class="eyebrow">Projekt Hail Mary · Amazon All-in-One</p>
+  <h1>Der ganzheitliche Überblick, der im Tagesgeschäft untergeht</h1>
+  <p class="lede">Ein <strong>Cockpit für Wachstum &amp; Profitabilität auf Amazon</strong>. Es führt zusammen, was heute verstreut liegt — und übersetzt es in <strong>konkrete, priorisierte Maßnahmen</strong>, von der Account-Ebene bis auf ASIN-Level. Zuerst intern für die Kundenbetreuung; Monetarisierung später.</p>
 
-  <div class="aud">
-    <div class="aud__card">
-      <div class="aud__k">Zugang A · Intern</div>
-      <div class="aud__t">Agentur betreut Kunden</div>
-      <p class="aud__d">Volle Tiefe: Workbench, alle Module, Kunden-Verwaltung, Outreach über Sales Rooms.</p>
+  <div class="thesis">
+    <div class="sources">
+      <div class="src"><b>Seller Central</b>Sales, Traffic, Suchbegriffe</div>
+      <div class="src"><b>Amazon-Ads-Konsole</b>Kampagnen, PPC-Performance</div>
+      <div class="src"><b>Excel-Margenlisten</b>Kosten, Gebühren, Marge</div>
+      <div class="src"><b>Ausgelagerter Content</b>Texte &amp; Bilder extern</div>
+      <div class="src"><b>Separates Account-Mgmt</b>Maßnahmen ohne Plan</div>
     </div>
-    <div class="aud__card">
-      <div class="aud__k">Zugang B · Extern</div>
-      <div class="aud__t">Self-Service-SaaS · Monatsabo</div>
-      <p class="aud__d">Kunden ohne Betreuung arbeiten selbst mit dem Tool. Module nach Tarif freigeschaltet.</p>
-    </div>
-  </div>
-
-  <div class="flowsec">
-    <div class="stackhint"><span>Der eine Kern-Workflow</span><span class="line"></span><span>ASIN / Marke → Handlung</span></div>
-    <div class="flow">
-      <div class="flow__step"><div class="flow__n">Eingang</div><div class="flow__t">ASIN / Marke</div><div class="flow__d">Produkt, Marktplatz, Ziel</div></div>
-      <div class="flow__step"><div class="flow__n">Ingest</div><div class="flow__t">Daten holen</div><div class="flow__d">Scrape · Berichte · Keywords</div></div>
-      <div class="flow__step"><div class="flow__n">Analyse</div><div class="flow__t">Analysieren</div><div class="flow__d">Listing · Reviews · PPC · SOV</div></div>
-      <div class="flow__step"><div class="flow__n">Synthese</div><div class="flow__t">Zielbild</div><div class="flow__d">Zielgruppe · Pain Points · USP</div></div>
-      <div class="flow__step"><div class="flow__n">Erzeugen</div><div class="flow__t">Content + Briefing</div><div class="flow__d">Texte · Bilder · A+</div></div>
-      <div class="flow__step"><div class="flow__n">Bewerten</div><div class="flow__t">Score + Reporting</div><div class="flow__d">Handlungsanweisungen</div></div>
+    <div class="arrowcol">→</div>
+    <div class="cockpit">
+      <div class="k">Ein Cockpit</div>
+      <div class="t">Alles spricht miteinander</div>
+      <p class="d">Statt fünf Silos, die sich nicht kennen: ein Ort für KPIs, Sichtbarkeit, Content, Wirtschaftlichkeit — mit Handlungsempfehlungen, die die Bereiche verbinden.</p>
     </div>
   </div>
 
@@ -245,168 +174,171 @@
     <button class="lg-all" type="button">Alle zeigen</button>
   </div>
 
-  <div class="stackhint"><span>Oben: was der Nutzer sieht</span><span class="line"></span><span>Unten: das Fundament</span></div>
-
-  <!-- SURFACES -->
-  <div class="band">
-    <div class="band__label">
-      <span class="tag">Schicht 1</span>
-      <span class="name">Oberflächen</span>
-      <span class="role">Was Nutzer bedienen</span>
+  <div class="secttitle"><span class="num">Ebene 1</span><span class="h">Intelligenz-Schicht</span><span class="sub">Das Differenzierungsmerkmal — sitzt über allen Säulen und macht aus Daten Handlungen</span></div>
+  <div class="intel">
+    <div class="intel__h"><span class="tag">Von Daten zu Handlung</span><span class="name">Nicht noch ein Dashboard — ein Ratgeber</span></div>
+    <p class="intel__note">Reine Dashboards gibt es viele. Der Sprung zu „hier sind die 3 Maßnahmen mit dem größten Hebel" ist der Unterschied.</p>
+    <div class="intel__grid">
+      <div class="icard"><div class="it">AI-Advisor</div><div class="id">Konkrete Actions nach Uplift-Potenzial — auf Account- &amp; ASIN-Ebene.</div></div>
+      <div class="icard"><div class="it">Alerts &amp; Monitoring</div><div class="id">Buybox-Verlust, verkürzte Zeichenlimits, handlungsrelevante Ausreißer.</div></div>
+      <div class="icard"><div class="it">Market Intelligence</div><div class="id">Trends, Muster, Ausreißer — im Kontext von Prime Day &amp; Saison.</div></div>
     </div>
-    <div class="band__body">
+  </div>
+
+  <div class="secttitle"><span class="num">Ebene 2</span><span class="h">Sieben Modul-Säulen</span><span class="sub">Was das Tool kann</span></div>
+  <div class="pillars">
+    <div class="pillar">
+      <div class="pillar__h"><span class="pn">S1</span><span class="pt">Überblick &amp; Performance</span></div>
       <div class="chips">
-        <span class="chip" data-prov="build">Internes Workbench <small>neu</small></span>
-        <span class="chip" data-prov="build">Kunden-Portal / SaaS-App <small>neu</small></span>
-        <span class="chip" data-prov="port">Sales Room · Outreach-Tease <small>portieren</small></span>
-        <span class="chip" data-prov="port">Kunden-Reporting-Ansicht <small>portieren</small></span>
+        <span class="chip" data-prov="build">KPI-Cockpit <small>neu</small></span>
+        <span class="chip" data-prov="build">Custom Dashboards <small>neu</small></span>
+        <span class="chip" data-prov="port">Performance-Historie <small>portieren</small></span>
+        <span class="chip" data-prov="port">Conversion-Funnel <small>portieren</small></span>
+        <span class="chip" data-prov="build">Forecasts <small>neu</small></span>
+        <span class="chip" data-prov="build">Lagerbestand <small>neu</small></span>
       </div>
     </div>
-  </div>
-
-  <!-- CAPABILITIES / MODULES -->
-  <div class="band">
-    <div class="band__label">
-      <span class="tag">Schicht 2</span>
-      <span class="name">Module</span>
-      <span class="role">Die „Reiter" des Tools</span>
-    </div>
-    <div class="band__body">
-      <div class="group">
-        <div class="group__h">Content bestellen</div>
-        <div class="chips">
-          <span class="chip" data-prov="build">Hauptbild <small>neu</small></span>
-          <span class="chip" data-prov="build">Listing-Bilder <small>neu</small></span>
-          <span class="chip" data-prov="build">A+ Content <small>neu</small></span>
-          <span class="chip" data-prov="port">Titel <small>portieren</small></span>
-          <span class="chip" data-prov="port">Bullet Points <small>portieren</small></span>
-          <span class="chip" data-prov="port">Beschreibung <small>portieren</small></span>
-          <span class="chip" data-prov="port">Backend-Keywords <small>portieren</small></span>
-        </div>
-      </div>
-      <div class="group">
-        <div class="group__h">Analyse</div>
-        <div class="chips">
-          <span class="chip" data-prov="build">Listing-Audit · Text + Bild <small>neu</small></span>
-          <span class="chip" data-prov="know">Competitor-Analyse <small>wissen</small></span>
-          <span class="chip" data-prov="port">Keyword-Analyse <small>portieren</small></span>
-          <span class="chip" data-prov="port">Review-Insights <small>portieren</small></span>
-          <span class="chip" data-prov="port">Share of Voice <small>portieren</small></span>
-        </div>
-      </div>
-      <div class="group">
-        <div class="group__h">Reporting &amp; Wirtschaftlichkeit</div>
-        <div class="chips">
-          <span class="chip" data-prov="port">Reporting-Erstellung <small>portieren</small></span>
-          <span class="chip" data-prov="port">Performance-Historie <small>portieren</small></span>
-          <span class="chip" data-prov="port">Wochenreport <small>portieren</small></span>
-          <span class="chip" data-prov="port">Margenkalkulation <small>portieren</small></span>
-        </div>
-      </div>
-      <div class="group">
-        <div class="group__h">Advertising &amp; Handlung</div>
-        <div class="chips">
-          <span class="chip" data-prov="port">PPC-Analyse <small>portieren</small></span>
-          <span class="chip" data-prov="port">Kampagnen-Builder <small>portieren</small></span>
-          <span class="chip" data-prov="port">Search-Term-Harvest <small>portieren</small></span>
-          <span class="chip" data-prov="port">Handlungsanweisungen · Action-Plan <small>portieren</small></span>
-          <span class="chip" data-prov="build">Echter Listing-Score <small>neu</small></span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ENGINES -->
-  <div class="band">
-    <div class="band__label">
-      <span class="tag">Schicht 3</span>
-      <span class="name">Engines</span>
-      <span class="role">Die Rechenlogik · reine Funktionen</span>
-    </div>
-    <div class="band__body">
+    <div class="pillar">
+      <div class="pillar__h"><span class="pn">S2</span><span class="pt">Sichtbarkeit &amp; Wettbewerb</span></div>
       <div class="chips">
-        <span class="chip" data-prov="port">SQP-Engine · CTR/CVR-Rekonstruktion <small>reporting</small></span>
-        <span class="chip" data-prov="port">N-Gram · Waste vs. Scale <small>reporting</small></span>
-        <span class="chip" data-prov="port">Action-Plan-Engine · regelbasiert <small>reporting</small></span>
-        <span class="chip" data-prov="port">Margin- / Gebühren-Engine <small>reporting</small></span>
-        <span class="chip" data-prov="port">buildPrompt + Byte-Enforcement <small>temoa-os</small></span>
-        <span class="chip" data-prov="port">Review → Pain Points <small>temoa-os</small></span>
-        <span class="chip" data-prov="port">Kampagnen-Builder + Excel-Export <small>temoa-os</small></span>
-        <span class="chip" data-prov="build">Content-Validation · USP + Reihenfolge <small>neu</small></span>
-        <span class="chip" data-prov="build">Bild-Audit · Vision <small>neu</small></span>
-        <span class="chip" data-prov="build">Score-Engine <small>neu</small></span>
+        <span class="chip" data-prov="port">Share of Voice <small>portieren</small></span>
+        <span class="chip" data-prov="build">Organisch vs. bezahlt <small>neu</small></span>
+        <span class="chip" data-prov="port">Relevante Keywords <small>portieren</small></span>
+        <span class="chip" data-prov="know">Wettbewerbsposition <small>wissen</small></span>
+        <span class="chip" data-prov="build">Market Share / Pricing <small>neu</small></span>
       </div>
     </div>
-  </div>
-
-  <!-- DATA / INGEST -->
-  <div class="band">
-    <div class="band__label">
-      <span class="tag">Schicht 4</span>
-      <span class="name">Daten &amp; Ingest</span>
-      <span class="role">„Import-First, API-Ready"</span>
-    </div>
-    <div class="band__body">
-      <div class="group">
-        <div class="group__h">Berichte hochladen · geführt, Schritt für Schritt</div>
-        <div class="chips">
-          <span class="chip" data-prov="port">Business Report <small>parser</small></span>
-          <span class="chip" data-prov="port">Search Query (SQP) <small>parser</small></span>
-          <span class="chip" data-prov="port">Ads / PPC <small>parser</small></span>
-          <span class="chip" data-prov="port">Search-Term Report <small>parser</small></span>
-          <span class="chip" data-prov="port">Helium 10 Cerebro <small>parser</small></span>
-        </div>
-      </div>
-      <div class="group">
-        <div class="group__h">Scrape &amp; API</div>
-        <div class="chips">
-          <span class="chip" data-prov="port">Apify · Review-Scrape <small>portieren</small></span>
-          <span class="chip" data-prov="build">Listing-Scrape · Text + Bilder <small>neu</small></span>
-          <span class="chip" data-prov="build">SP-API / Ads-API-Adapter <small>später</small></span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- KNOWLEDGE -->
-  <div class="band">
-    <div class="band__label">
-      <span class="tag">Schicht 5</span>
-      <span class="name">Wissens-Layer</span>
-      <span class="role">„Amazon-Brain" · produktunabhängig</span>
-    </div>
-    <div class="band__body">
+    <div class="pillar">
+      <div class="pillar__h"><span class="pn">S3</span><span class="pt">Content-AI</span></div>
       <div class="chips">
-        <span class="chip" data-prov="know">SPEC · Hard-Specs &amp; Limits <small>wissen</small></span>
-        <span class="chip" data-prov="know">RECIPE · Prompts / Methoden <small>wissen</small></span>
-        <span class="chip" data-prov="know">REFERENCES · Design-Bibliothek <small>wissen</small></span>
-        <span class="chip" data-prov="know">Findings- &amp; Faktor-Presets <small>sales-room</small></span>
-        <span class="chip" data-prov="know">Blog-Prinzipien &amp; Reasoning <small>korpus</small></span>
-        <span class="chip" data-prov="know">Validation-Regeln <small>wissen</small></span>
+        <span class="chip" data-prov="port">SEO-Texte <small>portieren</small></span>
+        <span class="chip" data-prov="build">Bildererstellung <small>neu</small></span>
+        <span class="chip" data-prov="build">Content-Performance <small>neu</small></span>
+        <span class="chip" data-prov="build">Content-Pflege &amp; Uploads <small>neu</small></span>
+        <span class="chip" data-prov="build">Flat-File-Erstellung <small>neu</small></span>
+      </div>
+    </div>
+    <div class="pillar">
+      <div class="pillar__h"><span class="pn">S4</span><span class="pt">Listing-Diagnose &amp; Score</span></div>
+      <div class="chips">
+        <span class="chip" data-prov="build">Listing-Audit · Text + Bild <small>neu</small></span>
+        <span class="chip" data-prov="build">Echter Score <small>neu</small></span>
+        <span class="chip" data-prov="know">Competitor-Vergleich <small>wissen</small></span>
+      </div>
+    </div>
+    <div class="pillar">
+      <div class="pillar__h"><span class="pn">S5</span><span class="pt">Advertising / PPC</span></div>
+      <div class="chips">
+        <span class="chip" data-prov="port">PPC-Analyse <small>portieren</small></span>
+        <span class="chip" data-prov="port">Kampagnen-Templates <small>portieren</small></span>
+        <span class="chip" data-prov="build">API-Upload <small>neu</small></span>
+        <span class="chip" data-prov="port">Search-Term-Harvest <small>portieren</small></span>
+        <span class="chip" data-prov="port">Wasted Spend <small>portieren</small></span>
+      </div>
+    </div>
+    <div class="pillar">
+      <div class="pillar__h"><span class="pn">S6</span><span class="pt">Profitabilität</span></div>
+      <div class="chips">
+        <span class="chip" data-prov="port">Margenkalkulation <small>portieren</small></span>
+        <span class="chip" data-prov="port">Break-even-ACoS <small>portieren</small></span>
+        <span class="chip" data-prov="build">Profit-Tracking <small>neu</small></span>
+      </div>
+    </div>
+    <div class="pillar" style="grid-column: 1 / -1;">
+      <div class="pillar__h"><span class="pn">S7</span><span class="pt">Reviews / Voice of Customer</span></div>
+      <div class="chips">
+        <span class="chip" data-prov="port">Review-Scan · positiv/negativ <small>portieren</small></span>
+        <span class="chip" data-prov="port">Typische Probleme <small>portieren</small></span>
+        <span class="chip" data-prov="build">Handlung → Content <small>neu</small></span>
+        <span class="chip" data-prov="build">Handlung → PPC <small>neu</small></span>
+        <span class="chip" data-prov="build">Handlung → Produktänderung <small>neu</small></span>
       </div>
     </div>
   </div>
 
-  <!-- FOUNDATION -->
+  <div class="secttitle"><span class="num">Ebene 3</span><span class="h">Zwei orthogonale Dimensionen</span><span class="sub">Wie das Tool schneidet — Datenmodell, kein Feature. Jede Säule wertet entlang dieser Achsen aus.</span></div>
+  <div class="dims">
+    <div class="dim">
+      <div class="dk">Entity-Hierarchie</div>
+      <div class="chain">
+        <span class="node first">Account</span><span class="sep">›</span>
+        <span class="node">Brand</span><span class="sep">›</span>
+        <span class="node">Land</span><span class="sep">›</span>
+        <span class="node">Produktgruppe</span><span class="sep">›</span>
+        <span class="node">ASIN</span>
+      </div>
+    </div>
+    <div class="dim">
+      <div class="dk">Zeit</div>
+      <div class="chain">
+        <span class="node first">Periode</span><span class="sep">·</span>
+        <span class="node">Woche</span><span class="sep">·</span>
+        <span class="node">Monat</span><span class="sep">·</span>
+        <span class="node">Zeitraum-Vergleich</span><span class="sep">·</span>
+        <span class="node">Kontext (Prime Day, Saison)</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="secttitle"><span class="num">Unter der Haube</span><span class="h">Engines · Daten · Wissen</span><span class="sub">Die Substanz — überwiegend aus dem Bestand portierbar</span></div>
+
+  <div class="band">
+    <div class="band__label"><span class="tag">Engines</span><span class="name">Rechenlogik</span><span class="role">reine Funktionen</span></div>
+    <div class="band__body"><div class="chips">
+      <span class="chip" data-prov="port">SQP-Engine <small>reporting</small></span>
+      <span class="chip" data-prov="port">N-Gram · Waste/Scale <small>reporting</small></span>
+      <span class="chip" data-prov="port">Action-Plan-Engine <small>reporting</small></span>
+      <span class="chip" data-prov="port">Margin / Gebühren <small>reporting</small></span>
+      <span class="chip" data-prov="port">buildPrompt + Byte-Enforcement <small>temoa-os</small></span>
+      <span class="chip" data-prov="port">Review → Pain Points <small>temoa-os</small></span>
+      <span class="chip" data-prov="port">Kampagnen-Builder + Excel <small>temoa-os</small></span>
+      <span class="chip" data-prov="build">Content-Validation · USP/Reihenfolge <small>neu</small></span>
+      <span class="chip" data-prov="build">Bild-Audit · Vision <small>neu</small></span>
+      <span class="chip" data-prov="build">Score-Engine <small>neu</small></span>
+      <span class="chip" data-prov="build">Trend-/Ausreißer-Erkennung <small>neu</small></span>
+    </div></div>
+  </div>
+
+  <div class="band">
+    <div class="band__label"><span class="tag">Daten</span><span class="name">Ingest</span><span class="role">Import-First, API-Ready</span></div>
+    <div class="band__body"><div class="chips">
+      <span class="chip" data-prov="port">Seller Central · Sales/Traffic/SQP <small>parser</small></span>
+      <span class="chip" data-prov="port">Amazon-Ads-Konsole <small>parser</small></span>
+      <span class="chip" data-prov="port">Helium 10 Cerebro <small>parser</small></span>
+      <span class="chip" data-prov="port">Apify · Review-Scrape <small>portieren</small></span>
+      <span class="chip" data-prov="build">Listing-Scrape · Text + Bild <small>neu</small></span>
+      <span class="chip" data-prov="build">Geführter Berichts-Upload <small>neu</small></span>
+      <span class="chip" data-prov="build">SP-API / Ads-API <small>später</small></span>
+    </div></div>
+  </div>
+
+  <div class="band">
+    <div class="band__label"><span class="tag">Wissen</span><span class="name">Amazon-Brain</span><span class="role">produktunabhängig</span></div>
+    <div class="band__body"><div class="chips">
+      <span class="chip" data-prov="know">SPEC · Hard-Specs &amp; Limits <small>wissen</small></span>
+      <span class="chip" data-prov="know">RECIPE · Prompts / Methoden <small>wissen</small></span>
+      <span class="chip" data-prov="know">REFERENCES · Design-Bibliothek <small>wissen</small></span>
+      <span class="chip" data-prov="know">Findings- &amp; Faktor-Presets <small>sales-room</small></span>
+      <span class="chip" data-prov="know">Blog-Prinzipien &amp; Reasoning <small>korpus</small></span>
+      <span class="chip" data-prov="know">Validation-Regeln <small>wissen</small></span>
+    </div></div>
+  </div>
+
   <div class="foundation">
-    <div class="foundation__h">
-      <span class="tag">Fundament</span>
-      <span class="name">Infrastruktur · trägt alle Schichten</span>
-      <span class="role">Genau das, was zwei Zugänge erst möglich macht</span>
-    </div>
+    <div class="foundation__h"><span class="tag">Fundament</span><span class="name">Infrastruktur · intern zuerst</span><span class="role">EIN kombinierter Bereich — später trennbar</span></div>
     <div class="chips">
-      <span class="chip" data-prov="build">Mandantenfähigkeit · Kunden-Isolation <small>neu</small></span>
-      <span class="chip" data-prov="build">Auth &amp; Rollen · intern / extern / Feature-Gating <small>neu</small></span>
-      <span class="chip" data-prov="build">Abrechnung · Monatsabo, Freischaltung <small>neu</small></span>
-      <span class="chip" data-prov="build">Datenbank · Berichte &amp; Historie <small>neu</small></span>
-      <span class="chip" data-prov="build">Objektspeicher · Bilder &amp; Assets <small>neu</small></span>
-      <span class="chip" data-prov="port">AI- / Scrape-Proxy · Keys serverseitig <small>temoa-os</small></span>
+      <span class="chip" data-prov="build">Mehr-Kunden-Datenmodell · Account→ASIN <small>neu</small></span>
+      <span class="chip" data-prov="build">Rollen · leichtgewichtig <small>neu</small></span>
+      <span class="chip" data-prov="build">Datenbank + Historie <small>neu</small></span>
+      <span class="chip" data-prov="build">Objektspeicher · Bilder/Assets <small>neu</small></span>
+      <span class="chip" data-prov="port">AI- / Scrape-Proxy <small>temoa-os</small></span>
+      <span class="chip" data-prov="build">Kundenzugang &amp; Abrechnung <small>später</small></span>
     </div>
   </div>
 
   <div class="foot">
     <span>project-hail-mary · docs/architecture-map.html</span>
-    <span>v0 · lebendes Dokument</span>
+    <span>v1 · Cockpit für Wachstum &amp; Profitabilität</span>
   </div>
 </div>
 
@@ -416,18 +348,11 @@
     var buttons = Array.prototype.slice.call(document.querySelectorAll('.lg'));
     var allBtn = document.querySelector('.lg-all');
     var active = null;
-
     function apply() {
       var chips = document.querySelectorAll('.chip');
-      if (!active) {
-        body.classList.remove('filtering');
-        chips.forEach(function (c) { c.classList.remove('match'); });
-        return;
-      }
+      if (!active) { body.classList.remove('filtering'); chips.forEach(function (c) { c.classList.remove('match'); }); return; }
       body.classList.add('filtering');
-      chips.forEach(function (c) {
-        c.classList.toggle('match', c.getAttribute('data-prov') === active);
-      });
+      chips.forEach(function (c) { c.classList.toggle('match', c.getAttribute('data-prov') === active); });
     }
     buttons.forEach(function (b) {
       b.addEventListener('click', function () {
@@ -437,10 +362,6 @@
         apply();
       });
     });
-    allBtn.addEventListener('click', function () {
-      active = null;
-      buttons.forEach(function (x) { x.setAttribute('aria-pressed', 'false'); });
-      apply();
-    });
+    allBtn.addEventListener('click', function () { active = null; buttons.forEach(function (x) { x.setAttribute('aria-pressed', 'false'); }); apply(); });
   })();
 </script>

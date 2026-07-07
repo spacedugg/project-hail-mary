@@ -12,12 +12,12 @@
 
 Eine **ganzheitliche Amazon-Plattform als Infrastruktur** für den gesamten Kundenwert — Content bestellen (Bilder + Texte), Analysen fahren, Reporting aus hochgeladenen Berichten erstellen, Margen rechnen, Performance-Historie führen und Handlungsanweisungen aus PPC- und Listing-Analysen ableiten — mit **zwei Zugängen**: intern für betreute Kunden und extern als Self-Service-SaaS auf Monatsbasis.
 
-## 1a. Zwei Zugänge (Go-to-Market)
+## 1a. Go-to-Market: intern zuerst
 
-- **Intern** — die Agentur bearbeitet betreute Kunden mit voller Tiefe (Workbench, alle Module, Sales-Room-Outreach).
-- **Extern** — Kunden ohne Betreuung arbeiten selbst mit dem Tool; Module werden **nach Tarif freigeschaltet** (Monatsabo).
+- **Intern** (jetzt) — die Agentur baut und nutzt das Tool selbst, um Kunden effizient zu betreuen. **EIN kombinierter Bereich** (Admin + Kunde zusammengelegt).
+- **Extern** (später) — Kunden „mitnehmen"/draufschauen lassen; eigene Kunden-Accounts, Feature-Gating und Monetarisierung sind **nachrangig** und im Backlog.
 
-Diese Dualität ist keine Zusatzfunktion, sondern **treibt die Architektur**: Mandantenfähigkeit, Rollen/Feature-Gating und Abrechnung sind Fundament, nicht Nachgedanke. Die Listing-Optimierung (früher als „die Vision" beschrieben) ist nur **einer** der Modul-Bereiche.
+Wichtig: Das Mehr-Kunden-**Datenmodell** (mehrere Marken/Accounts intern verwalten) ist Fundament — aber kundenseitiges Auth/Abrechnung ist es (noch) nicht. Details & vollständiger Modulumfang: **`product-scope.md`**. Die Listing-Optimierung ist nur **einer** von sieben Modul-Bereichen.
 
 ## 2. Die zentrale Umdeutung (das Wichtigste überhaupt)
 
