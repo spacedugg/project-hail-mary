@@ -50,6 +50,8 @@
 | D33 | **R3 revidiert (Nutzer-Einwand übernommen): Qualitätsmessung ist zweistufig.** (a) Offline-Eval mit Golden-ASINs vor Release (billig, schnell); (b) **Content-Performance-Monitoring IM Tool als Produktfeature**: Baseline (SQP/Business-Report) vor Content-Änderung, Vergleich danach — „ob ein Titel besser verkauft" wird im Tool messbar, das ist sein Zweck. | Nutzer-Korrektur: Messbarkeit ist Feature, nicht Lücke. |
 | D34 | **Wissens-Konsolidierung Layer 1 begonnen: `knowledge/`** — kanonische SPEC+RECIPE pro Content-Typ (title, bullets, backend-keywords, description), Eingabe-Matrix (`inputs.md`), KPI-Kontextualisierung (`kpi-context.md`). Quellen-Konflikte explizit entschieden (z. B. seo-os „Keyword vor Marke" verworfen; Bullet-Länge Ziel 200–300 B / Max 500 Z; Bytes via TextEncoder statt String.length). | Nutzer-Auftrag: Implementierungen gegen Blog-Wissen abgleichen statt nebeneinander inventarisieren. |
 
+| D35 | **100%-Durchsicht aller 7 Quellen abgeschlossen** (8 parallele Vollextraktionen → `knowledge/sources/`, je mit Abdeckungs-Nachweis): alle 82 Blogartikel + alle Repo-Dateien. Wichtigste Korrekturen in SALVAGE.md-Kopf eingearbeitet (Code-vs-Kommentar-Widersprüche im SOV-Formelwerk — Code gilt; Gebührentabellen im Wortlaut + Golden-Fixture; Rufus→Alexa for Shopping 05/2026; Orders-Definitions-Inkonsistenz → zentral definieren). | Nutzer-Auftrag „100 % durchschauen für vernünftige Datengrundlage" erfüllt; Wissen versioniert statt nur im Chat-Kontext. |
+
 ## Offene Fragen (zu klären, bevor Phase 1 startet)
 
 1. **Tech-Stack des Neubaus?** Next.js (wie sales-room/reporting) oder Vite+React (wie temoa-os)? Empfehlung folgt — beeinflusst, wie leicht sich Engines portieren lassen.

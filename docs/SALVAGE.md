@@ -1,6 +1,13 @@
 # Salvage-Inventar — Was aus welchem Repo kommt
 
-> Ergebnis der Tiefenanalyse der 6 hochgeladenen Pakete (2026-07-06). Referenz für den Greenfield-Neubau: was portieren, was als Wissen übernehmen, was verwerfen.
+> Ergebnis der Tiefenanalyse der Pakete (2026-07-06). Referenz für den Greenfield-Neubau: was portieren, was als Wissen übernehmen, was verwerfen.
+>
+> **⚠️ Seit 2026-07-07 gilt: `knowledge/sources/` enthält die 100%-Vollextraktionen aller 7 Quellen (jede Datei, alle 82 Blogartikel) und ist die maßgebliche Detailquelle.** Dieses Dokument bleibt als Überblick/Portierungs-Entscheidung gültig. Wichtige Korrekturen aus der Volldurchsicht:
+> - **sales-room:** 275 relevante Dateien (nicht ~618); 44 Findings-Presets (31 kritisch + 13 positiv); Stack ist Next 16/Turso (README veraltet). Neu dokumentiert: komplette Pricing-Engine, Outreach-Doktrin mit Templates, Schwellen (readinessLabel 85/70/50, Auto-Lost nach 5 Tagen, SoV-Ampel <5/5–20/>20 %).
+> - **temoa-audit:** Zwei Kommentar/Code-Widersprüche im sov_calculator — CTR-Top10-Pool real **0,687** (Kommentar ~0,78), Korridor-Low real **×0,4** (Kommentar „60 %"). **Bei Portierung gilt der Code.** Quick-Win-Score exakt: 30 % Rank-Proximity (Sweet-Spot Rang 11–20!), 20 % SV log-norm, je 15 % Title-Density/CPR, je 10 % Relevance/Content-Fit (feste 70er-Defaults).
+> - **Temoa-Tools-Beta:** SOV-oppScore-Gewichte: Gap 0,45 / KS 0,25 / SV 0,15 / cprEase 0,15; Prioritätsschwellen 0,6/0,35; Korridor 20/60/95 %. JSON-Export-Vertrag v1.0 zum Sales Room vollständig dokumentiert. Root-App und temoa-os divergieren real (u. a. zwei verschiedene reviews-APIs) → bestätigt „nur temoa-os als Quelle".
+> - **reporting-main:** Amazon.de-**Gebührentabellen im Wortlaut** extrahiert (24 Referral-Kategorien + Staffeln, Lager €/m³, Entsorgungstabellen) + **Golden-Fixture** (1L-Beispiel, Marge 18,319 %) für Verifikation des portierten Margen-Rechners. Gefundene Inkonsistenz: „Orders" mal Bestellposten, mal Einheiten → im Neubau einmal zentral definieren. Charts sind eigene SVG-Komponenten (recharts ungenutzt) → kopierbar.
+> - **Blog-Korpus:** Rufus wurde **2026-05-13 durch „Alexa for Shopping" ersetzt** (Art. 74) — AEO-Wissen entsprechend aktualisiert. 5 Artikel zeitkritisch markiert (40, 49, 72, 73, 74). Small-and-Light ist eingestellt (Art. 49).
 
 ## Übersicht der 6 Quellen
 
