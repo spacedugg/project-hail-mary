@@ -39,6 +39,10 @@ Jede Analyse aus jeder Säule schneidet entlang dieser Achsen. Einmal richtig im
 
 Reine Dashboard-Tools gibt es viele; der Sprung zu „hier sind die 3 Maßnahmen mit dem größten Hebel" ist der Unterschied.
 
+## v1-Nicht-Ziele (bestätigt 2026-07-07 — bewusst gestrichen, nicht vergessen)
+
+v1 verspricht **nicht**: Market Share/Pricing-Intelligence (keine Datenquelle), Forecasts, Lagerbestand, API-Write-back zu Amazon, Custom Dashboards, externe Kunden-Accounts/Abrechnung, Multi-Marktplatz jenseits DE. Alles bleibt im Zielbild; nichts davon blockiert die erste Scheibe.
+
 ## Datenanschluss (Ingest)
 
 Primär **Seller Central** (Sales-/Performance-Berichte, Suchbegriffsbericht, Business Report) und **Amazon-Ads-Konsole** (Kampagnen/PPC) — daraus werden die wichtigsten KPIs berechnet/hergeleitet/dargestellt. Ergänzend Helium 10 Cerebro, Apify-Review-Scrape, Listing-Scrape (Text + Bild). Prinzip „Import-First, API-Ready": später SP-API / Ads-API-Adapter. Berichts-Upload **geführt, Schritt für Schritt**.
