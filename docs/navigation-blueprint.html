@@ -1,0 +1,297 @@
+<style>
+  :root {
+    --ground: #eceef1; --surface: #ffffff; --surface-2: #f5f7f9;
+    --ink: #18212e; --ink-soft: #52606f; --ink-faint: #8894a2;
+    --hair: #d5dbe2; --hair-strong: #c2cad3;
+    --accent: #1f7a7a; --accent-ink: #135c5c; --accent-soft: rgba(31,122,122,.10);
+    --port: #2f6d8a; --build: #b5642a; --know: #6a58a8;
+    --shadow: 0 1px 2px rgba(24,33,46,.05), 0 4px 16px rgba(24,33,46,.05);
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0f131a; --surface: #171e28; --surface-2: #1e2732;
+      --ink: #e7ecf2; --ink-soft: #9aa6b4; --ink-faint: #6a7788;
+      --hair: #2a333f; --hair-strong: #3a4552;
+      --accent: #3fabab; --accent-ink: #7fd0d0; --accent-soft: rgba(63,171,171,.14);
+      --port: #63a9cc; --build: #dd9350; --know: #a290df;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.28);
+    }
+  }
+  :root[data-theme="light"] {
+    --ground: #eceef1; --surface: #ffffff; --surface-2: #f5f7f9;
+    --ink: #18212e; --ink-soft: #52606f; --ink-faint: #8894a2;
+    --hair: #d5dbe2; --hair-strong: #c2cad3;
+    --accent: #1f7a7a; --accent-ink: #135c5c; --accent-soft: rgba(31,122,122,.10);
+    --port: #2f6d8a; --build: #b5642a; --know: #6a58a8;
+    --shadow: 0 1px 2px rgba(24,33,46,.05), 0 4px 16px rgba(24,33,46,.05);
+  }
+  :root[data-theme="dark"] {
+    --ground: #0f131a; --surface: #171e28; --surface-2: #1e2732;
+    --ink: #e7ecf2; --ink-soft: #9aa6b4; --ink-faint: #6a7788;
+    --hair: #2a333f; --hair-strong: #3a4552;
+    --accent: #3fabab; --accent-ink: #7fd0d0; --accent-soft: rgba(63,171,171,.14);
+    --port: #63a9cc; --build: #dd9350; --know: #a290df;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.28);
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--sans); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: clamp(20px, 4vw, 52px) clamp(16px, 4vw, 40px) 72px; }
+  .eyebrow { font-family: var(--mono); font-size: 11.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent-ink); margin: 0 0 14px; display: flex; align-items: center; gap: 10px; }
+  .eyebrow::before { content: ""; width: 26px; height: 2px; background: var(--accent); display: inline-block; }
+  h1 { font-size: clamp(26px, 4.2vw, 42px); line-height: 1.08; letter-spacing: -.015em; margin: 0 0 16px; text-wrap: balance; font-weight: 680; }
+  .lede { font-size: clamp(15px, 1.7vw, 18px); color: var(--ink-soft); max-width: 68ch; margin: 0; }
+  .lede strong { color: var(--ink); font-weight: 620; }
+
+  .secttitle { display: flex; align-items: baseline; gap: 10px; margin: 42px 2px 14px; flex-wrap: wrap; }
+  .secttitle .num { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-ink); }
+  .secttitle .h { font-size: 19px; font-weight: 660; letter-spacing: -.01em; }
+  .secttitle .sub { font-size: 13px; color: var(--ink-soft); }
+
+  /* two-level nav mock */
+  .navmock { display: grid; grid-template-columns: 240px 1fr; gap: 16px; }
+  @media (max-width: 720px) { .navmock { grid-template-columns: 1fr; } }
+  .side { background: var(--surface); border: 1px solid var(--hair); border-radius: 14px; padding: 14px; box-shadow: var(--shadow); }
+  .side__brand { display: flex; align-items: center; gap: 9px; padding: 4px 8px 14px; border-bottom: 1px solid var(--hair); margin-bottom: 10px; }
+  .side__logo { width: 22px; height: 22px; border-radius: 6px; background: linear-gradient(135deg, var(--accent), var(--accent-ink)); }
+  .side__brand b { font-size: 15px; letter-spacing: -.01em; }
+  .side__ctx { font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); padding: 8px 8px 5px; }
+  .side__item { display: flex; align-items: center; gap: 10px; padding: 8px 9px; border-radius: 8px; font-size: 13.5px; color: var(--ink-soft); }
+  .side__item .ic { width: 15px; height: 15px; border-radius: 4px; border: 1.6px solid currentColor; opacity: .55; flex: none; }
+  .side__item.active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+  .side__item.active .ic { opacity: 1; background: var(--accent-soft); }
+  .side__sep { height: 1px; background: var(--hair); margin: 9px 4px; }
+
+  .navnote { background: var(--surface); border: 1px solid var(--hair); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+  .navnote p { margin: 0 0 12px; font-size: 14px; color: var(--ink-soft); }
+  .navnote p:last-child { margin-bottom: 0; }
+  .navnote b { color: var(--ink); }
+  .pathline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 16px; }
+  .pathline .node { background: var(--surface-2); border: 1px solid var(--hair); border-radius: 6px; padding: 4px 9px; font-size: 12.5px; font-weight: 560; }
+  .pathline .node.first { border-color: var(--accent); color: var(--accent-ink); }
+  .pathline .sep { color: var(--ink-faint); }
+
+  /* area cards */
+  .areas { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  @media (max-width: 720px) { .areas { grid-template-columns: 1fr; } }
+  .area { background: var(--surface); border: 1px solid var(--hair); border-radius: 13px; padding: 15px 16px; box-shadow: var(--shadow); }
+  .area__h { display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
+  .area__h .lvl { font-family: var(--mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; padding: 2px 7px; border-radius: 5px; }
+  .lvl.acc { background: var(--accent-soft); color: var(--accent-ink); }
+  .lvl.prod { background: rgba(181,100,42,.14); color: var(--build); }
+  .area__h .at { font-size: 15px; font-weight: 655; letter-spacing: -.01em; }
+  .area__d { font-size: 12.5px; color: var(--ink-soft); margin: 0 0 10px; }
+  .area ul { margin: 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; }
+  .area li { font-size: 12.5px; color: var(--ink); padding-left: 15px; position: relative; }
+  .area li::before { content: ""; position: absolute; left: 2px; top: 7px; width: 5px; height: 5px; border-radius: 2px; background: var(--accent); opacity: .6; }
+
+  /* product tabs mock */
+  .tabsmock { background: var(--surface); border: 1px solid var(--hair); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); }
+  .tabsmock__head { padding: 14px 16px; border-bottom: 1px solid var(--hair); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .thumb { width: 40px; height: 40px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--hair); flex: none; }
+  .tabsmock__head .pt { font-size: 14.5px; font-weight: 640; }
+  .tabsmock__head .asin { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); }
+  .scorepill { margin-left: auto; font-family: var(--mono); font-size: 12px; font-weight: 600; background: var(--accent-soft); color: var(--accent-ink); border-radius: 999px; padding: 5px 12px; }
+  .tabsrow { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px 12px; background: var(--surface-2); }
+  .tab { font-size: 12.5px; padding: 6px 12px; border-radius: 7px; color: var(--ink-soft); border: 1px solid transparent; }
+  .tab.active { background: var(--surface); border-color: var(--hair); color: var(--ink); font-weight: 600; }
+
+  /* flows */
+  .flow { display: flex; align-items: stretch; overflow-x: auto; padding-bottom: 6px; }
+  .flow__step { flex: 1 0 auto; min-width: 132px; background: var(--surface); border: 1px solid var(--hair); border-radius: 10px; padding: 11px 13px; position: relative; box-shadow: var(--shadow); }
+  .flow__step:not(:last-child) { margin-right: 26px; }
+  .flow__step:not(:last-child)::after { content: "→"; position: absolute; right: -20px; top: 50%; transform: translateY(-50%); color: var(--accent); font-size: 16px; font-weight: 700; }
+  .flow__n { font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
+  .flow__t { font-size: 13px; font-weight: 600; margin-top: 3px; }
+  .flow__d { font-size: 11.5px; color: var(--ink-soft); margin-top: 2px; }
+  .flowlabel { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-ink); margin: 22px 2px 9px; }
+
+  .callout { border-left: 3px solid var(--accent); background: var(--surface); border-radius: 0 10px 10px 0; padding: 13px 15px; margin-top: 14px; box-shadow: var(--shadow); font-size: 13px; color: var(--ink-soft); }
+  .callout b { color: var(--ink); }
+  .foot { margin-top: 42px; padding-top: 18px; border-top: 1px solid var(--hair); font-size: 12px; color: var(--ink-faint); font-family: var(--mono); letter-spacing: .04em; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">Projekt Hail Mary · Navigation &amp; Abläufe</p>
+  <h1>Wie man sich durch das Tool bewegt</h1>
+  <p class="lede">Komplementär zur Schichten-Landkarte: nicht <em>woraus</em> das Tool besteht, sondern <strong>wie ein Nutzer es bedient</strong> — Bereiche, Elemente je Bereich und die operativen Abläufe (Kunde anbinden, Berichte hochladen, Daten &amp; Marge eingeben). Vorschlag, kein Gesetz.</p>
+
+  <div class="secttitle"><span class="num">Teil 1</span><span class="h">Das Rückgrat: zwei Navigations-Ebenen</span><span class="sub">Primäres Objekt ist das Produkt (ASIN) — gruppiert unter Marke unter Kunde</span></div>
+  <div class="navmock">
+    <div class="side">
+      <div class="side__brand"><span class="side__logo"></span><b>Cockpit</b></div>
+      <div class="side__ctx">Kunde · Marke ▾</div>
+      <div class="side__item active"><span class="ic"></span>Cockpit</div>
+      <div class="side__item"><span class="ic"></span>Katalog</div>
+      <div class="side__item"><span class="ic"></span>Sichtbarkeit &amp; Markt</div>
+      <div class="side__item"><span class="ic"></span>Advertising / PPC</div>
+      <div class="side__item"><span class="ic"></span>Berichte &amp; Daten</div>
+      <div class="side__item"><span class="ic"></span>Handlungen</div>
+      <div class="side__sep"></div>
+      <div class="side__ctx">Agentur</div>
+      <div class="side__item"><span class="ic"></span>Portfolio · alle Kunden</div>
+      <div class="side__item"><span class="ic"></span>Einstellungen &amp; Wissen</div>
+    </div>
+    <div class="navnote">
+      <p><b>Ebene A — Agentur (global):</b> Portfolio-Überblick über alle betreuten Marken (Health/Score je Kunde), plus die Wissens- &amp; Gebühren-Einstellungen. Der Einstieg, wenn man morgens „über alles" schauen will.</p>
+      <p><b>Ebene B — Kunden-Workspace:</b> oben Kunde/Marke wählen — danach ist alles auf diese Marke gefiltert. Die Seitenleiste zeigt die Account-Bereiche.</p>
+      <div class="pathline">
+        <span class="node first">Account</span><span class="sep">›</span>
+        <span class="node">Marke</span><span class="sep">›</span>
+        <span class="node">Land</span><span class="sep">›</span>
+        <span class="node">Produktgruppe</span><span class="sep">›</span>
+        <span class="node">ASIN</span>
+      </div>
+      <p>Diese Hierarchie ist zugleich der <b>Filter überall</b> und der Weg in die Tiefe: vom Konto-Überblick bis zum einzelnen ASIN.</p>
+      <p style="margin:0;">Intern zuerst: <b>ein kombinierter Bereich</b>, kein separater Kundenlogin. „Kunde anbinden" heißt heute: Marke anlegen + Daten verbinden (siehe Teil 4).</p>
+    </div>
+  </div>
+
+  <div class="secttitle"><span class="num">Teil 2</span><span class="h">Account-Bereiche</span><span class="sub">Was marken-weit gilt — die Seitenleiste</span></div>
+  <div class="areas">
+    <div class="area">
+      <div class="area__h"><span class="lvl acc">Account</span><span class="at">Cockpit</span></div>
+      <p class="area__d">Der Überblick, der sonst fehlt. Anpassbare Karten (wie remdash).</p>
+      <ul>
+        <li>KPI-Karten: Umsatz, Funnel, CTR/CVR, ACoS/TACoS, Marge</li>
+        <li>Top-Handlungen des AI-Advisors (nach Uplift)</li>
+        <li>Alert-Feed (Buybox, Zeichenlimit, Ausreißer)</li>
+        <li>Performance-Trend über Zeiträume · Kontext (Prime Day/Saison)</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area__h"><span class="lvl acc">Account</span><span class="at">Katalog</span></div>
+      <p class="area__d">Das Rückgrat. Alle Produkte der Marke — Einstieg ins Produkt-Detail.</p>
+      <ul>
+        <li>Produktliste mit Score, Status, Kern-KPIs je ASIN</li>
+        <li>Baum Marke → Produktgruppe → ASIN, filterbar nach Land</li>
+        <li>„Out of Stock"-Sicht, Content-Lücken auf einen Blick</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area__h"><span class="lvl acc">Account</span><span class="at">Sichtbarkeit &amp; Markt</span></div>
+      <p class="area__d">Die eigene Position im Markt (ROPT-Muster).</p>
+      <ul>
+        <li>Market Share nach Kategorie &amp; Land (Multi-Country)</li>
+        <li>Share of Voice · organisch vs. bezahlt</li>
+        <li>Relevante Keywords &amp; Wettbewerber-Lücken</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area__h"><span class="lvl acc">Account</span><span class="at">Advertising / PPC</span></div>
+      <p class="area__d">Kampagnen-Portfolio &amp; Steuerung.</p>
+      <ul>
+        <li>PPC-Analyse (ACoS/TACoS, Wasted Spend, Search-Term-Harvest)</li>
+        <li>Kampagnen aus Templates bauen → API-Upload</li>
+        <li>Gebots-/Negativ-Empfehlungen</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area__h"><span class="lvl acc">Account</span><span class="at">Berichte &amp; Daten</span></div>
+      <p class="area__d">Das Datenwerk — hier kommt alles rein (siehe Teil 4).</p>
+      <ul>
+        <li>Geführter Upload je Berichtstyp, Status je Periode</li>
+        <li>Datenanschluss (später SP-API / Ads-API)</li>
+        <li>Manuelle Kennzahlen: Kosten, Maße, COGS</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area__h"><span class="lvl acc">Account</span><span class="at">Handlungen</span></div>
+      <p class="area__d">Aggregierter Action-Plan über alle Analysen.</p>
+      <ul>
+        <li>Priorisierte Maßnahmen nach €-Hebel (Account &amp; ASIN)</li>
+        <li>Kategorien: Content · PPC · Listing · Produkt</li>
+        <li>Status-Tracking: offen / in Arbeit / erledigt</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="secttitle"><span class="num">Teil 3</span><span class="h">Produkt-Detail</span><span class="sub">Aus dem Katalog in einen ASIN — hier läuft alles Produktbezogene zusammen</span></div>
+  <div class="tabsmock">
+    <div class="tabsmock__head">
+      <span class="thumb"></span>
+      <div><div class="pt">Produktname · Marke</div><div class="asin">ASIN B0XYZ1234 · amazon.de</div></div>
+      <span class="scorepill">Score 72 / 100</span>
+    </div>
+    <div class="tabsrow">
+      <span class="tab active">Übersicht</span>
+      <span class="tab">Content</span>
+      <span class="tab">Listing-Diagnose</span>
+      <span class="tab">Reviews</span>
+      <span class="tab">Marge</span>
+      <span class="tab">Performance</span>
+    </div>
+  </div>
+  <div class="callout"><b>Warum Tabs statt eigener Top-Bereiche:</b> Content, Reviews und Marge sind von Natur aus <b>produktbezogen</b> — sie gehören an den ASIN, nicht in getrennte Menüs mit eigenem Produktfilter. Account-weite Fähigkeiten (Cockpit, Markt, PPC-Portfolio) bleiben oben. So denkt ein Seller: „öffne dieses Produkt, zeig mir alles dazu, lass mich handeln."</div>
+  <div class="areas" style="margin-top:14px;">
+    <div class="area">
+      <div class="area__h"><span class="lvl prod">Produkt</span><span class="at">Content</span></div>
+      <ul>
+        <li>SEO-Texte: Titel · Bullets · Beschreibung · Backend (byte-genau)</li>
+        <li>Danach: Bild-Briefing &amp; Bilder</li>
+        <li>Content-Pflege, Uploads, Flat-File-Erstellung</li>
+        <li>Content-Performance-Monitoring (hilft die Änderung?)</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area__h"><span class="lvl prod">Produkt</span><span class="at">Listing-Diagnose &amp; Score</span></div>
+      <ul>
+        <li>8-Dim-Audit (Titel/Bullets/Bild/A+/Reviews/Preis …)</li>
+        <li>Echter engine-gestützter Score + „Das fällt uns auf"</li>
+        <li>Competitor-Vergleich &amp; Lücken</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area__h"><span class="lvl prod">Produkt</span><span class="at">Reviews</span></div>
+      <ul>
+        <li>Pain Points &amp; Kaufauslöser (mit verbatim Zitaten)</li>
+        <li>Handlungsableitung → Content / PPC / Produktänderung</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area__h"><span class="lvl prod">Produkt</span><span class="at">Marge</span></div>
+      <ul>
+        <li>Rechner: Kosten + Maße + Preis → Marge, Break-even-ACoS</li>
+        <li>Amazon-Gebühren je Land &amp; Paketgröße (aus Wissens-Layer)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="secttitle"><span class="num">Teil 4</span><span class="h">Drei operative Abläufe</span><span class="sub">Kunde anbinden · Berichte hochladen · Daten &amp; Marge eingeben</span></div>
+
+  <div class="flowlabel">A · Kunde / Marke anbinden</div>
+  <div class="flow">
+    <div class="flow__step"><div class="flow__n">Anlegen</div><div class="flow__t">Kunde + Marke</div><div class="flow__d">Name, Logo, Kontakt</div></div>
+    <div class="flow__step"><div class="flow__n">Scope</div><div class="flow__t">Märkte wählen</div><div class="flow__d">DE / UK / FR / IT / ES</div></div>
+    <div class="flow__step"><div class="flow__n">Katalog</div><div class="flow__t">Produkte anlegen</div><div class="flow__d">ASINs manuell oder per Bericht-Import</div></div>
+    <div class="flow__step"><div class="flow__n">Verbinden</div><div class="flow__t">Daten anschließen</div><div class="flow__d">erste Berichte hochladen</div></div>
+    <div class="flow__step"><div class="flow__n">Baseline</div><div class="flow__t">Tool rechnet</div><div class="flow__d">KPIs, Score, erste Handlungen</div></div>
+  </div>
+
+  <div class="flowlabel">B · Berichte hochladen (geführt, Schritt für Schritt)</div>
+  <div class="flow">
+    <div class="flow__step"><div class="flow__n">Typ</div><div class="flow__t">Bericht wählen</div><div class="flow__d">Business · SQP · Ads · Search-Term · Cerebro</div></div>
+    <div class="flow__step"><div class="flow__n">Zuordnen</div><div class="flow__t">Kontext taggen</div><div class="flow__d">Marke · Land · Periode</div></div>
+    <div class="flow__step"><div class="flow__n">Parsen</div><div class="flow__t">Auto-Erkennung</div><div class="flow__d">Format/Zahlen erkannt, validiert</div></div>
+    <div class="flow__step"><div class="flow__n">Prüfen</div><div class="flow__t">Vorschau &amp; Bestätigen</div><div class="flow__d">Fehler/Lücken sichtbar</div></div>
+    <div class="flow__step"><div class="flow__n">Status</div><div class="flow__t">Historie wächst</div><div class="flow__d">was fehlt je Periode</div></div>
+  </div>
+
+  <div class="flowlabel">C · Daten &amp; Marge eingeben</div>
+  <div class="flow">
+    <div class="flow__step"><div class="flow__n">Produkt</div><div class="flow__t">ASIN öffnen</div><div class="flow__d">Tab „Marge"</div></div>
+    <div class="flow__step"><div class="flow__n">Eingabe</div><div class="flow__t">Kosten &amp; Maße</div><div class="flow__d">EK, Gewicht, Paketmaße, Preis</div></div>
+    <div class="flow__step"><div class="flow__n">Gebühren</div><div class="flow__t">Auto aus Wissen</div><div class="flow__d">Amazon-Gebühren je Land/Größe</div></div>
+    <div class="flow__step"><div class="flow__n">Ergebnis</div><div class="flow__t">Marge &amp; Break-even</div><div class="flow__d">fließt ins Cockpit</div></div>
+  </div>
+
+  <div class="callout"><b>Prinzip über alle drei Abläufe:</b> „Import-First, API-Ready" — heute geführter Upload, morgen SP-API/Ads-API, ohne dass sich die Bedienung ändert. Die Margen-Gebührentabellen (je Land &amp; Paketgröße) liegen im <b>Wissens-Layer</b> und sind aus dem Reporting-Repo portierbar — nicht neu recherchieren.</div>
+
+  <div class="foot">
+    <span>project-hail-mary · docs/navigation-blueprint.html</span>
+    <span>v0 · Navigation &amp; Abläufe</span>
+  </div>
+</div>
