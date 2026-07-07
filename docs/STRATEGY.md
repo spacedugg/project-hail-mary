@@ -6,9 +6,18 @@
 
 ---
 
+> 📊 **Visuelle Landkarte:** `docs/architecture-map.html` (als Artifact rendern) — Schichten, Module und Herkunft jedes Bausteins auf einen Blick.
+
 ## 1. Die Vision in einem Satz
 
-Ein zentrales Tool, in dem ein Amazon-Listing **vollständig analysiert** (Text + Bilder, vor dem Hintergrund von Zielgruppe, Pain Points, Kaufauslösern und Kundenbewertungen) und daraus ein **organisch perfektes Listing** (Content, Bilder-Briefing, Backend-Keywords) sowie belastbare **Handlungsempfehlungen** (PPC, Keyword-Strategie, Share of Voice) erzeugt werden — mit einem echten, engine-gestützten Score, der den Outreach über digitale Sales Rooms speist.
+Eine **ganzheitliche Amazon-Plattform als Infrastruktur** für den gesamten Kundenwert — Content bestellen (Bilder + Texte), Analysen fahren, Reporting aus hochgeladenen Berichten erstellen, Margen rechnen, Performance-Historie führen und Handlungsanweisungen aus PPC- und Listing-Analysen ableiten — mit **zwei Zugängen**: intern für betreute Kunden und extern als Self-Service-SaaS auf Monatsbasis.
+
+## 1a. Zwei Zugänge (Go-to-Market)
+
+- **Intern** — die Agentur bearbeitet betreute Kunden mit voller Tiefe (Workbench, alle Module, Sales-Room-Outreach).
+- **Extern** — Kunden ohne Betreuung arbeiten selbst mit dem Tool; Module werden **nach Tarif freigeschaltet** (Monatsabo).
+
+Diese Dualität ist keine Zusatzfunktion, sondern **treibt die Architektur**: Mandantenfähigkeit, Rollen/Feature-Gating und Abrechnung sind Fundament, nicht Nachgedanke. Die Listing-Optimierung (früher als „die Vision" beschrieben) ist nur **einer** der Modul-Bereiche.
 
 ## 2. Die zentrale Umdeutung (das Wichtigste überhaupt)
 

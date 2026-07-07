@@ -21,6 +21,7 @@
 | D11 | **Content-Generierung als 5-Baustein-Wissenssystem** (SPEC / RECIPE / REFERENCES / GENERATION / VALIDATION). Bestandstools haben nur GENERATION → Qualitätslücke = fehlende SPEC + VALIDATION. Siehe `content-knowledge-system.md`. | „LLM schlägt vor, Code erzwingt" auch für Bilder (Cross-Asset-USP-Regel, Reihenfolge). |
 | D12 | **Speicher-Split:** SPEC + RECIPE ins Repo (versioniert); REFERENCE-Bilder in Objektspeicher + DB (Metadaten, UI-pflegbar). | Binärdateien gehören nicht ins Git; nicht-technisches Team pflegt Referenzen via UI. Muster existiert schon (sales-room `referenceImages`). |
 | D13 | **Erste Layer-1-Arbeit: Blaupause am Hauptbild** — bestehenden Prompt + Referenzen dekomponieren, bevor App-Code entsteht. | Stärkster Conversion-Hebel, Rohmaterial vorhanden; wird Schablone für alle Content-Typen. |
+| D14 | **Wahre Mission = ganzheitliche Plattform mit zwei Zugängen (intern + externes SaaS-Abo), nicht Listing-Optimierung mit Extras.** Voller Modulumfang: Content, Analyse, Reporting, Marge, Performance-Historie, Handlung, PPC. Listing-Optimierung ist EIN Bereich. | Nutzer-Präzisierung. Mandantenfähigkeit/Rollen/Abrechnung werden dadurch Fundament, nicht Nachgedanke. Visuell: `architecture-map.html`. |
 
 ## Offene Fragen (zu klären, bevor Phase 1 startet)
 
