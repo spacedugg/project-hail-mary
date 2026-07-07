@@ -21,6 +21,21 @@ Für jeden Content-Typ (Hauptbild, Lifestyle-Bild, Infografik, Titel, Bullet, A+
 
 **Die Bestandstools haben nur Baustein 4.** Deshalb sind sie flach. Baustein 1 + 5 sind der Qualitätssprung.
 
+## Konkrete VALIDATION-Regeln aus temoa-audit (bereits hart erarbeitet)
+
+Das bestehende Audit-Tool hat zwei Bild-Brief-Regeln, die genau die „fehlerhaften Briefings"-Klage adressieren. Sie gehören in unsere VALIDATION-Schicht (deterministisch, nicht als Prosa-Bitte an ein Bildmodell):
+
+1. **Reference-Fidelity-Lock** — Material-/Form-/Farb-Claims dürfen das Produkt NICHT über die Wahrheit hinaus idealisieren. Bildmodelle priorisieren Brief-Text über Referenzbilder → bei absoluten Claims („ALUMINIUM STATT KUNSTSTOFF", obwohl Hybrid Alu+ABS) generieren sie eine geschönte Variante → Käufer sieht was anderes als geliefert → Reklamationen + 1-Sterne. Regel: Hybrid-Materialien ehrlich beidseitig nennen; keine ausschließenden „STATT X"-Claims wenn Produkt X enthält; Claims 1:1 gegen die echte Produktwahrheit (Original-Bullets/Specs) prüfen.
+2. **Spelling-Risk-Constraints** — Bildgen-Modelle verkacken lange deutsche Komposita („VERARBEITET"→„VERARBEEITET"). Regel: pro Wort max. 12 Zeichen; pro Headline max. 1 Wort > 8 Zeichen; im Zweifel kürzen/zerlegen/englisch. Substitut-Tabelle pflegen (z. B. „BEWEGUNGSMELDER" → „PIR-SENSOR").
+
+Beide sind **prüfbare SPEC + VALIDATION**, kein Prompt-Wunsch — genau der Hebel, der die Qualität hebt.
+
+## Wiederverwendbare Output-Kontrakte (aus temoa-audit, siehe SALVAGE.md §7)
+
+- **Bild-Brief-Struktur** (copy-paste-ready): Produkt-Wahrheit · Top-3-Audit-Findings→Bild-Konsequenz · Headlines verbatim aus Bullets · Differentiation-Hooks (ohne Wettbewerber-Marken) · Pain-Points→Szenen · Borrowed Phrases · Sprache-vermeiden · ABSOLUTE FORBIDDEN (Hauptbild pure white, keine Badges/Marken/Marketing-Text).
+- **review-insights-Schema** (Pain Points + Kaufauslöser mit frequency_pct + verbatim quotes) als Output-Kontrakt des Review-Moduls.
+- **8-Dim-Audit** als Grundraster der Listing-Diagnose (mit echtem Score-Engine statt Prosa).
+
 ## Speicher-Aufteilung (Entscheidung)
 
 | Artefakt | Ort | Grund |
