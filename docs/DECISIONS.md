@@ -34,6 +34,17 @@
 | D24 | **Inspirationsquellen (remdash, ROPT BI) validieren, werden NICHT nachgebaut.** Mitnahme: Land- + Produktgruppen-Slicing zentral, YoY-Vergleich, Organic-vs-Ad-Split, konfigurierbare KPI-Karten. | Eigene Logik/Struktur; Screenshots nur als Input. |
 | D21b | **temoa-audit analysiert** (SALVAGE §7). Es IST das aktuelle Tool: Skill-orchestriert (nexscope-Submodul) + Flask-Onepager. **Struktur portieren** (review-insights-Schema, 8-Dim-Audit, Profit-Hebel-Logik, Onepager-Narrativ, Bild-Brief + Reference-Fidelity-Lock + Spelling-Risk-Regeln), **Code/Pipeline nicht**. | Bestätigt die These: gute Spezifikation, schwache Umsetzung (LLM-Pipeline über gescrapte Daten, kein Validierungs-Gate). |
 
+### 2026-07-07 (Forts.) — Build-Entscheidungen
+
+| # | Entscheidung | Begründung |
+|---|---|---|
+| D25 | **Cloud + echte Datenbank, kein Local-/HTML-Storage.** Daten jederzeit von jedem Gerät/Land/Nutzer erreichbar; durch Kunden navigierbar. | Nutzer-Vorgabe. Multi-Client-Agentur-Nutzung. |
+| D26 | **Auth v1: Kunden-Zugang per Passwort = Markenname (lowercase) als Default.** Bedingungen: gehasht, änderbar, KEIN echter Schutz. Vor externen Accounts härten. | Nutzer-Vorschlag; als pragmatischer Startwert ok für interne/Peek-Phase (D15). |
+| D27 | **API-Ready mit bidirektionalem Write-back zu Amazon** (SP-API/Ads-API später). Content/Kampagnen aus dem Tool zurück nach Seller Central pushbar. | Nutzer-Vorgabe. Datenmodell: Content-Zustände Entwurf→freigegeben→synchronisiert. |
+| D28 | **LLM anbieter-agnostisch: Provider-/Modell-Registry, konfigurierbar, „bestes aktuelles Modell" wählbar.** Kein hartcodiertes Modell. Mehrere Anbieter anschließbar. | Nutzer-Vorgabe. Modellwahl ändert sich schnell. |
+| D29 | **Content-Erzeugung im Tool für Text UND Bilder** (Haupt, Listing, A+, Premium-A+). | Nutzer-Vorgabe. |
+| D30 | **PPC-/Performance-KPIs kommen alle aus dem Reporting-Repo** (weekly.ts, ads/parser, business/parser, sqp/{metrics,tier1,tier2,scenario}, margin/calc). Keine neue Rechenlogik — nur Darstellung. KPI-Kachel-Zuordnung siehe `information-architecture.md`. | Bestätigt: Substanz vorhanden, portierbar. |
+
 ## Offene Fragen (zu klären, bevor Phase 1 startet)
 
 1. **Tech-Stack des Neubaus?** Next.js (wie sales-room/reporting) oder Vite+React (wie temoa-os)? Empfehlung folgt — beeinflusst, wie leicht sich Engines portieren lassen.

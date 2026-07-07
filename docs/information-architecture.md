@@ -26,6 +26,16 @@ Begründung: Content, Reviews und Marge sind von Natur aus produktbezogen → ge
 
 Prinzip über alle: **Import-First, API-Ready** — heute Upload, später SP-API/Ads-API, ohne Bedienungsänderung. Gebührentabellen aus dem Reporting-Repo portierbar (nicht neu recherchieren).
 
+## KPI-Kachel-Zuordnung (welche Kennzahl wohin)
+
+Alle Kennzahlen kommen aus dem Reporting-Repo (D30). Zuordnung zu Bereichen:
+
+- **Cockpit (Account-Überblick):** Ad-Spend, AOV, org-CR, PPC-CR, Gesamt-CR, Bestellungen, bestellte Einheiten, Retouren + Quote, Buybox-Anteil. → `business/parser.ts`, `reporting/weekly.ts`.
+- **Advertising / PPC:** PPC-CR, PPC-Anteil, PPC-AOV, ACoS, TACoS, Break-even-ACoS (als Schwellenlinie), Kampagnen, Search-Term-Harvest, Wasted Spend. → `ads/parser.ts`, `reporting/weekly.ts`, `searchterm/ngram.ts`, `margin/calc.ts`.
+- **Sichtbarkeit & Markt (alles mit Markt-Vergleich):** CR vs. Markt, CTR vs. Markt, Delta, geschätzter Marken-Mehrumsatz (Potenzial zum Marktdurchschnitt), **Opportunity-Matrix** (Bubbles Sichtbarkeit × Suchvolumen), Funnel-Stufen (Impr→Klick→Warenkorb→Kauf) vs. Markt, Impression-Share. → `sqp/metrics.ts`, `sqp/tier1.ts`, `sqp/tier2.ts`, `sqp/scenario.ts`.
+
+Break-even-ACoS wird pro Produkt in der Marge-Kachel gerechnet, aber als Schwellenlinie auch in Advertising/Cockpit gezeigt.
+
 ## Inspirationsquellen (NICHT nachbauen — eigene Logik)
 
 - **remdash:** anpassbares Card-Dashboard (Content Accuracy, Retail Readiness Score, SEO Benchmark, Traffic & Conversion) mit „+"-Widget-Muster → validiert unser Cockpit mit konfigurierbaren KPI-Karten.
