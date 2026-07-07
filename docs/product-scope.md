@@ -13,15 +13,16 @@ Ein **Cockpit für Wachstum & Profitabilität auf Amazon**, das den **ganzheitli
 
 ## Struktur in drei Ebenen
 
-### A) Sieben Modul-Säulen (was das Tool kann)
+### A) Sechs Modul-Säulen (was das Tool kann)
 
-1. **Überblick & Performance** — KPI-Cockpit (Conversion-Funnel, CTR, CVR, Impressions, Impression-Share, ACoS, TACoS), Custom Dashboards, Performance-Historie über Zeiträume, Forecasts, Lagerbestandsdaten.
+> **Wirtschaftlichkeit ist KEINE eigene Säule** (Entscheidung D18): Marge, Break-even-ACoS, Profit-Tracking und ACoS/TACoS sind Kennzahlen *innerhalb* des Performance-Dashboards — ACoS ist nur eine von vielen KPIs.
+
+1. **Überblick, Performance & Wirtschaftlichkeit** — KPI-Cockpit (Conversion-Funnel, CTR, CVR, Impressions, Impression-Share, ACoS, TACoS), **Margenkalkulation, Break-even-ACoS, Profit-Tracking**, Custom Dashboards, Performance-Historie über Zeiträume, Forecasts, Lagerbestandsdaten.
 2. **Sichtbarkeit & Wettbewerb** — Share of Voice, organische vs. bezahlte Sichtbarkeit, relevante Keywords, Wettbewerbsposition, Market Share, Pricing-Analyse.
 3. **Content-AI** — SEO-Texte (Titel/Bullets/Beschreibung/Backend), Bildererstellung (Haupt/Listing/A+), Content-Performance-Monitoring (hilft die Titeländerung?), Content-Pflege & Uploads, **Flat-File-Erstellung** für Produktanlage.
 4. **Listing-Diagnose & Score** — Listing-Audit (Text + Bild), echter engine-gestützter Score, Competitor-Vergleich.
 5. **Advertising / PPC** — PPC-Analyse, Kampagnen aus **Templates → API-Upload**, Search-Term-Harvest, Wasted-Spend, Gebots-/Negativ-Empfehlungen.
-6. **Profitabilität** — Margenkalkulation, Break-even-ACoS, Profit-Tracking.
-7. **Reviews / Voice of Customer** — Review-Scan (positiv/negativ, typische Probleme) → Handlungsableitung via **Content-Änderung (Bilder/Texte), PPC-Anpassung oder grundlegende Produktänderung**.
+6. **Reviews / Voice of Customer** — Review-Scan (positiv/negativ, typische Probleme) → Handlungsableitung via **Content-Änderung (Bilder/Texte), PPC-Anpassung oder grundlegende Produktänderung**.
 
 ### B) Zwei orthogonale Dimensionen (wie das Tool schneidet) — Datenmodell, kein Feature
 
