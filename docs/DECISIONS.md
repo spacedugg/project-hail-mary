@@ -72,3 +72,11 @@
 - A+-Erstellung als eigenes Modul (Nutzer erwähnt).
 - Operations-Domäne (Wissen aus marketplaceadpros gesichert): Reorder-Planung (inkl. AWD-Doppelzähl-Falle), FBA-Inventory-Risk (Effective-DOS), Experiment-State-Machine. Andere Domäne als Listing — später ggf. eigener Bereich.
 - Dünne Skill-Layer über den Tool-Modulen als spätere Bedien-/Routing-Option (Frontmatter-Trigger-Engineering beachten).
+
+### 2026-07-07 (Forts. 2) — Baustart
+
+| # | Entscheidung | Begründung |
+|---|---|---|
+| D36 | **Supabase bestätigt, Anbindung deferred.** Schema ab Tag 1 Postgres/Drizzle; Dev läuft auf eingebettetem PGlite. Wechsel = nur `DATABASE_URL` setzen. | Nutzer: „können wir später anbinden". Kein Code-Umbau nötig. |
+| D37 | **Auth komplett deferred** (kein Blocker; intern zuerst). Review-Empfehlung R5 bleibt für den Zeitpunkt der Kunden-Freischaltung notiert. | Nutzer: „nichts, an dem wir uns jetzt aufhängen". |
+| D38 | **Grundgerüst gebaut & verifiziert:** Next.js 16 (Repo-Root), Drizzle-Schema (Hierarchie + Content-Zustände + Review-Insights + Report-Uploads), deterministisches Validation-Gate aus den kanonischen Specs (19 Tests grün, inkl. seo-os-Regressionen), LLM-Registry mit Recipe-Pinning + Mock-Provider. Build grün. | Erster Produktcode; Fundament der Text-Content-Scheibe. |
