@@ -11,6 +11,8 @@
 | Dedup | Kein Wort, das bereits sichtbar in Titel/Bullets/Beschreibung steht | Amazon ignoriert Duplikate → reine Platzverschwendung |
 | Verboten | Fremde Markennamen, ASINs, irreführende Begriffe, Dopplungen Singular+Plural (eins reicht) | Amazon-Policy |
 
+**Ausschöpfung (07/2026):** Ziel ≥220 von 249 Bytes — Budget nutzen, Warnung darunter.
+
 ## RECIPE — Befüllungs-Priorität (nicht raten, sondern aus Analysen ziehen)
 
 1. **`invisible_keywords` aus dem SOV-Audit** — hohe Suchvolumen, für die wir NICHT ranken (temoa-audit: „die wollen wir am dringendsten aufnehmen").

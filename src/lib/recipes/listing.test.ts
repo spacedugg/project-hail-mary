@@ -37,7 +37,10 @@ describe("listing recipes (mock)", () => {
       const res = await generateSection(section, inputs);
       expect(res.provider).toBe("mock");
       if (section === "bullets") expect(res.payload.items).toHaveLength(5);
+      else if (section === "qa") expect(res.payload.pairs).toHaveLength(5);
       else expect((res.payload.text ?? "").length).toBeGreaterThan(0);
+      // Begründungs-Pflicht: jede Sektion liefert eine Rationale
+      expect((res.payload.rationale ?? []).length).toBeGreaterThan(0);
     }
   });
 

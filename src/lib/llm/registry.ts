@@ -88,6 +88,8 @@ export const RECIPE_MODELS: Record<string, { provider: string; model: string }> 
   "listing.bullets": { provider: "anthropic", model: "claude-sonnet-5" },
   "listing.description": { provider: "anthropic", model: "claude-sonnet-5" },
   "listing.backend": { provider: "anthropic", model: "claude-sonnet-5" },
+  "listing.highlights": { provider: "anthropic", model: "claude-sonnet-5" },
+  "listing.qa": { provider: "anthropic", model: "claude-sonnet-5" },
   "reviews.pain-points": { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
   "keywords.filter": { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
 };

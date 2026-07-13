@@ -117,12 +117,12 @@ export async function generateContent(formData: FormData) {
 
   const result = await generateSection(section, inputs);
 
-  const dbType = section === "backend" ? "backend_keywords" : section;
+  const dbType = section === "backend" ? "backend_keywords" : section === "highlights" ? "item_highlights" : section;
   const prev = versions.filter((v) => v.type === dbType);
   await db.insert(schema.contentVersions).values({
     id: id(),
     productId,
-    type: dbType as "title" | "bullets" | "description" | "backend_keywords",
+    type: dbType as "title" | "bullets" | "item_highlights" | "description" | "backend_keywords" | "qa",
     version: (prev[0]?.version ?? 0) + 1,
     payload: result.payload,
     status: "draft",

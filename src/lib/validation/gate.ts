@@ -93,9 +93,9 @@ export function validateBullets(bullets: string[], ctx: Ctx = {}): ValidationIss
     const bytes = byteLength(t);
     if (charLength(t) > RULES.bullets.hardMaxChars)
       issues.push(issue("bullets.hard-max", "error", `Bullet ${n} überschreitet ${RULES.bullets.hardMaxChars} Zeichen.`));
-    else if (bytes < RULES.bullets.targetMinBytes || bytes > RULES.bullets.targetMaxBytes)
+    else if (bytes < RULES.bullets.utilizationMinBytes)
       issues.push(
-        issue("bullets.target-range", "warning", `Bullet ${n}: ${bytes} B außerhalb Ziel ${RULES.bullets.targetMinBytes}–${RULES.bullets.targetMaxBytes} B.`),
+        issue("bullets.budget", "warning", `Bullet ${n}: nur ${bytes} B — Budget nicht ausgenutzt (Ziel ≥${RULES.bullets.utilizationMinBytes} B, max. ${RULES.bullets.hardMaxChars} Zeichen).`),
       );
 
     // Headline-Pattern: VERSALIEN (3–5 Wörter) + Doppelpunkt
@@ -145,6 +145,8 @@ export function validateBackendKeywords(
   const bytes = byteLength(t);
   if (bytes > RULES.backendKeywords.maxBytes)
     issues.push(issue("backend.max-bytes", "error", `${bytes} B > ${RULES.backendKeywords.maxBytes} B (UTF-8).`));
+  else if (bytes < RULES.backendKeywords.utilizationMinBytes)
+    issues.push(issue("backend.budget", "warning", `Nur ${bytes} von ${RULES.backendKeywords.maxBytes} B genutzt — Budget ausschöpfen.`));
   if (t.includes(","))
     issues.push(issue("backend.commas", "error", "Kommas sind nicht erlaubt — Einzelwörter mit Leerzeichen."));
 
@@ -183,6 +185,8 @@ export function validateDescription(description: string, bullets: string[] = [],
   const bytes = byteLength(t);
   if (bytes > RULES.description.maxBytes)
     issues.push(issue("description.max-bytes", "error", `${bytes} B > ${RULES.description.maxBytes} B.`));
+  else if (bytes < RULES.description.utilizationMinBytes)
+    issues.push(issue("description.budget", "warning", `Nur ${bytes} von ${RULES.description.maxBytes} B genutzt — Budget ausschöpfen.`));
 
   // Kein 1:1-Bullet-Duplikat (Substring-Heuristik über den Bullet-Body)
   for (const [i, b] of bullets.entries()) {
@@ -194,6 +198,47 @@ export function validateDescription(description: string, bullets: string[] = [],
   issues.push(...findBanned(t, RULES.bannedPhrases, "description"));
   issues.push(...findBanned(t, RULES.bannedClaims, "description"));
   issues.push(...findCompetitorBrands(t, ctx, "description"));
+  return issues;
+}
+
+// ── Item Highlights (neue Amazon-Sektion, 125 Zeichen — Nutzer 07/2026) ─────
+
+export function validateItemHighlights(text: string, ctx: Ctx = {}): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const t = text.trim();
+  if (!t) return [issue("highlights.empty", "error", "Item Highlights fehlen.")];
+  const chars = charLength(t);
+  if (chars > RULES.itemHighlights.maxChars)
+    issues.push(issue("highlights.max-length", "error", `${chars} Zeichen > ${RULES.itemHighlights.maxChars}.`));
+  else if (chars < RULES.itemHighlights.targetMinChars)
+    issues.push(issue("highlights.budget", "warning", `Nur ${chars} von ${RULES.itemHighlights.maxChars} Zeichen — Ziel ${RULES.itemHighlights.targetMinChars}–${RULES.itemHighlights.maxChars}.`));
+  issues.push(...findBanned(t, RULES.bannedPhrases, "highlights"));
+  issues.push(...findBanned(t, RULES.bannedClaims, "highlights"));
+  issues.push(...findCompetitorBrands(t, ctx, "highlights"));
+  return issues;
+}
+
+// ── Q&A (Datengrundlage für Rufus/Alexa-for-Shopping) ───────────────────────
+
+export function validateQa(pairs: Array<{ q: string; a: string }>, ctx: Ctx = {}): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  if (pairs.length !== RULES.qa.pairs)
+    issues.push(issue("qa.count", "error", `${pairs.length} Q&A-Paare statt ${RULES.qa.pairs}.`));
+  pairs.forEach((p, i) => {
+    const n = i + 1;
+    if (!p.q.trim() || !p.a.trim()) {
+      issues.push(issue("qa.empty", "error", `Q&A ${n}: Frage oder Antwort leer.`));
+      return;
+    }
+    if (charLength(p.q) > RULES.qa.questionMaxChars)
+      issues.push(issue("qa.question-max", "error", `Frage ${n}: ${charLength(p.q)} Zeichen > ${RULES.qa.questionMaxChars}.`));
+    if (charLength(p.a) > RULES.qa.answerMaxChars)
+      issues.push(issue("qa.answer-max", "error", `Antwort ${n}: ${charLength(p.a)} Zeichen > ${RULES.qa.answerMaxChars}.`));
+    else if (charLength(p.a) < RULES.qa.answerUtilizationMinChars)
+      issues.push(issue("qa.budget", "warning", `Antwort ${n}: nur ${charLength(p.a)} Zeichen — Budget ausschöpfen (Ziel ≥${RULES.qa.answerUtilizationMinChars}).`));
+    issues.push(...findBanned(`${p.q} ${p.a}`, RULES.bannedClaims, "qa"));
+    issues.push(...findCompetitorBrands(`${p.q} ${p.a}`, ctx, "qa"));
+  });
   return issues;
 }
 

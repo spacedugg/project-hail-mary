@@ -163,6 +163,41 @@ export default async function AnalysePage({ params }: { params: Promise<{ id: st
         </ol>
       </section>
 
+      {/* Begründungen — für den Kunden: warum die Texte so formuliert sind */}
+      {(() => {
+        const rationaleSections = [
+          { t: "title", label: "Titel" },
+          { t: "bullets", label: "Bullet Points" },
+          { t: "item_highlights", label: "Item Highlights" },
+          { t: "description", label: "Beschreibung" },
+          { t: "backend_keywords", label: "Backend-Keywords" },
+          { t: "qa", label: "Q&A" },
+        ]
+          .map(({ t, label }) => ({ label, rationale: (latest(t)?.rationale as Array<{ part: string; source: string; verified: boolean }> | undefined) ?? [] }))
+          .filter((s) => s.rationale.length > 0);
+        if (rationaleSections.length === 0) return null;
+        return (
+          <section className="mt-6">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Warum diese Texte so formuliert sind</h2>
+            <p className="mt-1 text-xs text-neutral-500">Jeder Bestandteil mit seiner Herleitung — ✓ = im Text belegt, ⚠︎ = Behauptung nicht belegt.</p>
+            <div className="mt-2 space-y-3">
+              {rationaleSections.map((s) => (
+                <div key={s.label} className="rounded border border-neutral-200 p-3 dark:border-neutral-800">
+                  <h3 className="text-sm font-medium">{s.label}</h3>
+                  <ul className="mt-1 space-y-0.5">
+                    {s.rationale.map((r, i) => (
+                      <li key={i} className="text-xs text-neutral-600 dark:text-neutral-400">
+                        {r.verified ? "✓" : "⚠︎"} <b>„{r.part}"</b> ← {r.source}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
+
       <section className="mt-8 print:hidden">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Bild-/A+-Brief (copy-paste für Bildgen-Tool)</h2>
         <p className="mt-1 text-xs text-neutral-500">Deterministisch aus der Analyse assembliert — inkl. Reference-Fidelity-Lock und spelling-safe Headlines.</p>

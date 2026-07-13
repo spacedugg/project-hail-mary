@@ -10,8 +10,10 @@ export const dynamic = "force-dynamic";
 const SECTIONS = [
   { key: "title", label: "Titel" },
   { key: "bullets", label: "Bullet Points" },
+  { key: "highlights", label: "Item Highlights" },
   { key: "backend", label: "Backend-Keywords" },
   { key: "description", label: "Beschreibung" },
+  { key: "qa", label: "Q&A" },
 ] as const;
 
 function IssueList({ issues }: { issues: ValidationIssue[] }) {
@@ -157,9 +159,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         </p>
         <div className="mt-3 space-y-4">
           {SECTIONS.map(({ key, label }) => {
-            const dbType = key === "backend" ? "backend_keywords" : key;
+            const dbType = key === "backend" ? "backend_keywords" : key === "highlights" ? "item_highlights" : key;
             const v = latestOf(dbType);
-            const payload = v?.payload as { text?: string; items?: string[]; rationale?: Array<{ part: string; source: string; verified: boolean }> } | undefined;
+            const payload = v?.payload as { text?: string; items?: string[]; pairs?: Array<{ q: string; a: string }>; rationale?: Array<{ part: string; source: string; verified: boolean }> } | undefined;
             return (
               <div key={key} className="rounded border border-neutral-200 p-3 dark:border-neutral-800">
                 <div className="flex items-center justify-between">
@@ -179,15 +181,23 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                   <p className="mt-2 whitespace-pre-wrap rounded bg-neutral-50 p-2 text-sm dark:bg-neutral-900">
                     {payload.text}
                     {key === "title" && <span className="ml-2 font-mono text-[10px] text-neutral-400">{payload.text.length}/75</span>}
+                    {key === "highlights" && <span className="ml-2 font-mono text-[10px] text-neutral-400">{payload.text.length}/125</span>}
                   </p>
                 )}
-                {key === "title" && payload?.rationale && payload.rationale.length > 0 && (
+                {payload?.pairs && (
+                  <ul className="mt-2 space-y-1.5 rounded bg-neutral-50 p-2 text-sm dark:bg-neutral-900">
+                    {payload.pairs.map((p, i) => (
+                      <li key={i}><b>F: {p.q}</b><br />A: {p.a}</li>
+                    ))}
+                  </ul>
+                )}
+                {payload?.rationale && payload.rationale.length > 0 && (
                   <details className="mt-1">
-                    <summary className="cursor-pointer text-xs text-neutral-500 hover:text-neutral-700">Warum dieser Titel? — Komponenten-Begründung</summary>
+                    <summary className="cursor-pointer text-xs text-neutral-500 hover:text-neutral-700">Begründung — warum so formuliert?</summary>
                     <ul className="mt-1 space-y-0.5">
                       {payload.rationale.map((r, i) => (
                         <li key={i} className="text-xs text-neutral-600 dark:text-neutral-400">
-                          {r.verified ? "✓" : "⚠︎"} <b>„{r.part}"</b> ← {r.source}{!r.verified && " (nicht im Titel gefunden — Behauptung unbelegt)"}
+                          {r.verified ? "✓" : "⚠︎"} <b>„{r.part}"</b> ← {r.source}{!r.verified && " (im Text nicht belegt)"}
                         </li>
                       ))}
                     </ul>

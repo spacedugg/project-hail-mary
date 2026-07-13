@@ -117,8 +117,10 @@ export const keywords = pgTable("keywords", {
 export const contentTypeEnum = pgEnum("content_type", [
   "title",
   "bullets",
+  "item_highlights", // neue Amazon-Sektion, 125 Zeichen (Nutzer 07/2026)
   "description",
   "backend_keywords",
+  "qa", // Q&A-Paare — Datengrundlage für Rufus/Alexa-for-Shopping
   // spätere Phase: main_image_brief, listing_image_brief, aplus_plan
 ]);
 

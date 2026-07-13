@@ -12,19 +12,34 @@ export const RULES = {
     targetMinChars: 70,
     maxKeywordOccurrence: 1,
   },
+  /**
+   * Ausschöpfungs-Prinzip (Nutzer 07/2026): jedes Budget bestmöglich nutzen —
+   * maximale Datengrundlage für den Algorithmus. Unterausnutzung = WARNUNG (kein Muss).
+   */
   bullets: {
     count: 5,
-    targetMinBytes: 200,
-    targetMaxBytes: 300,
+    utilizationMinBytes: 300, // darunter: "Budget nicht ausgenutzt"
     hardMaxChars: 500,
-    maxSentences: 2,
+    maxSentences: 3, // bei ausgeschöpften Bullets realistisch (vorher 2)
     maxEmoji: 1,
+  },
+  itemHighlights: {
+    maxChars: 125, // neue Amazon-Sektion (Nutzer 07/2026)
+    targetMinChars: 115,
   },
   backendKeywords: {
     maxBytes: 249,
+    utilizationMinBytes: 220,
   },
   description: {
     maxBytes: 1999,
+    utilizationMinBytes: 1700,
+  },
+  qa: {
+    pairs: 5,
+    questionMaxChars: 110,
+    answerMaxChars: 230,
+    answerUtilizationMinChars: 180,
   },
   /** Werbe-/Verbotsphrasen (Blog 06/07, sales-room-Presets) — lowercase-Vergleich. */
   bannedPhrases: [

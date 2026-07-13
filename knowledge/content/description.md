@@ -10,6 +10,8 @@
 | Kein Bullet-Duplikat | Beschreibung wiederholt Bullets nicht 1:1 | analog Blog-07-Regel für A+ |
 | Verboten | Preise/Versand, Wettbewerber-Marken, unbelegte Claims, Kontakt-/URL-Angaben | Amazon-Policy |
 
+**Ausschöpfung (07/2026):** Ziel ≥1.700 von 1.999 Bytes — maximale Datengrundlage, kein Füllwort-Padding.
+
 ## RECIPE
 
 - **Auch mit A+ pflegen:** A+ ersetzt die Beschreibung visuell auf der Produktseite, aber die Beschreibung bleibt relevant (mobile Ansichten, Indexierung). A+-Text wird NICHT vom Suchalgorithmus indexiert (Blog 07) — Keywords gehören hierher, nicht ins A+.

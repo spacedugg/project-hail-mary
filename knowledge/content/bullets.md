@@ -7,8 +7,8 @@
 | Regel | Wert | Quelle / Konfliktauflösung |
 |---|---|---|
 | Anzahl | **genau 5** | alle Quellen einig |
-| Länge pro Bullet | **Ziel 200–300 Bytes**, hartes Max **500 Zeichen** | temoa-os (250–300 B, Scanbarkeit) vs. seo-os (≤500) → Ziel eng, Limit weit. Bytes via `TextEncoder` (Umlaute = 2 B) |
-| Aufbau | **HEADLINE IN VERSALIEN (3–5 Wörter) + Doppelpunkt + max. 2 Sätze** | temoa-os + temoa-audit Brand-Voice |
+| Länge pro Bullet | **Ziel ≥300 Bytes (Ausschöpfungs-Prinzip 07/2026)**, hartes Max **500 Zeichen** | Nutzer 07/2026: Budget bestmöglich nutzen (kein Muss → Warnung). Ersetzt das alte 200–300-B-Ziel. Bytes via `TextEncoder` |
+| Aufbau | **HEADLINE IN VERSALIEN (3–5 Wörter) + Doppelpunkt + max. 3 Sätze** | temoa-os-Muster; 3 statt 2 Sätze wegen Ausschöpfungs-Prinzip |
 | Emojis | max. 1 pro Bullet, Default 0 | temoa-audit („Emoji-Spam" ist Preset-Issue) |
 | Verboten | Preise/Versand/Aktionen, Garantieversprechen über Amazon-Policy hinaus, Wettbewerber-Marken, unbelegte Superlative („hochwertig" → konkretes Material/Zahl), medizinische/verbotene Claims (Banned-Claims-Liste) | sales-room-Presets + marketplaceadpros + Blog 07 |
 | USP-Einmaligkeit | **Jede USP genau 1× über alle 5 Bullets** (Cross-Bullet-Dedup) | eigene Regel — dieselbe Logik wie später bei Bildern (USP-Verteilungs-Problem des Nutzers) |
