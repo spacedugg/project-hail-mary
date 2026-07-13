@@ -20,6 +20,12 @@ async function init(): Promise<Db> {
   let client;
   if (url) {
     client = createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN });
+  } else if (process.env.VERCEL) {
+    // Auf Vercel gibt es kein beschreibbares Dateisystem — ohne Turso-Variablen
+    // klar scheitern statt kryptisch beim mkdir.
+    throw new Error(
+      "TURSO_DATABASE_URL fehlt. In Vercel unter Settings → Environment Variables setzen (siehe DEPLOY.md) und danach Redeploy klicken.",
+    );
   } else {
     const file = process.env.DB_FILE ?? "./.data/dev.db";
     const { mkdirSync } = await import("node:fs");
