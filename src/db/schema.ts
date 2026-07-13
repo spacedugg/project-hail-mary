@@ -1,29 +1,25 @@
-import {
-  pgTable,
-  text,
-  integer,
-  timestamp,
-  jsonb,
-  boolean,
-  pgEnum,
-  uniqueIndex,
-} from "drizzle-orm/pg-core";
+import { sqliteTable, text, integer, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /**
  * Entity-Hierarchie (D16): Kunde → Marke → Marktplatz/Land → Produktgruppe → Produkt (ASIN).
- * Diese Achse + Zeit (Perioden) ist das Rückgrat aller Auswertungen — Datenmodell, kein Feature.
+ * Dialekt: Turso/libSQL (D43) — gleicher Stack wie sales-room/seo-os und damit
+ * merge-kompatibel zum temoa-os-Kosmos (D39). Enums = getypte text-Spalten,
+ * JSON = text im json-Mode (Drizzle validiert via $type).
  */
 
-export const clients = pgTable("clients", {
-  id: text("id").primaryKey(), // nanoid
+const ts = (name: string) =>
+  integer(name, { mode: "timestamp" }).$defaultFn(() => new Date());
+
+export const clients = sqliteTable("clients", {
+  id: text("id").primaryKey(), // crypto.randomUUID()
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   logoUrl: text("logo_url"),
   notes: text("notes"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdAt: ts("created_at").notNull(),
 });
 
-export const brands = pgTable("brands", {
+export const brands = sqliteTable("brands", {
   id: text("id").primaryKey(),
   clientId: text("client_id")
     .notNull()
@@ -31,21 +27,13 @@ export const brands = pgTable("brands", {
   name: text("name").notNull(),
   // Brand-Voice-Override; Default ist die temoa-Voice aus dem Wissens-Layer
   voiceTone: text("voice_tone"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdAt: ts("created_at").notNull(),
 });
 
 /** v1: DE-only (D32) — Feld existiert, damit Multi-Marktplatz kein Schema-Bruch wird. */
-export const marketplaceEnum = pgEnum("marketplace", [
-  "de",
-  "uk",
-  "fr",
-  "it",
-  "es",
-  "nl",
-  "us",
-]);
+export type Marketplace = "de" | "uk" | "fr" | "it" | "es" | "nl" | "us";
 
-export const productGroups = pgTable("product_groups", {
+export const productGroups = sqliteTable("product_groups", {
   id: text("id").primaryKey(),
   brandId: text("brand_id")
     .notNull()
@@ -53,7 +41,7 @@ export const productGroups = pgTable("product_groups", {
   name: text("name").notNull(),
 });
 
-export const products = pgTable(
+export const products = sqliteTable(
   "products",
   {
     id: text("id").primaryKey(),
@@ -64,16 +52,15 @@ export const products = pgTable(
       onDelete: "set null",
     }),
     asin: text("asin"), // null bei Neuprodukt ohne Listing
-    marketplace: marketplaceEnum("marketplace").notNull().default("de"),
+    marketplace: text("marketplace").$type<Marketplace>().notNull().default("de"),
     name: text("name").notNull(),
     /**
      * Produkt-Wahrheit (PFLICHT-Input #1, knowledge/inputs.md):
      * Material, Maße, Specs, USPs — der Anker für Reference-Fidelity-Checks.
-     * Bewusst strukturloses JSON in v1; härtet mit dem Wissens-Layer aus.
      */
-    facts: jsonb("facts").$type<ProductFacts>().notNull().default({}),
+    facts: text("facts", { mode: "json" }).$type<ProductFacts>().notNull().default({}),
     price: integer("price_cents"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: ts("created_at").notNull(),
   },
   (t) => [uniqueIndex("products_brand_asin_mp").on(t.brandId, t.asin, t.marketplace)],
 );
@@ -89,64 +76,52 @@ export type ProductFacts = {
 };
 
 /** Keyword-Basis (PFLICHT-Input #2) — aus Cerebro-CSV oder manuell. */
-export const keywordTierEnum = pgEnum("keyword_tier", [
-  "primary", // 3–4 → Titel
-  "secondary", // 8–12 → Bullets
-  "tertiary", // → Beschreibung
-  "backend", // Rest → Backend
-  "excluded", // vom Filter ausgeschlossen (Grund in meta)
-]);
+export type KeywordTier = "primary" | "secondary" | "tertiary" | "backend" | "excluded";
 
-export const keywords = pgTable("keywords", {
+export const keywords = sqliteTable("keywords", {
   id: text("id").primaryKey(),
   productId: text("product_id")
     .notNull()
     .references(() => products.id, { onDelete: "cascade" }),
   keyword: text("keyword").notNull(),
   searchVolume: integer("search_volume"),
-  tier: keywordTierEnum("tier"),
+  tier: text("tier").$type<KeywordTier>(),
   source: text("source").notNull().default("manual"), // manual | cerebro | sov_quick_win | sov_revenue_gap | sov_invisible
-  meta: jsonb("meta").$type<Record<string, unknown>>(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  meta: text("meta", { mode: "json" }).$type<Record<string, unknown>>(),
+  createdAt: ts("created_at").notNull(),
 });
 
 /**
  * Content-Objekte mit Zuständen (D27): Entwurf → freigegeben → synchronisiert.
  * Versioniert pro Produkt & Typ; Baseline für Performance-Monitoring (D33).
  */
-export const contentTypeEnum = pgEnum("content_type", [
-  "title",
-  "bullets",
-  "item_highlights", // neue Amazon-Sektion, 125 Zeichen (Nutzer 07/2026)
-  "description",
-  "backend_keywords",
-  "qa", // Q&A-Paare — Datengrundlage für Rufus/Alexa-for-Shopping
-  // spätere Phase: main_image_brief, listing_image_brief, aplus_plan
-]);
+export type ContentType =
+  | "title"
+  | "bullets"
+  | "item_highlights" // neue Amazon-Sektion, 125 Zeichen (Nutzer 07/2026)
+  | "description"
+  | "backend_keywords"
+  | "qa"; // Q&A-Paare — Datengrundlage für Alexa-for-Shopping
 
-export const contentStatusEnum = pgEnum("content_status", [
-  "draft",
-  "approved",
-  "synced",
-]);
+export type ContentStatus = "draft" | "approved" | "synced";
 
-export const contentVersions = pgTable("content_versions", {
+export const contentVersions = sqliteTable("content_versions", {
   id: text("id").primaryKey(),
   productId: text("product_id")
     .notNull()
     .references(() => products.id, { onDelete: "cascade" }),
-  type: contentTypeEnum("type").notNull(),
+  type: text("type").$type<ContentType>().notNull(),
   version: integer("version").notNull().default(1),
-  /** title/description: { text }, bullets: { items: string[5] }, backend: { terms } */
-  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
-  status: contentStatusEnum("status").notNull().default("draft"),
+  /** title/description/highlights: { text }, bullets: { items }, qa: { pairs }, + rationale */
+  payload: text("payload", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
+  status: text("status").$type<ContentStatus>().notNull().default("draft"),
   /** Ergebnis des Validation-Gates zum Zeitpunkt der Erstellung (Audit-Trail). */
-  validation: jsonb("validation").$type<ValidationReport>(),
+  validation: text("validation", { mode: "json" }).$type<ValidationReport>(),
   /** Herkunft: Modell + Recipe-Version (D28: pro Recipe gepinnt) oder "manual". */
   generatedBy: text("generated_by"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  approvedAt: timestamp("approved_at"),
-  syncedAt: timestamp("synced_at"),
+  createdAt: ts("created_at").notNull(),
+  approvedAt: integer("approved_at", { mode: "timestamp" }),
+  syncedAt: integer("synced_at", { mode: "timestamp" }),
 });
 
 export type ValidationIssue = {
@@ -164,15 +139,15 @@ export type ValidationReport = {
 };
 
 /** Review-Insights (Output-Kontrakt aus temoa-audit, SALVAGE §7). */
-export const reviewInsights = pgTable("review_insights", {
+export const reviewInsights = sqliteTable("review_insights", {
   id: text("id").primaryKey(),
   productId: text("product_id")
     .notNull()
     .references(() => products.id, { onDelete: "cascade" }),
   dataBasis: text("data_basis").notNull(), // uploaded_csv | apify_scrape | none
   confidence: text("confidence").notNull(), // high | medium | low
-  payload: jsonb("payload").$type<ReviewInsightsPayload>().notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  payload: text("payload", { mode: "json" }).$type<ReviewInsightsPayload>().notNull(),
+  createdAt: ts("created_at").notNull(),
 });
 
 export type ReviewInsightsPayload = {
@@ -195,20 +170,20 @@ export type ReviewInsightsPayload = {
 };
 
 /** Hochgeladene Berichte, getaggt mit Marke·Land·Periode (geführter Upload). */
-export const reportUploads = pgTable("report_uploads", {
+export const reportUploads = sqliteTable("report_uploads", {
   id: text("id").primaryKey(),
   brandId: text("brand_id")
     .notNull()
     .references(() => brands.id, { onDelete: "cascade" }),
-  marketplace: marketplaceEnum("marketplace").notNull().default("de"),
+  marketplace: text("marketplace").$type<Marketplace>().notNull().default("de"),
   reportType: text("report_type").notNull(), // business | sqp | ads | searchterm | cerebro | h10_bundle | reviews_csv
-  periodStart: timestamp("period_start"),
-  periodEnd: timestamp("period_end"),
+  periodStart: integer("period_start", { mode: "timestamp" }),
+  periodEnd: integer("period_end", { mode: "timestamp" }),
   fileName: text("file_name").notNull(),
-  /** Geparste, normalisierte Zeilen — Rohdatei liegt im Objektspeicher (später). */
-  parsed: jsonb("parsed"),
+  /** Geparste, normalisierte Daten — Rohdatei liegt später im Objektspeicher. */
+  parsed: text("parsed", { mode: "json" }),
   parseStatus: text("parse_status").notNull().default("pending"), // pending | ok | error
   parseError: text("parse_error"),
-  isSuspended: boolean("is_suspended").notNull().default(false), // Perioden-Flag-Muster
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  isSuspended: integer("is_suspended", { mode: "boolean" }).notNull().default(false), // Perioden-Flag-Muster
+  createdAt: ts("created_at").notNull(),
 });

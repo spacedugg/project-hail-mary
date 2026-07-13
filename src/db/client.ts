@@ -1,34 +1,34 @@
-import { drizzle as drizzlePglite, type PgliteDatabase } from "drizzle-orm/pglite";
-import { drizzle as drizzlePostgres, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import { drizzle, type LibSQLDatabase } from "drizzle-orm/libsql";
 import * as schema from "./schema";
 
 /**
- * DB-Zugriff, anbieter-neutral (D25/D36):
- * - Mit DATABASE_URL (Supabase/Postgres): postgres-js.
- * - Ohne: eingebettetes PGlite (echte Postgres-Semantik, Datei ./.data/dev).
- * Der Wechsel auf Supabase ist ausschließlich ein Env-Wechsel — kein Code-Umbau.
+ * DB-Zugriff via Turso/libSQL (D43) — gleicher Stack wie sales-room/seo-os:
+ * - Mit TURSO_DATABASE_URL (+ TURSO_AUTH_TOKEN): Turso-Cloud, von überall erreichbar.
+ * - Ohne: lokale Datei ./.data/dev.db (gleiche Engine, kein Setup nötig).
  * Migrationen (./drizzle) laufen beim ersten Zugriff automatisch.
  */
 
-export type Db = PgliteDatabase<typeof schema> | PostgresJsDatabase<typeof schema>;
+export type Db = LibSQLDatabase<typeof schema>;
 
 let _db: Promise<Db> | null = null;
 
 async function init(): Promise<Db> {
-  const url = process.env.DATABASE_URL;
+  const { createClient } = await import("@libsql/client");
+  const { migrate } = await import("drizzle-orm/libsql/migrator");
+
+  const url = process.env.TURSO_DATABASE_URL;
+  let client;
   if (url) {
-    const { default: postgres } = await import("postgres");
-    const { migrate } = await import("drizzle-orm/postgres-js/migrator");
-    const db = drizzlePostgres(postgres(url, { prepare: false }), { schema });
-    await migrate(db, { migrationsFolder: "./drizzle" });
-    return db;
+    client = createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN });
+  } else {
+    const file = process.env.DB_FILE ?? "./.data/dev.db";
+    const { mkdirSync } = await import("node:fs");
+    const { dirname } = await import("node:path");
+    mkdirSync(dirname(file), { recursive: true });
+    client = createClient({ url: `file:${file}` });
   }
-  const { PGlite } = await import("@electric-sql/pglite");
-  const { migrate } = await import("drizzle-orm/pglite/migrator");
-  const dataDir = process.env.PGLITE_DIR ?? "./.data/dev";
-  const { mkdirSync } = await import("node:fs");
-  mkdirSync(dataDir, { recursive: true });
-  const db = drizzlePglite(new PGlite(dataDir), { schema });
+
+  const db = drizzle(client, { schema });
   await migrate(db, { migrationsFolder: "./drizzle" });
   return db;
 }

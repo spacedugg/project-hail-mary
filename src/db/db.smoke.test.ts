@@ -2,10 +2,10 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { eq } from "drizzle-orm";
 
 beforeAll(() => {
-  process.env.PGLITE_DIR = ".data/smoke-" + Date.now();
+  process.env.DB_FILE = `.data/smoke-${Date.now()}.db`;
 });
 
-describe("DB (PGlite, Auto-Migration)", () => {
+describe("DB (libSQL/Turso, Auto-Migration)", () => {
   it("migriert, schreibt und liest die Hierarchie", { timeout: 30000 }, async () => {
     const { getDb, schema } = await import("./client");
     const db = await getDb();
