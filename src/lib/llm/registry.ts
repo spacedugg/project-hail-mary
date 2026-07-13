@@ -106,6 +106,8 @@ export function resolveRecipe(recipeKey: string): { provider: LlmProvider; model
     else model = a;
   }
   if (process.env.LLM_FORCE_MOCK === "1") providerName = "mock";
+  // DX-Fallback: ohne Key läuft der Mock (deterministisches Template) statt eines Fehlers.
+  if (providerName === "anthropic" && !process.env.ANTHROPIC_API_KEY) providerName = "mock";
 
   const provider = providers.get(providerName);
   if (!provider) throw new Error(`Unbekannter Provider: ${providerName}`);
