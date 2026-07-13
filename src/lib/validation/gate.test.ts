@@ -11,8 +11,9 @@ import {
 const VALID_BULLET = (head: string, body: string) => `${head}: ${body}`;
 
 // Realistischer Beispiel-Content (Trinkflaschen-Beispiel aus dem Blog-Korpus)
+// 73 Zeichen — im 70–75-Zielband (Spec-Update 07/2026)
 const goodTitle =
-  "AquaNova Edelstahl-Trinkflasche 750 ml, auslaufsicher, doppelwandig isoliert, hält 24 h kalt und 12 h heiß – BPA-frei, spülmaschinenfest, mattschwarz";
+  "AquaNova Edelstahl-Trinkflasche 750 ml, auslaufsicher, isoliert, BPA-frei";
 
 const goodBullets = [
   VALID_BULLET(
@@ -74,9 +75,18 @@ describe("validateTitle", () => {
   it("leerer Titel ist ERROR (nie stilles Bestehen — seo-os-Regression)", () => {
     expect(validateTitle("", ctx).some((i) => i.severity === "error")).toBe(true);
   });
-  it("erkennt Hauptkeyword außerhalb des 80-Zeichen-Fensters", () => {
-    const late = `${"AquaNova Premium Flasche für Sport und Freizeit, robust und langlebig gebaut, ".padEnd(90, "x")} Edelstahl-Trinkflasche`;
-    expect(validateTitle(late, ctx).map((i) => i.rule)).toContain("title.keyword-window");
+  it("über 75 Zeichen ist ERROR (Amazon-Limit 07/2026)", () => {
+    const long = "AquaNova Edelstahl-Trinkflasche 750 ml, auslaufsicher, doppelwandig isoliert und robust";
+    expect(validateTitle(long, ctx).map((i) => i.rule)).toContain("title.max-length");
+  });
+  it("unter 70 Zeichen ist WARNUNG (Budget nicht ausgenutzt)", () => {
+    const short = "AquaNova Edelstahl-Trinkflasche 750 ml";
+    const hits = validateTitle(short, ctx).filter((i) => i.rule === "title.budget");
+    expect(hits).toHaveLength(1);
+    expect(hits[0].severity).toBe("warning");
+  });
+  it("fehlendes Hauptkeyword ist ERROR", () => {
+    expect(validateTitle("AquaNova Flasche 750 ml, auslaufsicher, isoliert, BPA-frei, mattschwarz", ctx).map((i) => i.rule)).toContain("title.keyword-window");
   });
   it("erkennt Werbephrasen und Emojis", () => {
     expect(validateTitle("Bestseller Trinkflasche 🔥", ctx).map((i) => i.rule)).toEqual(

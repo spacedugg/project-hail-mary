@@ -37,9 +37,11 @@ export type RecipeInputs = {
   approved?: Partial<Record<ListingSection, string | string[]>>;
 };
 
+export type TitleRationale = Array<{ part: string; source: string; verified: boolean }>;
+
 export type SectionResult = {
   section: ListingSection;
-  payload: { text?: string; items?: string[] };
+  payload: { text?: string; items?: string[]; rationale?: TitleRationale };
   issues: ValidationIssue[];
   raw: string;
   provider: string;
@@ -98,12 +100,13 @@ function sectionPrompt(section: ListingSection, inputs: RecipeInputs): string {
       return `${ctx}
 
 AUFGABE: Schreibe den Amazon-Produkttitel.
-REGELN (knowledge/content/title.md):
-- Struktur: Marke → Produkttyp (=Hauptkeyword) → differenzierende Attribute (Material, Maß, Menge) → Kernnutzen → Variante.
-- Max ${RULES.title.maxChars} Zeichen; Hauptkeyword „${kw.primary[0] ?? ""}" MUSS in den ersten ${RULES.title.mobileWindowChars} Zeichen liegen.
-- PRIMARY-Keywords (je genau 1×, keine Wiederholungen): ${kw.primary.join(", ")}
+REGELN (knowledge/content/title.md, Amazon-Neuerung 07/2026):
+- HART: ${RULES.title.targetMinChars}–${RULES.title.maxChars} Zeichen — das 75er-Budget bestmöglich ausnutzen, NIE überschreiten. Zähle sorgfältig.
+- Struktur (gekürzt fürs Budget): Marke → Produkttyp (=Hauptkeyword) → 1–2 stärkste kaufentscheidende Attribute (Maß/Menge/Material) → ggf. Kernnutzen-Kürzel.
+- Hauptkeyword „${kw.primary[0] ?? ""}" MUSS vorkommen. PRIMARY-Keywords (je max. 1×): ${kw.primary.join(", ")}
 - Zahlen als Ziffern. Keine Werbephrasen, keine Emojis, keine Versalien-Wörter außer Marke/Norm.
-JSON: {"title": "..."}`;
+- BEGRÜNDUNG: Erkläre jeden Titelbestandteil — woraus er sich ableitet (Keyword-Analyse, USP, Produkt-Wahrheit, Marke) und warum er das Budget verdient.
+JSON: {"title": "...", "rationale": [{"part": "<Bestandteil>", "source": "<Herleitung, z. B. 'Hauptkeyword aus Keyword-Analyse' oder 'USP #1: hält 24 h kalt'>"}]}`;
     case "bullets":
       return `${ctx}
 
@@ -152,8 +155,24 @@ function templateDraft(section: ListingSection, inputs: RecipeInputs): Record<st
   const kw = inputs.keywords;
   switch (section) {
     case "title": {
-      const attrs = [f.dimensions, ...(f.materials ?? [])].filter(Boolean).slice(0, 3).join(", ");
-      return { title: `${inputs.brand} ${kw.primary[0] ?? inputs.productName}${attrs ? `, ${attrs}` : ""} – ${f.usps?.[0] ?? "praktisch im Alltag"}` };
+      // 70–75-Zeichen-Budget deterministisch füllen: Marke → Hauptkeyword → Attribute → USP-Kürzel
+      const parts: Array<{ text: string; source: string }> = [
+        { text: inputs.brand, source: "Marke (Stammdaten)" },
+        { text: kw.primary[0] ?? inputs.productName, source: "Hauptkeyword aus Keyword-Analyse" },
+      ];
+      for (const [i, a] of [f.dimensions, ...(f.materials ?? [])].filter(Boolean).entries())
+        parts.push({ text: String(a), source: i === 0 ? "Maß/Menge (Produkt-Wahrheit)" : "Material (Produkt-Wahrheit)" });
+      if (f.usps?.[0]) parts.push({ text: f.usps[0], source: "USP #1 (Produkt-Wahrheit/Reviews)" });
+
+      let title = "";
+      const used: typeof parts = [];
+      for (const p of parts) {
+        const candidate = title ? `${title}${used.length === 1 ? " " : ", "}${p.text}` : p.text;
+        if (candidate.length > RULES.title.maxChars) break;
+        title = candidate;
+        used.push(p);
+      }
+      return { title, rationale: used.map((p) => ({ part: p.text, source: p.source })) };
     }
     case "bullets": {
       const heads = ["STARKER ALLTAGS-NUTZEN", "PROBLEM GELÖST", "GEPRÜFTE QUALITÄT", "EINFACHE ANWENDUNG", "DURCHDACHTER LIEFERUMFANG"];
@@ -209,7 +228,13 @@ export async function generateSection(
   switch (section) {
     case "title": {
       const text = String(parsed.title ?? "").trim();
-      return { section, payload: { text }, issues: validateTitle(text, ctx), raw, provider: provider.name, model };
+      // Begründung: LLM-Behauptungen deterministisch verifizieren (steht der Teil wirklich im Titel?)
+      const rawRationale = Array.isArray(parsed.rationale) ? (parsed.rationale as Array<{ part?: unknown; source?: unknown }>) : [];
+      const rationale: TitleRationale = rawRationale
+        .map((r) => ({ part: String(r.part ?? ""), source: String(r.source ?? "") }))
+        .filter((r) => r.part)
+        .map((r) => ({ ...r, verified: text.toLowerCase().includes(r.part.toLowerCase()) }));
+      return { section, payload: { text, rationale }, issues: validateTitle(text, ctx), raw, provider: provider.name, model };
     }
     case "bullets": {
       const items = Array.isArray(parsed.bullets) ? parsed.bullets.map(String) : [];

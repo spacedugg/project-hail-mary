@@ -159,7 +159,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           {SECTIONS.map(({ key, label }) => {
             const dbType = key === "backend" ? "backend_keywords" : key;
             const v = latestOf(dbType);
-            const payload = v?.payload as { text?: string; items?: string[] } | undefined;
+            const payload = v?.payload as { text?: string; items?: string[]; rationale?: Array<{ part: string; source: string; verified: boolean }> } | undefined;
             return (
               <div key={key} className="rounded border border-neutral-200 p-3 dark:border-neutral-800">
                 <div className="flex items-center justify-between">
@@ -175,7 +175,24 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                     </button>
                   </form>
                 </div>
-                {payload?.text && <p className="mt-2 whitespace-pre-wrap rounded bg-neutral-50 p-2 text-sm dark:bg-neutral-900">{payload.text}</p>}
+                {payload?.text && (
+                  <p className="mt-2 whitespace-pre-wrap rounded bg-neutral-50 p-2 text-sm dark:bg-neutral-900">
+                    {payload.text}
+                    {key === "title" && <span className="ml-2 font-mono text-[10px] text-neutral-400">{payload.text.length}/75</span>}
+                  </p>
+                )}
+                {key === "title" && payload?.rationale && payload.rationale.length > 0 && (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-xs text-neutral-500 hover:text-neutral-700">Warum dieser Titel? — Komponenten-Begründung</summary>
+                    <ul className="mt-1 space-y-0.5">
+                      {payload.rationale.map((r, i) => (
+                        <li key={i} className="text-xs text-neutral-600 dark:text-neutral-400">
+                          {r.verified ? "✓" : "⚠︎"} <b>„{r.part}"</b> ← {r.source}{!r.verified && " (nicht im Titel gefunden — Behauptung unbelegt)"}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
                 {payload?.items && (
                   <ul className="mt-2 space-y-1 rounded bg-neutral-50 p-2 text-sm dark:bg-neutral-900">
                     {payload.items.map((b, i) => <li key={i}>• {b}</li>)}

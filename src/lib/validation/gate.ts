@@ -48,21 +48,14 @@ export function validateTitle(title: string, ctx: Ctx = {}): ValidationIssue[] {
 
   const chars = charLength(t);
   if (chars > RULES.title.maxChars)
-    issues.push(issue("title.max-length", "error", `Titel ${chars} Zeichen > ${RULES.title.maxChars}.`));
-  if (chars < RULES.title.minCharsWarn)
-    issues.push(issue("title.min-length", "warning", `Titel nur ${chars} Zeichen — verschenkter Platz (<${RULES.title.minCharsWarn}).`));
+    issues.push(issue("title.max-length", "error", `Titel ${chars} Zeichen > ${RULES.title.maxChars} (Amazon-Limit 07/2026).`));
+  if (chars < RULES.title.targetMinChars && chars <= RULES.title.maxChars)
+    issues.push(issue("title.budget", "warning", `Titel nur ${chars} Zeichen — Ziel 70–75, Budget nicht ausgenutzt.`));
 
-  // Hauptkeyword im Mobile-Fenster (erste 80 Zeichen)
-  const window = t.slice(0, RULES.title.mobileWindowChars).toLowerCase();
+  // Hauptkeyword muss vorkommen (bei 75 Zeichen ist der ganze Titel das Fenster)
   const primary = ctx.primaryKeywords?.[0];
-  if (primary && !window.includes(primary.toLowerCase()))
-    issues.push(
-      issue(
-        "title.keyword-window",
-        "error",
-        `Hauptkeyword „${primary}" liegt nicht in den ersten ${RULES.title.mobileWindowChars} Zeichen.`,
-      ),
-    );
+  if (primary && !t.toLowerCase().includes(primary.toLowerCase()))
+    issues.push(issue("title.keyword-window", "error", `Hauptkeyword „${primary}" fehlt im Titel.`));
 
   // Keyword-Wiederholung: kein signifikantes Wort >1× (Stamm-Vergleich); Zahlen/Kurzwörter ok
   const tokens = t.split(/\s+/).map(normalizeToken).filter((w) => w.length >= 4);

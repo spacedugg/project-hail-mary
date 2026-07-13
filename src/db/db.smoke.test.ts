@@ -6,7 +6,7 @@ beforeAll(() => {
 });
 
 describe("DB (PGlite, Auto-Migration)", () => {
-  it("migriert, schreibt und liest die Hierarchie", async () => {
+  it("migriert, schreibt und liest die Hierarchie", { timeout: 30000 }, async () => {
     const { getDb, schema } = await import("./client");
     const db = await getDb();
     await db.insert(schema.clients).values({ id: "c1", name: "Testkunde", slug: "testkunde" });

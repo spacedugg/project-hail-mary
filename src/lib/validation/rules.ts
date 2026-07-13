@@ -6,9 +6,10 @@
 
 export const RULES = {
   title: {
-    maxChars: 200, // Kategorie-Override später via Wissens-Layer
-    minCharsWarn: 120,
-    mobileWindowChars: 80, // Hauptkeyword + Kernaussage müssen hier hinein
+    // Spec-Update 07/2026: Amazon beschränkt Titel auf 75 Zeichen.
+    // Ziel 70–75 — Budget bestmöglich ausnutzen. Kategorie-Override via Wissens-Layer.
+    maxChars: 75,
+    targetMinChars: 70,
     maxKeywordOccurrence: 1,
   },
   bullets: {

@@ -4,17 +4,21 @@
 
 ## SPEC (hart, deterministisch prüfbar)
 
+> **⚠️ Spec-Update 07/2026 (Nutzer-Angabe, Amazon-Neuerung):** Produkttitel sind auf **75 Zeichen beschränkt**. Ziel: **70–75 Zeichen — das Budget bestmöglich ausnutzen.** Ersetzt die alte 200-Zeichen-Regel; das Mobile-Fenster ist damit obsolet (der ganze Titel IST das Fenster). Kategorie-Overrides bleiben möglich.
+
 | Regel | Wert | Quelle |
 |---|---|---|
-| Max. Länge | **200 Zeichen** (Kategorie-Limit kann kürzer sein → Kategorie-Override im Wissens-Layer) | temoa-os, seo-os, Blog 06 („häufig ~200") |
-| Mobile-Fenster | **Hauptkeyword + Kernaussage innerhalb der ersten 80 Zeichen** (Warnung ab Position >70) | sales-room-Preset (~80), Blog 06 (60–70), marketplaceadpros (75) → konservativ vereinheitlicht |
+| Max. Länge | **75 Zeichen** (hart) | Amazon-Neuerung, Nutzer 07/2026 |
+| Ziel-Länge | **70–75 Zeichen** (unter 70 = Warnung „Budget nicht ausgenutzt") | Nutzer-Vorgabe 07/2026 |
+| Hauptkeyword | muss im Titel vorkommen (Fenster = ganzer Titel) | abgeleitet aus alter 80-Zeichen-Regel |
 | Keyword-Wiederholung | **Jedes Keyword max. 1×** | Blog 06 („Wiederholung bringt kein Ranking"). Überstimmt seo-os (erlaubte 2×) |
+| Begründungs-Pflicht | Jeder generierte Titel liefert eine **Komponenten-Begründung** mit: welcher Bestandteil woher kommt (Keyword-Analyse/SV, USP, Produkt-Wahrheit, Marke) | Nutzer-Vorgabe 07/2026 — „auf Knopfdruck sehen, warum der Titel so formuliert ist" |
 | Verboten | Werbephrasen („Bestseller", „Sale", „Angebot", „Top", „Nr. 1"), Emojis, dekorative Sonderzeichen, durchgängige Versalien-Wörter (außer Marke/Norm), Wettbewerber-Marken, Preis-/Versandangaben, unbelegte Superlative | Blog 06 + sales-room-Presets + Amazon-Styleguide |
 | Zählweise | **Zeichen** (nicht Bytes) — aber via Grapheme, nicht `String.length` | seo-os-Fehlerlektion |
 
-## RECIPE (Struktur-Kanon DE)
+## RECIPE (Struktur-Kanon DE — 70–75-Zeichen-Budget)
 
-**Reihenfolge:** `Marke → Produkttyp (=Hauptkeyword) → differenzierende Attribute (Material, Maß, Menge, Kompatibilität) → Kernnutzen → Variante (Farbe/Größe/Pack)`
+**Reihenfolge (gekürzt fürs 75er-Budget):** `Marke → Produkttyp (=Hauptkeyword) → 1–2 stärkste differenzierende Attribute (Maß/Menge/Material) → ggf. Kernnutzen-Kürzel`. Kernnutzen/Variante nur, wenn Budget reicht — Priorität hat das Hauptkeyword + das kaufentscheidende Attribut.
 
 - Beispiel-Schema (Blog 06): „Marke – Edelstahl-Trinkflasche 750 ml, auslaufsicher, doppelwandig isoliert, hält 24 h kalt – BPA-frei, mattschwarz".
 - **Keyword-Quelle ist nie geraten:** PRIMARY-Keywords (3–4) kommen aus der Keyword-Analyse — bei vorhandenem SOV-Audit haben **Quick-Wins + Top-Revenue-Gaps Vorrang** (temoa-audit-Logik: Rank-Proximity × SV × CPR × Title-Density), sonst Cerebro-Ranking nach Relevanz × Volumen.
