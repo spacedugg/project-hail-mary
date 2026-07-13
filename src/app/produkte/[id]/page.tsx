@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { saveFacts, saveKeywords, generateContent } from "@/app/actions";
+import { saveFacts, saveKeywords, generateContent, uploadCerebro, runReviewInsights } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +35,17 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   if (!product) notFound();
 
   const kws = await db.query.keywords.findMany({ where: eq(schema.keywords.productId, id) });
+  const insights = await db.query.reviewInsights.findFirst({
+    where: eq(schema.reviewInsights.productId, id),
+    orderBy: desc(schema.reviewInsights.createdAt),
+  });
+  const uploads = await db.query.reportUploads.findMany({
+    where: eq(schema.reportUploads.brandId, product.brandId),
+    orderBy: desc(schema.reportUploads.createdAt),
+  });
+  const sovUpload = uploads.find(
+    (u) => u.reportType === "cerebro" && u.parseStatus === "ok" && (u.parsed as { productId?: string })?.productId === id,
+  );
   const versions = await db.query.contentVersions.findMany({
     where: eq(schema.contentVersions.productId, id),
     orderBy: desc(schema.contentVersions.createdAt),
@@ -46,10 +57,15 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   return (
     <main className="mx-auto max-w-3xl p-8">
       <Link href="/" className="text-xs text-neutral-500 hover:underline">← Katalog</Link>
-      <h1 className="mt-1 text-2xl font-semibold">
-        {product.name}{" "}
-        {product.asin && <span className="font-mono text-sm text-neutral-500">{product.asin} · amazon.{product.marketplace}</span>}
-      </h1>
+      <div className="mt-1 flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-semibold">
+          {product.name}{" "}
+          {product.asin && <span className="font-mono text-sm text-neutral-500">{product.asin} · amazon.{product.marketplace}</span>}
+        </h1>
+        <Link href={`/produkte/${product.id}/analyse`} className="rounded border border-teal-700 px-3 py-1.5 text-sm font-medium text-teal-700 hover:bg-teal-50 dark:text-teal-400 dark:hover:bg-teal-950">
+          Analyse öffnen →
+        </Link>
+      </div>
 
       {/* 1 · Produkt-Wahrheit */}
       <section className="mt-6 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
@@ -89,6 +105,48 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             Keywords speichern
           </button>
         </form>
+      </section>
+
+      {/* 2b · SOV-Report */}
+      <section className="mt-4 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+          2b · SOV-Report (Cerebro-CSV, optional) {sovUpload && <span className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">✓ {sovUpload.fileName}</span>}
+        </h2>
+        <p className="mt-1 text-xs text-neutral-500">Helium-10-Cerebro-Export (mit Wettbewerber-ASINs als Spalten) → SOV-Audit mit Quick-Wins & Umsatzlücken. Speist Analyse + Backend-Keywords.</p>
+        <form action={uploadCerebro} className="mt-3 flex flex-wrap items-center gap-2">
+          <input type="hidden" name="productId" value={product.id} />
+          <input type="file" name="file" accept=".csv" required className="text-sm" />
+          <input name="price" type="number" step="0.01" placeholder="Ø-Preis € (Default 45)" className={`${input} w-44`} />
+          <button className="rounded bg-neutral-800 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 dark:bg-neutral-200 dark:text-black">Hochladen & auswerten</button>
+        </form>
+        {uploads.find((u) => u.reportType === "cerebro" && u.parseStatus === "error") && !sovUpload && (
+          <p className="mt-2 text-xs text-red-600">Letzter Upload fehlgeschlagen: {uploads.find((u) => u.parseStatus === "error")?.parseError}</p>
+        )}
+      </section>
+
+      {/* 2c · Review-Insights */}
+      <section className="mt-4 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+          2c · Review-Insights (Apify) {insights && <span className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">✓ {insights.dataBasis} · {insights.confidence}</span>}
+        </h2>
+        <p className="mt-1 text-xs text-neutral-500">Scrapt Reviews der eigenen ASIN + bis 5 Wettbewerber (amazon.{product.marketplace}) → Pain Points & Kaufauslöser mit O-Tönen. Braucht APIFY_API_KEY (ohne: Mock).</p>
+        <form action={runReviewInsights} className="mt-3 flex flex-wrap items-center gap-2">
+          <input type="hidden" name="productId" value={product.id} />
+          <input name="competitorAsins" placeholder="Wettbewerber-ASINs (Leerzeichen-getrennt)" className={`${input} flex-1`} />
+          <button className="rounded bg-neutral-800 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 dark:bg-neutral-200 dark:text-black">Reviews analysieren</button>
+        </form>
+        {insights && (
+          <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
+            <div>
+              <div className="font-medium text-red-600">Pain Points</div>
+              <ul className="mt-1 space-y-0.5">{insights.payload.painPoints.slice(0, 5).map((p, i) => <li key={i}>· {p.label}{p.frequencyPct ? ` (${p.frequencyPct} %)` : ""}</li>)}</ul>
+            </div>
+            <div>
+              <div className="font-medium text-emerald-600">Kaufauslöser</div>
+              <ul className="mt-1 space-y-0.5">{insights.payload.buyingTriggers.slice(0, 5).map((t, i) => <li key={i}>· {t.label}{t.frequencyPct ? ` (${t.frequencyPct} %)` : ""}</li>)}</ul>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* 3 · Content */}

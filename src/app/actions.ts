@@ -135,3 +135,76 @@ export async function generateContent(formData: FormData) {
   });
   revalidatePath(`/produkte/${productId}`);
 }
+
+// ── SOV: Cerebro-CSV-Upload → Audit (portiertes Formelwerk) ──────────────────
+
+export async function uploadCerebro(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const file = formData.get("file") as File | null;
+  const price = parseFloat(String(formData.get("price") ?? "")) || undefined;
+  if (!productId || !file) return;
+
+  const db = await getDb();
+  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  if (!product) return;
+
+  const { parseCerebroCsv, computeSovAudit } = await import("@/lib/sov/audit");
+  let parseStatus = "ok", parseError: string | null = null, audit = null;
+  try {
+    const rows = parseCerebroCsv(await file.text(), product.asin);
+    audit = computeSovAudit(rows, { price, mainAsin: product.asin });
+  } catch (e) {
+    parseStatus = "error";
+    parseError = e instanceof Error ? e.message : String(e);
+  }
+
+  await db.insert(schema.reportUploads).values({
+    id: id(),
+    brandId: product.brandId,
+    marketplace: product.marketplace,
+    reportType: "cerebro",
+    fileName: file.name,
+    parsed: audit ? { productId, audit } : null,
+    parseStatus,
+    parseError,
+  });
+  revalidatePath(`/produkte/${productId}`);
+}
+
+// ── Review-Insights via Apify (Neubau der defekten temoa-os-Variante) ────────
+
+export async function runReviewInsights(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const competitorAsins = String(formData.get("competitorAsins") ?? "")
+    .split(/[\s,;]+/).filter(Boolean);
+  const db = await getDb();
+  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  if (!product) return;
+
+  const { scrapeReviews, extractInsights } = await import("@/lib/reviews/apify");
+  const asins = [product.asin, ...competitorAsins].filter(Boolean) as string[];
+
+  let payload, confidence = "low", dataBasis = "apify_scrape", errorMsg: string | null = null;
+  try {
+    const reviews = await scrapeReviews(asins, { domain: product.marketplace });
+    const res = await extractInsights(reviews, asins.map((a) => `amazon.${product.marketplace}/dp/${a}`), dataBasis);
+    payload = res.payload;
+    confidence = res.confidence;
+  } catch (e) {
+    errorMsg = e instanceof Error ? e.message : String(e);
+    // Ohne APIFY_API_KEY: Mock-Insights, klar gekennzeichnet (Dev-Modus)
+    if (errorMsg.includes("APIFY_API_KEY")) {
+      const res = await extractInsights([], ["mock"], "none");
+      payload = res.payload;
+      dataBasis = "none";
+      errorMsg = null;
+    }
+  }
+  if (payload) {
+    await db.insert(schema.reviewInsights).values({
+      id: id(), productId, dataBasis, confidence, payload,
+    });
+  }
+  revalidatePath(`/produkte/${productId}`);
+  if (errorMsg) throw new Error(errorMsg);
+}

@@ -1,0 +1,123 @@
+import { generateForRecipe, resolveRecipe } from "@/lib/llm/registry";
+import type { ReviewInsightsPayload } from "@/db/schema";
+
+/**
+ * Review-Insights via Apify — Neubau der (defekten) temoa-os-Variante,
+ * damit diese Version dort übernommen werden kann (D39).
+ * Verbesserungen ggü. Bestand: (a) ALLE Ratings scrapen — 1–3★ speisen Pain
+ * Points, 4–5★ die Kaufauslöser (Bestand filterte 1–4 und verlor Trigger);
+ * (b) robustes Rating-Parsing (Zahl ODER "4,0 von 5 Sternen"-String);
+ * (c) klare Fehlerbilder statt silent fallback.
+ */
+
+const ACTOR = "axesso_data~amazon-reviews-scraper";
+
+export type RawReview = { asin: string; rating: number; title: string; body: string };
+
+function parseRating(v: unknown): number {
+  if (typeof v === "number") return v;
+  if (typeof v === "string") {
+    const m = v.match(/^(\d+)[,.]?(\d)?/);
+    if (m) return parseFloat(`${m[1]}.${m[2] ?? "0"}`);
+  }
+  return 0;
+}
+
+export async function scrapeReviews(
+  asins: string[],
+  opts: { domain?: string; maxPages?: number } = {},
+): Promise<RawReview[]> {
+  const apiKey = process.env.APIFY_API_KEY;
+  if (!apiKey) throw new Error("APIFY_API_KEY fehlt (Env) — Review-Scrape nicht möglich.");
+  const valid = asins.map((a) => a.trim().toUpperCase()).filter((a) => /^B[A-Z0-9]{9}$/.test(a)).slice(0, 6);
+  if (valid.length === 0) throw new Error("Keine gültigen ASINs (Format B + 9 Zeichen).");
+
+  const input = valid.map((asin) => ({
+    asin,
+    domainCode: opts.domain ?? "de",
+    maxPages: opts.maxPages ?? 10,
+    reviewerType: "all_reviews",
+    formatType: "current_format",
+    mediaType: "all_contents",
+  }));
+
+  const res = await fetch(
+    `https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?timeout=240`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ input }),
+    },
+  );
+  if (!res.ok) throw new Error(`Apify ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  const items = (await res.json()) as Array<Record<string, unknown>>;
+
+  return items
+    .map((it) => ({
+      asin: String(it.asin ?? it.ASIN ?? ""),
+      rating: parseRating(it.rating ?? it.ratingScore),
+      title: String(it.title ?? "").trim(),
+      body: String(it.text ?? it.body ?? it.review ?? "").trim(),
+    }))
+    .filter((r) => r.rating > 0 && r.body.length > 10);
+}
+
+// ── Insights-Extraktion (LLM, Schema aus temoa-audit / SALVAGE §7) ──────────
+
+const INSIGHTS_SYSTEM =
+  "Du analysierst Amazon-Kundenrezensionen (DE) für Listing-Optimierung. " +
+  "Antworte AUSSCHLIESSLICH mit validem JSON nach dem geforderten Schema. Zitate wortwörtlich (verbatim) aus den Reviews übernehmen.";
+
+function insightsPrompt(reviews: RawReview[]): string {
+  const neg = reviews.filter((r) => r.rating <= 3).slice(0, 150);
+  const pos = reviews.filter((r) => r.rating >= 4).slice(0, 150);
+  const fmt = (rs: RawReview[]) => rs.map((r) => `[${r.rating}★ ${r.asin}] ${r.title}: ${r.body}`).join("\n").slice(0, 22000);
+  return `NEGATIVE/KRITISCHE REVIEWS (Pain Points):
+${fmt(neg) || "(keine)"}
+
+POSITIVE REVIEWS (Kaufauslöser):
+${fmt(pos) || "(keine)"}
+
+AUFGABE: Extrahiere 8–12 Pain Points (aus kritischen) und 6–10 Kaufauslöser (aus positiven), je mit Häufigkeit und 1–3 verbatim-Zitaten. Dazu Kundensprache zum Übernehmen (wörtliche Formulierungen) und Sprache zum Vermeiden.
+JSON-Schema:
+{"painPoints":[{"label":"...","frequencyPct":N,"mentionCount":N,"quotes":["..."]}],
+ "buyingTriggers":[{"label":"...","frequencyPct":N,"mentionCount":N,"quotes":["..."]}],
+ "languageToBorrow":["..."],"languageToAvoid":["..."]}`;
+}
+
+export async function extractInsights(
+  reviews: RawReview[],
+  sources: string[],
+  dataBasis: string,
+): Promise<{ payload: ReviewInsightsPayload; confidence: string }> {
+  const { provider } = resolveRecipe("reviews.pain-points");
+  const stats = {
+    reviewsTotal: reviews.length,
+    ratingAvg: reviews.length
+      ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) * 10) / 10
+      : null,
+  };
+
+  let core: Omit<ReviewInsightsPayload, "sources" | "stats">;
+  if (provider.name === "mock") {
+    core = {
+      painPoints: [{ label: "Mock: Dichtung undicht nach 2 Wochen", frequencyPct: 30, mentionCount: 3, quotes: ["tropft in der Tasche"] }],
+      buyingTriggers: [{ label: "Mock: hält wirklich kalt", frequencyPct: 60, mentionCount: 6, quotes: ["nach 24h noch eiskalt"] }],
+      languageToBorrow: ["nach 24h noch eiskalt"],
+      languageToAvoid: ["Premium-Qualität"],
+    };
+  } else {
+    const res = await generateForRecipe("reviews.pain-points", {
+      system: INSIGHTS_SYSTEM,
+      messages: [{ role: "user", content: insightsPrompt(reviews) }],
+      maxTokens: 2000,
+      temperature: 0,
+    });
+    const cleaned = res.text.trim().replace(/^```(?:json)?/m, "").replace(/```\s*$/m, "");
+    const start = cleaned.indexOf("{");
+    core = JSON.parse(cleaned.slice(start, cleaned.lastIndexOf("}") + 1));
+  }
+
+  const confidence = reviews.length >= 60 ? "high" : reviews.length >= 20 ? "medium" : "low";
+  return { payload: { sources, stats, ...core }, confidence: dataBasis === "apify_scrape" ? confidence : "medium" };
+}
