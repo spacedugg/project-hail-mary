@@ -71,7 +71,7 @@ async function ProfileFooter() {
 
 const BRAND_NAV = (brandId: string) => [
   { href: `/marke/${brandId}`, label: "Cockpit", icon: <IconCockpit />, exact: true },
-  { href: `/marke/${brandId}/katalog`, label: "Katalog", icon: <IconKatalog /> },
+  { href: `/marke/${brandId}/katalog`, label: "Katalog", icon: <IconKatalog />, alsoMatch: "/produkte/" },
   { href: `/marke/${brandId}/sichtbarkeit`, label: "Sichtbarkeit & Markt", icon: <IconSichtbarkeit /> },
   { href: `/marke/${brandId}/advertising`, label: "Advertising / PPC", icon: <IconAds /> },
   { href: `/marke/${brandId}/berichte`, label: "Berichte & Daten", icon: <IconBerichte /> },
@@ -91,7 +91,7 @@ export function BrandShell({
   return (
     // Fixe Sidebar: der Rahmen füllt die Höhe, nur die Inhaltsfläche scrollt.
     <div className="flex h-full gap-2 overflow-hidden p-2">
-      <aside className="card hidden w-60 flex-none flex-col sm:flex">
+      <aside className="card hidden w-60 flex-none flex-col print:hidden sm:flex">
         <div className="px-4 pb-3 pt-4">
           <Link href="/" className="text-[10px] uppercase tracking-wide text-muted transition hover:text-primary-strong">← Portfolio · temoa OS</Link>
           <div className="mt-2 flex items-center gap-2.5">
