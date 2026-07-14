@@ -89,8 +89,9 @@ export function BrandShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen gap-2 p-2">
-      <aside className="card hidden w-60 flex-none flex-col self-start sm:sticky sm:top-2 sm:flex sm:max-h-[calc(100vh-1rem)] sm:min-h-[calc(100vh-1rem)]">
+    // Fixe Sidebar: der Rahmen füllt die Höhe, nur die Inhaltsfläche scrollt.
+    <div className="flex h-full gap-2 overflow-hidden p-2">
+      <aside className="card hidden w-60 flex-none flex-col sm:flex">
         <div className="px-4 pb-3 pt-4">
           <Link href="/" className="text-[10px] uppercase tracking-wide text-muted transition hover:text-primary-strong">← Portfolio · temoa OS</Link>
           <div className="mt-2 flex items-center gap-2.5">
@@ -118,7 +119,7 @@ export function BrandShell({
         </div>
         <ProfileFooter />
       </aside>
-      <div className="min-w-0 flex-1">{children}</div>
+      <div className="min-w-0 flex-1 overflow-y-auto">{children}</div>
     </div>
   );
 }
@@ -126,8 +127,8 @@ export function BrandShell({
 /** Agentur-Ebene (Portfolio, Einstellungen): schlanke OS-Sidebar mit Profil unten. */
 export function OsShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen gap-2 p-2">
-      <aside className="card hidden w-60 flex-none flex-col self-start sm:sticky sm:top-2 sm:flex sm:max-h-[calc(100vh-1rem)] sm:min-h-[calc(100vh-1rem)]">
+    <div className="flex h-full gap-2 overflow-hidden p-2">
+      <aside className="card hidden w-60 flex-none flex-col sm:flex">
         <div className="flex items-center gap-2.5 px-4 pb-3 pt-4">
           <span className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-xl bg-gradient-to-br from-[#8f6dff] to-[#5b3fd4] text-white shadow-[0_4px_12px_rgb(124_92_252/0.35)]">
             <IconSparkle className="h-4 w-4" />
@@ -147,7 +148,7 @@ export function OsShell({ children }: { children: React.ReactNode }) {
         </div>
         <ProfileFooter />
       </aside>
-      <div className="min-w-0 flex-1">{children}</div>
+      <div className="min-w-0 flex-1 overflow-y-auto">{children}</div>
     </div>
   );
 }

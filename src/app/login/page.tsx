@@ -18,7 +18,7 @@ export default async function LoginPage({
   const input = "input-base";
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden p-6">
+    <main className="relative flex min-h-full items-center justify-center p-6">
       {/* Bühne: weicher Violett-Verlauf mit Lichtflecken */}
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(60%_50%_at_20%_10%,rgb(124_92_252/0.18),transparent),radial-gradient(50%_40%_at_85%_85%,rgb(47_158_143/0.14),transparent)]" />
 

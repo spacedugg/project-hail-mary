@@ -28,7 +28,13 @@ export default function RootLayout({
       lang="de"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col"><><DemoBanner />{children}</></body>
+      {/* App-Frame: der Body scrollt NIE — Banner + Shell füllen den Viewport,
+          gescrollt wird nur die Inhaltsfläche neben der Sidebar (bzw. dieser
+          Wrapper auf Seiten ohne Sidebar wie /login). */}
+      <body className="flex h-dvh flex-col overflow-hidden">
+        <DemoBanner />
+        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+      </body>
     </html>
   );
 }
