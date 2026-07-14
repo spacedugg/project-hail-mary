@@ -92,6 +92,13 @@ export const RECHENWERK: KpiGruppe[] = [
     ],
   },
   {
+    titel: "Perioden-Diagnose (Cockpit)",
+    eintraege: [
+      { name: "Umsatz-Zerlegung", formel: "Umsatz = Sitzungen × CVR × AOV; das Perioden-Delta wird über ln-Anteile exakt auf die drei Faktoren verteilt (Σ Faktor-Beiträge = Gesamt-Delta, kein Rest); bei Null-Werten keine Zerlegung statt erfundener Zahlen", quelle: "Eigenentwicklung (D64) — Antwort auf die fehlende Holistik der Bestands-Tools", code: "src/lib/reports/diagnose.ts" },
+      { name: "Ursachen-Abgleich", formel: "dominanter Faktor + Quer-Signale: Traffic-Rückgang × offene SOV-Lücken → Sichtbarkeit; CVR-Rückgang × Buybox −2 pp → Buybox vor Listing; CVR-Rückgang × Buybox stabil → Listing/Preis (SQP/Reviews); AOV → Preis/Mix; TACoS ≥ Break-even → unprofitabel erkauft; fehlende Signale werden benannt statt still gelückt", quelle: "Eigenentwicklung (D64), konservative Regeln — nur belegbare Aussagen", code: "src/lib/reports/diagnose.ts" },
+    ],
+  },
+  {
     titel: "Handlungen (€-Hebel)",
     eintraege: [
       { name: "SOV-Umsatzlücken", formel: "Hebel = Korridor-Obergrenze der Top-Lücken", quelle: "D45/temoa-tools-beta", code: "src/app/actions.ts (syncBrandActions)" },

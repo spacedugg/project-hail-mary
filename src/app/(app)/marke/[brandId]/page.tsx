@@ -4,6 +4,7 @@ import { getDb, schema } from "@/db/client";
 import { IconKatalog, IconContent, IconSichtbarkeit, IconReviews, IconHandlungen, IconEuro } from "@/components/icons";
 import { TrendLine } from "@/components/charts";
 import { buildTrendRows } from "@/lib/reports/trends";
+import { diagnosePeriods } from "@/lib/reports/diagnose";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,18 @@ export default async function BrandCockpit({ params }: { params: Promise<{ brand
   const threshold = brand?.marginPct ?? (beps.length ? beps.reduce((s, x) => s + x, 0) / beps.length : null);
   const ampel = (v: number | null) => (v === null || threshold === null ? "" : v < threshold ? "text-good" : "text-bad");
   const trendRows = buildTrendRows(uploads);
+
+  // Perioden-Diagnose (D64): Ursachen quer über die Module — SOV-Kontext aus den Audits der Marke
+  const sovAudits = uploads
+    .filter((u) => u.reportType === "cerebro" && u.parseStatus === "ok")
+    .map((u) => (u.parsed as { audit?: import("@/lib/sov/audit").SovAudit }).audit)
+    .filter((a): a is import("@/lib/sov/audit").SovAudit => Boolean(a));
+  const diag = diagnosePeriods(trendRows, {
+    sovQuickWins: sovAudits.reduce((s, a) => s + a.quickWins.length, 0),
+    sovGapEur: sovAudits.reduce((s, a) => s + a.totalCorridor.high, 0),
+    breakEven: threshold,
+  });
+  const fmtEurS = (n: number) => `${n >= 0 ? "+" : "−"}${new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 }).format(Math.abs(n))} €`;
 
   const withContent = new Set(versions.map((v) => v.productId)).size;
   const sovCount = uploads.filter((u) => u.reportType === "cerebro" && u.parseStatus === "ok").length;
@@ -129,7 +142,58 @@ export default async function BrandCockpit({ params }: { params: Promise<{ brand
       {trendRows.length >= 2 ? (
         <section className="mt-8">
           <h2 className="sect-h">Verlauf <span className="ml-1 font-normal normal-case text-neutral-400">({trendRows.length} Perioden)</span></h2>
-          <div className="stagger mt-2 grid gap-3 lg:grid-cols-2">
+
+          {diag && (
+            <div className="anim-in mt-2 card p-5">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className="text-sm font-semibold">Was hat sich verändert — und warum? <span className="font-normal text-muted">({diag.vorher} → {diag.nachher})</span></h3>
+                {diag.decomposition && (
+                  <span className={`text-lg font-semibold tabular-nums ${diag.decomposition.deltaEur >= 0 ? "text-good" : "text-bad"}`}>
+                    {fmtEurS(diag.decomposition.deltaEur)} <span className="text-xs font-normal text-muted">({diag.decomposition.deltaPct >= 0 ? "+" : ""}{diag.decomposition.deltaPct} %)</span>
+                  </span>
+                )}
+              </div>
+              {diag.decomposition && (
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  {diag.decomposition.factors.map((f) => {
+                    const maxAbs = Math.max(...diag.decomposition!.factors.map((x) => Math.abs(x.eur)), 1);
+                    return (
+                      <div key={f.key} className="rounded-xl border border-hair p-3">
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-xs font-medium">{f.label}</span>
+                          <span className={`text-sm font-semibold tabular-nums ${f.eur > 0 ? "text-good" : f.eur < 0 ? "text-bad" : "text-muted"}`}>{fmtEurS(f.eur)}</span>
+                        </div>
+                        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-hair">
+                          <div
+                            className={`bar-fill h-full rounded-full ${f.eur >= 0 ? "bg-good" : "bg-bad"}`}
+                            style={{ width: `${Math.max(3, (Math.abs(f.eur) / maxAbs) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <ul className="mt-4 space-y-2">
+                {diag.findings.map((f, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm">
+                    <span className={`pill flex-none pill-${f.severity === "good" ? "good" : f.severity === "warn" ? "warn" : "bad"}`}>
+                      {f.severity === "good" ? "✓" : f.severity === "warn" ? "△" : "!"}
+                    </span>
+                    <span>
+                      <b>{f.befund}</b>{" "}
+                      <span className="text-muted">— {f.evidenz}.</span>{" "}
+                      <span className="text-primary-strong">Nächster Schritt: {f.nextStep}.</span>
+                    </span>
+                  </li>
+                ))}
+                {diag.findings.length === 0 && <li className="text-sm text-muted">Keine auffälligen Bewegungen zwischen den Perioden.</li>}
+              </ul>
+              <p className="mt-3 text-[11px] text-muted">Zerlegung: Umsatz = Sitzungen × CVR × AOV (ln-Anteile, Summe = Gesamt-Delta) — Formel im Rechenwerk.</p>
+            </div>
+          )}
+
+          <div className="stagger mt-3 grid gap-3 lg:grid-cols-2">
             <div className="card p-4">
               <h3 className="text-sm font-medium">Umsatz je Periode</h3>
               <div className="mt-2">
