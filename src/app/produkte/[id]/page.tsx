@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { saveFacts, saveKeywords, generateContent, uploadCerebro, runReviewInsights, importListingFromAmazon, uploadListingCsv } from "@/app/actions";
+import { saveFacts, saveKeywords, generateContent, uploadCerebro, runReviewInsights, importListingFromAmazon, uploadListingCsv, saveContentManual } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 
 export const dynamic = "force-dynamic";
@@ -102,6 +102,31 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
               {snapshot.description ? `Beschreibung: ${snapshot.description.length} Zeichen` : "keine Beschreibung"} · {snapshot.imageUrls?.length ?? 0} Bilder
             </p>
           </div>
+        )}
+      </section>
+
+      {/* 0b · Bildplätze */}
+      <section className="mt-4 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">0b · Bildplätze (Listing)</h2>
+        {snapshot?.imageUrls && snapshot.imageUrls.length > 0 ? (
+          <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-7">
+            {Array.from({ length: 7 }, (_, i) => {
+              const url = snapshot.imageUrls?.[i];
+              return (
+                <div key={i} className="rounded border border-neutral-200 p-1 text-center dark:border-neutral-800">
+                  {url ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={url} alt={`Slot ${i + 1}`} className="mx-auto h-20 w-full rounded object-contain" />
+                  ) : (
+                    <div className="flex h-20 items-center justify-center text-lg text-neutral-300">＋</div>
+                  )}
+                  <div className="mt-1 text-[9px] uppercase tracking-wide text-neutral-500">{i === 0 ? "1 · Hauptbild" : `Slot ${i + 1}`}</div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-neutral-400">Noch keine Bilder — Original-Listing importieren (Sektion 0). A+-Bildplätze & Bild-Briefing folgen in der Bild-Phase; der Brief steht schon in der Analyse.</p>
         )}
       </section>
 
@@ -245,6 +270,33 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                   </ul>
                 )}
                 {v?.validation && <IssueList issues={v.validation.issues} />}
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs text-neutral-500 hover:text-neutral-700">
+                    {v ? "Bearbeiten" : "Manuell erfassen"} — Änderung läuft durchs Gate & ins Flat File
+                  </summary>
+                  <form action={saveContentManual} className="mt-2">
+                    <input type="hidden" name="productId" value={product.id} />
+                    <input type="hidden" name="section" value={key} />
+                    <textarea
+                      name="content"
+                      rows={key === "title" ? 2 : key === "highlights" ? 2 : key === "bullets" ? 6 : key === "qa" ? 6 : 5}
+                      defaultValue={
+                        key === "bullets"
+                          ? (payload?.items ?? []).join("\n")
+                          : key === "qa"
+                            ? (payload?.pairs ?? []).map((pr) => `${pr.q} => ${pr.a}`).join("\n")
+                            : payload?.text ?? ""
+                      }
+                      placeholder={
+                        key === "bullets" ? "Ein Bullet pro Zeile (HEADLINE: Text …)" : key === "qa" ? "Frage? => Antwort (eine Zeile pro Paar)" : undefined
+                      }
+                      className={`${input} font-mono text-xs`}
+                    />
+                    <button className="mt-1.5 rounded bg-neutral-800 px-3 py-1.5 text-xs text-white hover:bg-neutral-700 dark:bg-neutral-200 dark:text-black">
+                      Speichern als neue Version (v{(v?.version ?? 0) + 1})
+                    </button>
+                  </form>
+                </details>
               </div>
             );
           })}

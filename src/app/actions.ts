@@ -344,3 +344,90 @@ export async function uploadFlatfileTemplate(formData: FormData) {
   });
   revalidatePath(`/marke/${brandId}/flatfiles`);
 }
+
+// ── Manuelle Content-Bearbeitung (D47): Maske → Gate → neue Version → Flat File ──
+
+export async function saveContentManual(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const section = String(formData.get("section") ?? "") as ListingSection;
+  const raw = String(formData.get("content") ?? "").trim();
+  if (!productId || !raw) return;
+
+  const db = await getDb();
+  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  if (!product) return;
+  const kws = await db.query.keywords.findMany({ where: eq(schema.keywords.productId, productId) });
+  const versions = await db.query.contentVersions.findMany({
+    where: eq(schema.contentVersions.productId, productId),
+    orderBy: desc(schema.contentVersions.createdAt),
+  });
+  const latest = (t: string) => versions.find((v) => v.type === t)?.payload as Record<string, unknown> | undefined;
+  const ctx = {
+    facts: product.facts,
+    primaryKeywords: kws.filter((k) => k.tier === "primary").map((k) => k.keyword),
+    competitorBrands: [],
+  };
+
+  const gate = await import("@/lib/validation/gate");
+  let payload: Record<string, unknown>;
+  let issues;
+  switch (section) {
+    case "bullets": {
+      const items = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+      payload = { items };
+      issues = gate.validateBullets(items, ctx);
+      break;
+    }
+    case "qa": {
+      const pairs = raw.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => {
+        const [q, ...rest] = l.split("=>");
+        return { q: (q ?? "").trim(), a: rest.join("=>").trim() };
+      });
+      payload = { pairs };
+      issues = gate.validateQa(pairs, ctx);
+      break;
+    }
+    case "title":
+      payload = { text: raw };
+      issues = gate.validateTitle(raw, ctx);
+      break;
+    case "highlights":
+      payload = { text: raw };
+      issues = gate.validateItemHighlights(raw, ctx);
+      break;
+    case "backend": {
+      const visible = [
+        (latest("title")?.text as string) ?? "",
+        ...(((latest("bullets")?.items as string[]) ?? [])),
+        (latest("description")?.text as string) ?? "",
+      ].join(" ");
+      payload = { text: raw };
+      issues = gate.validateBackendKeywords(raw, visible, ctx);
+      break;
+    }
+    case "description":
+      payload = { text: raw };
+      issues = gate.validateDescription(raw, ((latest("bullets")?.items as string[]) ?? []), ctx);
+      break;
+    default:
+      return;
+  }
+
+  const dbType = section === "backend" ? "backend_keywords" : section === "highlights" ? "item_highlights" : section;
+  const prev = versions.filter((v) => v.type === dbType);
+  await db.insert(schema.contentVersions).values({
+    id: id(),
+    productId,
+    type: dbType as "title" | "bullets" | "item_highlights" | "description" | "backend_keywords" | "qa",
+    version: (prev[0]?.version ?? 0) + 1,
+    payload,
+    status: "draft",
+    validation: {
+      passed: !issues.some((i) => i.severity === "error"),
+      issues,
+      checkedAt: new Date().toISOString(),
+    },
+    generatedBy: "manual",
+  });
+  revalidatePath(`/produkte/${productId}`);
+}
