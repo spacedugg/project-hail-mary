@@ -64,6 +64,68 @@ export function Donut({
   );
 }
 
+/**
+ * Verlaufslinie (StageLine-Muster aus reporting-main): Linie + weiche Fläche,
+ * Wertlabel an jedem Punkt, optionale gestrichelte Referenzlinie.
+ * Nur mit ≥ 2 echten Datenpunkten rendern (keine Fake-Trends — dataviz-Regel).
+ */
+export function TrendLine({
+  points,
+  refLine,
+  unit = "",
+  color = "var(--primary)",
+}: {
+  points: Array<{ label: string; value: number }>;
+  refLine?: { value: number; label: string };
+  unit?: string;
+  color?: string;
+}) {
+  if (points.length < 2) return null;
+  const W = 640, H = 190, PAD_X = 26, PAD_TOP = 26, PAD_BOT = 34;
+  const values = points.map((p) => p.value);
+  const lo = Math.min(...values, refLine?.value ?? Infinity);
+  const hi = Math.max(...values, refLine?.value ?? -Infinity);
+  const span = hi - lo || 1;
+  const y = (v: number) => PAD_TOP + (H - PAD_TOP - PAD_BOT) * (1 - (v - lo + span * 0.08) / (span * 1.16));
+  const x = (i: number) => PAD_X + ((W - 2 * PAD_X) * i) / (points.length - 1);
+  const line = points.map((p, i) => `${x(i)},${y(p.value)}`).join(" ");
+  const area = `${PAD_X},${H - PAD_BOT} ${line} ${W - PAD_X},${H - PAD_BOT}`;
+  const fmt = (v: number) => new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(v);
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img">
+      <polygon points={area} fill={color} opacity="0.08" />
+      {refLine && (
+        <>
+          <line x1={PAD_X} x2={W - PAD_X} y1={y(refLine.value)} y2={y(refLine.value)} stroke="var(--muted)" strokeWidth="1" strokeDasharray="4 4" />
+          <text x={W - PAD_X} y={y(refLine.value) - 5} textAnchor="end" fontSize="10" fill="var(--muted)">{refLine.label}</text>
+        </>
+      )}
+      <polyline
+        points={line}
+        fill="none"
+        stroke={color}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        pathLength={1}
+        strokeDasharray="1"
+        className="donut-seg"
+        style={{ ["--donut-full" as string]: "1" }}
+      />
+      {points.map((p, i) => (
+        <g key={i}>
+          <circle cx={x(i)} cy={y(p.value)} r="4" fill={color} stroke="var(--surface)" strokeWidth="2" />
+          <text x={x(i)} y={y(p.value) - 9} textAnchor="middle" fontSize="11" fontWeight="600" fill="var(--foreground)">
+            {fmt(p.value)}{unit}
+          </text>
+          <text x={x(i)} y={H - 14} textAnchor="middle" fontSize="10" fill="var(--muted)">{p.label}</text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 /** Horizontaler Mini-Balken (sequentiell, eine Farbe) — für Tabellen-Spalten. */
 export function MiniBar({ pct, className = "" }: { pct: number; className?: string }) {
   return (

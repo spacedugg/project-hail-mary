@@ -2,6 +2,8 @@ import Link from "next/link";
 import { eq, inArray, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { IconKatalog, IconContent, IconSichtbarkeit, IconReviews, IconHandlungen, IconEuro } from "@/components/icons";
+import { TrendLine } from "@/components/charts";
+import { buildTrendRows } from "@/lib/reports/trends";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +34,7 @@ export default async function BrandCockpit({ params }: { params: Promise<{ brand
   const beps = products.map((p) => p.marginCalc?.results.breakEvenAcos).filter((x): x is number => x !== undefined);
   const threshold = brand?.marginPct ?? (beps.length ? beps.reduce((s, x) => s + x, 0) / beps.length : null);
   const ampel = (v: number | null) => (v === null || threshold === null ? "" : v < threshold ? "text-good" : "text-bad");
+  const trendRows = buildTrendRows(uploads);
 
   const withContent = new Set(versions.map((v) => v.productId)).size;
   const sovCount = uploads.filter((u) => u.reportType === "cerebro" && u.parseStatus === "ok").length;
@@ -121,6 +124,42 @@ export default async function BrandCockpit({ params }: { params: Promise<{ brand
           </p>
         )}
       </section>
+
+      {/* Verlauf über Perioden (reporting-main: Trendkarten nur ab 2 Punkten — keine Fake-Trends) */}
+      {trendRows.length >= 2 ? (
+        <section className="mt-8">
+          <h2 className="sect-h">Verlauf <span className="ml-1 font-normal normal-case text-neutral-400">({trendRows.length} Perioden)</span></h2>
+          <div className="stagger mt-2 grid gap-3 lg:grid-cols-2">
+            <div className="card p-4">
+              <h3 className="text-sm font-medium">Umsatz je Periode</h3>
+              <div className="mt-2">
+                <TrendLine points={trendRows.map((r) => ({ label: r.label, value: Math.round(r.revenue) }))} unit=" €" color="var(--cat-2)" />
+              </div>
+            </div>
+            {trendRows.filter((r) => r.tacos !== null).length >= 2 ? (
+              <div className="card p-4">
+                <h3 className="text-sm font-medium">TACoS je Periode {threshold !== null && <span className="text-xs font-normal text-muted">· Referenz: Break-even {new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(threshold)} %</span>}</h3>
+                <div className="mt-2">
+                  <TrendLine
+                    points={trendRows.filter((r) => r.tacos !== null).map((r) => ({ label: r.label, value: r.tacos! }))}
+                    unit=" %"
+                    color="var(--cat-1)"
+                    refLine={threshold !== null ? { value: threshold, label: "Break-even" } : undefined}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="card border-dashed p-4 text-sm text-muted">
+                TACoS-Verlauf braucht Ads-Berichte zu den Perioden — unter <Link href={`${base}/berichte`} className="text-primary-strong underline">Berichte & Daten</Link> nachladen.
+              </div>
+            )}
+          </div>
+        </section>
+      ) : biz ? (
+        <p className="mt-8 text-xs text-muted">
+          Verlaufslinien erscheinen, sobald Berichte für mindestens 2 Perioden vorliegen (Berichte & Daten → weitere Perioden hochladen).
+        </p>
+      ) : null}
 
       <section className="mt-8 card p-4">
         <h2 className="sect-h">Nächste Schritte</h2>
