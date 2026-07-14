@@ -182,6 +182,33 @@ export async function discardPendingFeeConfig() {
   revalidatePath("/rechenwerk");
 }
 
+/**
+ * Demo & Zurücksetzen (D65). Wipe ist destruktiv: der Nutzer muss „LÖSCHEN"
+ * eintippen (Server prüft) — Konten und Rechenwerk-Einstellungen bleiben.
+ */
+export async function wipeAllDataAction(formData: FormData) {
+  const { getSessionUser } = await import("@/lib/auth/session");
+  if (!(await getSessionUser())) return;
+  if (String(formData.get("confirm") ?? "").trim().toUpperCase() !== "LÖSCHEN") {
+    redirect(`/einstellungen?fehler=${encodeURIComponent("Zum Löschen bitte exakt LÖSCHEN eintippen.")}`);
+  }
+  const db = await getDb();
+  const { wipeAllBrandData } = await import("@/lib/demo/seed");
+  await wipeAllBrandData(db);
+  revalidatePath("/", "layout");
+  redirect(`/einstellungen?ok=${encodeURIComponent("Alle Marken und Daten gelöscht — Konten und Rechenwerk blieben erhalten.")}`);
+}
+
+export async function seedDemoDataAction() {
+  const { getSessionUser } = await import("@/lib/auth/session");
+  if (!(await getSessionUser())) return;
+  const db = await getDb();
+  const { seedDemoBrand } = await import("@/lib/demo/seed");
+  const { brandId } = await seedDemoBrand(db);
+  revalidatePath("/", "layout");
+  redirect(`/marke/${brandId}`);
+}
+
 export async function resetFeeConfigAction() {
   const { resetFeeConfig } = await import("@/lib/settings");
   await resetFeeConfig();

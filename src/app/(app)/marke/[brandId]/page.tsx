@@ -23,9 +23,14 @@ export default async function BrandCockpit({ params }: { params: Promise<{ brand
     : [];
   const uploads = await db.query.reportUploads.findMany({ where: eq(schema.reportUploads.brandId, brandId) });
   const brandActions = await db.query.actions.findMany({ where: eq(schema.actions.brandId, brandId) });
-  const businessUpload = uploads.find((u) => u.reportType === "business" && u.parseStatus === "ok");
+  // "Neuester" Report = neuestes PERIODEN-Ende (nicht Upload-Zeitpunkt — Perioden können rückwirkend geladen werden)
+  const latestByPeriod = (type: string) =>
+    uploads
+      .filter((u) => u.reportType === type && u.parseStatus === "ok")
+      .sort((a, b) => (b.periodEnd?.getTime() ?? 0) - (a.periodEnd?.getTime() ?? 0))[0];
+  const businessUpload = latestByPeriod("business");
   const biz = (businessUpload?.parsed as { totals?: import("@/lib/reports/business").BusinessTotals })?.totals ?? null;
-  const adsUpload = uploads.find((u) => u.reportType === "ads" && u.parseStatus === "ok");
+  const adsUpload = latestByPeriod("ads");
   const adsTotals = (adsUpload?.parsed as { totals?: import("@/lib/reports/ads").AdsTotals })?.totals ?? null;
   const combined = biz && adsTotals
     ? (await import("@/lib/reports/ads")).combineWithBusiness(adsTotals, { revenue: biz.revenue, sessions: biz.sessions, orders: biz.orders })

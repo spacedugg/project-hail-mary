@@ -1,6 +1,7 @@
 import { getDb } from "@/db/client";
 import { getSessionUser } from "@/lib/auth/session";
 import { updateProfile, changePassword } from "@/app/auth-actions";
+import { seedDemoDataAction, wipeAllDataAction } from "@/app/actions";
 import Link from "next/link";
 import { OsShell } from "@/components/shell";
 import { IconUsers, IconSearch, IconArrowRight } from "@/components/icons";
@@ -66,6 +67,24 @@ export default async function EinstellungenPage({
               </label>
               <button className="btn-dark">Ändern</button>
             </form>
+          </section>
+
+          <section className="card p-5">
+            <h2 className="sect-h">Demo & Zurücksetzen</h2>
+            <p className="mt-1 text-xs text-muted">
+              Legt die Demo-Marke „AquaVita" mit 3 Produkten und Monatsdaten ab 01.01.2026 an (Business/Ads Jan–Jun, Search-Term, SQP,
+              SOV-Audit, Keywords, Content, Margen-Kalkulation) — alles durch die echten Parser erzeugt. Der Wipe löscht ALLE Marken,
+              Produkte und Berichte; Konten und Rechenwerk bleiben.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <form action={seedDemoDataAction}>
+                <button className="btn-primary text-xs">Demo-Marke anlegen (Jahr 2026)</button>
+              </form>
+              <form action={wipeAllDataAction} className="flex items-center gap-2">
+                <input name="confirm" placeholder="Zum Bestätigen: LÖSCHEN" className={`${input} w-52 text-xs`} />
+                <button className="btn-ghost text-xs !text-bad">Alle Marken & Daten löschen</button>
+              </form>
+            </div>
           </section>
 
           <section className="card p-5">

@@ -48,9 +48,14 @@ export default async function AdvertisingPage({
     where: eq(schema.reportUploads.brandId, brandId),
     orderBy: desc(schema.reportUploads.createdAt),
   });
-  const adsUpload = uploads.find((u) => u.reportType === "ads" && u.parseStatus === "ok");
-  const bizUpload = uploads.find((u) => u.reportType === "business" && u.parseStatus === "ok");
-  const stUpload = uploads.find((u) => u.reportType === "searchterm" && u.parseStatus === "ok");
+  // neuester Report = neuestes Perioden-Ende (rückwirkende Uploads möglich)
+  const latestByPeriod = (type: string) =>
+    uploads
+      .filter((u) => u.reportType === type && u.parseStatus === "ok")
+      .sort((a, b) => (b.periodEnd?.getTime() ?? 0) - (a.periodEnd?.getTime() ?? 0))[0];
+  const adsUpload = latestByPeriod("ads");
+  const bizUpload = latestByPeriod("business");
+  const stUpload = latestByPeriod("searchterm");
   const ads = (adsUpload?.parsed as { campaigns?: AdsCampaign[]; totals?: AdsTotals }) ?? null;
   const biz = (bizUpload?.parsed as { totals?: BusinessTotals })?.totals ?? null;
   const st = (stUpload?.parsed as { rows?: SearchTermRow[]; totals?: SearchTermTotals }) ?? null;

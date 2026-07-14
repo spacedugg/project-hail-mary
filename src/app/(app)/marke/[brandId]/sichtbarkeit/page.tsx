@@ -20,7 +20,9 @@ export default async function BrandSichtbarkeit({ params }: { params: Promise<{ 
     .filter((u) => u.reportType === "cerebro" && u.parseStatus === "ok" && u.parsed)
     .map((u) => ({ u, productId: (u.parsed as { productId?: string }).productId, audit: (u.parsed as { audit?: SovAudit }).audit }))
     .filter((x) => x.audit);
-  const sqpUpload = uploads.find((u) => u.reportType === "sqp" && u.parseStatus === "ok");
+  const sqpUpload = uploads
+    .filter((u) => u.reportType === "sqp" && u.parseStatus === "ok")
+    .sort((a, b) => (b.periodEnd?.getTime() ?? 0) - (a.periodEnd?.getTime() ?? 0))[0];
   const sqp = (sqpUpload?.parsed as SqpReport | null) ?? null;
   const fmt = (n: number) => new Intl.NumberFormat("de-DE").format(n);
   const eur = (n: number) => `${fmt(Math.round(n))} €`;
