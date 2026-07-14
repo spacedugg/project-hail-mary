@@ -1,10 +1,17 @@
 import { OsShell } from "@/components/shell";
 import { RECHENWERK } from "@/lib/rechenwerk";
 import { RULES } from "@/lib/validation/rules";
+import { eq } from "drizzle-orm";
+import { getDb, schema } from "@/db/client";
 import { getFeeConfigState } from "@/lib/settings";
-import { DEFAULT_FEE_CONFIG } from "@/lib/margin/fees";
-import { saveFeeConfigAction, resetFeeConfigAction } from "@/app/actions";
-import { IconSearch, IconEuro, IconCheck } from "@/components/icons";
+import type { FeeConfig } from "@/lib/margin/fees";
+import type { FeeChange } from "@/lib/margin/feesFromPdf";
+import { uploadFeePdf, applyPendingFeeConfig, discardPendingFeeConfig, resetFeeConfigAction } from "@/app/actions";
+import { IconSearch, IconEuro, IconCheck, IconUpload } from "@/components/icons";
+
+type PendingFees =
+  | { config: FeeConfig; changes: FeeChange[]; warnings: string[]; fileName: string; extractedBy: string; extractedAt: string }
+  | { error: string; fileName: string; extractedBy: string; extractedAt: string };
 
 export const dynamic = "force-dynamic";
 
@@ -18,11 +25,13 @@ const pct = (n: number) => `${new Intl.NumberFormat("de-DE", { maximumFractionDi
 export default async function RechenwerkPage() {
   const feeState = await getFeeConfigState();
   const cfg = feeState.config;
-  const input = "input-base";
+  const db = await getDb();
+  const pendingRow = await db.query.settings.findFirst({ where: eq(schema.settings.key, "fee_config_pending") });
+  const pending = (pendingRow?.value as PendingFees | undefined) ?? null;
 
   return (
     <OsShell>
-      <main className="mx-auto max-w-4xl p-8">
+      <main className="w-full p-8">
         <h1 className="page-title">Rechenwerk</h1>
         <p className="page-sub">
           Wie das Tool rechnet — jede Formel mit Quelle und Code-Ort, jede Regel, jede Gebühren-Tabelle.
@@ -85,7 +94,7 @@ export default async function RechenwerkPage() {
           </div>
         </section>
 
-        {/* Gebühren-Tabellen — LIVE + austauschbar */}
+        {/* Gebühren-Tabellen — LIVE, Update per PDF (D62) */}
         <section className="mt-8 card p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
@@ -97,74 +106,99 @@ export default async function RechenwerkPage() {
               : <span className="pill pill-good">Standard (Workbook-Stand)</span>}
           </div>
           <p className="mt-1 text-xs text-muted">
-            Diese Werte rechnen LIVE in jeder Margen-Kalkulation. Amazon ändert Gebühren — hier die aktuelle Version eintragen und speichern;
-            bestehende Produkt-Kalkulationen behalten ihren Stand, bis sie neu berechnet werden. Default: 1:1 aus dem Margenkalkulation-Workbook.
+            Diese Werte rechnen LIVE in jeder Margen-Kalkulation. Aktualisierung: Amazon-Gebühren-PDF hochladen — das Tool extrahiert die
+            Tabellen, prüft sie deterministisch und zeigt die Abweichungen zur Bestätigung. Amazon bietet keine öffentliche Tabellen-API;
+            mit der SP-API-Anbindung (geplant) kommt die Gebühren-Vorschau je ASIN als automatische Gegenprobe.
           </p>
 
-          <form action={saveFeeConfigAction} className="mt-4 space-y-5">
+          {/* Update per PDF */}
+          <form action={uploadFeePdf} className="mt-4 flex flex-wrap items-center gap-2 rounded-xl bg-background p-3">
+            <IconUpload className="h-4 w-4 flex-none text-muted" />
+            <span className="text-xs font-medium">Aktualisierte Amazon-Gebühren als PDF:</span>
+            <input type="file" name="file" accept=".pdf" required className="text-sm" />
+            <button className="btn-primary text-xs">Extrahieren & prüfen</button>
+          </form>
+
+          {pending && (
+            <div className="mt-3 rounded-xl border border-primary bg-primary-soft/40 p-4">
+              {"error" in pending ? (
+                <>
+                  <p className="text-sm font-medium text-bad">✕ Extraktion fehlgeschlagen: {pending.error}</p>
+                  <p className="mt-1 text-xs text-muted">{pending.fileName} · {new Date(pending.extractedAt).toLocaleString("de-DE")} · {pending.extractedBy}</p>
+                  <form action={discardPendingFeeConfig} className="mt-2"><button className="btn-ghost text-xs">Ausblenden</button></form>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold">Vorschau aus {pending.fileName} <span className="font-normal text-muted">· {new Date(pending.extractedAt).toLocaleString("de-DE")} · {pending.extractedBy}</span></p>
+                  {pending.changes.length > 0 ? (
+                    <ul className="mt-2 space-y-1">
+                      {pending.changes.map((c, i) => (
+                        <li key={i} className="text-sm"><b>{c.feld}:</b> <span className="text-muted line-through">{c.alt}</span> → <span className="font-medium text-primary-strong">{c.neu}</span></li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-2 text-sm text-muted">Keine Änderungen gegenüber dem aktuellen Stand.</p>
+                  )}
+                  {pending.warnings.length > 0 && (
+                    <ul className="mt-2 space-y-0.5">{pending.warnings.map((w, i) => <li key={i} className="text-xs text-warn">△ {w}</li>)}</ul>
+                  )}
+                  <div className="mt-3 flex gap-2">
+                    {pending.changes.length > 0 && (
+                      <form action={applyPendingFeeConfig}><button className="btn-primary text-xs">Übernehmen — rechnet ab sofort</button></form>
+                    )}
+                    <form action={discardPendingFeeConfig}><button className="btn-ghost text-xs">Verwerfen</button></form>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Wirksamer Stand — read-only */}
+          <div className="mt-5 grid gap-5 lg:grid-cols-2">
             <div>
               <h3 className="sect-h">Verkaufsgebühr je Kategorie (% vom Brutto-VK)</h3>
-              <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
+              <div className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
                 {Object.entries(cfg.referralFlat).map(([cat, rate]) => (
-                  <label key={cat} className="flex items-center justify-between gap-2 text-xs">
+                  <div key={cat} className="flex items-center justify-between border-b border-hair py-1 text-xs">
                     <span className="truncate" title={cat}>{cat}</span>
-                    <span className="flex flex-none items-center gap-1">
-                      <input name={`flat:${cat}`} defaultValue={new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2 }).format(rate * 100)} inputMode="decimal" className={`${input} w-16 !py-1 text-right`} />
-                      <span className="text-muted">%</span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-              <h4 className="mt-3 text-xs font-medium text-muted">Preis-Staffeln</h4>
-              <div className="mt-1 space-y-1.5">
-                {cfg.referralTiered.map((t) => (
-                  <div key={t.category} className="flex flex-wrap items-center gap-2 text-xs">
-                    <span className="w-44 truncate font-medium">{t.category}</span>
-                    <span className="text-muted">bis</span>
-                    <input name={`tier:${t.category}:threshold`} defaultValue={t.thresholdEur} inputMode="decimal" className={`${input} w-16 !py-1 text-right`} />
-                    <span className="text-muted">€ →</span>
-                    <input name={`tier:${t.category}:below`} defaultValue={t.belowOrEq * 100} inputMode="decimal" className={`${input} w-14 !py-1 text-right`} />
-                    <span className="text-muted">% · darüber →</span>
-                    <input name={`tier:${t.category}:above`} defaultValue={t.above * 100} inputMode="decimal" className={`${input} w-14 !py-1 text-right`} />
-                    <span className="text-muted">%</span>
+                    <span className="tabular-nums font-medium">{pct(rate)}</span>
                   </div>
                 ))}
               </div>
+              <h4 className="mt-3 text-xs font-medium text-muted">Preis-Staffeln</h4>
+              <div className="mt-1 space-y-1">
+                {cfg.referralTiered.map((t) => (
+                  <div key={t.category} className="flex items-center justify-between border-b border-hair py-1 text-xs">
+                    <span className="font-medium">{t.category}</span>
+                    <span className="tabular-nums text-muted">bis {t.thresholdEur} € → {pct(t.belowOrEq)} · darüber {pct(t.above)}</span>
+                  </div>
+                ))}
+              </div>
+              <h4 className="mt-3 text-xs font-medium text-muted">Lagergebühr</h4>
+              <p className="mt-1 text-xs">Standard <b>{cfg.storage.standardPerM3Month} €/m³/Monat</b> · Bekleidung <b>{cfg.storage.apparelPerM3Month} €/m³/Monat</b> · pauschal <b>{cfg.storage.months} Monate</b> je Einheit</p>
             </div>
-
             <div>
-              <h3 className="sect-h">Lagergebühr</h3>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                <span>Standard</span>
-                <input name="storage:standard" defaultValue={cfg.storage.standardPerM3Month} inputMode="decimal" className={`${input} w-24 !py-1 text-right`} />
-                <span className="text-muted">€/m³/Monat · Bekleidung</span>
-                <input name="storage:apparel" defaultValue={cfg.storage.apparelPerM3Month} inputMode="decimal" className={`${input} w-24 !py-1 text-right`} />
-                <span className="text-muted">€/m³/Monat · pauschal</span>
-                <input name="storage:months" defaultValue={cfg.storage.months} inputMode="decimal" className={`${input} w-14 !py-1 text-right`} />
-                <span className="text-muted">Monate je Einheit</span>
+              <h3 className="sect-h">Entsorgung je Stück (Gewichtsstufen)</h3>
+              <p className="mt-1 text-[11px] text-muted">Oversize, sobald eine Seite ≥ {cfg.oversizeSideCm} cm. Erste Stufe mit Gewicht &gt; Grenze gewinnt; −1 = Auffangwert.</p>
+              <div className="mt-2 grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-[10px] uppercase tracking-wide text-muted">Standard</div>
+                  {cfg.disposalStandard.map(([g, fee]) => (
+                    <div key={`s${g}`} className="flex justify-between border-b border-hair py-0.5 text-xs tabular-nums"><span>&gt; {g} g</span><b>{new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2 }).format(fee)} €</b></div>
+                  ))}
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-wide text-muted">Oversize</div>
+                  {cfg.disposalOversize.map(([g, fee]) => (
+                    <div key={`o${g}`} className="flex justify-between border-b border-hair py-0.5 text-xs tabular-nums"><span>&gt; {g} g</span><b>{new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2 }).format(fee)} €</b></div>
+                  ))}
+                </div>
               </div>
             </div>
+          </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <h3 className="sect-h">Entsorgung Standard-Größe</h3>
-                <p className="mt-1 text-[11px] text-muted">Eine Zeile je Stufe: „Gewichtsgrenze in g (exklusiv); Gebühr €" — erste Zeile mit Gewicht &gt; Grenze gewinnt. Letzte Zeile −1 = Auffangwert.</p>
-                <textarea name="disposal:standard" rows={8} defaultValue={cfg.disposalStandard.map(([g, f]) => `${g};${f}`).join("\n")} className={`${input} mt-1 font-mono text-xs`} />
-              </div>
-              <div>
-                <h3 className="sect-h">Entsorgung Oversize <span className="font-normal normal-case">(ab einer Seite ≥ <input name="oversizeSideCm" defaultValue={cfg.oversizeSideCm} inputMode="decimal" className={`${input} inline-block w-14 !py-0.5 text-right`} /> cm)</span></h3>
-                <p className="mt-1 text-[11px] text-muted">Gleiche Logik wie Standard.</p>
-                <textarea name="disposal:oversize" rows={8} defaultValue={cfg.disposalOversize.map(([g, f]) => `${g};${f}`).join("\n")} className={`${input} mt-1 font-mono text-xs`} />
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <button className="btn-primary">Tabellen speichern — rechnet ab sofort</button>
-              <span className="text-xs text-muted">Beispiel-Kontrolle mit aktuellem Stand: „Alles andere", 9,90 € → Verkaufsgebühr {pct(cfg.referralFlat["Alles andere"] ?? 0)} = {new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 3 }).format((cfg.referralFlat["Alles andere"] ?? 0) * 9.9)} €</span>
-            </div>
-          </form>
           {feeState.source === "override" && (
-            <form action={resetFeeConfigAction} className="mt-2">
+            <form action={resetFeeConfigAction} className="mt-4">
               <button className="btn-ghost text-xs">Auf Workbook-Standard zurücksetzen</button>
             </form>
           )}

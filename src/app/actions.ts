@@ -119,60 +119,66 @@ export async function saveMarginCalc(formData: FormData) {
 }
 
 /**
- * Rechenwerk (D61): Gebühren-Tabellen als austauschbare Konfiguration.
- * Prozente kommen als ganze Zahlen (8 = 8 %); Entsorgungs-Tabellen als
- * Zeilen "Gewichtsgrenze;Gebühr". Gespeichert wird der KOMPLETTE Stand —
- * was das Rechenwerk anzeigt, rechnet ab sofort.
+ * Rechenwerk (D62): Gebühren-Update per PDF — Amazon liefert Änderungen als
+ * PDF, keine öffentliche Tabellen-API. LLM extrahiert, deterministische
+ * Validierung + Diff-Vorschau; wirksam wird erst die bestätigte Übernahme.
  */
-export async function saveFeeConfigAction(formData: FormData) {
+export async function uploadFeePdf(formData: FormData) {
   const { getSessionUser } = await import("@/lib/auth/session");
   const user = await getSessionUser();
   if (!user) return;
-  const { DEFAULT_FEE_CONFIG } = await import("@/lib/margin/fees");
-  const { saveFeeConfig } = await import("@/lib/settings");
+  const file = formData.get("file") as File | null;
+  if (!file) return;
 
-  const num = (k: string, fallback: number) => {
-    const v = String(formData.get(k) ?? "").replace(",", ".").trim();
-    const n = parseFloat(v);
-    return Number.isFinite(n) ? n : fallback;
-  };
-  const parseTable = (k: string, fallback: Array<[number, number]>): Array<[number, number]> => {
-    const raw = String(formData.get(k) ?? "").trim();
-    if (!raw) return fallback;
-    const rows = raw
-      .split("\n")
-      .map((l) => l.split(/[;,\t]/).map((s) => parseFloat(s.replace(",", ".").trim())))
-      .filter((p) => p.length >= 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]))
-      .map((p) => [p[0], p[1]] as [number, number]);
-    return rows.length ? rows.sort((a, b) => b[0] - a[0]) : fallback;
-  };
+  const { getFeeConfigState } = await import("@/lib/settings");
+  const { extractFeeConfigFromPdf } = await import("@/lib/margin/feesFromPdf");
+  const { config: current } = await getFeeConfigState();
 
-  const referralFlat: Record<string, number> = {};
-  for (const cat of Object.keys(DEFAULT_FEE_CONFIG.referralFlat)) {
-    referralFlat[cat] = num(`flat:${cat}`, DEFAULT_FEE_CONFIG.referralFlat[cat] * 100) / 100;
+  let pending: unknown;
+  try {
+    const base64 = Buffer.from(await file.arrayBuffer()).toString("base64");
+    const result = await extractFeeConfigFromPdf(base64, current);
+    pending = {
+      config: result.config,
+      changes: result.changes,
+      warnings: result.warnings,
+      fileName: file.name,
+      extractedBy: user.email,
+      extractedAt: new Date().toISOString(),
+    };
+  } catch (e) {
+    pending = {
+      error: e instanceof Error ? e.message : String(e),
+      fileName: file.name,
+      extractedBy: user.email,
+      extractedAt: new Date().toISOString(),
+    };
   }
-  const referralTiered = DEFAULT_FEE_CONFIG.referralTiered.map((t) => ({
-    category: t.category,
-    thresholdEur: num(`tier:${t.category}:threshold`, t.thresholdEur),
-    belowOrEq: num(`tier:${t.category}:below`, t.belowOrEq * 100) / 100,
-    above: num(`tier:${t.category}:above`, t.above * 100) / 100,
-  }));
+  const db = await getDb();
+  await db
+    .insert(schema.settings)
+    .values({ key: "fee_config_pending", value: pending, updatedBy: user.email, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: schema.settings.key, set: { value: pending, updatedBy: user.email, updatedAt: new Date() } });
+  revalidatePath("/rechenwerk");
+}
 
-  await saveFeeConfig(
-    {
-      referralFlat,
-      referralTiered,
-      storage: {
-        standardPerM3Month: num("storage:standard", DEFAULT_FEE_CONFIG.storage.standardPerM3Month),
-        apparelPerM3Month: num("storage:apparel", DEFAULT_FEE_CONFIG.storage.apparelPerM3Month),
-        months: num("storage:months", DEFAULT_FEE_CONFIG.storage.months),
-      },
-      disposalStandard: parseTable("disposal:standard", DEFAULT_FEE_CONFIG.disposalStandard),
-      disposalOversize: parseTable("disposal:oversize", DEFAULT_FEE_CONFIG.disposalOversize),
-      oversizeSideCm: num("oversizeSideCm", DEFAULT_FEE_CONFIG.oversizeSideCm),
-    },
-    user.email,
-  );
+export async function applyPendingFeeConfig() {
+  const { getSessionUser } = await import("@/lib/auth/session");
+  const user = await getSessionUser();
+  if (!user) return;
+  const db = await getDb();
+  const row = await db.query.settings.findFirst({ where: eq(schema.settings.key, "fee_config_pending") });
+  const pending = row?.value as { config?: import("@/lib/margin/fees").FeeConfig } | undefined;
+  if (!pending?.config) return;
+  const { saveFeeConfig } = await import("@/lib/settings");
+  await saveFeeConfig(pending.config, user.email);
+  await db.delete(schema.settings).where(eq(schema.settings.key, "fee_config_pending"));
+  revalidatePath("/rechenwerk");
+}
+
+export async function discardPendingFeeConfig() {
+  const db = await getDb();
+  await db.delete(schema.settings).where(eq(schema.settings.key, "fee_config_pending"));
   revalidatePath("/rechenwerk");
 }
 
