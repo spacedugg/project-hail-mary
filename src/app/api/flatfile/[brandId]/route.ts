@@ -23,8 +23,10 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ brandId: s
   const versions = pids.length
     ? await db.query.contentVersions.findMany({ where: inArray(schema.contentVersions.productId, pids), orderBy: desc(schema.contentVersions.createdAt) })
     : [];
+  // Freigegebene Version bevorzugt; ohne Freigabe der neueste Entwurf
   const latest = (pid: string, t: string) =>
-    versions.find((v) => v.productId === pid && v.type === t)?.payload as Record<string, unknown> | undefined;
+    (versions.find((v) => v.productId === pid && v.type === t && v.status === "approved") ??
+      versions.find((v) => v.productId === pid && v.type === t))?.payload as Record<string, unknown> | undefined;
 
   const rows = products.map((p) => ({
     sku: p.asin ?? p.id.slice(0, 12),

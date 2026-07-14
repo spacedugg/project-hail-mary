@@ -24,7 +24,10 @@ export default async function AnalysePage({ params }: { params: Promise<{ id: st
     where: eq(schema.contentVersions.productId, id),
     orderBy: desc(schema.contentVersions.createdAt),
   });
-  const latest = (t: string) => versions.find((v) => v.type === t)?.payload as Record<string, unknown> | undefined;
+  // Kundenfertige Sicht: freigegebene Version bevorzugt, sonst neuester Entwurf
+  const latest = (t: string) =>
+    (versions.find((v) => v.type === t && v.status === "approved") ?? versions.find((v) => v.type === t))
+      ?.payload as Record<string, unknown> | undefined;
   const snapshot: ListingSnapshot = {
     title: (latest("title")?.text as string) ?? "",
     bullets: (latest("bullets")?.items as string[]) ?? [],

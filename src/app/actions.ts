@@ -74,6 +74,23 @@ export async function saveKeywords(formData: FormData) {
   revalidatePath(`/produkte/${productId}`);
 }
 
+/**
+ * Content-Freigabe: die neueste Version einer Sektion wird "approved" —
+ * Flat File & Analyse bevorzugen ab dann Freigaben vor Entwürfen.
+ * Freigabe nur ohne Gate-Fehler (Warnungen sind ok — Ausschöpfungs-Prinzip).
+ */
+export async function approveContent(formData: FormData) {
+  const versionId = String(formData.get("versionId") ?? "");
+  const productId = String(formData.get("productId") ?? "");
+  if (!versionId) return;
+  const db = await getDb();
+  const version = await db.query.contentVersions.findFirst({ where: eq(schema.contentVersions.id, versionId) });
+  if (!version) return;
+  if (version.validation && !version.validation.passed) return;
+  await db.update(schema.contentVersions).set({ status: "approved" }).where(eq(schema.contentVersions.id, versionId));
+  revalidatePath(`/produkte/${productId}`);
+}
+
 /** Keyword-Tiering aus dem SOV-Audit ableiten — ersetzt nur source="cerebro", manuelle bleiben. */
 export async function deriveKeywordsFromSov(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");

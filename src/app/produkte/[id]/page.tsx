@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { saveFacts, saveKeywords, deriveKeywordsFromSov, generateContent, uploadCerebro, runReviewInsights, importListingFromAmazon, uploadListingCsv, saveContentManual } from "@/app/actions";
+import { saveFacts, saveKeywords, deriveKeywordsFromSov, generateContent, uploadCerebro, runReviewInsights, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 
 export const dynamic = "force-dynamic";
@@ -254,18 +254,30 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             const payload = v?.payload as { text?: string; items?: string[]; pairs?: Array<{ q: string; a: string }>; rationale?: Array<{ part: string; source: string; verified: boolean }> } | undefined;
             return (
               <div key={key} className="card p-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <h3 className="text-sm font-medium">
                     {label}{" "}
-                    {v && <span className="ml-1 tag">v{v.version} · {v.status} · {v.generatedBy}</span>}
+                    {v && <span className="ml-1 tag">v{v.version} · {v.generatedBy}</span>}
+                    {v && (v.status === "approved"
+                      ? <span className="ml-1 pill pill-good">✓ freigegeben</span>
+                      : <span className="ml-1 pill pill-neutral">Entwurf</span>)}
                   </h3>
-                  <form action={generateContent}>
-                    <input type="hidden" name="productId" value={product.id} />
-                    <input type="hidden" name="section" value={key} />
-                    <button className="btn-primary px-3 py-1 text-xs">
-                      {v ? "Neu generieren" : "Generieren"}
-                    </button>
-                  </form>
+                  <div className="flex flex-none items-center gap-1.5">
+                    {v && v.status === "draft" && (v.validation?.passed ?? true) && (
+                      <form action={approveContent}>
+                        <input type="hidden" name="productId" value={product.id} />
+                        <input type="hidden" name="versionId" value={v.id} />
+                        <button className="btn-ghost px-3 py-1 text-xs !text-good">✓ Freigeben</button>
+                      </form>
+                    )}
+                    <form action={generateContent}>
+                      <input type="hidden" name="productId" value={product.id} />
+                      <input type="hidden" name="section" value={key} />
+                      <button className="btn-primary px-3 py-1 text-xs">
+                        {v ? "Neu generieren" : "Generieren"}
+                      </button>
+                    </form>
+                  </div>
                 </div>
                 {payload?.text && (
                   <p className="mt-2 whitespace-pre-wrap rounded-xl bg-background p-2 text-sm">
