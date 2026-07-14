@@ -28,9 +28,10 @@ export default async function BrandCockpit({ params }: { params: Promise<{ brand
     ? (await import("@/lib/reports/ads")).combineWithBusiness(adsTotals, { revenue: biz.revenue, sessions: biz.sessions, orders: biz.orders })
     : null;
   const brand = await db.query.brands.findFirst({ where: eq(schema.brands.id, brandId) });
-  // ACoS/TACoS-Ampel gegen die Account-Marge (reporting-main acosColor); ohne Schwelle keine Färbung
-  const ampel = (v: number | null) =>
-    v === null || brand?.marginPct == null ? "" : v < brand.marginPct ? "text-good" : "text-bad";
+  // ACoS/TACoS-Ampel (reporting-main-Priorität): Account-Marge, sonst Ø Break-even-ACoS der Produkt-Kalkulationen
+  const beps = products.map((p) => p.marginCalc?.results.breakEvenAcos).filter((x): x is number => x !== undefined);
+  const threshold = brand?.marginPct ?? (beps.length ? beps.reduce((s, x) => s + x, 0) / beps.length : null);
+  const ampel = (v: number | null) => (v === null || threshold === null ? "" : v < threshold ? "text-good" : "text-bad");
 
   const withContent = new Set(versions.map((v) => v.productId)).size;
   const sovCount = uploads.filter((u) => u.reportType === "cerebro" && u.parseStatus === "ok").length;

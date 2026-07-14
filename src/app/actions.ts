@@ -75,6 +75,47 @@ export async function saveKeywords(formData: FormData) {
 }
 
 /**
+ * Margen-Kalkulation je Produkt (reporting-main-Port): Prozente kommen als
+ * ganze Zahlen (19 = 19 %), Maße nur wenn L+B+H ALLE gesetzt; Ergebnis wird
+ * mitgespeichert und liefert den Break-even-ACoS für die Ampel.
+ */
+export async function saveMarginCalc(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  if (!productId) return;
+  const num = (k: string) => {
+    const v = String(formData.get(k) ?? "").replace(",", ".").trim();
+    return v === "" ? undefined : parseFloat(v);
+  };
+  const purchasePrice = num("purchasePrice");
+  const sellingPriceGross = num("sellingPriceGross");
+  if (purchasePrice === undefined || sellingPriceGross === undefined) return;
+  const l = num("dimL"), w = num("dimW"), h = num("dimH");
+
+  const { computeMargin } = await import("@/lib/margin/calc");
+  const inputs: import("@/lib/margin/calc").MarginInputs = {
+    purchasePrice,
+    sellingPriceGross,
+    orderQty: num("orderQty") ?? 1,
+    vatRate: (num("vatPct") ?? 19) / 100,
+    category: String(formData.get("category") ?? "Alles andere"),
+    customsRate: (num("customsPct") ?? 0) / 100,
+    returnRate: (num("returnPct") ?? 0) / 100,
+    disposalShare: (num("disposalPct") ?? 0) / 100,
+    packagingCost: num("packagingCost"),
+    qualityInspection: num("qualityInspection"),
+    logisticsCost: num("logisticsCost"),
+    variableCosts: num("variableCosts"),
+    fbaShippingFee: num("fbaShippingFee"),
+    dims: l !== undefined && w !== undefined && h !== undefined ? { l, w, h } : null,
+    weightG: num("weightG") ?? null,
+  };
+  const results = computeMargin(inputs);
+  const db = await getDb();
+  await db.update(schema.products).set({ marginCalc: { inputs, results } }).where(eq(schema.products.id, productId));
+  revalidatePath(`/produkte/${productId}`);
+}
+
+/**
  * Account-Marge in % = Break-even-ACoS-Schwelle für die ACoS/TACoS-Ampel.
  * Hand-Eintrag hat Vorrang (reporting-main-Priorität); der volle
  * Margen-Rechner mit Gebühren-Tabellen liefert die Schwelle später je Produkt.

@@ -38,7 +38,12 @@ export default async function AdvertisingPage({
   const ngramN = n === "2" ? 2 : n === "3" ? 3 : 1;
   const db = await getDb();
   const brand = await db.query.brands.findFirst({ where: eq(schema.brands.id, brandId) });
-  const marginPct = brand?.marginPct ?? null;
+  // Ampel-Schwelle (reporting-main-Priorität): Hand-Eintrag, sonst Ø Break-even-ACoS der Produkt-Margen
+  const brandProducts = await db.query.products.findMany({ where: eq(schema.products.brandId, brandId) });
+  const beps = brandProducts.map((p) => p.marginCalc?.results.breakEvenAcos).filter((x): x is number => x !== undefined);
+  const avgBep = beps.length ? Math.round((beps.reduce((s, x) => s + x, 0) / beps.length) * 10) / 10 : null;
+  const marginPct = brand?.marginPct ?? avgBep;
+  const thresholdSource = brand?.marginPct != null ? "Account-Marge (Hand-Eintrag)" : avgBep !== null ? `Ø Break-even-ACoS aus ${beps.length} Produkt-Kalkulation${beps.length > 1 ? "en" : ""}` : null;
   const uploads = await db.query.reportUploads.findMany({
     where: eq(schema.reportUploads.brandId, brandId),
     orderBy: desc(schema.reportUploads.createdAt),
@@ -143,8 +148,8 @@ export default async function AdvertisingPage({
             <h2 className="sect-h">Ampel-Schwelle: Account-Marge / Break-even-ACoS</h2>
             <p className="mt-1 text-xs text-neutral-500">
               {marginPct !== null
-                ? `${new Intl.NumberFormat("de-DE").format(marginPct)} % — ACoS/TACoS darunter profitabel (grün), ab der Marge wird Umsatz unprofitabel erkauft (rot).`
-                : "Noch keine Marge hinterlegt — ohne Schwelle keine Färbung von ACoS/TACoS. Der volle Margen-Rechner (Gebühren-Tabellen) folgt; bis dahin zählt der Hand-Eintrag."}
+                ? `${new Intl.NumberFormat("de-DE").format(marginPct)} % (${thresholdSource}) — ACoS/TACoS darunter profitabel (grün), ab der Marge wird Umsatz unprofitabel erkauft (rot). Hand-Eintrag hat Vorrang vor den Produkt-Kalkulationen.`
+                : "Noch keine Schwelle — Account-Marge hier eintragen ODER am Produkt eine Margen-Kalkulation speichern (Sektion 4); dann färben sich ACoS/TACoS."}
             </p>
           </div>
           <form action={saveBrandMargin} className="flex items-center gap-2">

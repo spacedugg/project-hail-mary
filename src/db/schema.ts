@@ -84,6 +84,11 @@ export const products = sqliteTable(
      */
     facts: text("facts", { mode: "json" }).$type<ProductFacts>().notNull().default({}),
     price: integer("price_cents"),
+    /** Gespeicherte Margen-Kalkulation (Eingaben + Ergebnis) — liefert Break-even-ACoS je Produkt. */
+    marginCalc: text("margin_calc", { mode: "json" }).$type<{
+      inputs: import("@/lib/margin/calc").MarginInputs;
+      results: import("@/lib/margin/calc").MarginResults;
+    }>(),
     createdAt: ts("created_at").notNull(),
   },
   (t) => [uniqueIndex("products_brand_asin_mp").on(t.brandId, t.asin, t.marketplace)],

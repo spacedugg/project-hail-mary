@@ -2,8 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { saveFacts, saveKeywords, deriveKeywordsFromSov, generateContent, uploadCerebro, runReviewInsights, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent } from "@/app/actions";
+import { saveFacts, saveKeywords, deriveKeywordsFromSov, generateContent, uploadCerebro, runReviewInsights, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
+import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,10 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const latestOf = (t: string) => versions.find((v) => v.type === t);
   const f = product.facts;
   const input = "input-base";
+  const mc = product.marginCalc ?? null;
+  const mi = mc?.inputs;
+  const fmtEur = (n: number) => `${new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)} €`;
+  const fmtPct = (n: number) => `${new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(n)} %`;
 
   return (
     <main className="mx-auto max-w-3xl p-8">
@@ -342,6 +347,71 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             );
           })}
         </div>
+      </section>
+
+      {/* 4 · Marge & Break-even (reporting-main-Port; Hybrid: Auto-Defaults, alles überschreibbar) */}
+      <section className="mt-4 card p-4">
+        <h2 className="sect-h">
+          4 · Marge & Break-even {mc && <span className="ml-1 pill pill-good">✓ {fmtPct(mc.results.marginPct)} Marge · BEP-ACoS {fmtPct(mc.results.breakEvenAcos)}</span>}
+        </h2>
+        <p className="mt-1 text-xs text-neutral-500">
+          Gebühren nach Amazon.de-Tabellen (Verkaufsgebühr je Kategorie, Lager 2 Monate pauschal, Retouren/Entsorgung nach Workbook-Formeln).
+          Der Break-even-ACoS speist die ACoS/TACoS-Ampel, wenn keine Account-Marge gesetzt ist.
+        </p>
+        <form action={saveMarginCalc} className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <input type="hidden" name="productId" value={product.id} />
+          {([
+            ["purchasePrice", "Einkauf €/Stk *", mi?.purchasePrice],
+            ["sellingPriceGross", "Brutto-VK € *", mi?.sellingPriceGross],
+            ["fbaShippingFee", "FBA-Versand €/Stk", mi?.fbaShippingFee],
+            ["packagingCost", "Verpackung €/Stk", mi?.packagingCost],
+            ["logisticsCost", "Logistik €/Stk", mi?.logisticsCost],
+            ["qualityInspection", "QC €/Stk", mi?.qualityInspection],
+            ["variableCosts", "Variabel €/Stk", mi?.variableCosts],
+            ["orderQty", "Bestellmenge", mi?.orderQty ?? 1],
+            ["customsPct", "Zoll %", mi ? Math.round((mi.customsRate ?? 0) * 1000) / 10 : undefined],
+            ["vatPct", "MwSt %", mi ? Math.round((mi.vatRate ?? 0.19) * 100) : 19],
+            ["returnPct", "Retourenquote %", mi ? Math.round((mi.returnRate ?? 0) * 1000) / 10 : undefined],
+            ["disposalPct", "Entsorgungsanteil %", mi ? Math.round((mi.disposalShare ?? 0) * 1000) / 10 : undefined],
+            ["dimL", "Karton L (cm)", mi?.dims?.l],
+            ["dimW", "Karton B (cm)", mi?.dims?.w],
+            ["dimH", "Karton H (cm)", mi?.dims?.h],
+            ["weightG", "Gewicht (g)", mi?.weightG ?? undefined],
+          ] as const).map(([name, label, val]) => (
+            <label key={name} className="block">
+              <span className="mb-0.5 block text-[10px] font-medium text-muted">{label}</span>
+              <input name={name} inputMode="decimal" defaultValue={val ?? ""} required={String(label).includes("*")} className={input} />
+            </label>
+          ))}
+          <label className="col-span-2 block">
+            <span className="mb-0.5 block text-[10px] font-medium text-muted">Amazon-Kategorie (Verkaufsgebühr)</span>
+            <select name="category" defaultValue={mi?.category ?? "Alles andere"} className={input}>
+              {AMAZON_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </label>
+          <div className="col-span-2 flex items-end sm:col-span-2">
+            <button className="btn-primary">Berechnen & speichern</button>
+          </div>
+        </form>
+        {mc && (
+          <div className="stagger mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {([
+              ["Marge/Stk", `${fmtEur(mc.results.marginPerUnit)} · ${fmtPct(mc.results.marginPct)}`],
+              ["Break-even-ACoS", fmtPct(mc.results.breakEvenAcos)],
+              ["ROI", fmtPct(mc.results.roi)],
+              ["Auszahlung/Stk", fmtEur(mc.results.payoutPerUnit)],
+              ["Amazon-Gebühren/Stk", fmtEur(mc.results.amazonTotalPerUnit)],
+              ["davon Verkaufsgebühr", fmtEur(mc.results.referralFee)],
+              ["davon Retouren+Entsorgung", fmtEur(mc.results.returnCostPerUnit + mc.results.disposalCostPerUnit)],
+              ["Marge gesamt (Bestellung)", fmtEur(mc.results.totals.margin)],
+            ] as const).map(([l, v]) => (
+              <div key={l} className="rounded-xl border border-hair p-2.5">
+                <div className={`text-sm font-semibold tabular-nums ${l === "Marge/Stk" && mc.results.marginPerUnit < 0 ? "text-bad" : ""}`}>{v}</div>
+                <div className="text-[10px] text-neutral-500">{l}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </main>
   );

@@ -1,0 +1,1 @@
+ALTER TABLE `products` ADD `margin_calc` text;
