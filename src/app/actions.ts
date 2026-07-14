@@ -394,6 +394,19 @@ export async function syncBrandActions(formData: FormData) {
     }
   }
 
+  // SQP → größte Conversion-Lücke als Content-Handlung (reporting-main sqp-top-priority: Impact = Potenzial)
+  const sqpUpload = uploads.find((u) => u.reportType === "sqp" && u.parseStatus === "ok");
+  const sqpReport = (sqpUpload?.parsed as import("@/lib/reports/sqp").SqpReport | null) ?? null;
+  if (sqpReport && sqpReport.totals.totalPotential >= 1) {
+    const top = sqpReport.rows[0];
+    fresh.push({
+      id: id(), brandId, productId: null, scope: "brand",
+      category: "content",
+      title: `SQP: Conversion-Lücken schließen — größter Hebel „${top.query}" (eure CVR ${top.brandCvr ?? "–"} % vs. Markt ${top.marketCvr ?? "–"} %; Sichtbarkeit & Markt → Funnel)`,
+      source: "sqp-bericht", upliftEur: Math.round(sqpReport.totals.totalPotential), status: "open",
+    });
+  }
+
   // Offene Auto-Handlungen ersetzen; manuell erledigte/in Arbeit bleiben stehen.
   const existing = await db.query.actions.findMany({ where: eq(schema.actions.brandId, brandId) });
   const replaceIds = existing.filter((a) => a.status === "open").map((a) => a.id);
@@ -574,8 +587,11 @@ export async function uploadReport(formData: FormData) {
     } else if (reportType === "searchterm") {
       const { parseSearchTermReport } = await import("@/lib/reports/searchterm");
       parsed = parseSearchTermReport(await file.text());
+    } else if (reportType === "sqp") {
+      const { parseSqpReport } = await import("@/lib/reports/sqp");
+      parsed = parseSqpReport(await file.text());
     } else {
-      throw new Error(`Berichtstyp "${reportType}" folgt — aktuell: Business Report, Ads-Bericht & Search-Term-Report (SQP in Arbeit).`);
+      throw new Error(`Unbekannter Berichtstyp "${reportType}".`);
     }
   } catch (e) {
     parseStatus = "error";
