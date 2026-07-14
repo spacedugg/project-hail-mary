@@ -187,3 +187,29 @@ export const reportUploads = sqliteTable("report_uploads", {
   isSuspended: integer("is_suspended", { mode: "boolean" }).notNull().default(false), // Perioden-Flag-Muster
   createdAt: ts("created_at").notNull(),
 });
+
+/**
+ * Handlungen (D45): entstehen in den Analysen, verankert an der Entität
+ * (scope = brand | product; account folgt mit der Berichts-Schiene).
+ * Der Handlungen-Reiter ist nur eine SICHT auf diese Tabelle — er erzeugt nichts.
+ */
+export type ActionScope = "account" | "brand" | "product";
+export type ActionCategory = "content" | "ppc" | "listing" | "produkt" | "daten";
+export type ActionStatus = "open" | "in_progress" | "done";
+
+export const actions = sqliteTable("actions", {
+  id: text("id").primaryKey(),
+  brandId: text("brand_id")
+    .notNull()
+    .references(() => brands.id, { onDelete: "cascade" }),
+  productId: text("product_id").references(() => products.id, { onDelete: "cascade" }),
+  scope: text("scope").$type<ActionScope>().notNull(),
+  category: text("category").$type<ActionCategory>().notNull(),
+  title: text("title").notNull(),
+  /** Herkunft (Begründungs-Prinzip): welche Analyse hat das erzeugt. */
+  source: text("source").notNull().default("listing-analyse"),
+  upliftEur: integer("uplift_eur"),
+  status: text("status").$type<ActionStatus>().notNull().default("open"),
+  createdAt: ts("created_at").notNull(),
+  doneAt: integer("done_at", { mode: "timestamp" }),
+});

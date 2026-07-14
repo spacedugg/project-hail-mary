@@ -16,10 +16,11 @@ export async function createClient(formData: FormData) {
   if (!name) return;
   const db = await getDb();
   const clientId = id();
+  const brandId = id();
   await db.insert(schema.clients).values({ id: clientId, name, slug: slugify(name) || clientId.slice(0, 8) });
   // Default-Marke = Kundenname (vereinfachter v0-Flow; mehrere Marken jederzeit möglich)
-  await db.insert(schema.brands).values({ id: id(), clientId, name });
-  revalidatePath("/");
+  await db.insert(schema.brands).values({ id: brandId, clientId, name });
+  redirect(`/marke/${brandId}`);
 }
 
 export async function createProduct(formData: FormData) {
@@ -207,4 +208,90 @@ export async function runReviewInsights(formData: FormData) {
   }
   revalidatePath(`/produkte/${productId}`);
   if (errorMsg) throw new Error(errorMsg);
+}
+
+// ── Handlungen (D45): aus Analysen ableiten + Status pflegen ─────────────────
+
+export async function syncBrandActions(formData: FormData) {
+  const brandId = String(formData.get("brandId") ?? "");
+  if (!brandId) return;
+  const db = await getDb();
+  const products = await db.query.products.findMany({ where: eq(schema.products.brandId, brandId) });
+
+  const { analyzeListing } = await import("@/lib/analysis/listingAudit");
+  const { inArray } = await import("drizzle-orm");
+
+  const uploads = await db.query.reportUploads.findMany({ where: eq(schema.reportUploads.brandId, brandId) });
+
+  const fresh: (typeof schema.actions.$inferInsert)[] = [];
+  for (const product of products) {
+    const versions = await db.query.contentVersions.findMany({
+      where: eq(schema.contentVersions.productId, product.id),
+      orderBy: desc(schema.contentVersions.createdAt),
+    });
+    if (versions.length === 0) continue;
+    const latest = (t: string) => versions.find((v) => v.type === t)?.payload as Record<string, unknown> | undefined;
+    const kws = await db.query.keywords.findMany({ where: eq(schema.keywords.productId, product.id) });
+    const insight = await db.query.reviewInsights.findFirst({
+      where: eq(schema.reviewInsights.productId, product.id),
+      orderBy: desc(schema.reviewInsights.createdAt),
+    });
+    const sovUpload = uploads.find(
+      (u) => u.reportType === "cerebro" && u.parseStatus === "ok" && (u.parsed as { productId?: string })?.productId === product.id,
+    );
+    const sovAudit = (sovUpload?.parsed as { audit?: import("@/lib/sov/audit").SovAudit })?.audit ?? null;
+
+    const analysis = analyzeListing({
+      snapshot: {
+        title: (latest("title")?.text as string) ?? "",
+        bullets: (latest("bullets")?.items as string[]) ?? [],
+        description: (latest("description")?.text as string) ?? "",
+        backendKeywords: (latest("backend_keywords")?.text as string) ?? "",
+      },
+      facts: product.facts,
+      primaryKeywords: kws.filter((k) => k.tier === "primary").map((k) => k.keyword),
+      sovAudit,
+      reviewInsights: insight?.payload ?? null,
+    });
+
+    const categorize = (text: string): "content" | "ppc" | "listing" =>
+      /kampagne|ppc|spend|gebot/i.test(text) ? "ppc" : /keyword|titel|bullet|beschreibung|backend|einwand/i.test(text) ? "content" : "listing";
+
+    for (const rec of analysis.recommendations) {
+      fresh.push({
+        id: id(), brandId, productId: product.id, scope: "product",
+        category: categorize(rec), title: `${product.name}: ${rec}`,
+        source: "listing-analyse", upliftEur: null, status: "open",
+      });
+    }
+    if (analysis.sov && analysis.sov.corridor.high > 0) {
+      fresh.push({
+        id: id(), brandId, productId: product.id, scope: "brand",
+        category: "content",
+        title: `${product.name}: Top-Umsatzlücken schließen (${analysis.sov.topGaps.slice(0, 3).map((g) => g.keyword).join(", ")} …)`,
+        source: "sov-audit", upliftEur: analysis.sov.corridor.high, status: "open",
+      });
+    }
+  }
+
+  // Offene Auto-Handlungen ersetzen; manuell erledigte/in Arbeit bleiben stehen.
+  const existing = await db.query.actions.findMany({ where: eq(schema.actions.brandId, brandId) });
+  const replaceIds = existing.filter((a) => a.status === "open").map((a) => a.id);
+  if (replaceIds.length) await db.delete(schema.actions).where(inArray(schema.actions.id, replaceIds));
+  if (fresh.length) await db.insert(schema.actions).values(fresh);
+
+  revalidatePath(`/marke/${brandId}`, "layout");
+}
+
+export async function setActionStatus(formData: FormData) {
+  const actionId = String(formData.get("actionId") ?? "");
+  const status = String(formData.get("status") ?? "") as "open" | "in_progress" | "done";
+  const brandId = String(formData.get("brandId") ?? "");
+  if (!actionId || !status) return;
+  const db = await getDb();
+  await db
+    .update(schema.actions)
+    .set({ status, doneAt: status === "done" ? new Date() : null })
+    .where(eq(schema.actions.id, actionId));
+  revalidatePath(`/marke/${brandId}/handlungen`);
 }

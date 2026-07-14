@@ -58,7 +58,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
   return (
     <main className="mx-auto max-w-3xl p-8">
-      <Link href="/" className="text-xs text-neutral-500 hover:underline">← Katalog</Link>
+      <Link href={`/marke/${product.brandId}/katalog`} className="text-xs text-neutral-500 hover:underline">← Katalog</Link>
       <div className="mt-1 flex items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold">
           {product.name}{" "}
