@@ -1,26 +1,197 @@
 @import "tailwindcss";
 
+/**
+ * temoa OS — Design-Tokens (D49).
+ * Look nach Nutzer-Referenzen: helle Fläche, weiche Karten mit großen Radien,
+ * dunkles Hero-Element als Akzentträger, Violett als Primärfarbe, große
+ * Tabellenziffern + kleine gedämpfte Labels. Eine Quelle der Wahrheit —
+ * Komponentenklassen statt Copy-Paste (D8).
+ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f4f5f9; /* leicht kühles Hellgrau als Bühne */
+  --foreground: #17181d;
+  --surface: #ffffff;
+  --surface-ink: #17181d;
+  --hero: #17181d; /* dunkle Hero-Kachel */
+  --hero-ink: #ffffff;
+  --muted: #7b8090;
+  --hair: #e7e9f0;
+  --primary: #7c5cfc; /* Violett-Akzent aus den Referenzen */
+  --primary-strong: #6543ea;
+  --primary-soft: #efeafe;
+  --good: #16a34a;
+  --warn: #d97706;
+  --bad: #dc2626;
+  --shadow-card: 0 1px 2px rgb(23 24 29 / 0.04), 0 8px 24px rgb(23 24 29 / 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #101116;
+    --foreground: #eceef4;
+    --surface: #181a21;
+    --surface-ink: #eceef4;
+    --hero: #7c5cfc;
+    --hero-ink: #ffffff;
+    --muted: #8f94a3;
+    --hair: #262935;
+    --primary: #977dff;
+    --primary-strong: #7c5cfc;
+    --primary-soft: rgb(124 92 252 / 0.16);
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-muted: var(--muted);
+  --color-hair: var(--hair);
+  --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
+  --color-primary-soft: var(--primary-soft);
+  --color-good: var(--good);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer components {
+  /* Karten */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    border-radius: 1.25rem; /* 20px — weiche Radien aus den Referenzen */
+    box-shadow: var(--shadow-card);
+  }
+  .card-hero {
+    background: var(--hero);
+    color: var(--hero-ink);
+    border-radius: 1.25rem;
+    box-shadow: 0 12px 32px rgb(23 24 29 / 0.25);
+    position: relative;
+    overflow: hidden;
+  }
+  .card-hero::after {
+    /* dezenter Violett-Schein wie in der Referenz-Hero-Kachel */
+    content: "";
+    position: absolute;
+    inset: auto -30% -60% auto;
+    width: 75%;
+    height: 120%;
+    background: radial-gradient(closest-side, rgb(124 92 252 / 0.55), transparent);
+    pointer-events: none;
+  }
+
+  /* Stat-Kacheln */
+  .stat-value {
+    font-size: 1.6rem;
+    line-height: 1.15;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+  .stat-label {
+    margin-top: 0.15rem;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+
+  /* Buttons */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-radius: 9999px;
+    background: var(--primary);
+    color: #fff;
+    padding: 0.5rem 1.1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: background 0.15s ease;
+  }
+  .btn-primary:hover { background: var(--primary-strong); }
+  .btn-primary:disabled { opacity: 0.4; }
+  .btn-dark {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-radius: 9999px;
+    background: var(--hero);
+    color: var(--hero-ink);
+    padding: 0.45rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .btn-dark:hover { opacity: 0.9; }
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    border: 1px solid var(--hair);
+    background: var(--surface);
+    padding: 0.4rem 0.9rem;
+    font-size: 0.8rem;
+    color: var(--foreground);
+  }
+  .btn-ghost:hover { border-color: var(--primary); color: var(--primary-strong); }
+
+  /* Formulare */
+  .input-base {
+    width: 100%;
+    border-radius: 0.75rem;
+    border: 1px solid var(--hair);
+    background: var(--surface);
+    padding: 0.45rem 0.7rem;
+    font-size: 0.85rem;
+  }
+  .input-base:focus { outline: 2px solid var(--primary); outline-offset: 0; border-color: transparent; }
+
+  /* Sidebar */
+  .side-item {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    border-radius: 0.9rem;
+    padding: 0.55rem 0.8rem;
+    font-size: 0.85rem;
+    color: var(--foreground);
+    opacity: 0.75;
+  }
+  .side-item:hover { background: var(--primary-soft); opacity: 1; }
+
+  /* Abschnitts-Überschrift */
+  .sect-h {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+
+  /* Meta-Tag (Typ/Scope/Version — neutrale Auszeichnung, kein Status) */
+  .tag {
+    border-radius: 0.5rem;
+    background: var(--background);
+    padding: 0.1rem 0.45rem;
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 0.62rem;
+    color: var(--muted);
+  }
+
+  /* Status-Pills (Status-Farben NUR für Status — dataviz-Regel) */
+  .pill { border-radius: 9999px; padding: 0.1rem 0.55rem; font-size: 0.66rem; font-weight: 600; }
+  .pill-good { background: rgb(22 163 74 / 0.12); color: var(--good); }
+  .pill-warn { background: rgb(217 119 6 / 0.12); color: var(--warn); }
+  .pill-bad { background: rgb(220 38 38 / 0.12); color: var(--bad); }
+  .pill-neutral { background: var(--primary-soft); color: var(--primary-strong); }
 }

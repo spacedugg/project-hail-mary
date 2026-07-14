@@ -38,35 +38,35 @@ export default async function BrandHandlungen({ params }: { params: Promise<{ br
         </div>
         <form action={syncBrandActions}>
           <input type="hidden" name="brandId" value={brandId} />
-          <button className="rounded bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800">
+          <button className="btn-primary">
             Aus Analysen ableiten
           </button>
         </form>
       </div>
 
       {all.length === 0 && (
-        <p className="mt-8 rounded-lg border border-dashed border-neutral-300 p-6 text-sm text-neutral-500 dark:border-neutral-700">
-          Noch keine Handlungen. Erst Content generieren / SOV-Report hochladen (im <Link href={`/marke/${brandId}/katalog`} className="text-teal-700 underline">Katalog</Link>),
+        <p className="mt-8 card border-dashed p-6 text-sm text-muted">
+          Noch keine Handlungen. Erst Content generieren / SOV-Report hochladen (im <Link href={`/marke/${brandId}/katalog`} className="text-primary-strong underline">Katalog</Link>),
           dann oben „Aus Analysen ableiten" klicken.
         </p>
       )}
 
       <ul className="mt-6 space-y-2">
         {open.map((a) => (
-          <li key={a.id} className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
+          <li key={a.id} className="card p-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                  <span className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono uppercase text-neutral-500 dark:bg-neutral-800">{CAT_LABEL[a.category] ?? a.category}</span>
-                  <span className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-neutral-500 dark:bg-neutral-800">{a.scope === "product" ? "Produkt" : "Marke"}</span>
+                  <span className="tag uppercase">{CAT_LABEL[a.category] ?? a.category}</span>
+                  <span className="tag">{a.scope === "product" ? "Produkt" : "Marke"}</span>
                   <span className="text-neutral-400">← {a.source}</span>
-                  {a.upliftEur ? <span className="rounded bg-emerald-100 px-1.5 py-0.5 font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">~{fmt(a.upliftEur)} €/Mo</span> : null}
-                  {a.status === "in_progress" && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-sky-700 dark:bg-sky-950 dark:text-sky-300">in Arbeit</span>}
+                  {a.upliftEur ? <span className="pill pill-good">~{fmt(a.upliftEur)} €/Mo</span> : null}
+                  {a.status === "in_progress" && <span className="pill pill-neutral">in Arbeit</span>}
                 </div>
                 <p className="mt-1 text-sm">
                   {a.title}
                   {a.productId && (
-                    <Link href={`/produkte/${a.productId}/analyse`} className="ml-1 text-xs text-teal-700 hover:underline dark:text-teal-400">
+                    <Link href={`/produkte/${a.productId}/analyse`} className="ml-1 text-xs text-primary-strong hover:underline">
                       → Analyse
                     </Link>
                   )}
@@ -78,14 +78,14 @@ export default async function BrandHandlungen({ params }: { params: Promise<{ br
                     <input type="hidden" name="actionId" value={a.id} />
                     <input type="hidden" name="brandId" value={brandId} />
                     <input type="hidden" name="status" value="in_progress" />
-                    <button className="rounded border border-neutral-300 px-2 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900">Start</button>
+                    <button className="btn-ghost px-2 py-1 text-xs">Start</button>
                   </form>
                 )}
                 <form action={setActionStatus}>
                   <input type="hidden" name="actionId" value={a.id} />
                   <input type="hidden" name="brandId" value={brandId} />
                   <input type="hidden" name="status" value="done" />
-                  <button className="rounded border border-emerald-600 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950">✓ Erledigt</button>
+                  <button className="btn-ghost px-2 py-1 text-xs !text-good">✓ Erledigt</button>
                 </form>
               </div>
             </div>

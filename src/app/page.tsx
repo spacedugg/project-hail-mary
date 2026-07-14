@@ -15,7 +15,7 @@ export default async function Portfolio() {
   return (
     <main className="mx-auto max-w-4xl p-8">
       <div className="flex items-center gap-2">
-        <span className="inline-block h-7 w-7 rounded-md bg-gradient-to-br from-teal-600 to-teal-900" />
+        <span className="inline-block h-7 w-7 rounded-md bg-gradient-to-br from-[#8f6dff] to-[#5b3fd4]" />
         <div>
           <h1 className="text-2xl font-semibold leading-tight">temoa OS</h1>
           <p className="text-xs text-neutral-500">Portfolio · alle Kunden & Marken</p>
@@ -26,10 +26,10 @@ export default async function Portfolio() {
         <input
           name="name"
           placeholder="Neuen Kunden anlegen (Marke wird mit angelegt)"
-          className="flex-1 rounded border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+          className="input-base flex-1"
           required
         />
-        <button className="rounded bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800">
+        <button className="btn-primary">
           Anlegen
         </button>
       </form>
@@ -47,7 +47,7 @@ export default async function Portfolio() {
               <Link
                 key={b.id}
                 href={`/marke/${b.id}`}
-                className="rounded-lg border border-neutral-200 p-4 transition hover:border-teal-600 dark:border-neutral-800"
+                className="card p-4 transition hover:border-primary"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
@@ -55,14 +55,14 @@ export default async function Portfolio() {
                     <div className="text-xs text-neutral-500">Kunde: {c.name}</div>
                   </div>
                   {open > 0 && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                    <span className="pill pill-warn">
                       {open} offen
                     </span>
                   )}
                 </div>
                 <div className="mt-3 flex gap-4 text-xs text-neutral-500">
                   <span>{prods.length} Produkte</span>
-                  <span className="text-teal-700 dark:text-teal-400">Workspace öffnen →</span>
+                  <span className="text-primary-strong">Workspace öffnen →</span>
                 </div>
               </Link>
             );

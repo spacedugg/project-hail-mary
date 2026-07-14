@@ -54,45 +54,55 @@ export default async function BrandCockpit({ params }: { params: Promise<{ brand
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
         {tiles.map((t) => (
-          <Link key={t.label} href={t.href} className="rounded-lg border border-neutral-200 p-4 hover:border-teal-600 dark:border-neutral-800">
-            <div className="text-2xl font-semibold tabular-nums">{t.value}</div>
-            <div className="mt-0.5 text-xs text-neutral-500">{t.label}</div>
+          <Link key={t.label} href={t.href} className="card p-4 hover:border-primary">
+            <div className="stat-value">{t.value}</div>
+            <div className="stat-label">{t.label}</div>
           </Link>
         ))}
       </div>
 
       <section className="mt-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+        <h2 className="sect-h">
           Performance {businessUpload && <span className="ml-1 font-normal normal-case text-neutral-400">(Business Report {businessUpload.periodStart?.toLocaleDateString("de-DE")} – {businessUpload.periodEnd?.toLocaleDateString("de-DE")})</span>}
         </h2>
         {biz ? (
-          <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-5">
+          <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="card-hero col-span-2 row-span-2 flex flex-col justify-between p-5 sm:col-span-2">
+              <div className="text-xs font-medium text-white/60">Umsatz (Periode)</div>
+              <div>
+                <div className="text-4xl font-semibold tabular-nums tracking-tight">
+                  {new Intl.NumberFormat("de-DE").format(Math.round(biz.revenue))} €
+                </div>
+                <div className="mt-1 text-xs text-white/50">
+                  {new Intl.NumberFormat("de-DE").format(biz.orders)} Bestellungen · Ø {biz.orders ? new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2 }).format(biz.revenue / biz.orders) : "–"} € AOV
+                </div>
+              </div>
+            </div>
             {[
-              ["Umsatz", `${new Intl.NumberFormat("de-DE").format(Math.round(biz.revenue))} €`],
               ["Einheiten", new Intl.NumberFormat("de-DE").format(biz.units)],
               ["Sitzungen", new Intl.NumberFormat("de-DE").format(biz.sessions)],
               ["CVR", biz.cvr !== null ? `${biz.cvr} %` : "–"],
               ["Buybox", biz.buyBoxPct !== null ? `${biz.buyBoxPct} %` : "–"],
             ].map(([l, v]) => (
-              <div key={l} className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-                <div className="text-2xl font-semibold tabular-nums">{v}</div>
-                <div className="mt-0.5 text-xs text-neutral-500">{l}</div>
+              <div key={l} className="card p-4">
+                <div className="stat-value">{v}</div>
+                <div className="stat-label">{l}</div>
               </div>
             ))}
           </div>
         ) : (
-          <p className="mt-2 rounded-lg border border-dashed border-neutral-300 p-4 text-sm text-neutral-500 dark:border-neutral-700">
-            Noch kein Business Report — unter <Link href={`${base}/berichte`} className="text-teal-700 underline">Berichte & Daten</Link> hochladen, dann erscheinen hier Umsatz, CVR & Buybox. ACoS/TACoS folgen mit dem Ads-Bericht.
+          <p className="mt-2 card border-dashed p-4 text-sm text-muted">
+            Noch kein Business Report — unter <Link href={`${base}/berichte`} className="text-primary-strong underline">Berichte & Daten</Link> hochladen, dann erscheinen hier Umsatz, CVR & Buybox. ACoS/TACoS folgen mit dem Ads-Bericht.
           </p>
         )}
       </section>
 
-      <section className="mt-8 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Nächste Schritte</h2>
+      <section className="mt-8 card p-4">
+        <h2 className="sect-h">Nächste Schritte</h2>
         <ul className="mt-2 space-y-1.5">
           {steps.map((s, i) => (
             <li key={i} className="flex items-center gap-2 text-sm">
-              <span className={s.done ? "text-emerald-600" : "text-neutral-300 dark:text-neutral-600"}>{s.done ? "✓" : "○"}</span>
+              <span className={s.done ? "text-good" : "text-muted opacity-50"}>{s.done ? "✓" : "○"}</span>
               <Link href={s.href} className={s.done ? "text-neutral-400 line-through" : "text-neutral-800 hover:underline dark:text-neutral-200"}>
                 {s.text}
               </Link>

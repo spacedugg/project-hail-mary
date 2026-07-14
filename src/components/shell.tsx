@@ -39,36 +39,32 @@ export function BrandShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen">
-      <aside className="hidden w-60 flex-none border-r border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950 sm:block">
-        <div className="border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
-          <Link href="/" className="text-[10px] uppercase tracking-wide text-neutral-400 hover:text-teal-700">← Portfolio · temoa OS</Link>
-          <div className="mt-1 flex items-center gap-2">
-            <span className="inline-block h-6 w-6 flex-none rounded-md bg-gradient-to-br from-teal-600 to-teal-900" />
+    <div className="flex min-h-screen gap-2 p-2">
+      <aside className="card hidden w-60 flex-none self-start sm:sticky sm:top-2 sm:block">
+        <div className="px-4 pb-3 pt-4">
+          <Link href="/" className="text-[10px] uppercase tracking-wide text-muted hover:text-primary-strong">← Portfolio · temoa OS</Link>
+          <div className="mt-2 flex items-center gap-2.5">
+            <span className="inline-block h-8 w-8 flex-none rounded-xl bg-gradient-to-br from-[#8f6dff] to-[#5b3fd4] shadow-[0_4px_12px_rgb(124_92_252/0.35)]" />
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold leading-tight">{brand.name}</div>
-              <div className="truncate text-[10px] text-neutral-500">Kunde: {brand.clientName}</div>
+              <div className="truncate text-[10px] text-muted">Kunde: {brand.clientName}</div>
             </div>
           </div>
         </div>
-        <nav className="p-2">
+        <nav className="space-y-0.5 px-2 pb-2">
           {BRAND_NAV.map((n) => (
-            <Link
-              key={n.path}
-              href={`/marke/${brand.id}${n.path}`}
-              className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-900"
-            >
-              <span className="w-4 text-center text-neutral-400">{n.icon}</span>
+            <Link key={n.path} href={`/marke/${brand.id}${n.path}`} className="side-item">
+              <span className="w-4 text-center text-muted">{n.icon}</span>
               {n.label}
             </Link>
           ))}
         </nav>
         {allBrands.length > 1 && (
-          <div className="mx-2 mt-3 border-t border-neutral-200 px-2 pt-3 dark:border-neutral-800">
-            <div className="px-1 text-[10px] uppercase tracking-wide text-neutral-400">Marke wechseln</div>
+          <div className="mx-3 mb-3 mt-1 border-t border-hair px-1 pt-3">
+            <div className="px-1 text-[10px] uppercase tracking-wide text-muted">Marke wechseln</div>
             <div className="mt-1 space-y-0.5">
               {allBrands.filter((b) => b.id !== brand.id).slice(0, 8).map((b) => (
-                <Link key={b.id} href={`/marke/${b.id}`} className="block truncate rounded px-2 py-1 text-xs text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-900">
+                <Link key={b.id} href={`/marke/${b.id}`} className="block truncate rounded-lg px-2 py-1 text-xs text-muted hover:bg-primary-soft hover:text-foreground">
                   {b.name}
                 </Link>
               ))}
@@ -97,13 +93,13 @@ export function AreaStub({
     <main className="mx-auto max-w-3xl p-8">
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-semibold">{title}</h1>
-        <span className="rounded-full border border-amber-400 bg-amber-50 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+        <span className="pill pill-warn">
           im Aufbau
         </span>
       </div>
       <p className="mt-2 max-w-xl text-sm text-neutral-600 dark:text-neutral-400">{purpose}</p>
-      <div className="mt-6 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Geplante Elemente</h2>
+      <div className="mt-6 card p-4">
+        <h2 className="sect-h">Geplante Elemente</h2>
         <ul className="mt-2 space-y-1">
           {planned.map((p, i) => (
             <li key={i} className="text-sm text-neutral-700 dark:text-neutral-300">· {p}</li>

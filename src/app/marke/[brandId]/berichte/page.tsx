@@ -23,7 +23,7 @@ export default async function BerichtePage({ params }: { params: Promise<{ brand
     where: eq(schema.reportUploads.brandId, brandId),
     orderBy: desc(schema.reportUploads.createdAt),
   });
-  const input = "rounded border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
+  const input = "input-base";
 
   return (
     <main className="mx-auto max-w-3xl p-8">
@@ -32,8 +32,8 @@ export default async function BerichtePage({ params }: { params: Promise<{ brand
         Geführter Upload: Berichtstyp wählen, Periode taggen, hochladen — das Tool parst, validiert und rechnet KPIs aus Roh-Summen. Später ersetzt die SP-API den Upload, die Bedienung bleibt.
       </p>
 
-      <section className="mt-6 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Bericht hochladen</h2>
+      <section className="mt-6 card p-4">
+        <h2 className="sect-h">Bericht hochladen</h2>
         <form action={uploadReport} className="mt-3 space-y-2">
           <input type="hidden" name="brandId" value={brandId} />
           <select name="reportType" className={`${input} w-full`} defaultValue="business">
@@ -47,7 +47,7 @@ export default async function BerichtePage({ params }: { params: Promise<{ brand
             <span className="text-neutral-400">–</span>
             <input type="date" name="periodEnd" required className={input} />
             <input type="file" name="file" accept=".csv,.txt" required className="text-sm" />
-            <button className="rounded bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800">
+            <button className="btn-primary">
               Hochladen & auswerten
             </button>
           </div>
@@ -55,20 +55,20 @@ export default async function BerichtePage({ params }: { params: Promise<{ brand
       </section>
 
       <section className="mt-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Upload-Historie</h2>
+        <h2 className="sect-h">Upload-Historie</h2>
         <ul className="mt-2 space-y-2">
           {uploads.length === 0 && <li className="text-sm text-neutral-400">Noch keine Berichte hochgeladen.</li>}
           {uploads.map((u) => {
             const t = u.reportType === "business" ? ((u.parsed as { totals?: BusinessTotals })?.totals ?? null) : null;
             return (
-              <li key={u.id} className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
+              <li key={u.id} className="card p-3">
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono uppercase text-neutral-500 dark:bg-neutral-800">{u.reportType}</span>
+                  <span className="tag uppercase">{u.reportType}</span>
                   <span className="font-medium">{u.fileName}</span>
                   <span className="text-neutral-400">{dateStr(u.periodStart)} – {dateStr(u.periodEnd)}</span>
                   {u.parseStatus === "ok"
-                    ? <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">✓ ausgewertet</span>
-                    : <span className="rounded bg-red-100 px-1.5 py-0.5 text-red-700 dark:bg-red-950 dark:text-red-400">✕ Fehler</span>}
+                    ? <span className="pill pill-good">✓ ausgewertet</span>
+                    : <span className="pill pill-bad">✕ Fehler</span>}
                 </div>
                 {u.parseError && <p className="mt-1 text-xs text-red-600">{u.parseError}</p>}
                 {t && (
@@ -81,7 +81,7 @@ export default async function BerichtePage({ params }: { params: Promise<{ brand
                       ["CVR", t.cvr !== null ? `${t.cvr} %` : "–"],
                       ["Buybox", t.buyBoxPct !== null ? `${t.buyBoxPct} %` : "–"],
                     ].map(([l, v]) => (
-                      <div key={l} className="rounded border border-neutral-100 p-2 dark:border-neutral-900">
+                      <div key={l} className="rounded-xl border border-hair p-2">
                         <div className="text-sm font-semibold tabular-nums">{v}</div>
                         <div className="text-[10px] text-neutral-500">{l}</div>
                       </div>

@@ -58,7 +58,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   });
   const latestOf = (t: string) => versions.find((v) => v.type === t);
   const f = product.facts;
-  const input = "w-full rounded border border-neutral-300 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900";
+  const input = "input-base";
 
   return (
     <main className="mx-auto max-w-3xl p-8">
@@ -68,32 +68,32 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           {product.name}{" "}
           {product.asin && <span className="font-mono text-sm text-neutral-500">{product.asin} · amazon.{product.marketplace}</span>}
         </h1>
-        <Link href={`/produkte/${product.id}/analyse`} className="rounded border border-teal-700 px-3 py-1.5 text-sm font-medium text-teal-700 hover:bg-teal-50 dark:text-teal-400 dark:hover:bg-teal-950">
+        <Link href={`/produkte/${product.id}/analyse`} className="btn-ghost !text-primary-strong font-medium">
           Analyse öffnen →
         </Link>
       </div>
 
       {/* 0 · Original-Listing (Import) */}
-      <section className="mt-6 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-          0 · Original-Listing (Import) {snapshot && <span className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">✓ {snapshot.source} · {snapshot.createdAt.toLocaleDateString("de-DE")}</span>}
+      <section className="mt-6 card p-4">
+        <h2 className="sect-h">
+          0 · Original-Listing (Import) {snapshot && <span className="ml-1 pill pill-good">✓ {snapshot.source} · {snapshot.createdAt.toLocaleDateString("de-DE")}</span>}
         </h2>
         <p className="mt-1 text-xs text-neutral-500">Bestehende ASIN? Daten importieren statt tippen — als „Vorher" für Analyse & Vergleich.</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <form action={importListingFromAmazon}>
             <input type="hidden" name="productId" value={product.id} />
-            <button disabled={!product.asin} className="rounded bg-neutral-800 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 disabled:opacity-40 dark:bg-neutral-200 dark:text-black">
+            <button disabled={!product.asin} className="btn-dark disabled:opacity-40">
               Von Amazon importieren (Apify)
             </button>
           </form>
           <form action={uploadListingCsv} className="flex items-center gap-2">
             <input type="hidden" name="productId" value={product.id} />
             <input type="file" name="file" accept=".csv" required className="text-sm" />
-            <button className="rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900">H10-CSV importieren</button>
+            <button className="btn-ghost">H10-CSV importieren</button>
           </form>
         </div>
         {snapshot && (
-          <div className="mt-3 rounded bg-neutral-50 p-3 text-xs dark:bg-neutral-900">
+          <div className="mt-3 rounded-xl bg-background p-3 text-xs">
             {snapshot.title && <p><b>Titel:</b> {snapshot.title}</p>}
             {snapshot.bullets && snapshot.bullets.length > 0 && (
               <ul className="mt-1 space-y-0.5">{snapshot.bullets.slice(0, 5).map((b, i) => <li key={i}>• {b.slice(0, 140)}{b.length > 140 ? "…" : ""}</li>)}</ul>
@@ -106,14 +106,14 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       </section>
 
       {/* 0b · Bildplätze */}
-      <section className="mt-4 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">0b · Bildplätze (Listing)</h2>
+      <section className="mt-4 card p-4">
+        <h2 className="sect-h">0b · Bildplätze (Listing)</h2>
         {snapshot?.imageUrls && snapshot.imageUrls.length > 0 ? (
           <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-7">
             {Array.from({ length: 7 }, (_, i) => {
               const url = snapshot.imageUrls?.[i];
               return (
-                <div key={i} className="rounded border border-neutral-200 p-1 text-center dark:border-neutral-800">
+                <div key={i} className="card p-1 text-center">
                   {url ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img src={url} alt={`Slot ${i + 1}`} className="mx-auto h-20 w-full rounded object-contain" />
@@ -131,8 +131,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       </section>
 
       {/* 1 · Produkt-Wahrheit */}
-      <section className="mt-6 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">1 · Produkt-Wahrheit (Pflicht)</h2>
+      <section className="mt-6 card p-4">
+        <h2 className="sect-h">1 · Produkt-Wahrheit (Pflicht)</h2>
         <form action={saveFacts} className="mt-3 grid grid-cols-2 gap-2">
           <input type="hidden" name="productId" value={product.id} />
           <input name="productType" defaultValue={f.productType} placeholder="Produkttyp (z. B. Trinkflasche)" className={input} />
@@ -141,15 +141,15 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           <input name="usps" defaultValue={f.usps?.join(" | ")} placeholder="USPs (| -getrennt) — jede wird genau 1× verwendet" className={`${input} col-span-2`} />
           <input name="targetAudience" defaultValue={f.targetAudience} placeholder="Zielgruppe" className={input} />
           <input name="certifications" defaultValue={f.certifications?.join(" | ")} placeholder="Zertifikate/Normen (nur echte)" className={input} />
-          <button className="col-span-2 rounded bg-neutral-800 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 dark:bg-neutral-200 dark:text-black">
+          <button className="col-span-2 btn-dark">
             Speichern
           </button>
         </form>
       </section>
 
       {/* 2 · Keywords */}
-      <section className="mt-4 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+      <section className="mt-4 card p-4">
+        <h2 className="sect-h">
           2 · Keyword-Basis (Pflicht) — {kws.length} Keywords
         </h2>
         <p className="mt-1 text-xs text-neutral-500">
@@ -164,23 +164,23 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             placeholder={"edelstahl trinkflasche;18100\nthermosflasche;9900\n…"}
             className={`${input} font-mono`}
           />
-          <button className="mt-2 rounded bg-neutral-800 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 dark:bg-neutral-200 dark:text-black">
+          <button className="mt-2 btn-dark">
             Keywords speichern
           </button>
         </form>
       </section>
 
       {/* 2b · SOV-Report */}
-      <section className="mt-4 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-          2b · SOV-Report (Cerebro-CSV, optional) {sovUpload && <span className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">✓ {sovUpload.fileName}</span>}
+      <section className="mt-4 card p-4">
+        <h2 className="sect-h">
+          2b · SOV-Report (Cerebro-CSV, optional) {sovUpload && <span className="ml-1 pill pill-good">✓ {sovUpload.fileName}</span>}
         </h2>
         <p className="mt-1 text-xs text-neutral-500">Helium-10-Cerebro-Export (mit Wettbewerber-ASINs als Spalten) → SOV-Audit mit Quick-Wins & Umsatzlücken. Speist Analyse + Backend-Keywords.</p>
         <form action={uploadCerebro} className="mt-3 flex flex-wrap items-center gap-2">
           <input type="hidden" name="productId" value={product.id} />
           <input type="file" name="file" accept=".csv" required className="text-sm" />
           <input name="price" type="number" step="0.01" placeholder="Ø-Preis € (Default 45)" className={`${input} w-44`} />
-          <button className="rounded bg-neutral-800 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 dark:bg-neutral-200 dark:text-black">Hochladen & auswerten</button>
+          <button className="btn-dark">Hochladen & auswerten</button>
         </form>
         {uploads.find((u) => u.reportType === "cerebro" && u.parseStatus === "error") && !sovUpload && (
           <p className="mt-2 text-xs text-red-600">Letzter Upload fehlgeschlagen: {uploads.find((u) => u.parseStatus === "error")?.parseError}</p>
@@ -188,15 +188,15 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       </section>
 
       {/* 2c · Review-Insights */}
-      <section className="mt-4 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-          2c · Review-Insights (Apify) {insights && <span className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">✓ {insights.dataBasis} · {insights.confidence}</span>}
+      <section className="mt-4 card p-4">
+        <h2 className="sect-h">
+          2c · Review-Insights (Apify) {insights && <span className="ml-1 pill pill-good">✓ {insights.dataBasis} · {insights.confidence}</span>}
         </h2>
         <p className="mt-1 text-xs text-neutral-500">Scrapt Reviews der eigenen ASIN + bis 5 Wettbewerber (amazon.{product.marketplace}) → Pain Points & Kaufauslöser mit O-Tönen. Braucht APIFY_API_KEY (ohne: Mock).</p>
         <form action={runReviewInsights} className="mt-3 flex flex-wrap items-center gap-2">
           <input type="hidden" name="productId" value={product.id} />
           <input name="competitorAsins" placeholder="Wettbewerber-ASINs (Leerzeichen-getrennt)" className={`${input} flex-1`} />
-          <button className="rounded bg-neutral-800 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 dark:bg-neutral-200 dark:text-black">Reviews analysieren</button>
+          <button className="btn-dark">Reviews analysieren</button>
         </form>
         {insights && (
           <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
@@ -213,8 +213,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       </section>
 
       {/* 3 · Content */}
-      <section className="mt-4 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">3 · Content — generieren & Gate</h2>
+      <section className="mt-4 card p-4">
+        <h2 className="sect-h">3 · Content — generieren & Gate</h2>
         <p className="mt-1 text-xs text-neutral-500">
           Sektionsweise (Titel → Bullets → Backend → Beschreibung); jede Generierung durchläuft das Validation-Gate. Ohne API-Key läuft der Mock-Modus.
         </p>
@@ -224,29 +224,29 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             const v = latestOf(dbType);
             const payload = v?.payload as { text?: string; items?: string[]; pairs?: Array<{ q: string; a: string }>; rationale?: Array<{ part: string; source: string; verified: boolean }> } | undefined;
             return (
-              <div key={key} className="rounded border border-neutral-200 p-3 dark:border-neutral-800">
+              <div key={key} className="card p-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-medium">
                     {label}{" "}
-                    {v && <span className="ml-1 rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[10px] text-neutral-500 dark:bg-neutral-800">v{v.version} · {v.status} · {v.generatedBy}</span>}
+                    {v && <span className="ml-1 tag">v{v.version} · {v.status} · {v.generatedBy}</span>}
                   </h3>
                   <form action={generateContent}>
                     <input type="hidden" name="productId" value={product.id} />
                     <input type="hidden" name="section" value={key} />
-                    <button className="rounded bg-teal-700 px-3 py-1 text-xs font-medium text-white hover:bg-teal-800">
+                    <button className="btn-primary px-3 py-1 text-xs">
                       {v ? "Neu generieren" : "Generieren"}
                     </button>
                   </form>
                 </div>
                 {payload?.text && (
-                  <p className="mt-2 whitespace-pre-wrap rounded bg-neutral-50 p-2 text-sm dark:bg-neutral-900">
+                  <p className="mt-2 whitespace-pre-wrap rounded-xl bg-background p-2 text-sm">
                     {payload.text}
                     {key === "title" && <span className="ml-2 font-mono text-[10px] text-neutral-400">{payload.text.length}/75</span>}
                     {key === "highlights" && <span className="ml-2 font-mono text-[10px] text-neutral-400">{payload.text.length}/125</span>}
                   </p>
                 )}
                 {payload?.pairs && (
-                  <ul className="mt-2 space-y-1.5 rounded bg-neutral-50 p-2 text-sm dark:bg-neutral-900">
+                  <ul className="mt-2 space-y-1.5 rounded-xl bg-background p-2 text-sm">
                     {payload.pairs.map((p, i) => (
                       <li key={i}><b>F: {p.q}</b><br />A: {p.a}</li>
                     ))}
@@ -265,7 +265,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                   </details>
                 )}
                 {payload?.items && (
-                  <ul className="mt-2 space-y-1 rounded bg-neutral-50 p-2 text-sm dark:bg-neutral-900">
+                  <ul className="mt-2 space-y-1 rounded-xl bg-background p-2 text-sm">
                     {payload.items.map((b, i) => <li key={i}>• {b}</li>)}
                   </ul>
                 )}
@@ -292,7 +292,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                       }
                       className={`${input} font-mono text-xs`}
                     />
-                    <button className="mt-1.5 rounded bg-neutral-800 px-3 py-1.5 text-xs text-white hover:bg-neutral-700 dark:bg-neutral-200 dark:text-black">
+                    <button className="btn-dark mt-1.5 text-xs">
                       Speichern als neue Version (v{(v?.version ?? 0) + 1})
                     </button>
                   </form>

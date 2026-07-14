@@ -72,7 +72,7 @@ export default async function AnalysePage({ params }: { params: Promise<{ id: st
       <Link href={`/produkte/${id}`} className="text-xs text-neutral-500 hover:underline print:hidden">← Produkt</Link>
 
       <header className="mt-2 border-b border-neutral-200 pb-4 dark:border-neutral-800">
-        <p className="text-xs uppercase tracking-widest text-teal-700 dark:text-teal-400">Listing-Analyse · {brand?.name}</p>
+        <p className="text-xs uppercase tracking-widest text-primary-strong">Listing-Analyse · {brand?.name}</p>
         <div className="mt-1 flex items-end justify-between gap-4">
           <h1 className="text-2xl font-semibold">{product.name}</h1>
           <div className="text-right">
@@ -85,7 +85,7 @@ export default async function AnalysePage({ params }: { params: Promise<{ id: st
 
       {analysis.sov && (
         <section className="mt-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Markt-Position (Share of Voice)</h2>
+          <h2 className="sect-h">Markt-Position (Share of Voice)</h2>
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[
               ["Eigener SOV", `${analysis.sov.brandSOV} %`],
@@ -93,7 +93,7 @@ export default async function AnalysePage({ params }: { params: Promise<{ id: st
               ["Top-10-Abdeckung", `${analysis.sov.top10Coverage} %`],
               ["Quick Wins", String(analysis.sov.quickWinCount)],
             ].map(([l, v]) => (
-              <div key={l} className="rounded border border-neutral-200 p-3 dark:border-neutral-800">
+              <div key={l} className="card p-3">
                 <div className="text-lg font-semibold tabular-nums">{v}</div>
                 <div className="text-[11px] text-neutral-500">{l}</div>
               </div>
@@ -129,20 +129,20 @@ export default async function AnalysePage({ params }: { params: Promise<{ id: st
       )}
 
       <section className="mt-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Dimensionen</h2>
+        <h2 className="sect-h">Dimensionen</h2>
         <div className="mt-2 space-y-3">
           {analysis.dimensions.map((d) => (
-            <div key={d.key} className="rounded border border-neutral-200 p-3 dark:border-neutral-800">
+            <div key={d.key} className="card p-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium">{d.label}</h3>
                 <div className="flex items-center gap-2">
-                  <span className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[10px] text-neutral-500 dark:bg-neutral-800">
+                  <span className="tag">
                     {d.evidence === "deterministic" ? "gemessen" : d.evidence === "llm" ? "KI-Rubrik" : "Experte"}
                   </span>
                   <span className="text-lg font-semibold tabular-nums">{d.score}</span>
                 </div>
               </div>
-              <div className="mt-1 h-1.5 overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800">
+              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-hair">
                 <div className={`h-full ${d.score >= 80 ? "bg-emerald-500" : d.score >= 60 ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${d.score}%` }} />
               </div>
               {d.findings.length > 0 && (
@@ -156,7 +156,7 @@ export default async function AnalysePage({ params }: { params: Promise<{ id: st
       </section>
 
       <section className="mt-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Warum neu konzipieren — die Maßnahmen</h2>
+        <h2 className="sect-h">Warum neu konzipieren — die Maßnahmen</h2>
         <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm">
           {analysis.recommendations.map((r, i) => <li key={i}>{r}</li>)}
           {analysis.recommendations.length === 0 && <li className="list-none text-neutral-400">Keine offenen Maßnahmen — Listing ist regelkonform.</li>}
@@ -178,11 +178,11 @@ export default async function AnalysePage({ params }: { params: Promise<{ id: st
         if (rationaleSections.length === 0) return null;
         return (
           <section className="mt-6">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Warum diese Texte so formuliert sind</h2>
+            <h2 className="sect-h">Warum diese Texte so formuliert sind</h2>
             <p className="mt-1 text-xs text-neutral-500">Jeder Bestandteil mit seiner Herleitung — ✓ = im Text belegt, ⚠︎ = Behauptung nicht belegt.</p>
             <div className="mt-2 space-y-3">
               {rationaleSections.map((s) => (
-                <div key={s.label} className="rounded border border-neutral-200 p-3 dark:border-neutral-800">
+                <div key={s.label} className="card p-3">
                   <h3 className="text-sm font-medium">{s.label}</h3>
                   <ul className="mt-1 space-y-0.5">
                     {s.rationale.map((r, i) => (
@@ -199,9 +199,9 @@ export default async function AnalysePage({ params }: { params: Promise<{ id: st
       })()}
 
       <section className="mt-8 print:hidden">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Bild-/A+-Brief (copy-paste für Bildgen-Tool)</h2>
+        <h2 className="sect-h">Bild-/A+-Brief (copy-paste für Bildgen-Tool)</h2>
         <p className="mt-1 text-xs text-neutral-500">Deterministisch aus der Analyse assembliert — inkl. Reference-Fidelity-Lock und spelling-safe Headlines.</p>
-        <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded bg-neutral-50 p-3 text-xs dark:bg-neutral-900">{brief}</pre>
+        <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-xl bg-background p-3 text-xs">{brief}</pre>
       </section>
 
       <footer className="mt-8 border-t border-neutral-200 pt-3 text-[10px] text-neutral-400 dark:border-neutral-800">

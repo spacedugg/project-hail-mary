@@ -23,7 +23,7 @@ export default async function BrandSichtbarkeit({ params }: { params: Promise<{ 
       <p className="mt-1 text-sm text-neutral-500">Share of Voice je Produkt (aus Cerebro-Uploads). Funnel-vs-Markt & Opportunity-Matrix folgen mit dem SQP-Bericht.</p>
 
       {audits.length === 0 && (
-        <p className="mt-8 rounded-lg border border-dashed border-neutral-300 p-6 text-sm text-neutral-500 dark:border-neutral-700">
+        <p className="mt-8 card border-dashed p-6 text-sm text-muted">
           Noch kein SOV-Audit. Cerebro-CSV am Produkt hochladen (Katalog → Produkt → 2b).
         </p>
       )}
@@ -33,10 +33,10 @@ export default async function BrandSichtbarkeit({ params }: { params: Promise<{ 
           const p = products.find((x) => x.id === productId);
           const a = audit!;
           return (
-            <div key={u.id} className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+            <div key={u.id} className="card p-4">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-medium">{p?.name ?? "Produkt"} <span className="font-mono text-xs text-neutral-500">{a.mainAsin}</span></div>
-                {p && <Link href={`/produkte/${p.id}/analyse`} className="text-xs text-teal-700 hover:underline dark:text-teal-400">Analyse →</Link>}
+                {p && <Link href={`/produkte/${p.id}/analyse`} className="text-xs text-primary-strong hover:underline">Analyse →</Link>}
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
                 {[
@@ -46,7 +46,7 @@ export default async function BrandSichtbarkeit({ params }: { params: Promise<{ 
                   ["Quick Wins", String(a.quickWins.length)],
                   ["Korridor €/Mo", a.totalCorridor.high ? `${fmt(a.totalCorridor.low)}–${fmt(a.totalCorridor.high)}` : "–"],
                 ].map(([l, v]) => (
-                  <div key={l} className="rounded border border-neutral-100 p-2 dark:border-neutral-900">
+                  <div key={l} className="rounded-xl border border-hair p-2">
                     <div className="text-sm font-semibold tabular-nums">{v}</div>
                     <div className="text-[10px] text-neutral-500">{l}</div>
                   </div>

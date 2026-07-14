@@ -33,14 +33,14 @@ export default async function FlatfilesPage({ params }: { params: Promise<{ bran
         Das Tool füllt sie mit dem generierten Content; Download als upload-fertige TXT. Direkter API-Push folgt.
       </p>
 
-      <section className="mt-6 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-          1 · Vorlage {latestTpl && <span className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">✓ {latestTpl.fileName}</span>}
+      <section className="mt-6 card p-4">
+        <h2 className="sect-h">
+          1 · Vorlage {latestTpl && <span className="ml-1 pill pill-good">✓ {latestTpl.fileName}</span>}
         </h2>
         <form action={uploadFlatfileTemplate} className="mt-3 flex flex-wrap items-center gap-2">
           <input type="hidden" name="brandId" value={brandId} />
           <input type="file" name="file" accept=".xlsx,.xlsm,.txt,.tsv" required className="text-sm" />
-          <button className="rounded bg-neutral-800 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 dark:bg-neutral-200 dark:text-black">
+          <button className="btn-dark">
             Neuste Vorlage hochladen
           </button>
         </form>
@@ -52,8 +52,8 @@ export default async function FlatfilesPage({ params }: { params: Promise<{ bran
         )}
       </section>
 
-      <section className="mt-4 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">2 · Produkte im Flat File</h2>
+      <section className="mt-4 card p-4">
+        <h2 className="sect-h">2 · Produkte im Flat File</h2>
         <ul className="mt-2 space-y-1">
           {products.length === 0 && <li className="text-sm text-neutral-400">Keine Produkte im Katalog.</li>}
           {products.map((p) => (
@@ -70,7 +70,7 @@ export default async function FlatfilesPage({ params }: { params: Promise<{ bran
         {latestTpl && products.length > 0 ? (
           <a
             href={`/api/flatfile/${brandId}`}
-            className="inline-block rounded bg-teal-700 px-5 py-2.5 text-sm font-medium text-white hover:bg-teal-800"
+            className="inline-block btn-primary"
             download
           >
             ⇣ Flat File herunterladen (TXT für Seller Central)
