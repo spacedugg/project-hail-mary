@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 const TYPES = [
   { value: "business", label: "Business Report (Verkäufe & Traffic, nach untergeordnetem Artikel)", active: true },
   { value: "ads", label: "Ads-/Kampagnenbericht (Sponsored Ads, alle Typen)", active: true },
+  { value: "searchterm", label: "Search-Term-Report (Sponsored Products Suchbegriffe)", active: true },
   { value: "sqp", label: "Search Query Performance — folgt", active: false },
-  { value: "searchterm", label: "Search-Term-Report — folgt", active: false },
 ];
 
 const fmt = (n: number) => new Intl.NumberFormat("de-DE").format(n);

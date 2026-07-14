@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /**
  * Entity-Hierarchie (D16): Kunde → Marke → Marktplatz/Land → Produktgruppe → Produkt (ASIN).
@@ -27,6 +27,12 @@ export const brands = sqliteTable("brands", {
   name: text("name").notNull(),
   // Brand-Voice-Override; Default ist die temoa-Voice aus dem Wissens-Layer
   voiceTone: text("voice_tone"),
+  /**
+   * Account-Marge in % = Break-even-ACoS-Schwelle für die ACoS/TACoS-Ampel
+   * (reporting-main-Priorität: Hand-Eintrag vor berechneten Produkt-Margen;
+   * der volle Margen-Rechner mit Gebühren-Tabellen folgt).
+   */
+  marginPct: real("margin_pct"),
   createdAt: ts("created_at").notNull(),
 });
 

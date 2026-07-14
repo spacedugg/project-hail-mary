@@ -75,6 +75,22 @@ export async function saveKeywords(formData: FormData) {
 }
 
 /**
+ * Account-Marge in % = Break-even-ACoS-Schwelle für die ACoS/TACoS-Ampel.
+ * Hand-Eintrag hat Vorrang (reporting-main-Priorität); der volle
+ * Margen-Rechner mit Gebühren-Tabellen liefert die Schwelle später je Produkt.
+ */
+export async function saveBrandMargin(formData: FormData) {
+  const brandId = String(formData.get("brandId") ?? "");
+  const raw = String(formData.get("marginPct") ?? "").replace(",", ".").trim();
+  if (!brandId) return;
+  const marginPct = raw === "" ? null : parseFloat(raw);
+  if (marginPct !== null && (!Number.isFinite(marginPct) || marginPct < 0 || marginPct > 100)) return;
+  const db = await getDb();
+  await db.update(schema.brands).set({ marginPct }).where(eq(schema.brands.id, brandId));
+  revalidatePath(`/marke/${brandId}`, "layout");
+}
+
+/**
  * Content-Freigabe: die neueste Version einer Sektion wird "approved" —
  * Flat File & Analyse bevorzugen ab dann Freigaben vor Entwürfen.
  * Freigabe nur ohne Gate-Fehler (Warnungen sind ok — Ausschöpfungs-Prinzip).
@@ -332,7 +348,8 @@ export async function syncBrandActions(formData: FormData) {
 
   // Marken-Ebene: Ads-Bericht → Spend ohne Verkäufe als PPC-Handlung (Hebel = eingesparter Spend)
   const adsUpload = uploads.find((u) => u.reportType === "ads" && u.parseStatus === "ok");
-  const adsTotals = (adsUpload?.parsed as { totals?: import("@/lib/reports/ads").AdsTotals })?.totals ?? null;
+  const adsParsed = adsUpload?.parsed as { totals?: import("@/lib/reports/ads").AdsTotals; campaigns?: import("@/lib/reports/ads").AdsCampaign[] } | null;
+  const adsTotals = adsParsed?.totals ?? null;
   if (adsTotals && adsTotals.noSaleSpend > 0) {
     fresh.push({
       id: id(), brandId, productId: null, scope: "brand",
@@ -340,6 +357,41 @@ export async function syncBrandActions(formData: FormData) {
       title: `${adsTotals.noSaleCount} Kampagnen mit Spend ohne Verkäufe prüfen (pausieren/negativieren)`,
       source: "ads-bericht", upliftEur: Math.round(adsTotals.noSaleSpend), status: "open",
     });
+  }
+  // Ads-Bericht → Überspend über Portfolio-Ziel (spend − sales × targetAcos, reporting-main ads-over-target)
+  const overTarget = (adsParsed?.campaigns ?? []).filter(
+    (c) => c.targetAcos !== null && c.sales > 0 && c.spend > c.sales * c.targetAcos,
+  );
+  const overspend = overTarget.reduce((s, c) => s + (c.spend - c.sales * (c.targetAcos ?? 0)), 0);
+  if (overTarget.length > 0 && overspend >= 1) {
+    fresh.push({
+      id: id(), brandId, productId: null, scope: "brand",
+      category: "ppc",
+      title: `${overTarget.length} Kampagnen über Portfolio-Ziel-ACoS — Gebote/Ausrichtung prüfen (${overTarget.slice(0, 3).map((c) => c.name).join(", ")}${overTarget.length > 3 ? " …" : ""})`,
+      source: "ads-bericht", upliftEur: Math.round(overspend), status: "open",
+    });
+  }
+  // Search-Term-Report → echte Negativ-Kandidaten; ASIN-Ziele separat (reporting-main st-negatives/st-asin-negatives)
+  const stUpload = uploads.find((u) => u.reportType === "searchterm" && u.parseStatus === "ok");
+  const stTotals = (stUpload?.parsed as { totals?: import("@/lib/reports/searchterm").SearchTermTotals })?.totals ?? null;
+  if (stTotals) {
+    const textWaste = stTotals.wastedSpend - stTotals.asinWastedSpend;
+    if (textWaste >= 1) {
+      fresh.push({
+        id: id(), brandId, productId: null, scope: "brand",
+        category: "ppc",
+        title: `Negativ-Keywords setzen: ${stTotals.zeroOrderTerms} Suchbegriffe mit Spend ohne Kauf (Kandidaten unter Advertising → N-Gram)`,
+        source: "searchterm-report", upliftEur: Math.round(textWaste), status: "open",
+      });
+    }
+    if (stTotals.asinWastedSpend >= 1) {
+      fresh.push({
+        id: id(), brandId, productId: null, scope: "brand",
+        category: "ppc",
+        title: "ASIN-Ziele ohne Conversion aus den Kampagnen nehmen",
+        source: "searchterm-report", upliftEur: Math.round(stTotals.asinWastedSpend), status: "open",
+      });
+    }
   }
 
   // Offene Auto-Handlungen ersetzen; manuell erledigte/in Arbeit bleiben stehen.
@@ -519,8 +571,11 @@ export async function uploadReport(formData: FormData) {
     } else if (reportType === "ads") {
       const { parseAdsReport } = await import("@/lib/reports/ads");
       parsed = parseAdsReport(await file.text());
+    } else if (reportType === "searchterm") {
+      const { parseSearchTermReport } = await import("@/lib/reports/searchterm");
+      parsed = parseSearchTermReport(await file.text());
     } else {
-      throw new Error(`Berichtstyp "${reportType}" folgt — aktuell: Business Report & Ads-Bericht (SQP/Search-Term in Arbeit).`);
+      throw new Error(`Berichtstyp "${reportType}" folgt — aktuell: Business Report, Ads-Bericht & Search-Term-Report (SQP in Arbeit).`);
     }
   } catch (e) {
     parseStatus = "error";

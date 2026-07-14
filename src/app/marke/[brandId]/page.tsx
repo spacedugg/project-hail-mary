@@ -26,6 +26,10 @@ export default async function BrandCockpit({ params }: { params: Promise<{ brand
   const combined = biz && adsTotals
     ? (await import("@/lib/reports/ads")).combineWithBusiness(adsTotals, { revenue: biz.revenue, sessions: biz.sessions, orders: biz.orders })
     : null;
+  const brand = await db.query.brands.findFirst({ where: eq(schema.brands.id, brandId) });
+  // ACoS/TACoS-Ampel gegen die Account-Marge (reporting-main acosColor); ohne Schwelle keine Färbung
+  const ampel = (v: number | null) =>
+    v === null || brand?.marginPct == null ? "" : v < brand.marginPct ? "text-good" : "text-bad";
 
   const withContent = new Set(versions.map((v) => v.productId)).size;
   const sovCount = uploads.filter((u) => u.reportType === "cerebro" && u.parseStatus === "ok").length;
@@ -83,16 +87,16 @@ export default async function BrandCockpit({ params }: { params: Promise<{ brand
                 </div>
               </div>
             </div>
-            {[
-              ["Einheiten", new Intl.NumberFormat("de-DE").format(biz.units)],
-              ["Sitzungen", new Intl.NumberFormat("de-DE").format(biz.sessions)],
-              ["CVR", biz.cvr !== null ? `${biz.cvr} %` : "–"],
-              ["Buybox", biz.buyBoxPct !== null ? `${biz.buyBoxPct} %` : "–"],
-              ...(adsTotals ? [["ACoS", adsTotals.acos !== null ? `${adsTotals.acos} %` : "–"]] : []),
-              ...(combined ? [["TACoS", combined.tacos !== null ? `${combined.tacos} %` : "–"]] : []),
-            ].map(([l, v]) => (
+            {([
+              ["Einheiten", new Intl.NumberFormat("de-DE").format(biz.units), ""],
+              ["Sitzungen", new Intl.NumberFormat("de-DE").format(biz.sessions), ""],
+              ["CVR", biz.cvr !== null ? `${biz.cvr} %` : "–", ""],
+              ["Buybox", biz.buyBoxPct !== null ? `${biz.buyBoxPct} %` : "–", ""],
+              ...(adsTotals ? [["ACoS", adsTotals.acos !== null ? `${adsTotals.acos} %` : "–", ampel(adsTotals.acos)] as const] : []),
+              ...(combined ? [["TACoS", combined.tacos !== null ? `${combined.tacos} %` : "–", ampel(combined.tacos)] as const] : []),
+            ] as ReadonlyArray<readonly [string, string, string]>).map(([l, v, cls]) => (
               <div key={l} className="card p-4">
-                <div className="stat-value">{v}</div>
+                <div className={`stat-value ${cls}`}>{v}</div>
                 <div className="stat-label">{l}</div>
               </div>
             ))}
