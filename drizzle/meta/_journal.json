@@ -15,6 +15,13 @@
       "when": 1784014386781,
       "tag": "0001_handlungen",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784016766833,
+      "tag": "0002_import_flatfile",
+      "breakpoints": true
     }
   ]
 }

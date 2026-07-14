@@ -213,3 +213,36 @@ export const actions = sqliteTable("actions", {
   createdAt: ts("created_at").notNull(),
   doneAt: integer("done_at", { mode: "timestamp" }),
 });
+
+/** Original-Listing-Snapshot (Import aus Amazon-Scrape oder H10-CSV) — das "Vorher". */
+export const listingSnapshots = sqliteTable("listing_snapshots", {
+  id: text("id").primaryKey(),
+  productId: text("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  source: text("source").notNull(), // apify | h10_csv | manual
+  title: text("title"),
+  bullets: text("bullets", { mode: "json" }).$type<string[]>(),
+  description: text("description"),
+  imageUrls: text("image_urls", { mode: "json" }).$type<string[]>(),
+  raw: text("raw", { mode: "json" }),
+  createdAt: ts("created_at").notNull(),
+});
+
+/**
+ * Flat-File-Vorlagen (D46): Amazon-Kategorievorlagen ändern sich laufend —
+ * die jeweils NEUSTE Vorlage wird pro Marke hochgeladen; wir speichern nur die
+ * 3 Header-Zeilen + Feldnamen (klein, kein Binary) und erzeugen daraus
+ * upload-fertige tab-getrennte TXT-Dateien.
+ */
+export const flatfileTemplates = sqliteTable("flatfile_templates", {
+  id: text("id").primaryKey(),
+  brandId: text("brand_id")
+    .notNull()
+    .references(() => brands.id, { onDelete: "cascade" }),
+  fileName: text("file_name").notNull(),
+  sheetName: text("sheet_name"),
+  headerRows: text("header_rows", { mode: "json" }).$type<string[][]>().notNull(),
+  fieldNames: text("field_names", { mode: "json" }).$type<string[]>().notNull(),
+  createdAt: ts("created_at").notNull(),
+});

@@ -295,3 +295,52 @@ export async function setActionStatus(formData: FormData) {
     .where(eq(schema.actions.id, actionId));
   revalidatePath(`/marke/${brandId}/handlungen`);
 }
+
+// ── Produktdaten-Import (D46): Amazon-Scrape / H10-CSV → Original-Snapshot ───
+
+export async function importListingFromAmazon(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const db = await getDb();
+  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  if (!product?.asin) throw new Error("Produkt hat keine ASIN — Import nicht möglich.");
+
+  const { scrapeProduct } = await import("@/lib/scrape/apifyProduct");
+  const snap = await scrapeProduct(product.asin, product.marketplace);
+  await db.insert(schema.listingSnapshots).values({
+    id: id(), productId, source: "apify",
+    title: snap.title, bullets: snap.bullets, description: snap.description,
+    imageUrls: snap.imageUrls, raw: snap.raw,
+  });
+  revalidatePath(`/produkte/${productId}`);
+}
+
+export async function uploadListingCsv(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const file = formData.get("file") as File | null;
+  if (!productId || !file) return;
+  const db = await getDb();
+  const { parseListingCsv } = await import("@/lib/scrape/apifyProduct");
+  const snap = parseListingCsv(await file.text());
+  await db.insert(schema.listingSnapshots).values({
+    id: id(), productId, source: "h10_csv",
+    title: snap.title, bullets: snap.bullets, description: snap.description,
+    imageUrls: snap.imageUrls, raw: snap.raw,
+  });
+  revalidatePath(`/produkte/${productId}`);
+}
+
+// ── Flat-File-Vorlage (D46): neuste Amazon-Vorlage pro Marke ────────────────
+
+export async function uploadFlatfileTemplate(formData: FormData) {
+  const brandId = String(formData.get("brandId") ?? "");
+  const file = formData.get("file") as File | null;
+  if (!brandId || !file) return;
+  const db = await getDb();
+  const { parseTemplate } = await import("@/lib/flatfile/build");
+  const tpl = parseTemplate(await file.arrayBuffer(), file.name);
+  await db.insert(schema.flatfileTemplates).values({
+    id: id(), brandId, fileName: file.name,
+    sheetName: tpl.sheetName, headerRows: tpl.headerRows, fieldNames: tpl.fieldNames,
+  });
+  revalidatePath(`/marke/${brandId}/flatfiles`);
+}

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { saveFacts, saveKeywords, generateContent, uploadCerebro, runReviewInsights } from "@/app/actions";
+import { saveFacts, saveKeywords, generateContent, uploadCerebro, runReviewInsights, importListingFromAmazon, uploadListingCsv } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 
 export const dynamic = "force-dynamic";
@@ -52,6 +52,10 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     where: eq(schema.contentVersions.productId, id),
     orderBy: desc(schema.contentVersions.createdAt),
   });
+  const snapshot = await db.query.listingSnapshots.findFirst({
+    where: eq(schema.listingSnapshots.productId, id),
+    orderBy: desc(schema.listingSnapshots.createdAt),
+  });
   const latestOf = (t: string) => versions.find((v) => v.type === t);
   const f = product.facts;
   const input = "w-full rounded border border-neutral-300 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900";
@@ -68,6 +72,38 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           Analyse öffnen →
         </Link>
       </div>
+
+      {/* 0 · Original-Listing (Import) */}
+      <section className="mt-6 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+          0 · Original-Listing (Import) {snapshot && <span className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">✓ {snapshot.source} · {snapshot.createdAt.toLocaleDateString("de-DE")}</span>}
+        </h2>
+        <p className="mt-1 text-xs text-neutral-500">Bestehende ASIN? Daten importieren statt tippen — als „Vorher" für Analyse & Vergleich.</p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <form action={importListingFromAmazon}>
+            <input type="hidden" name="productId" value={product.id} />
+            <button disabled={!product.asin} className="rounded bg-neutral-800 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 disabled:opacity-40 dark:bg-neutral-200 dark:text-black">
+              Von Amazon importieren (Apify)
+            </button>
+          </form>
+          <form action={uploadListingCsv} className="flex items-center gap-2">
+            <input type="hidden" name="productId" value={product.id} />
+            <input type="file" name="file" accept=".csv" required className="text-sm" />
+            <button className="rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900">H10-CSV importieren</button>
+          </form>
+        </div>
+        {snapshot && (
+          <div className="mt-3 rounded bg-neutral-50 p-3 text-xs dark:bg-neutral-900">
+            {snapshot.title && <p><b>Titel:</b> {snapshot.title}</p>}
+            {snapshot.bullets && snapshot.bullets.length > 0 && (
+              <ul className="mt-1 space-y-0.5">{snapshot.bullets.slice(0, 5).map((b, i) => <li key={i}>• {b.slice(0, 140)}{b.length > 140 ? "…" : ""}</li>)}</ul>
+            )}
+            <p className="mt-1 text-neutral-500">
+              {snapshot.description ? `Beschreibung: ${snapshot.description.length} Zeichen` : "keine Beschreibung"} · {snapshot.imageUrls?.length ?? 0} Bilder
+            </p>
+          </div>
+        )}
+      </section>
 
       {/* 1 · Produkt-Wahrheit */}
       <section className="mt-6 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">

@@ -25,6 +25,7 @@ const BRAND_NAV = [
   { path: "/sichtbarkeit", label: "Sichtbarkeit & Markt", icon: "◔" },
   { path: "/advertising", label: "Advertising / PPC", icon: "◎" },
   { path: "/berichte", label: "Berichte & Daten", icon: "⇪" },
+  { path: "/flatfiles", label: "Flat Files", icon: "⇣" },
   { path: "/handlungen", label: "Handlungen", icon: "☰" },
 ];
 
