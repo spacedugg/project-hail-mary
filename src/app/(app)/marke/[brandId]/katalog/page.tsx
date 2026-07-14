@@ -14,8 +14,8 @@ export default async function BrandKatalog({ params }: { params: Promise<{ brand
 
   return (
     <main className="mx-auto max-w-3xl p-8">
-      <h1 className="text-2xl font-semibold">Katalog</h1>
-      <p className="mt-1 text-sm text-neutral-500">Produkte dieser Marke. Die meisten ASINs existieren schon — anlegen, dann Daten anbinden.</p>
+      <h1 className="page-title">Katalog</h1>
+      <p className="page-sub">Produkte dieser Marke. Die meisten ASINs existieren schon — anlegen, dann Daten anbinden.</p>
 
       <form action={createProduct} className="mt-5 flex gap-2">
         <input type="hidden" name="brandId" value={brandId} />

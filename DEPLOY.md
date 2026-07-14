@@ -22,6 +22,9 @@
 | `TURSO_AUTH_TOKEN` | der Token aus Schritt 1 | Pflicht zusammen mit der URL |
 | `ANTHROPIC_API_KEY` | Text-Generierung (Claude) | Mock-Texte (deterministische Templates) |
 | `APIFY_API_KEY` | Review-Scraping | Review-Insights nur als Mock |
+| `AUTH_SECRET` | Signatur der Login-Sitzungen — **beliebige lange Zufallszeichenfolge** (z. B. in Vercel beim Feld auf „Generate" klicken oder einen Passwort-Manager 40+ Zeichen erzeugen lassen; niemals im Chat posten) | Logins nur dev-signiert (Demo-Banner warnt) |
+
+> **Anmeldung:** Nach dem Deploy öffnet sich die Login-Seite. Jedes Agentur-Mitglied legt sein Konto selbst an („Konto anlegen") — das **erste Konto wird automatisch Admin**. Profil, Passwort & Team-Übersicht unter *Einstellungen* (Zahnrad unten in der Seitenleiste).
 
 ### 4. Deploy
 **Deploy**-Button klicken. Fertig — die App läuft unter `…vercel.app`, erreichbar von jedem Gerät. Jeder Push auf den Branch deployt automatisch neu. Datenbank-Migrationen laufen automatisch beim ersten Aufruf.

@@ -3,6 +3,7 @@ import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import type { SovAudit } from "@/lib/sov/audit";
 import type { SqpReport } from "@/lib/reports/sqp";
+import { MiniBar } from "@/components/charts";
 
 export const dynamic = "force-dynamic";
 
@@ -25,10 +26,12 @@ export default async function BrandSichtbarkeit({ params }: { params: Promise<{ 
   const eur = (n: number) => `${fmt(Math.round(n))} €`;
   const dateStr = (d: Date | null) => (d ? d.toLocaleDateString("de-DE") : "–");
 
+  const maxPotential = sqp ? Math.max(...sqp.rows.map((r) => r.revenuePotential), 1) : 1;
+
   return (
     <main className="mx-auto max-w-3xl p-8">
-      <h1 className="text-2xl font-semibold">Sichtbarkeit & Markt</h1>
-      <p className="mt-1 text-sm text-neutral-500">Share of Voice je Produkt (Cerebro) + Suchanfragen-Funnel vs. Markt (SQP). Opportunity-Matrix folgt.</p>
+      <h1 className="page-title">Sichtbarkeit & Markt</h1>
+      <p className="page-sub">Share of Voice je Produkt (Cerebro) + Suchanfragen-Funnel vs. Markt (SQP). Opportunity-Matrix folgt.</p>
 
       <section className="mt-6">
         <h2 className="sect-h">
@@ -36,7 +39,7 @@ export default async function BrandSichtbarkeit({ params }: { params: Promise<{ 
         </h2>
         {sqp ? (
           <>
-            <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="stagger mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {([
                 ["Eure CTR", sqp.totals.brandCtr, sqp.totals.marketCtr],
                 ["Eure CVR", sqp.totals.brandCvr, sqp.totals.marketCvr],
@@ -72,7 +75,14 @@ export default async function BrandSichtbarkeit({ params }: { params: Promise<{ 
                       <td className="pr-2 tabular-nums">{r.brandCvr !== null ? `${r.brandCvr} %` : "–"}</td>
                       <td className="pr-2 tabular-nums">{r.marketCvr !== null ? `${r.marketCvr} %` : "–"}</td>
                       <td className="pr-2 tabular-nums">{r.cvrDeltaPp !== null ? `${r.cvrDeltaPp > 0 ? "+" : ""}${r.cvrDeltaPp}` : "–"}</td>
-                      <td className="tabular-nums">{r.revenuePotential > 0 ? eur(r.revenuePotential) : "–"}</td>
+                      <td className="min-w-28 tabular-nums">
+                        {r.revenuePotential > 0 ? (
+                          <span className="flex items-center gap-2">
+                            <MiniBar pct={(r.revenuePotential / maxPotential) * 100} className="w-14 flex-none" />
+                            {eur(r.revenuePotential)}
+                          </span>
+                        ) : "–"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { eq, inArray, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
+import { IconKatalog, IconContent, IconSichtbarkeit, IconReviews, IconHandlungen, IconEuro } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -54,28 +55,40 @@ export default async function BrandCockpit({ params }: { params: Promise<{ brand
     { done: brandActions.length > 0, text: "Handlungen aus Analysen ableiten", href: `${base}/handlungen` },
   ];
 
+  const tileChips = [
+    { icon: <IconKatalog />, chip: "chip-violet" },
+    { icon: <IconContent />, chip: "chip-teal" },
+    { icon: <IconSichtbarkeit />, chip: "chip-pink" },
+    { icon: <IconReviews />, chip: "chip-amber" },
+    { icon: <IconHandlungen />, chip: "chip-violet" },
+    { icon: <IconEuro />, chip: "chip-teal" },
+  ];
+
   return (
     <main className="mx-auto max-w-4xl p-8">
-      <h1 className="text-2xl font-semibold">Cockpit</h1>
-      <p className="mt-1 text-sm text-neutral-500">
-        Zustand dieser Marke. Umsatz/CVR/Buybox aus dem Business Report, ACoS/TACoS aus dem Ads-Bericht — Funnel & Trends folgen mit SQP.
+      <h1 className="page-title">Cockpit</h1>
+      <p className="page-sub">
+        Zustand dieser Marke. Umsatz/CVR/Buybox aus dem Business Report, ACoS/TACoS aus dem Ads-Bericht — Trends folgen mit der Historie.
       </p>
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {tiles.map((t) => (
-          <Link key={t.label} href={t.href} className="card p-4 hover:border-primary">
-            <div className="stat-value">{t.value}</div>
-            <div className="stat-label">{t.label}</div>
+      <div className="stagger mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {tiles.map((t, i) => (
+          <Link key={t.label} href={t.href} className="card flex items-center gap-3 p-4">
+            <span className={`icon-chip ${tileChips[i].chip}`}>{tileChips[i].icon}</span>
+            <div className="min-w-0">
+              <div className="stat-value">{t.value}</div>
+              <div className="stat-label truncate">{t.label}</div>
+            </div>
           </Link>
         ))}
       </div>
 
-      <section className="mt-6">
+      <section className="mt-8">
         <h2 className="sect-h">
           Performance {businessUpload && <span className="ml-1 font-normal normal-case text-neutral-400">(Business Report {businessUpload.periodStart?.toLocaleDateString("de-DE")} – {businessUpload.periodEnd?.toLocaleDateString("de-DE")})</span>}
         </h2>
         {biz ? (
-          <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="stagger mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="card-hero col-span-2 row-span-2 flex flex-col justify-between p-5 sm:col-span-2">
               <div className="text-xs font-medium text-white/60">Umsatz (Periode)</div>
               <div>

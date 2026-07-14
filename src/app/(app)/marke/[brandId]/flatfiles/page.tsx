@@ -27,8 +27,8 @@ export default async function FlatfilesPage({ params }: { params: Promise<{ bran
 
   return (
     <main className="mx-auto max-w-3xl p-8">
-      <h1 className="text-2xl font-semibold">Flat Files</h1>
-      <p className="mt-1 text-sm text-neutral-500">
+      <h1 className="page-title">Flat Files</h1>
+      <p className="page-sub">
         Amazon-Vorlagen ändern sich laufend — hier immer die <b>neuste Kategorievorlage</b> hochladen (aus Seller Central: „Vorlage generieren", .xlsx/.xlsm/.txt).
         Das Tool füllt sie mit dem generierten Content; Download als upload-fertige TXT. Direkter API-Push folgt.
       </p>

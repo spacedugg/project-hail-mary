@@ -28,8 +28,8 @@ export default async function BerichtePage({ params }: { params: Promise<{ brand
 
   return (
     <main className="mx-auto max-w-3xl p-8">
-      <h1 className="text-2xl font-semibold">Berichte & Daten</h1>
-      <p className="mt-1 text-sm text-neutral-500">
+      <h1 className="page-title">Berichte & Daten</h1>
+      <p className="page-sub">
         Geführter Upload: Berichtstyp wählen, Periode taggen, hochladen — das Tool parst, validiert und rechnet KPIs aus Roh-Summen. Später ersetzt die SP-API den Upload, die Bedienung bleibt.
       </p>
 

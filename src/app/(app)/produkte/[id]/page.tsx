@@ -64,7 +64,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     <main className="mx-auto max-w-3xl p-8">
       <Link href={`/marke/${product.brandId}/katalog`} className="text-xs text-neutral-500 hover:underline">← Katalog</Link>
       <div className="mt-1 flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">
+        <h1 className="page-title">
           {product.name}{" "}
           {product.asin && <span className="font-mono text-sm text-neutral-500">{product.asin} · amazon.{product.marketplace}</span>}
         </h1>

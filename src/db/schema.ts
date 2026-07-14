@@ -19,6 +19,24 @@ export const clients = sqliteTable("clients", {
   createdAt: ts("created_at").notNull(),
 });
 
+/**
+ * Agentur-interne Nutzer (D57): jeder meldet sich mit eigenem Konto an und
+ * sieht die gesamte Anwendung. Passwort als scrypt "saltHex:hashHex"
+ * (reporting-main-Muster); Rollen für später (heute alle "member").
+ */
+export const users = sqliteTable(
+  "users",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(),
+    name: text("name").notNull(),
+    passwordHash: text("password_hash").notNull(),
+    role: text("role").$type<"admin" | "member">().notNull().default("member"),
+    createdAt: ts("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("users_email_unique").on(t.email)],
+);
+
 export const brands = sqliteTable("brands", {
   id: text("id").primaryKey(),
   clientId: text("client_id")

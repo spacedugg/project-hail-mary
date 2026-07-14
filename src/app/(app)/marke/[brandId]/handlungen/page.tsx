@@ -31,8 +31,8 @@ export default async function BrandHandlungen({ params }: { params: Promise<{ br
     <main className="mx-auto max-w-3xl p-8">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Handlungen</h1>
-          <p className="mt-1 text-sm text-neutral-500">
+          <h1 className="page-title">Handlungen</h1>
+          <p className="page-sub">
             Priorisiert nach €-Hebel. Handlungen entstehen in den Analysen — dieser Reiter ist die Sammelsicht der Marke.
           </p>
         </div>

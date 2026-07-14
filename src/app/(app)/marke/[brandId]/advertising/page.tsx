@@ -7,6 +7,7 @@ import { combineWithBusiness } from "@/lib/reports/ads";
 import type { BusinessTotals } from "@/lib/reports/business";
 import type { SearchTermRow, SearchTermTotals } from "@/lib/reports/searchterm";
 import { ngramRoots, topConverting, negativeCandidates } from "@/lib/reports/searchterm";
+import { Donut } from "@/components/charts";
 
 export const dynamic = "force-dynamic";
 
@@ -53,8 +54,8 @@ export default async function AdvertisingPage({
   if (!ads?.totals) {
     return (
       <main className="mx-auto max-w-4xl p-8">
-        <h1 className="text-2xl font-semibold">Advertising / PPC</h1>
-        <p className="mt-1 text-sm text-neutral-500">Kampagnen-Portfolio dieser Marke — gespeist aus dem Ads-/Kampagnenbericht.</p>
+        <h1 className="page-title">Advertising / PPC</h1>
+        <p className="page-sub">Kampagnen-Portfolio dieser Marke — gespeist aus dem Ads-/Kampagnenbericht.</p>
         <div className="mt-6 card border-dashed p-6 text-sm text-muted">
           Noch kein Ads-Bericht. Unter <Link href={`${base}/berichte`} className="text-primary-strong underline">Berichte & Daten</Link> den
           Sponsored-Ads-Kampagnenbericht hochladen (Werbekonsole → Berichte → Kampagnen, alle Anzeigentypen) — dann erscheinen hier
@@ -80,12 +81,12 @@ export default async function AdvertisingPage({
 
   return (
     <main className="mx-auto max-w-4xl p-8">
-      <h1 className="text-2xl font-semibold">Advertising / PPC</h1>
-      <p className="mt-1 text-sm text-neutral-500">
+      <h1 className="page-title">Advertising / PPC</h1>
+      <p className="page-sub">
         Ads-Bericht {dateStr(adsUpload!.periodStart)} – {dateStr(adsUpload!.periodEnd)} · {t.campaignCount} Kampagnen · Raten aus Roh-Summen berechnet.
       </p>
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="stagger mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="card-hero col-span-2 row-span-2 flex flex-col justify-between p-5">
           <div className="text-xs font-medium text-white/60">Ad-Spend (Periode)</div>
           <div>
@@ -162,15 +163,18 @@ export default async function AdvertisingPage({
       </section>
 
       {byType.length > 1 && (
-        <section className="mt-6">
+        <section className="anim-in mt-6 card p-5" style={{ animationDelay: "0.2s" }}>
           <h2 className="sect-h">Spend je Anzeigentyp</h2>
-          <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {byType.map((g) => (
-              <div key={g.type} className="card p-4">
-                <div className="stat-value">{eur(g.spend)}</div>
-                <div className="stat-label">{g.type === "other" ? "Sonstige" : g.type} · {g.count} Kampagnen · ACoS {g.acos !== null ? `${g.acos} %` : "–"}</div>
-              </div>
-            ))}
+          <div className="mt-4">
+            <Donut
+              segments={byType.map((g) => ({
+                label: g.type === "other" ? "Sonstige" : g.type,
+                value: g.spend,
+                detail: `${eur(g.spend)} · ACoS ${g.acos !== null ? `${g.acos} %` : "–"}`,
+              }))}
+              centerValue={eur(t.spend)}
+              centerLabel="Ad-Spend"
+            />
           </div>
         </section>
       )}

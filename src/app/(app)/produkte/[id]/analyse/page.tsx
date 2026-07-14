@@ -77,7 +77,7 @@ export default async function AnalysePage({ params }: { params: Promise<{ id: st
       <header className="mt-2 border-b border-neutral-200 pb-4 dark:border-neutral-800">
         <p className="text-xs uppercase tracking-widest text-primary-strong">Listing-Analyse · {brand?.name}</p>
         <div className="mt-1 flex items-end justify-between gap-4">
-          <h1 className="text-2xl font-semibold">{product.name}</h1>
+          <h1 className="page-title">{product.name}</h1>
           <div className="text-right">
             <div className={`text-4xl font-bold tabular-nums ${scoreColor}`}>{analysis.overall}<span className="text-base font-normal text-neutral-400">/100</span></div>
             <div className="text-[10px] uppercase tracking-wide text-neutral-500">Gesamt (Ø gemessener Dimensionen)</div>

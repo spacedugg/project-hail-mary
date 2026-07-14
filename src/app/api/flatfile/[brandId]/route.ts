@@ -7,6 +7,8 @@ export const dynamic = "force-dynamic";
 
 /** Flat-File-Download: neuste Vorlage der Marke + aktuellster Content je Produkt. */
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ brandId: string }> }) {
+  const { getSessionUser } = await import("@/lib/auth/session");
+  if (!(await getSessionUser())) return NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 });
   const { brandId } = await ctx.params;
   const db = await getDb();
   const brand = await db.query.brands.findFirst({ where: eq(schema.brands.id, brandId) });
