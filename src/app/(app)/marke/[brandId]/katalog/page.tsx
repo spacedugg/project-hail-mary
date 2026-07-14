@@ -13,7 +13,7 @@ export default async function BrandKatalog({ params }: { params: Promise<{ brand
   const input = "input-base";
 
   return (
-    <main className="mx-auto max-w-3xl p-8">
+    <main className="w-full p-8">
       <h1 className="page-title">Katalog</h1>
       <p className="page-sub">Produkte dieser Marke. Die meisten ASINs existieren schon — anlegen, dann Daten anbinden.</p>
 

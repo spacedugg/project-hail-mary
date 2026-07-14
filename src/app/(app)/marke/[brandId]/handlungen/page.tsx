@@ -28,7 +28,7 @@ export default async function BrandHandlungen({ params }: { params: Promise<{ br
   const fmt = (n: number) => new Intl.NumberFormat("de-DE").format(n);
 
   return (
-    <main className="mx-auto max-w-3xl p-8">
+    <main className="w-full p-8">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="page-title">Handlungen</h1>

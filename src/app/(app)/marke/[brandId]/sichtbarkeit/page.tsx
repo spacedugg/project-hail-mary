@@ -29,7 +29,7 @@ export default async function BrandSichtbarkeit({ params }: { params: Promise<{ 
   const maxPotential = sqp ? Math.max(...sqp.rows.map((r) => r.revenuePotential), 1) : 1;
 
   return (
-    <main className="mx-auto max-w-3xl p-8">
+    <main className="w-full p-8">
       <h1 className="page-title">Sichtbarkeit & Markt</h1>
       <p className="page-sub">Share of Voice je Produkt (Cerebro) + Suchanfragen-Funnel vs. Markt (SQP). Opportunity-Matrix folgt.</p>
 

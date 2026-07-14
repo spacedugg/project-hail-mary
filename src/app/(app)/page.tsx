@@ -17,11 +17,11 @@ export default async function Portfolio() {
 
   return (
     <OsShell>
-      <main className="mx-auto max-w-4xl p-8">
+      <main className="w-full p-8">
         <h1 className="page-title">Portfolio</h1>
         <p className="page-sub">Alle Kunden & Marken der Agentur — der Einstieg in jeden Marken-Workspace.</p>
 
-        <div className="stagger mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="stagger mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
           {[
             { label: "Marken", value: brands.length, icon: <IconUsers />, chip: "chip-violet" },
             { label: "Produkte (ASINs)", value: products.length, icon: <IconKatalog />, chip: "chip-teal" },
@@ -47,7 +47,7 @@ export default async function Portfolio() {
           <button className="btn-primary">Anlegen</button>
         </form>
 
-        <div className="stagger mt-6 grid gap-3 sm:grid-cols-2">
+        <div className="stagger mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {clients.length === 0 && (
             <p className="card border-dashed p-6 text-sm text-muted">Noch keine Kunden. Lege den ersten an — danach öffnet sich der Marken-Workspace.</p>
           )}

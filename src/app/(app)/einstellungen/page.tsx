@@ -21,7 +21,7 @@ export default async function EinstellungenPage({
 
   return (
     <OsShell>
-      <main className="mx-auto max-w-3xl p-8">
+      <main className="w-full p-8">
         <h1 className="page-title">Einstellungen</h1>
         <p className="page-sub">Dein Profil und das Agentur-Team. Rollen & Rechte folgen mit der Kunden-Freischaltung.</p>
 

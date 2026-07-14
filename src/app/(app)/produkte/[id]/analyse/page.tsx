@@ -71,7 +71,7 @@ export default async function AnalysePage({ params }: { params: Promise<{ id: st
   const fmt = (n: number) => new Intl.NumberFormat("de-DE").format(n);
 
   return (
-    <main className="mx-auto max-w-3xl p-8 print:p-0">
+    <main className="w-full p-8 print:p-0">
       <Link href={`/produkte/${id}`} className="text-xs text-neutral-500 hover:underline print:hidden">← Produkt</Link>
 
       <header className="mt-2 border-b border-neutral-200 pb-4 dark:border-neutral-800">

@@ -58,7 +58,7 @@ export default async function AdvertisingPage({
 
   if (!ads?.totals) {
     return (
-      <main className="mx-auto max-w-4xl p-8">
+      <main className="w-full p-8">
         <h1 className="page-title">Advertising / PPC</h1>
         <p className="page-sub">Kampagnen-Portfolio dieser Marke — gespeist aus dem Ads-/Kampagnenbericht.</p>
         <div className="mt-6 card border-dashed p-6 text-sm text-muted">
@@ -85,13 +85,13 @@ export default async function AdvertisingPage({
   const wasted = campaigns.filter((c) => c.spend > 0 && c.sales === 0);
 
   return (
-    <main className="mx-auto max-w-4xl p-8">
+    <main className="w-full p-8">
       <h1 className="page-title">Advertising / PPC</h1>
       <p className="page-sub">
         Ads-Bericht {dateStr(adsUpload!.periodStart)} – {dateStr(adsUpload!.periodEnd)} · {t.campaignCount} Kampagnen · Raten aus Roh-Summen berechnet.
       </p>
 
-      <div className="stagger mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="stagger mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-6">
         <div className="card-hero col-span-2 row-span-2 flex flex-col justify-between p-5">
           <div className="text-xs font-medium text-white/60">Ad-Spend (Periode)</div>
           <div>

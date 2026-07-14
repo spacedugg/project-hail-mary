@@ -26,7 +26,7 @@ export default async function FlatfilesPage({ params }: { params: Promise<{ bran
   const hasTitle = (pid: string) => versions.some((v) => v.productId === pid && v.type === "title");
 
   return (
-    <main className="mx-auto max-w-3xl p-8">
+    <main className="w-full p-8">
       <h1 className="page-title">Flat Files</h1>
       <p className="page-sub">
         Amazon-Vorlagen ändern sich laufend — hier immer die <b>neuste Kategorievorlage</b> hochladen (aus Seller Central: „Vorlage generieren", .xlsx/.xlsm/.txt).

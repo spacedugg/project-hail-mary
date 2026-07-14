@@ -66,13 +66,13 @@ export default async function BrandCockpit({ params }: { params: Promise<{ brand
   ];
 
   return (
-    <main className="mx-auto max-w-4xl p-8">
+    <main className="w-full p-8">
       <h1 className="page-title">Cockpit</h1>
       <p className="page-sub">
         Zustand dieser Marke. Umsatz/CVR/Buybox aus dem Business Report, ACoS/TACoS aus dem Ads-Bericht — Trends folgen mit der Historie.
       </p>
 
-      <div className="stagger mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="stagger mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         {tiles.map((t, i) => (
           <Link key={t.label} href={t.href} className="card flex items-center gap-3 p-4">
             <span className={`icon-chip ${tileChips[i].chip}`}>{tileChips[i].icon}</span>
@@ -89,7 +89,7 @@ export default async function BrandCockpit({ params }: { params: Promise<{ brand
           Performance {businessUpload && <span className="ml-1 font-normal normal-case text-neutral-400">(Business Report {businessUpload.periodStart?.toLocaleDateString("de-DE")} – {businessUpload.periodEnd?.toLocaleDateString("de-DE")})</span>}
         </h2>
         {biz ? (
-          <div className="stagger mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="stagger mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-6">
             <div className="card-hero col-span-2 row-span-2 flex flex-col justify-between p-5 sm:col-span-2">
               <div className="text-xs font-medium text-white/60">Umsatz (Periode)</div>
               <div>
