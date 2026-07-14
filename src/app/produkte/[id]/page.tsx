@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { saveFacts, saveKeywords, generateContent, uploadCerebro, runReviewInsights, importListingFromAmazon, uploadListingCsv, saveContentManual } from "@/app/actions";
+import { saveFacts, saveKeywords, deriveKeywordsFromSov, generateContent, uploadCerebro, runReviewInsights, importListingFromAmazon, uploadListingCsv, saveContentManual } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 
 export const dynamic = "force-dynamic";
@@ -153,21 +153,50 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           2 · Keyword-Basis (Pflicht) — {kws.length} Keywords
         </h2>
         <p className="mt-1 text-xs text-neutral-500">
-          Eine Zeile je Keyword, optional „;Suchvolumen". v0-Tiering nach Reihenfolge: 1–3 primary → Titel, 4–13 secondary → Bullets, 14–18 tertiary → Beschreibung, Rest → Backend. (Cerebro-CSV-Import folgt.)
+          Tiering: 1–3 primary → Titel, 4–13 secondary → Bullets/Highlights, 14–18 tertiary → Beschreibung, Rest → Backend.
+          Beste Quelle ist die Herleitung aus dem SOV-Audit (Suchvolumen × Relevanz); manuelle Keywords ergänzen sie.
         </p>
-        <form action={saveKeywords} className="mt-3">
-          <input type="hidden" name="productId" value={product.id} />
-          <textarea
-            name="keywords"
-            rows={6}
-            defaultValue={kws.map((k) => `${k.keyword}${k.searchVolume ? `;${k.searchVolume}` : ""}`).join("\n")}
-            placeholder={"edelstahl trinkflasche;18100\nthermosflasche;9900\n…"}
-            className={`${input} font-mono`}
-          />
-          <button className="mt-2 btn-dark">
-            Keywords speichern
-          </button>
-        </form>
+        {sovUpload && (
+          <form action={deriveKeywordsFromSov} className="mt-3">
+            <input type="hidden" name="productId" value={product.id} />
+            <button className="btn-primary">
+              Aus SOV-Audit ableiten ({kws.filter((k) => k.source === "cerebro").length ? "aktualisieren" : "Cerebro-Daten nutzen"})
+            </button>
+          </form>
+        )}
+        {(["primary", "secondary", "tertiary", "backend"] as const).map((tier) => {
+          const inTier = kws.filter((k) => k.tier === tier && k.source !== "manual");
+          if (inTier.length === 0) return null;
+          return (
+            <div key={tier} className="mt-3">
+              <div className="text-[10px] uppercase tracking-wide text-neutral-400">{tier} · {inTier.length}</div>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {inTier.slice(0, 24).map((k) => (
+                  <span key={k.id} className="tag">{k.keyword}{k.searchVolume ? ` · ${new Intl.NumberFormat("de-DE").format(k.searchVolume)}` : ""}</span>
+                ))}
+                {inTier.length > 24 && <span className="text-[10px] text-neutral-400">… +{inTier.length - 24}</span>}
+              </div>
+            </div>
+          );
+        })}
+        <details className="mt-3" open={kws.every((k) => k.source === "manual")}>
+          <summary className="cursor-pointer text-xs text-neutral-500">
+            Manuelle Keywords ({kws.filter((k) => k.source === "manual").length}) — eine Zeile je Keyword, optional „;Suchvolumen"
+          </summary>
+          <form action={saveKeywords} className="mt-2">
+            <input type="hidden" name="productId" value={product.id} />
+            <textarea
+              name="keywords"
+              rows={6}
+              defaultValue={kws.filter((k) => k.source === "manual").map((k) => `${k.keyword}${k.searchVolume ? `;${k.searchVolume}` : ""}`).join("\n")}
+              placeholder={"edelstahl trinkflasche;18100\nthermosflasche;9900\n…"}
+              className={`${input} font-mono`}
+            />
+            <button className="mt-2 btn-dark">
+              Keywords speichern
+            </button>
+          </form>
+        </details>
       </section>
 
       {/* 2b · SOV-Report */}

@@ -74,6 +74,45 @@ export async function saveKeywords(formData: FormData) {
   revalidatePath(`/produkte/${productId}`);
 }
 
+/** Keyword-Tiering aus dem SOV-Audit ableiten — ersetzt nur source="cerebro", manuelle bleiben. */
+export async function deriveKeywordsFromSov(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  if (!productId) return;
+  const db = await getDb();
+  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  if (!product) return;
+
+  const uploads = await db.query.reportUploads.findMany({
+    where: eq(schema.reportUploads.brandId, product.brandId),
+    orderBy: desc(schema.reportUploads.createdAt),
+  });
+  const sovUpload = uploads.find(
+    (u) => u.reportType === "cerebro" && u.parseStatus === "ok" && (u.parsed as { productId?: string })?.productId === productId,
+  );
+  const audit = (sovUpload?.parsed as { audit?: import("@/lib/sov/audit").SovAudit })?.audit;
+  if (!audit) return;
+
+  const { deriveKeywordTiers } = await import("@/lib/sov/tiering");
+  const { tiered } = deriveKeywordTiers(audit);
+
+  const existing = await db.query.keywords.findMany({ where: eq(schema.keywords.productId, productId) });
+  const manual = new Set(existing.filter((k) => k.source === "manual").map((k) => k.keyword.toLowerCase().trim()));
+
+  await db.delete(schema.keywords).where(and(eq(schema.keywords.productId, productId), eq(schema.keywords.source, "cerebro")));
+  const rows = tiered
+    .filter((k) => !manual.has(k.keyword.toLowerCase().trim()))
+    .map((k) => ({
+      id: id(),
+      productId,
+      keyword: k.keyword,
+      searchVolume: k.searchVolume,
+      tier: k.tier,
+      source: "cerebro",
+    }));
+  if (rows.length) await db.insert(schema.keywords).values(rows);
+  revalidatePath(`/produkte/${productId}`);
+}
+
 export async function generateContent(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
   const section = String(formData.get("section") ?? "") as ListingSection;
