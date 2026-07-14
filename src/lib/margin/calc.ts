@@ -5,7 +5,7 @@
  * BEP-ACoS 15,394 %) — siehe calc.test.ts.
  */
 
-import { referralRate, storageFeePerUnit, disposalFeePerUnit } from "./fees";
+import { referralRate, storageFeePerUnit, disposalFeePerUnit, DEFAULT_FEE_CONFIG, type FeeConfig } from "./fees";
 
 export type MarginInputs = {
   purchasePrice: number; // Einkauf €/Stk (Pflicht)
@@ -45,7 +45,7 @@ export type MarginResults = {
   totals: { revenue: number; margin: number; payout: number }; // × Menge
 };
 
-export function computeMargin(i: MarginInputs): MarginResults {
+export function computeMargin(i: MarginInputs, cfg: FeeConfig = DEFAULT_FEE_CONFIG): MarginResults {
   const qty = i.orderQty ?? 1;
   const vat = i.vatRate ?? 0.19;
   const category = i.category ?? "Alles andere";
@@ -56,9 +56,9 @@ export function computeMargin(i: MarginInputs): MarginResults {
   const customs = dutiable * (i.customsRate ?? 0);
   const goods = dutiable + (i.qualityInspection ?? 0) + customs;
 
-  const referral = (i.referralRateOverride ?? referralRate(category, gross)) * gross;
+  const referral = (i.referralRateOverride ?? referralRate(category, gross, cfg)) * gross;
   const fba = i.fbaShippingFee ?? 0;
-  const storage = i.storageFeeOverride ?? (i.dims ? storageFeePerUnit(i.dims, category) : 0);
+  const storage = i.storageFeeOverride ?? (i.dims ? storageFeePerUnit(i.dims, category, cfg) : 0);
   const variable = i.variableCosts ?? 0;
   const inbound = i.inboundCost ?? 0;
   const isApparel = category === "Bekleidung & Schuhe";
@@ -75,7 +75,7 @@ export function computeMargin(i: MarginInputs): MarginResults {
 
   // Entsorgung (D30): abgeschriebene Ware + verlorener Umsatz − 80 % erstattete Verkaufsgebühr
   const p = (i.returnRate ?? 0) * (i.disposalShare ?? 0);
-  const disposalFee = i.weightG != null ? disposalFeePerUnit(i.weightG, i.dims) : 0;
+  const disposalFee = i.weightG != null ? disposalFeePerUnit(i.weightG, i.dims, cfg) : 0;
   const disposalT =
     qty * p * disposalFee + (goodsT + inboundT + variableT) * p + revenueT * p - referralT * 0.8 * p + (isApparel ? fbaT * p : 0);
 

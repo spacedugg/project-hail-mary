@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { computeMargin } from "./calc";
-import { referralRate, storageFeePerUnit, disposalFeePerUnit } from "./fees";
+import { referralRate, storageFeePerUnit, disposalFeePerUnit, DEFAULT_FEE_CONFIG } from "./fees";
 
 describe("computeMargin — 1L-Referenz-Fixture (Regressionsanker aus reporting-main)", () => {
   const r = computeMargin({
@@ -49,6 +49,21 @@ describe("computeMargin — Randfälle", () => {
   it("Override schlägt Auto-Wert", () => {
     const r = computeMargin({ purchasePrice: 2, sellingPriceGross: 10, storageFeeOverride: 0.5, dims: { l: 9, w: 9, h: 27 } });
     expect(r.storageFee).toBe(0.5);
+  });
+});
+
+describe("Gebühren-Konfiguration (Rechenwerk-Override, D61)", () => {
+  it("geänderte Tabellen rechnen sofort — Default bleibt unberührt", () => {
+    const custom = {
+      ...DEFAULT_FEE_CONFIG,
+      referralFlat: { ...DEFAULT_FEE_CONFIG.referralFlat, "Alles andere": 0.1 },
+      storage: { standardPerM3Month: 40, apparelPerM3Month: 20, months: 3 },
+    };
+    expect(referralRate("Alles andere", 9.9, custom)).toBe(0.1);
+    expect(referralRate("Alles andere", 9.9)).toBe(0.08); // Default unverändert
+    const r = computeMargin({ purchasePrice: 2, sellingPriceGross: 10 }, custom);
+    expect(r.referralFee).toBeCloseTo(1.0, 6);
+    expect(storageFeePerUnit({ l: 100, w: 100, h: 100 }, "Alles andere", custom)).toBeCloseTo(120, 6);
   });
 });
 

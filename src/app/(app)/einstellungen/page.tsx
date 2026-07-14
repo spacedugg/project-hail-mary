@@ -1,8 +1,9 @@
 import { getDb } from "@/db/client";
 import { getSessionUser } from "@/lib/auth/session";
 import { updateProfile, changePassword } from "@/app/auth-actions";
+import Link from "next/link";
 import { OsShell } from "@/components/shell";
-import { IconUsers } from "@/components/icons";
+import { IconUsers, IconSearch, IconArrowRight } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,15 @@ export default async function EinstellungenPage({
         {ok && <p className="mt-4 rounded-xl bg-[rgb(22_163_74/0.08)] px-3 py-2 text-sm text-good">✓ {ok}</p>}
 
         <div className="stagger mt-6 space-y-4">
+          <Link href="/rechenwerk" className="card group flex items-center gap-3 p-5">
+            <span className="icon-chip chip-violet"><IconSearch /></span>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold">Rechenwerk — wie das Tool rechnet</div>
+              <div className="text-xs text-muted">Alle KPI-Formeln mit Quelle, Content-Regeln, Amazon-Gebühren-Tabellen (live & austauschbar). Anti-Blackbox.</div>
+            </div>
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-primary-strong transition group-hover:gap-2">öffnen <IconArrowRight className="h-3.5 w-3.5" /></span>
+          </Link>
+
           <section className="card p-5">
             <h2 className="sect-h">Profil</h2>
             <form action={updateProfile} className="mt-3 flex flex-wrap items-end gap-2">

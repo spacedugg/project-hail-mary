@@ -43,6 +43,13 @@
       "when": 1784030727265,
       "tag": "0005_margin-calc",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1784031467986,
+      "tag": "0006_settings",
+      "breakpoints": true
     }
   ]
 }

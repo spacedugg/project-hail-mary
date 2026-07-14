@@ -109,10 +109,77 @@ export async function saveMarginCalc(formData: FormData) {
     dims: l !== undefined && w !== undefined && h !== undefined ? { l, w, h } : null,
     weightG: num("weightG") ?? null,
   };
-  const results = computeMargin(inputs);
+  // Wirksame Gebühren-Tabellen (Rechenwerk-Override oder Workbook-Default)
+  const { getFeeConfigState } = await import("@/lib/settings");
+  const feeState = await getFeeConfigState();
+  const results = computeMargin(inputs, feeState.config);
   const db = await getDb();
   await db.update(schema.products).set({ marginCalc: { inputs, results } }).where(eq(schema.products.id, productId));
   revalidatePath(`/produkte/${productId}`);
+}
+
+/**
+ * Rechenwerk (D61): Gebühren-Tabellen als austauschbare Konfiguration.
+ * Prozente kommen als ganze Zahlen (8 = 8 %); Entsorgungs-Tabellen als
+ * Zeilen "Gewichtsgrenze;Gebühr". Gespeichert wird der KOMPLETTE Stand —
+ * was das Rechenwerk anzeigt, rechnet ab sofort.
+ */
+export async function saveFeeConfigAction(formData: FormData) {
+  const { getSessionUser } = await import("@/lib/auth/session");
+  const user = await getSessionUser();
+  if (!user) return;
+  const { DEFAULT_FEE_CONFIG } = await import("@/lib/margin/fees");
+  const { saveFeeConfig } = await import("@/lib/settings");
+
+  const num = (k: string, fallback: number) => {
+    const v = String(formData.get(k) ?? "").replace(",", ".").trim();
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  const parseTable = (k: string, fallback: Array<[number, number]>): Array<[number, number]> => {
+    const raw = String(formData.get(k) ?? "").trim();
+    if (!raw) return fallback;
+    const rows = raw
+      .split("\n")
+      .map((l) => l.split(/[;,\t]/).map((s) => parseFloat(s.replace(",", ".").trim())))
+      .filter((p) => p.length >= 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]))
+      .map((p) => [p[0], p[1]] as [number, number]);
+    return rows.length ? rows.sort((a, b) => b[0] - a[0]) : fallback;
+  };
+
+  const referralFlat: Record<string, number> = {};
+  for (const cat of Object.keys(DEFAULT_FEE_CONFIG.referralFlat)) {
+    referralFlat[cat] = num(`flat:${cat}`, DEFAULT_FEE_CONFIG.referralFlat[cat] * 100) / 100;
+  }
+  const referralTiered = DEFAULT_FEE_CONFIG.referralTiered.map((t) => ({
+    category: t.category,
+    thresholdEur: num(`tier:${t.category}:threshold`, t.thresholdEur),
+    belowOrEq: num(`tier:${t.category}:below`, t.belowOrEq * 100) / 100,
+    above: num(`tier:${t.category}:above`, t.above * 100) / 100,
+  }));
+
+  await saveFeeConfig(
+    {
+      referralFlat,
+      referralTiered,
+      storage: {
+        standardPerM3Month: num("storage:standard", DEFAULT_FEE_CONFIG.storage.standardPerM3Month),
+        apparelPerM3Month: num("storage:apparel", DEFAULT_FEE_CONFIG.storage.apparelPerM3Month),
+        months: num("storage:months", DEFAULT_FEE_CONFIG.storage.months),
+      },
+      disposalStandard: parseTable("disposal:standard", DEFAULT_FEE_CONFIG.disposalStandard),
+      disposalOversize: parseTable("disposal:oversize", DEFAULT_FEE_CONFIG.disposalOversize),
+      oversizeSideCm: num("oversizeSideCm", DEFAULT_FEE_CONFIG.oversizeSideCm),
+    },
+    user.email,
+  );
+  revalidatePath("/rechenwerk");
+}
+
+export async function resetFeeConfigAction() {
+  const { resetFeeConfig } = await import("@/lib/settings");
+  await resetFeeConfig();
+  revalidatePath("/rechenwerk");
 }
 
 /**

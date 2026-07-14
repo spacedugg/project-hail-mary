@@ -37,6 +37,18 @@ export const users = sqliteTable(
   (t) => [uniqueIndex("users_email_unique").on(t.email)],
 );
 
+/**
+ * Tool-weite Einstellungen als Key-Value (D61): z. B. `fee_config` =
+ * Override der Amazon-Gebühren-Tabellen. Was hier steht, rechnet SOFORT —
+ * das Rechenwerk zeigt immer den wirksamen Stand an (Anti-Blackbox).
+ */
+export const settings = sqliteTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value", { mode: "json" }).$type<unknown>().notNull(),
+  updatedBy: text("updated_by"),
+  updatedAt: ts("updated_at").notNull(),
+});
+
 export const brands = sqliteTable("brands", {
   id: text("id").primaryKey(),
   clientId: text("client_id")

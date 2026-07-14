@@ -142,7 +142,7 @@ export function OsShell({ children }: { children: React.ReactNode }) {
           <SideNav
             items={[
               { href: "/", label: "Portfolio", icon: <IconCockpit />, exact: true },
-              { href: "/einstellungen", label: "Einstellungen", icon: <IconSettings /> },
+              { href: "/einstellungen", label: "Einstellungen", icon: <IconSettings />, alsoMatch: "/rechenwerk" },
             ]}
           />
         </div>

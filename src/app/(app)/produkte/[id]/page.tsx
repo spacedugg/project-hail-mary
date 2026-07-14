@@ -357,6 +357,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         <p className="mt-1 text-xs text-neutral-500">
           Gebühren nach Amazon.de-Tabellen (Verkaufsgebühr je Kategorie, Lager 2 Monate pauschal, Retouren/Entsorgung nach Workbook-Formeln).
           Der Break-even-ACoS speist die ACoS/TACoS-Ampel, wenn keine Account-Marge gesetzt ist.
+          {" "}Formeln & Tabellen einsehen/aktualisieren: <Link href="/rechenwerk" className="text-primary-strong underline">Rechenwerk</Link>.
         </p>
         <form action={saveMarginCalc} className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <input type="hidden" name="productId" value={product.id} />
