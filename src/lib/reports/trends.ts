@@ -33,6 +33,9 @@ export type TrendRow = {
   acos: number | null;
   tacos: number | null;
   ppcShare: number | null;
+  ppcSales: number | null;
+  /** Organisch = max(0, Umsatz − PPC-Umsatz) — Näherung, kein Cent-Ledger. */
+  orgRevenue: number | null;
 };
 
 const d = (x: Date) => x.toLocaleDateString("de-DE", { day: "numeric", month: "numeric" });
@@ -81,6 +84,8 @@ export function buildTrendRows(uploads: UploadLike[]): TrendRow[] {
         acos: at?.acos ?? null,
         tacos: combined?.tacos ?? null,
         ppcShare: combined?.ppcShare ?? null,
+        ppcSales: at?.sales ?? null,
+        orgRevenue: at ? Math.max(0, Math.round((t.revenue - at.sales) * 100) / 100) : null,
       };
     })
     .filter((r): r is TrendRow => r !== null)

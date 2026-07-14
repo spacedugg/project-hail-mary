@@ -3,7 +3,7 @@ import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import type { SovAudit } from "@/lib/sov/audit";
 import type { SqpReport } from "@/lib/reports/sqp";
-import { MiniBar } from "@/components/charts";
+import { MiniBar, OpportunityMatrix } from "@/components/charts";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +33,7 @@ export default async function BrandSichtbarkeit({ params }: { params: Promise<{ 
   return (
     <main className="w-full p-8">
       <h1 className="page-title">Sichtbarkeit & Markt</h1>
-      <p className="page-sub">Share of Voice je Produkt (Cerebro) + Suchanfragen-Funnel vs. Markt (SQP). Opportunity-Matrix folgt.</p>
+      <p className="page-sub">Suchanfragen-Funnel vs. Markt (SQP) + Share of Voice mit Opportunity-Matrix je Produkt (Cerebro).</p>
 
       <section className="mt-6">
         <h2 className="sect-h">
@@ -117,6 +117,23 @@ export default async function BrandSichtbarkeit({ params }: { params: Promise<{ 
                 <div className="text-sm font-medium">{p?.name ?? "Produkt"} <span className="font-mono text-xs text-neutral-500">{a.mainAsin}</span></div>
                 {p && <Link href={`/produkte/${p.id}/analyse`} className="text-xs text-primary-strong hover:underline">Analyse →</Link>}
               </div>
+
+              {/* Opportunity-Matrix: X = Suchvolumen (log) · Y = Sichtbarkeit · Größe = Potenzial · Farbe = Typ */}
+              <div className="mt-4">
+                <h3 className="sect-h">Opportunity-Matrix</h3>
+                <div className="mt-2">
+                  <OpportunityMatrix
+                    points={a.keywords.map((k) => ({
+                      keyword: k.keyword,
+                      sv: k.sv,
+                      visibility: k.kwSOV,
+                      potential: k.corridors.base,
+                      type: k.opportunityType,
+                    }))}
+                  />
+                </div>
+              </div>
+
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
                 {[
                   ["Eigener SOV", `${a.brandSOV} %`],

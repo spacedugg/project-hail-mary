@@ -16,6 +16,8 @@ const row = (o: Partial<TrendRow>): TrendRow => ({
   acos: 20,
   tacos: 5,
   ppcShare: 40,
+  ppcSales: 2000,
+  orgRevenue: 8000,
   ...o,
 });
 

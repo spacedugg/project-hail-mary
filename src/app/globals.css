@@ -119,8 +119,9 @@ body {
   .stagger > *:nth-child(7) { animation-delay: 0.39s; }
   .stagger > *:nth-child(8) { animation-delay: 0.45s; }
 
-  /* Balken bauen sich auf (Breite), Donuts zeichnen sich (stroke) */
+  /* Balken bauen sich auf (Breite/Höhe), Donuts zeichnen sich (stroke) */
   .bar-fill { transform-origin: left; animation: grow-x 0.9s 0.15s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .bar-fill-y { transform-origin: bottom; animation: grow-y 0.9s 0.15s cubic-bezier(0.22, 1, 0.36, 1) both; }
   .donut-seg { animation: donut-draw 1s 0.2s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
   /* Icon-Chip: weiches Farbquadrat mit Icon (Referenz-Look) */
