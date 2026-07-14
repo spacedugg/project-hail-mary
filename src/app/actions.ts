@@ -431,3 +431,41 @@ export async function saveContentManual(formData: FormData) {
   });
   revalidatePath(`/produkte/${productId}`);
 }
+
+// ── Berichte-Upload (D48): geführt, getaggt mit Periode ─────────────────────
+
+export async function uploadReport(formData: FormData) {
+  const brandId = String(formData.get("brandId") ?? "");
+  const reportType = String(formData.get("reportType") ?? "");
+  const file = formData.get("file") as File | null;
+  const periodStart = String(formData.get("periodStart") ?? "");
+  const periodEnd = String(formData.get("periodEnd") ?? "");
+  if (!brandId || !file) return;
+
+  const db = await getDb();
+  let parsed: unknown = null, parseStatus = "ok", parseError: string | null = null;
+  try {
+    if (reportType === "business") {
+      const { parseBusinessReport } = await import("@/lib/reports/business");
+      parsed = parseBusinessReport(await file.text());
+    } else {
+      throw new Error(`Berichtstyp "${reportType}" folgt — aktuell: Business Report (SQP/Ads/Search-Term in Arbeit).`);
+    }
+  } catch (e) {
+    parseStatus = "error";
+    parseError = e instanceof Error ? e.message : String(e);
+  }
+
+  await db.insert(schema.reportUploads).values({
+    id: id(),
+    brandId,
+    reportType,
+    fileName: file.name,
+    periodStart: periodStart ? new Date(periodStart) : null,
+    periodEnd: periodEnd ? new Date(periodEnd) : null,
+    parsed,
+    parseStatus,
+    parseError,
+  });
+  revalidatePath(`/marke/${brandId}`, "layout");
+}

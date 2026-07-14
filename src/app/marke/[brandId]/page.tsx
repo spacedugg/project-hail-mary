@@ -19,6 +19,8 @@ export default async function BrandCockpit({ params }: { params: Promise<{ brand
     : [];
   const uploads = await db.query.reportUploads.findMany({ where: eq(schema.reportUploads.brandId, brandId) });
   const brandActions = await db.query.actions.findMany({ where: eq(schema.actions.brandId, brandId) });
+  const businessUpload = uploads.find((u) => u.reportType === "business" && u.parseStatus === "ok");
+  const biz = (businessUpload?.parsed as { totals?: import("@/lib/reports/business").BusinessTotals })?.totals ?? null;
 
   const withContent = new Set(versions.map((v) => v.productId)).size;
   const sovCount = uploads.filter((u) => u.reportType === "cerebro" && u.parseStatus === "ok").length;
@@ -58,6 +60,32 @@ export default async function BrandCockpit({ params }: { params: Promise<{ brand
           </Link>
         ))}
       </div>
+
+      <section className="mt-6">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+          Performance {businessUpload && <span className="ml-1 font-normal normal-case text-neutral-400">(Business Report {businessUpload.periodStart?.toLocaleDateString("de-DE")} – {businessUpload.periodEnd?.toLocaleDateString("de-DE")})</span>}
+        </h2>
+        {biz ? (
+          <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-5">
+            {[
+              ["Umsatz", `${new Intl.NumberFormat("de-DE").format(Math.round(biz.revenue))} €`],
+              ["Einheiten", new Intl.NumberFormat("de-DE").format(biz.units)],
+              ["Sitzungen", new Intl.NumberFormat("de-DE").format(biz.sessions)],
+              ["CVR", biz.cvr !== null ? `${biz.cvr} %` : "–"],
+              ["Buybox", biz.buyBoxPct !== null ? `${biz.buyBoxPct} %` : "–"],
+            ].map(([l, v]) => (
+              <div key={l} className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+                <div className="text-2xl font-semibold tabular-nums">{v}</div>
+                <div className="mt-0.5 text-xs text-neutral-500">{l}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-2 rounded-lg border border-dashed border-neutral-300 p-4 text-sm text-neutral-500 dark:border-neutral-700">
+            Noch kein Business Report — unter <Link href={`${base}/berichte`} className="text-teal-700 underline">Berichte & Daten</Link> hochladen, dann erscheinen hier Umsatz, CVR & Buybox. ACoS/TACoS folgen mit dem Ads-Bericht.
+          </p>
+        )}
+      </section>
 
       <section className="mt-8 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Nächste Schritte</h2>
