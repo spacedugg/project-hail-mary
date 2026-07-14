@@ -31,7 +31,7 @@ export type BusinessTotals = {
   rowCount: number;
 };
 
-function parseCsvLine(line: string, sep: string): string[] {
+export function parseCsvLine(line: string, sep: string): string[] {
   const out: string[] = [];
   let cur = "", q = false;
   for (let i = 0; i < line.length; i++) {
@@ -49,7 +49,7 @@ function parseCsvLine(line: string, sep: string): string[] {
 }
 
 /** Zahlformat aus Geld-Zellen erkennen (reporting-main-Muster), dann tolerant parsen. */
-function makeNumParser(sampleCells: string[]): (s: string | undefined) => number {
+export function makeNumParser(sampleCells: string[]): (s: string | undefined) => number {
   const sample = sampleCells.join(" ");
   // deutsch: 1.234,56 — US: 1,234.56. Entscheider: letztes Trennzeichen vor Dezimalstellen.
   const german = /\d,\d{2}(\D|$)/.test(sample) || (!/\d\.\d{2}(\D|$)/.test(sample) && sample.includes(","));

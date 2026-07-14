@@ -21,6 +21,11 @@ export default async function BrandCockpit({ params }: { params: Promise<{ brand
   const brandActions = await db.query.actions.findMany({ where: eq(schema.actions.brandId, brandId) });
   const businessUpload = uploads.find((u) => u.reportType === "business" && u.parseStatus === "ok");
   const biz = (businessUpload?.parsed as { totals?: import("@/lib/reports/business").BusinessTotals })?.totals ?? null;
+  const adsUpload = uploads.find((u) => u.reportType === "ads" && u.parseStatus === "ok");
+  const adsTotals = (adsUpload?.parsed as { totals?: import("@/lib/reports/ads").AdsTotals })?.totals ?? null;
+  const combined = biz && adsTotals
+    ? (await import("@/lib/reports/ads")).combineWithBusiness(adsTotals, { revenue: biz.revenue, sessions: biz.sessions, orders: biz.orders })
+    : null;
 
   const withContent = new Set(versions.map((v) => v.productId)).size;
   const sovCount = uploads.filter((u) => u.reportType === "cerebro" && u.parseStatus === "ok").length;
@@ -49,7 +54,7 @@ export default async function BrandCockpit({ params }: { params: Promise<{ brand
     <main className="mx-auto max-w-4xl p-8">
       <h1 className="text-2xl font-semibold">Cockpit</h1>
       <p className="mt-1 text-sm text-neutral-500">
-        Zustand dieser Marke. KPI-Karten (Umsatz, ACoS/TACoS, Funnel) folgen mit der Berichte-Schiene.
+        Zustand dieser Marke. Umsatz/CVR/Buybox aus dem Business Report, ACoS/TACoS aus dem Ads-Bericht — Funnel & Trends folgen mit SQP.
       </p>
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -83,6 +88,8 @@ export default async function BrandCockpit({ params }: { params: Promise<{ brand
               ["Sitzungen", new Intl.NumberFormat("de-DE").format(biz.sessions)],
               ["CVR", biz.cvr !== null ? `${biz.cvr} %` : "–"],
               ["Buybox", biz.buyBoxPct !== null ? `${biz.buyBoxPct} %` : "–"],
+              ...(adsTotals ? [["ACoS", adsTotals.acos !== null ? `${adsTotals.acos} %` : "–"]] : []),
+              ...(combined ? [["TACoS", combined.tacos !== null ? `${combined.tacos} %` : "–"]] : []),
             ].map(([l, v]) => (
               <div key={l} className="card p-4">
                 <div className="stat-value">{v}</div>

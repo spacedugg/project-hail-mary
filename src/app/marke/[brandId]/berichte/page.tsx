@@ -2,13 +2,14 @@ import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { uploadReport } from "@/app/actions";
 import type { BusinessTotals } from "@/lib/reports/business";
+import type { AdsTotals } from "@/lib/reports/ads";
 
 export const dynamic = "force-dynamic";
 
 const TYPES = [
   { value: "business", label: "Business Report (Verkäufe & Traffic, nach untergeordnetem Artikel)", active: true },
+  { value: "ads", label: "Ads-/Kampagnenbericht (Sponsored Ads, alle Typen)", active: true },
   { value: "sqp", label: "Search Query Performance — folgt", active: false },
-  { value: "ads", label: "Ads-/Kampagnenbericht — folgt", active: false },
   { value: "searchterm", label: "Search-Term-Report — folgt", active: false },
 ];
 
@@ -60,6 +61,7 @@ export default async function BerichtePage({ params }: { params: Promise<{ brand
           {uploads.length === 0 && <li className="text-sm text-neutral-400">Noch keine Berichte hochgeladen.</li>}
           {uploads.map((u) => {
             const t = u.reportType === "business" ? ((u.parsed as { totals?: BusinessTotals })?.totals ?? null) : null;
+            const a = u.reportType === "ads" ? ((u.parsed as { totals?: AdsTotals })?.totals ?? null) : null;
             return (
               <li key={u.id} className="card p-3">
                 <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -80,6 +82,23 @@ export default async function BerichtePage({ params }: { params: Promise<{ brand
                       ["Sitzungen", fmt(t.sessions)],
                       ["CVR", t.cvr !== null ? `${t.cvr} %` : "–"],
                       ["Buybox", t.buyBoxPct !== null ? `${t.buyBoxPct} %` : "–"],
+                    ].map(([l, v]) => (
+                      <div key={l} className="rounded-xl border border-hair p-2">
+                        <div className="text-sm font-semibold tabular-nums">{v}</div>
+                        <div className="text-[10px] text-neutral-500">{l}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {a && (
+                  <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">
+                    {[
+                      ["Ad-Spend", `${fmt(Math.round(a.spend))} €`],
+                      ["PPC-Umsatz", `${fmt(Math.round(a.sales))} €`],
+                      ["ACoS", a.acos !== null ? `${a.acos} %` : "–"],
+                      ["Klicks", fmt(a.clicks)],
+                      ["PPC-CR", a.cvr !== null ? `${a.cvr} %` : "–"],
+                      ["Kampagnen", fmt(a.campaignCount)],
                     ].map(([l, v]) => (
                       <div key={l} className="rounded-xl border border-hair p-2">
                         <div className="text-sm font-semibold tabular-nums">{v}</div>

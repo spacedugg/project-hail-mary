@@ -274,6 +274,18 @@ export async function syncBrandActions(formData: FormData) {
     }
   }
 
+  // Marken-Ebene: Ads-Bericht → Spend ohne Verkäufe als PPC-Handlung (Hebel = eingesparter Spend)
+  const adsUpload = uploads.find((u) => u.reportType === "ads" && u.parseStatus === "ok");
+  const adsTotals = (adsUpload?.parsed as { totals?: import("@/lib/reports/ads").AdsTotals })?.totals ?? null;
+  if (adsTotals && adsTotals.noSaleSpend > 0) {
+    fresh.push({
+      id: id(), brandId, productId: null, scope: "brand",
+      category: "ppc",
+      title: `${adsTotals.noSaleCount} Kampagnen mit Spend ohne Verkäufe prüfen (pausieren/negativieren)`,
+      source: "ads-bericht", upliftEur: Math.round(adsTotals.noSaleSpend), status: "open",
+    });
+  }
+
   // Offene Auto-Handlungen ersetzen; manuell erledigte/in Arbeit bleiben stehen.
   const existing = await db.query.actions.findMany({ where: eq(schema.actions.brandId, brandId) });
   const replaceIds = existing.filter((a) => a.status === "open").map((a) => a.id);
@@ -448,8 +460,11 @@ export async function uploadReport(formData: FormData) {
     if (reportType === "business") {
       const { parseBusinessReport } = await import("@/lib/reports/business");
       parsed = parseBusinessReport(await file.text());
+    } else if (reportType === "ads") {
+      const { parseAdsReport } = await import("@/lib/reports/ads");
+      parsed = parseAdsReport(await file.text());
     } else {
-      throw new Error(`Berichtstyp "${reportType}" folgt — aktuell: Business Report (SQP/Ads/Search-Term in Arbeit).`);
+      throw new Error(`Berichtstyp "${reportType}" folgt — aktuell: Business Report & Ads-Bericht (SQP/Search-Term in Arbeit).`);
     }
   } catch (e) {
     parseStatus = "error";
