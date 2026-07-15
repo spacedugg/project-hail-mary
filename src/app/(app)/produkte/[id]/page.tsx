@@ -65,17 +65,25 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const fmtEur = (n: number) => `${new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)} €`;
   const fmtPct = (n: number) => `${new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(n)} %`;
 
+  const parentBrand = await db.query.brands.findFirst({ where: eq(schema.brands.id, product.brandId) });
+  const backHref = parentBrand?.kind === "workbench" ? "/optimizer" : `/marke/${product.brandId}/katalog`;
+
   return (
     <main className="w-full p-8">
-      <Link href={`/marke/${product.brandId}/katalog`} className="text-xs text-neutral-500 hover:underline">← Katalog</Link>
+      <Link href={backHref} className="text-xs text-neutral-500 hover:underline">← {parentBrand?.kind === "workbench" ? "Listing Optimizer" : "Katalog"}</Link>
       <div className="mt-1 flex items-center justify-between gap-4">
         <h1 className="page-title">
           {product.name}{" "}
           {product.asin && <span className="font-mono text-sm text-neutral-500">{product.asin} · amazon.{product.marketplace}</span>}
         </h1>
-        <Link href={`/produkte/${product.id}/analyse`} className="btn-ghost !text-primary-strong font-medium">
-          Analyse öffnen →
-        </Link>
+        <div className="flex flex-none gap-2">
+          <Link href={`/produkte/${product.id}/briefs`} className="btn-ghost font-medium">
+            Creative-Briefs
+          </Link>
+          <Link href={`/produkte/${product.id}/analyse`} className="btn-ghost !text-primary-strong font-medium">
+            Analyse öffnen →
+          </Link>
+        </div>
       </div>
 
       {/* 0 · Original-Listing (Import) */}

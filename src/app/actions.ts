@@ -23,6 +23,37 @@ export async function createClient(formData: FormData) {
   redirect(`/marke/${brandId}`);
 }
 
+/**
+ * Listing Optimizer (D68): Einzelauftrag OHNE Kundenmarke — läuft in einem
+ * automatisch angelegten Werkbank-Container (kind=workbench), der nie im
+ * Portfolio als Marke auftaucht. Volle Produkt-Werkbank inklusive.
+ */
+export async function createOptimizerOrder(formData: FormData) {
+  const name = String(formData.get("name") ?? "").trim();
+  const asin = String(formData.get("asin") ?? "").trim() || null;
+  const brandName = String(formData.get("brandName") ?? "").trim();
+  if (!name) return;
+  const db = await getDb();
+
+  let workbench = await db.query.brands.findFirst({ where: eq(schema.brands.kind, "workbench") });
+  if (!workbench) {
+    const clientId = id();
+    await db.insert(schema.clients).values({ id: clientId, name: "Intern (Einzelaufträge)", slug: "intern-optimizer" });
+    const brandId = id();
+    await db.insert(schema.brands).values({ id: brandId, clientId, name: "Listing Optimizer", kind: "workbench" });
+    workbench = await db.query.brands.findFirst({ where: eq(schema.brands.id, brandId) });
+  }
+  const productId = id();
+  await db.insert(schema.products).values({
+    id: productId,
+    brandId: workbench!.id,
+    // Marken-/Herstellername des Auftrags wandert in die Produkt-Wahrheit
+    name: brandName ? `${brandName} — ${name}` : name,
+    asin,
+  });
+  redirect(`/produkte/${productId}`);
+}
+
 export async function createProduct(formData: FormData) {
   const brandId = String(formData.get("brandId") ?? "");
   const name = String(formData.get("name") ?? "").trim();

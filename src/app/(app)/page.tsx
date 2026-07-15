@@ -10,8 +10,10 @@ export const dynamic = "force-dynamic";
 export default async function Portfolio() {
   const db = await getDb();
   const clients = await db.query.clients.findMany();
-  const brands = await db.query.brands.findMany();
-  const products = await db.query.products.findMany();
+  const brands = (await db.query.brands.findMany()).filter((b) => b.kind !== "workbench");
+  const allProducts = await db.query.products.findMany();
+  const brandIds = new Set(brands.map((b) => b.id));
+  const products = allProducts.filter((p) => brandIds.has(p.brandId));
   const openActions = await db.query.actions.findMany();
   const open = openActions.filter((a) => a.status !== "done");
 

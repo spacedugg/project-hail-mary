@@ -13,6 +13,7 @@ import {
   IconSettings,
   IconLogout,
   IconSparkle,
+  IconContent,
 } from "@/components/icons";
 
 /**
@@ -139,12 +140,14 @@ export function OsShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <SideNav
-            items={[
-              { href: "/", label: "Portfolio", icon: <IconCockpit />, exact: true },
-              { href: "/einstellungen", label: "Einstellungen", icon: <IconSettings />, alsoMatch: "/rechenwerk" },
-            ]}
-          />
+          <SideNav items={[{ href: "/", label: "Portfolio", icon: <IconCockpit />, exact: true }]} />
+          {/* Werkzeuge — visuell abgetrennt von der Marken-Betreuung (D68) */}
+          <div className="mx-3 mt-2 border-t border-hair pt-2">
+            <div className="px-2 pb-1 text-[10px] uppercase tracking-wide text-muted">Werkzeuge</div>
+          </div>
+          <SideNav items={[{ href: "/optimizer", label: "Listing Optimizer", icon: <IconContent />, alsoMatch: "/produkte/" }]} />
+          <div className="mx-3 mt-2 border-t border-hair pt-2" />
+          <SideNav items={[{ href: "/einstellungen", label: "Einstellungen", icon: <IconSettings />, alsoMatch: "/rechenwerk" }]} />
         </div>
         <ProfileFooter />
       </aside>

@@ -63,6 +63,12 @@ export const brands = sqliteTable("brands", {
    * der volle Margen-Rechner mit Gebühren-Tabellen folgt).
    */
   marginPct: real("margin_pct"),
+  /**
+   * "brand" = betreute Kundenmarke (Portfolio/Workspace).
+   * "workbench" = interner Listing-Optimizer-Container für Einzelaufträge
+   * ohne Markenbetreuung (D68) — taucht nie als Kundenmarke auf.
+   */
+  kind: text("kind").$type<"brand" | "workbench">().notNull().default("brand"),
   createdAt: ts("created_at").notNull(),
 });
 

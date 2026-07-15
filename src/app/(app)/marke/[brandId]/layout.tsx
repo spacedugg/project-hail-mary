@@ -16,14 +16,14 @@ export default async function BrandLayout({
   const { brandId } = await params;
   const db = await getDb();
   const brand = await db.query.brands.findFirst({ where: eq(schema.brands.id, brandId) });
-  if (!brand) notFound();
+  if (!brand || brand.kind === "workbench") notFound();
   const client = await db.query.clients.findFirst({ where: eq(schema.clients.id, brand.clientId) });
   const allBrands = await db.query.brands.findMany();
 
   return (
     <BrandShell
       brand={{ id: brand.id, name: brand.name, clientName: client?.name ?? "" }}
-      allBrands={allBrands.map((b) => ({ id: b.id, name: b.name }))}
+      allBrands={allBrands.filter((b) => b.kind !== "workbench").map((b) => ({ id: b.id, name: b.name }))}
     >
       {children}
     </BrandShell>
