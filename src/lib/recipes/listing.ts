@@ -1,4 +1,5 @@
 import { generateForRecipe, resolveRecipe } from "@/lib/llm/registry";
+import { parseLlmJson } from "@/lib/llm/json";
 import { trimToBytesByWord, trimToBytesBySentence } from "@/lib/text/bytes";
 import { RULES } from "@/lib/validation/rules";
 import {
@@ -165,12 +166,9 @@ JSON: {"pairs": [{"q": "...", "a": "..."}], "rationale": [{"part": "<Frage-Kurzf
 
 // ── Parsing & deterministische Nachbearbeitung ───────────────────────────────
 
+/** Tolerantes Parsen (repariert abgeschnittene LLM-Antworten, D70/D81). */
 function parseJson(raw: string): Record<string, unknown> {
-  const cleaned = raw.trim().replace(/^```(?:json)?/m, "").replace(/```\s*$/m, "").trim();
-  const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  if (start === -1 || end === -1) throw new Error("Keine JSON-Antwort erkennbar.");
-  return JSON.parse(cleaned.slice(start, end + 1));
+  return parseLlmJson<Record<string, unknown>>(raw);
 }
 
 /** Deterministischer Fallback ohne LLM-Key (Mock-Modus): baut ein regelkonformes Skelett aus den Inputs. */
@@ -271,7 +269,7 @@ export async function generateSection(
     const res = await generateForRecipe(recipeKey, {
       system: SYSTEM,
       messages: [{ role: "user", content: sectionPrompt(section, inputs) }],
-      maxTokens: 1200,
+      maxTokens: 3000, // Q&A/Beschreibung + Begründung sprengten 1200 → abgeschnittenes JSON (D81)
       temperature: 0.4,
     });
     raw = res.text;

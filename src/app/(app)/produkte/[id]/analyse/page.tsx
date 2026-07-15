@@ -23,10 +23,10 @@ export default async function AnalysePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ fehler?: string }>;
+  searchParams: Promise<{ fehler?: string; hinweis?: string }>;
 }) {
   const { id } = await params;
-  const { fehler } = await searchParams;
+  const { fehler, hinweis } = await searchParams;
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, id) });
   if (!product) notFound();
@@ -56,6 +56,10 @@ export default async function AnalysePage({
   const deepAudit = await db.query.deepAudits.findFirst({
     where: eq(schema.deepAudits.productId, id),
     orderBy: desc(schema.deepAudits.createdAt),
+  });
+  const lastScrape = await db.query.reviewScrapes.findFirst({
+    where: eq(schema.reviewScrapes.productId, id),
+    orderBy: desc(schema.reviewScrapes.createdAt),
   });
 
   const kws = await db.query.keywords.findMany({ where: eq(schema.keywords.productId, id) });
@@ -117,17 +121,33 @@ export default async function AnalysePage({
       </header>
 
       {fehler && <p className="mt-4 rounded-xl bg-[rgb(220_38_38/0.08)] px-3 py-2 text-sm text-bad print:hidden">✕ {fehler}</p>}
+      {hinweis && <p className="mt-4 rounded-xl bg-[var(--primary-soft)] px-3 py-2 text-sm text-primary-strong print:hidden">ℹ {hinweis}</p>}
 
-      {/* Tiefen-Audit (D76): 8 Dimensionen nach temoa-audit-Spec, USPs & Zielgruppe hergeleitet */}
+      {/* Tiefen-Audit (D76): 8 Dimensionen nach temoa-audit-Spec, USPs & Zielgruppe hergeleitet.
+          „Neu bewerten" nur, wenn sich die Datenbasis seit dem Audit geändert hat (D81). */}
+      {(() => {
+        const newestInput = Math.max(
+          original?.createdAt.getTime() ?? 0,
+          insights?.createdAt.getTime() ?? 0,
+          versions[0]?.createdAt.getTime() ?? 0,
+          lastScrape?.createdAt.getTime() ?? 0,
+          sovUpload?.createdAt.getTime() ?? 0,
+        );
+        const auditStale = !deepAudit || newestInput > deepAudit.createdAt.getTime();
+        return (
       <section className="mt-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="sect-h">Tiefen-Audit (KI) {deepAudit && <span className="ml-1 pill pill-good">✓ {deepAudit.createdAt.toLocaleDateString("de-DE")}</span>}</h2>
-          <form action={runDeepAuditAction} className="print:hidden">
-            <input type="hidden" name="productId" value={product.id} />
-            <SubmitButton className={deepAudit ? "btn-ghost text-xs" : "btn-primary text-xs"} pendingLabel="KI bewertet 8 Dimensionen…" progress>
-              {deepAudit ? "Neu bewerten" : "Tiefen-Audit starten"}
-            </SubmitButton>
-          </form>
+          {auditStale ? (
+            <form action={runDeepAuditAction} className="print:hidden">
+              <input type="hidden" name="productId" value={product.id} />
+              <SubmitButton className="btn-primary text-xs" pendingLabel="KI bewertet 8 Dimensionen…" progress>
+                {deepAudit ? "Neu bewerten (Datenbasis hat sich geändert)" : "Tiefen-Audit starten"}
+              </SubmitButton>
+            </form>
+          ) : (
+            <span className="pill pill-neutral print:hidden">aktuell — Datenbasis unverändert</span>
+          )}
         </div>
         {!deepAudit && (
           <p className="mt-1 text-xs text-muted">
@@ -196,6 +216,8 @@ export default async function AnalysePage({
           </>
         )}
       </section>
+        );
+      })()}
 
       {analysis.sov && (
         <section className="mt-6">

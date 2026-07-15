@@ -56,10 +56,10 @@ export default async function ProductPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ fehler?: string }>;
+  searchParams: Promise<{ fehler?: string; hinweis?: string }>;
 }) {
   const { id } = await params;
-  const { fehler } = await searchParams;
+  const { fehler, hinweis } = await searchParams;
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, id) });
   if (!product) notFound();
@@ -127,6 +127,7 @@ export default async function ProductPage({
       </div>
 
       {fehler && <p className="mt-4 rounded-xl bg-[rgb(220_38_38/0.08)] px-3 py-2 text-sm text-bad">✕ {fehler}</p>}
+      {hinweis && <p className="mt-4 rounded-xl bg-[var(--primary-soft)] px-3 py-2 text-sm text-primary-strong">ℹ {hinweis}</p>}
 
       <div className="stagger mt-6 space-y-3">
         {/* Original-Listing (inkl. Bildplätze) */}
@@ -139,12 +140,16 @@ export default async function ProductPage({
             right={
               <>
                 {snapshot && <span className="pill pill-good">✓ {snapshot.createdAt.toLocaleDateString("de-DE")}</span>}
-                <form action={importListingFromAmazon}>
-                  <input type="hidden" name="productId" value={product.id} />
-                  <SubmitButton disabled={!product.asin} className="btn-primary disabled:opacity-40" pendingLabel="Lädt Listing…" progress>
-                    {snapshot ? "Neu laden" : "Von Amazon laden"}
-                  </SubmitButton>
-                </form>
+                {snapshot && snapshot.source === "apify" && Date.now() - snapshot.createdAt.getTime() < 24 * 60 * 60 * 1000 ? (
+                  <span className="text-[11px] text-muted">Stand von heute — neu laden ab morgen</span>
+                ) : (
+                  <form action={importListingFromAmazon}>
+                    <input type="hidden" name="productId" value={product.id} />
+                    <SubmitButton disabled={!product.asin} className="btn-primary disabled:opacity-40" pendingLabel="Lädt Listing…" progress>
+                      {snapshot ? "Neu laden" : "Von Amazon laden"}
+                    </SubmitButton>
+                  </form>
+                )}
               </>
             }
           />
@@ -316,6 +321,9 @@ export default async function ProductPage({
             </SubmitButton>
           </form>
           {!product.asin && <p className="mt-2 text-xs text-warn">△ Dafür braucht das Produkt eine ASIN.</p>}
+          {scrape && scrape.source === "apify" && Date.now() - scrape.createdAt.getTime() < 24 * 60 * 60 * 1000 && (
+            <p className="mt-2 text-[11px] text-muted">Dieselben ASINs werden 24 h nicht doppelt gescraped — neu scrapen lohnt mit zusätzlichen Wettbewerber-ASINs.</p>
+          )}
 
           {scrape && (
             <div className="mt-3 rounded-xl bg-background p-3">

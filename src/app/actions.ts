@@ -360,7 +360,13 @@ export async function generateContent(formData: FormData) {
     },
   };
 
-  const result = await generateSection(section, inputs);
+  // Fehler (API, Zeitbudget, kaputtes JSON) als Banner, nie als Fehlerseite (D81)
+  let result: Awaited<ReturnType<typeof generateSection>>;
+  try {
+    result = await generateSection(section, inputs);
+  } catch (e) {
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Text-Generierung (${section}): ${e instanceof Error ? e.message : String(e)}`)}`);
+  }
 
   const dbType = section === "backend" ? "backend_keywords" : section === "highlights" ? "item_highlights" : section;
   const prev = versions.filter((v) => v.type === dbType);
@@ -369,14 +375,14 @@ export async function generateContent(formData: FormData) {
     productId,
     type: dbType as "title" | "bullets" | "item_highlights" | "description" | "backend_keywords" | "qa",
     version: (prev[0]?.version ?? 0) + 1,
-    payload: result.payload,
+    payload: result!.payload,
     status: "draft",
     validation: {
-      passed: !result.issues.some((i) => i.severity === "error"),
-      issues: result.issues,
+      passed: !result!.issues.some((i) => i.severity === "error"),
+      issues: result!.issues,
       checkedAt: new Date().toISOString(),
     },
-    generatedBy: `${result.provider}:${result.model}`,
+    generatedBy: `${result!.provider}:${result!.model}`,
   });
   revalidatePath(`/produkte/${productId}`);
 }
@@ -433,6 +439,22 @@ export async function scrapeReviewsAction(formData: FormData) {
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return;
   const asins = [product.asin, ...competitorAsins].filter(Boolean) as string[];
+
+  // Redundanz-Guard (D81): identische ASIN-Menge, jünger als 24 h → kein
+  // Doppel-Scrape derselben Daten; neue ASINs oder Wartezeit schalten frei.
+  const lastScrape = await db.query.reviewScrapes.findFirst({
+    where: eq(schema.reviewScrapes.productId, productId),
+    orderBy: desc(schema.reviewScrapes.createdAt),
+  });
+  const norm = (a: string[]) => [...new Set(a.map((x) => x.trim().toUpperCase()))].sort().join(",");
+  if (
+    lastScrape &&
+    lastScrape.source === "apify" &&
+    norm(lastScrape.asins) === norm(asins) &&
+    Date.now() - lastScrape.createdAt.getTime() < 24 * 60 * 60 * 1000
+  ) {
+    redirect(`/produkte/${productId}?hinweis=${encodeURIComponent("Diese ASINs wurden in den letzten 24 h bereits gescraped — Datenbasis unten. Für mehr Daten Wettbewerber-ASINs dazugeben; neue Reviews gibt es ab morgen.")}#reviews`);
+  }
 
   const { scrapeReviews } = await import("@/lib/reviews/apify");
   const { scrapeProduct } = await import("@/lib/scrape/apifyProduct");
@@ -592,6 +614,25 @@ export async function runDeepAuditAction(formData: FormData) {
     (u) => u.reportType === "cerebro" && u.parseStatus === "ok" && (u.parsed as { productId?: string })?.productId === productId,
   );
   const sovAudit = (sovUpload?.parsed as { audit?: import("@/lib/sov/audit").SovAudit })?.audit ?? null;
+
+  // Redundanz-Guard (D81): dieselbe Datenbasis wird nicht doppelt auditiert —
+  // erst neuer Import/Scrape/Analyse/Content schaltet „Neu bewerten" frei.
+  const lastAudit = await db.query.deepAudits.findFirst({
+    where: eq(schema.deepAudits.productId, productId),
+    orderBy: desc(schema.deepAudits.createdAt),
+  });
+  if (lastAudit) {
+    const newestInput = Math.max(
+      snapshot?.createdAt.getTime() ?? 0,
+      insights!.createdAt.getTime(),
+      versions[0]?.createdAt.getTime() ?? 0,
+      scrape?.createdAt.getTime() ?? 0,
+      sovUpload?.createdAt.getTime() ?? 0,
+    );
+    if (newestInput <= lastAudit.createdAt.getTime()) {
+      redirect(`/produkte/${productId}/analyse?hinweis=${encodeURIComponent("Die Datenbasis ist seit dem letzten Tiefen-Audit unverändert — das Ergebnis unten ist aktuell. Neu bewerten wird nach neuem Import, Scrape, Analyse oder Content wieder frei.")}`);
+    }
+  }
 
   // Bewertungs-Sockel: neueste Wahrheit gewinnt (Scrape-Totals vor Import-Basics)
   const basics = scrape?.amazonTotals
@@ -794,6 +835,15 @@ export async function importListingFromAmazon(formData: FormData) {
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product?.asin) {
     redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Produkt hat keine ASIN — Import nicht möglich.")}`);
+  }
+
+  // Redundanz-Guard (D81): erfolgreicher Import jünger als 24 h → kein Doppel-Import
+  const lastSnap = await db.query.listingSnapshots.findFirst({
+    where: eq(schema.listingSnapshots.productId, productId),
+    orderBy: desc(schema.listingSnapshots.createdAt),
+  });
+  if (lastSnap && lastSnap.source === "apify" && Date.now() - lastSnap.createdAt.getTime() < 24 * 60 * 60 * 1000) {
+    redirect(`/produkte/${productId}?hinweis=${encodeURIComponent("Das Listing wurde in den letzten 24 h bereits geladen (Stand unten). Amazon-Änderungen sind frühestens morgen sinnvoll neu zu ziehen.")}`);
   }
 
   // Fehler landen als Banner an der Seite, nie als Server-Fehlerseite (D78)
