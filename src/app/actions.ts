@@ -661,7 +661,9 @@ export async function importListingFromAmazon(formData: FormData) {
   await db.insert(schema.listingSnapshots).values({
     id: id(), productId, source: "apify",
     title: snap.title, bullets: snap.bullets, description: snap.description,
-    imageUrls: snap.imageUrls, raw: snap.raw,
+    imageUrls: snap.imageUrls,
+    reviewsTotal: snap.reviewsTotal, ratingAvg: snap.ratingAvg, ratingDist: snap.ratingDist,
+    raw: snap.raw,
   });
 
   // Produkt-Fakten automatisch aus dem Import extrahieren (D70) — nur leere

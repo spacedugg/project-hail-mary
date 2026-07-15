@@ -131,7 +131,14 @@ export default async function ProductPage({
             )}
             <p className="mt-1 text-neutral-500">
               {snapshot.description ? `Beschreibung: ${snapshot.description.length} Zeichen` : "keine Beschreibung"} · {snapshot.imageUrls?.length ?? 0} Bilder
+              {snapshot.reviewsTotal !== null && <> · <b>{new Intl.NumberFormat("de-DE").format(snapshot.reviewsTotal)} Bewertungen</b></>}
+              {snapshot.ratingAvg !== null && <> · Ø {new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(snapshot.ratingAvg)} ★</>}
             </p>
+            {snapshot.ratingDist && (
+              <p className="mt-0.5 text-neutral-500">
+                Verteilung: {(["5", "4", "3", "2", "1"] as const).filter((s) => snapshot.ratingDist![s] !== undefined).map((s) => `${s}★ ${snapshot.ratingDist![s]} %`).join(" · ")}
+              </p>
+            )}
           </div>
         )}
       </section>

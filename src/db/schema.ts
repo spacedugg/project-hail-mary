@@ -293,6 +293,10 @@ export const listingSnapshots = sqliteTable("listing_snapshots", {
   bullets: text("bullets", { mode: "json" }).$type<string[]>(),
   description: text("description"),
   imageUrls: text("image_urls", { mode: "json" }).$type<string[]>(),
+  /** Amazon-Basics zum Import-Zeitpunkt (D73): echte Gesamt-Bewertungszahl, Ø-Rating, Sterne-Verteilung (% je Klasse) — wie auf der Produktseite sichtbar. */
+  reviewsTotal: integer("reviews_total"),
+  ratingAvg: real("rating_avg"),
+  ratingDist: text("rating_dist", { mode: "json" }).$type<Record<string, number>>(),
   raw: text("raw", { mode: "json" }),
   createdAt: ts("created_at").notNull(),
 });
