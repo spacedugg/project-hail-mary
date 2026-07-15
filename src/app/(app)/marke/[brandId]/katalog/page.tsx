@@ -2,6 +2,7 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { createProduct } from "@/app/actions";
+import { SubmitButton } from "@/components/submit-button";
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +22,9 @@ export default async function BrandKatalog({ params }: { params: Promise<{ brand
         <input type="hidden" name="brandId" value={brandId} />
         <input name="name" placeholder="Produktname" required className={`${input} flex-1`} />
         <input name="asin" placeholder="ASIN (B0…)" className={`${input} w-40 font-mono`} />
-        <button className="btn-primary">
+        <SubmitButton className="btn-primary">
           + Produkt
-        </button>
+        </SubmitButton>
       </form>
 
       <ul className="mt-6 card divide-y divide-hair overflow-hidden">

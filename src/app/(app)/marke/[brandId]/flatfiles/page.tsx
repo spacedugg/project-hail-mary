@@ -1,6 +1,7 @@
 import { eq, desc, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { uploadFlatfileTemplate } from "@/app/actions";
+import { SubmitButton } from "@/components/submit-button";
 
 export const dynamic = "force-dynamic";
 
@@ -40,9 +41,9 @@ export default async function FlatfilesPage({ params }: { params: Promise<{ bran
         <form action={uploadFlatfileTemplate} className="mt-3 flex flex-wrap items-center gap-2">
           <input type="hidden" name="brandId" value={brandId} />
           <input type="file" name="file" accept=".xlsx,.xlsm,.txt,.tsv" required className="text-sm" />
-          <button className="btn-dark">
+          <SubmitButton className="btn-dark">
             Neuste Vorlage hochladen
-          </button>
+          </SubmitButton>
         </form>
         {latestTpl && (
           <p className="mt-2 text-xs text-neutral-500">

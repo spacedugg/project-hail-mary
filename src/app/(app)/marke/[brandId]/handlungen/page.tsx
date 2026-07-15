@@ -2,6 +2,7 @@ import Link from "next/link";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { syncBrandActions, setActionStatus } from "@/app/actions";
+import { SubmitButton } from "@/components/submit-button";
 
 export const dynamic = "force-dynamic";
 
@@ -38,9 +39,9 @@ export default async function BrandHandlungen({ params }: { params: Promise<{ br
         </div>
         <form action={syncBrandActions}>
           <input type="hidden" name="brandId" value={brandId} />
-          <button className="btn-primary">
+          <SubmitButton className="btn-primary" pendingLabel="Leitet Handlungen ab…" progress>
             Aus Analysen ableiten
-          </button>
+          </SubmitButton>
         </form>
       </div>
 
@@ -78,14 +79,14 @@ export default async function BrandHandlungen({ params }: { params: Promise<{ br
                     <input type="hidden" name="actionId" value={a.id} />
                     <input type="hidden" name="brandId" value={brandId} />
                     <input type="hidden" name="status" value="in_progress" />
-                    <button className="btn-ghost px-2 py-1 text-xs">Start</button>
+                    <SubmitButton className="btn-ghost px-2 py-1 text-xs">Start</SubmitButton>
                   </form>
                 )}
                 <form action={setActionStatus}>
                   <input type="hidden" name="actionId" value={a.id} />
                   <input type="hidden" name="brandId" value={brandId} />
                   <input type="hidden" name="status" value="done" />
-                  <button className="btn-ghost px-2 py-1 text-xs !text-good">✓ Erledigt</button>
+                  <SubmitButton className="btn-ghost px-2 py-1 text-xs !text-good">✓ Erledigt</SubmitButton>
                 </form>
               </div>
             </div>

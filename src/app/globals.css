@@ -87,6 +87,17 @@ body {
 @keyframes donut-draw {
   from { stroke-dashoffset: var(--donut-full, 100); }
 }
+@keyframes spin360 {
+  to { transform: rotate(360deg); }
+}
+@keyframes progress-slide {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(280%); }
+}
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
 @keyframes glow-drift {
   0%, 100% { opacity: 0.85; transform: translate(0, 0) scale(1); }
   50% { opacity: 1; transform: translate(-4%, -6%) scale(1.06); }
@@ -261,6 +272,47 @@ body {
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--muted);
+  }
+
+  /* Lade-Feedback (D69): Conic-Ring-Spinner im CI-Look + Shimmer-Skeletons */
+  .spinner {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    border-radius: 9999px;
+    background: conic-gradient(from 0deg, transparent 10%, currentColor 90%);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+    animation: spin360 0.7s linear infinite;
+    flex: none;
+  }
+  .spinner-lg { width: 2.25rem; height: 2.25rem; color: var(--primary); }
+  .skeleton {
+    border-radius: 1.25rem;
+    background: linear-gradient(100deg, var(--surface) 40%, color-mix(in oklab, var(--primary-soft) 55%, var(--surface)) 50%, var(--surface) 60%);
+    background-size: 200% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+    border: 1px solid var(--hair);
+  }
+  /* Indeterminate-Fortschritt für Hintergrund-Analysen (keine Fake-Prozente) */
+  .progress-indeterminate {
+    position: relative;
+    height: 0.375rem;
+    overflow: hidden;
+    border-radius: 9999px;
+    background: var(--hair);
+  }
+  .progress-indeterminate::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    width: 40%;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, var(--primary), var(--primary-strong));
+    animation: shimmer 1.2s ease-in-out infinite;
+    background-size: 250% 100%;
+    transform: translateX(-100%);
+    animation-name: progress-slide;
   }
 
   /* Meta-Tag (Typ/Scope/Version — neutrale Auszeichnung, kein Status) */

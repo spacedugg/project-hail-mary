@@ -5,8 +5,11 @@ import { getDb, schema } from "@/db/client";
 import { saveFacts, saveKeywords, deriveKeywordsFromSov, generateContent, uploadCerebro, runReviewInsights, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
+import { SubmitButton } from "@/components/submit-button";
 
 export const dynamic = "force-dynamic";
+// Apify-Scrapes & LLM-Generierung brauchen mehr als das Vercel-Default-Zeitbudget
+export const maxDuration = 60;
 
 const SECTIONS = [
   { key: "title", label: "Titel" },
@@ -31,8 +34,15 @@ function IssueList({ issues }: { issues: ValidationIssue[] }) {
   );
 }
 
-export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProductPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ fehler?: string }>;
+}) {
   const { id } = await params;
+  const { fehler } = await searchParams;
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, id) });
   if (!product) notFound();
@@ -86,6 +96,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
+      {fehler && <p className="mt-4 rounded-xl bg-[rgb(220_38_38/0.08)] px-3 py-2 text-sm text-bad">✕ {fehler}</p>}
+
       {/* 0 · Original-Listing (Import) */}
       <section className="mt-6 card p-4">
         <h2 className="sect-h">
@@ -95,14 +107,14 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <form action={importListingFromAmazon}>
             <input type="hidden" name="productId" value={product.id} />
-            <button disabled={!product.asin} className="btn-dark disabled:opacity-40">
+            <SubmitButton disabled={!product.asin} className="btn-dark disabled:opacity-40" pendingLabel="Importiert von Amazon…" progress>
               Von Amazon importieren (Apify)
-            </button>
+            </SubmitButton>
           </form>
           <form action={uploadListingCsv} className="flex items-center gap-2">
             <input type="hidden" name="productId" value={product.id} />
             <input type="file" name="file" accept=".csv" required className="text-sm" />
-            <button className="btn-ghost">H10-CSV importieren</button>
+            <SubmitButton className="btn-ghost">H10-CSV importieren</SubmitButton>
           </form>
         </div>
         {snapshot && (
@@ -154,9 +166,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           <input name="usps" defaultValue={f.usps?.join(" | ")} placeholder="USPs (| -getrennt) — jede wird genau 1× verwendet" className={`${input} col-span-2`} />
           <input name="targetAudience" defaultValue={f.targetAudience} placeholder="Zielgruppe" className={input} />
           <input name="certifications" defaultValue={f.certifications?.join(" | ")} placeholder="Zertifikate/Normen (nur echte)" className={input} />
-          <button className="col-span-2 btn-dark">
+          <SubmitButton className="col-span-2 btn-dark">
             Speichern
-          </button>
+          </SubmitButton>
         </form>
       </section>
 
@@ -172,9 +184,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         {sovUpload && (
           <form action={deriveKeywordsFromSov} className="mt-3">
             <input type="hidden" name="productId" value={product.id} />
-            <button className="btn-primary">
+            <SubmitButton className="btn-primary">
               Aus SOV-Audit ableiten ({kws.filter((k) => k.source === "cerebro").length ? "aktualisieren" : "Cerebro-Daten nutzen"})
-            </button>
+            </SubmitButton>
           </form>
         )}
         {(["primary", "secondary", "tertiary", "backend"] as const).map((tier) => {
@@ -205,9 +217,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
               placeholder={"edelstahl trinkflasche;18100\nthermosflasche;9900\n…"}
               className={`${input} font-mono`}
             />
-            <button className="mt-2 btn-dark">
+            <SubmitButton className="mt-2 btn-dark">
               Keywords speichern
-            </button>
+            </SubmitButton>
           </form>
         </details>
       </section>
@@ -222,7 +234,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           <input type="hidden" name="productId" value={product.id} />
           <input type="file" name="file" accept=".csv" required className="text-sm" />
           <input name="price" type="number" step="0.01" placeholder="Ø-Preis € (Default 45)" className={`${input} w-44`} />
-          <button className="btn-dark">Hochladen & auswerten</button>
+          <SubmitButton className="btn-dark" pendingLabel="Wertet aus…">Hochladen & auswerten</SubmitButton>
         </form>
         {uploads.find((u) => u.reportType === "cerebro" && u.parseStatus === "error") && !sovUpload && (
           <p className="mt-2 text-xs text-red-600">Letzter Upload fehlgeschlagen: {uploads.find((u) => u.parseStatus === "error")?.parseError}</p>
@@ -230,7 +242,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       </section>
 
       {/* 2c · Review-Insights */}
-      <section className="mt-4 card p-4">
+      <section id="reviews" className="mt-4 card p-4">
         <h2 className="sect-h">
           2c · Review-Insights (Apify) {insights && <span className="ml-1 pill pill-good">✓ {insights.dataBasis} · {insights.confidence}</span>}
         </h2>
@@ -238,7 +250,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         <form action={runReviewInsights} className="mt-3 flex flex-wrap items-center gap-2">
           <input type="hidden" name="productId" value={product.id} />
           <input name="competitorAsins" placeholder="Wettbewerber-ASINs (Leerzeichen-getrennt)" className={`${input} flex-1`} />
-          <button className="btn-dark">Reviews analysieren</button>
+          <SubmitButton className="btn-dark" pendingLabel="Scrapt & analysiert Reviews…" progress>Reviews analysieren</SubmitButton>
         </form>
         {insights && (
           <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
@@ -280,15 +292,15 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                       <form action={approveContent}>
                         <input type="hidden" name="productId" value={product.id} />
                         <input type="hidden" name="versionId" value={v.id} />
-                        <button className="btn-ghost px-3 py-1 text-xs !text-good">✓ Freigeben</button>
+                        <SubmitButton className="btn-ghost px-3 py-1 text-xs !text-good">✓ Freigeben</SubmitButton>
                       </form>
                     )}
                     <form action={generateContent}>
                       <input type="hidden" name="productId" value={product.id} />
                       <input type="hidden" name="section" value={key} />
-                      <button className="btn-primary px-3 py-1 text-xs">
+                      <SubmitButton className="btn-primary px-3 py-1 text-xs">
                         {v ? "Neu generieren" : "Generieren"}
-                      </button>
+                      </SubmitButton>
                     </form>
                   </div>
                 </div>
@@ -346,9 +358,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                       }
                       className={`${input} font-mono text-xs`}
                     />
-                    <button className="btn-dark mt-1.5 text-xs">
+                    <SubmitButton className="btn-dark mt-1.5 text-xs">
                       Speichern als neue Version (v{(v?.version ?? 0) + 1})
-                    </button>
+                    </SubmitButton>
                   </form>
                 </details>
               </div>
@@ -399,7 +411,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             </select>
           </label>
           <div className="col-span-2 flex items-end sm:col-span-2">
-            <button className="btn-primary">Berechnen & speichern</button>
+            <SubmitButton className="btn-primary">Berechnen & speichern</SubmitButton>
           </div>
         </form>
         {mc && (

@@ -451,7 +451,7 @@ export async function runReviewInsights(formData: FormData) {
     });
   }
   revalidatePath(`/produkte/${productId}`);
-  if (errorMsg) throw new Error(errorMsg);
+  if (errorMsg) redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Review-Analyse: ${errorMsg}`)}#reviews`);
 }
 
 // ── Handlungen (D45): aus Analysen ableiten + Status pflegen ─────────────────

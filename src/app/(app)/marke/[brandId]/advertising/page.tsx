@@ -8,6 +8,7 @@ import type { BusinessTotals } from "@/lib/reports/business";
 import type { SearchTermRow, SearchTermTotals } from "@/lib/reports/searchterm";
 import { ngramRoots, topConverting, negativeCandidates } from "@/lib/reports/searchterm";
 import { Donut } from "@/components/charts";
+import { SubmitButton } from "@/components/submit-button";
 
 export const dynamic = "force-dynamic";
 
@@ -167,7 +168,7 @@ export default async function AdvertisingPage({
               className="input-base w-28 text-right"
             />
             <span className="text-xs text-neutral-500">%</span>
-            <button className="btn-dark text-xs">Speichern</button>
+            <SubmitButton className="btn-dark text-xs">Speichern</SubmitButton>
           </form>
         </div>
       </section>

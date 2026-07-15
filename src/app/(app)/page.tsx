@@ -3,6 +3,7 @@ import { getDb } from "@/db/client";
 import { createClient } from "@/app/actions";
 import { OsShell } from "@/components/shell";
 import { IconKatalog, IconHandlungen, IconUsers, IconArrowRight } from "@/components/icons";
+import { SubmitButton } from "@/components/submit-button";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,7 @@ export default async function Portfolio() {
             className="input-base flex-1"
             required
           />
-          <button className="btn-primary">Anlegen</button>
+          <SubmitButton className="btn-primary">Anlegen</SubmitButton>
         </form>
 
         <div className="stagger mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">

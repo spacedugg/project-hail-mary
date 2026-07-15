@@ -35,20 +35,30 @@ export async function scrapeReviews(
   const input = valid.map((asin) => ({
     asin,
     domainCode: opts.domain ?? "de",
-    maxPages: opts.maxPages ?? 10,
+    maxPages: opts.maxPages ?? 3, // 3 Seiten/ASIN reichen für Insights und bleiben im Zeit-Budget
     reviewerType: "all_reviews",
     formatType: "current_format",
     mediaType: "all_contents",
   }));
 
-  const res = await fetch(
-    `https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?timeout=240`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ input }),
-    },
-  );
+  // Zeit-Budget: Vercel-Function max. 60 s → Apify synchron auf 50 s begrenzen
+  let res: Response;
+  try {
+    res = await fetch(
+      `https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?timeout=50`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({ input }),
+        signal: AbortSignal.timeout(55_000),
+      },
+    );
+  } catch (e) {
+    if (e instanceof Error && e.name === "TimeoutError")
+      throw new Error("Review-Scrape hat das Zeit-Budget (55 s) überschritten — mit weniger Wettbewerber-ASINs erneut versuchen.");
+    throw e;
+  }
+  if (res.status === 408) throw new Error("Apify-Lauf hat das Zeit-Budget überschritten — mit weniger ASINs erneut versuchen.");
   if (!res.ok) throw new Error(`Apify ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const items = (await res.json()) as Array<Record<string, unknown>>;
 

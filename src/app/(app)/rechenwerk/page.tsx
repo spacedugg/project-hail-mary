@@ -8,12 +8,14 @@ import type { FeeConfig } from "@/lib/margin/fees";
 import type { FeeChange } from "@/lib/margin/feesFromPdf";
 import { uploadFeePdf, applyPendingFeeConfig, discardPendingFeeConfig, resetFeeConfigAction } from "@/app/actions";
 import { IconSearch, IconEuro, IconCheck, IconUpload } from "@/components/icons";
+import { SubmitButton } from "@/components/submit-button";
 
 type PendingFees =
   | { config: FeeConfig; changes: FeeChange[]; warnings: string[]; fileName: string; extractedBy: string; extractedAt: string }
   | { error: string; fileName: string; extractedBy: string; extractedAt: string };
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const pct = (n: number) => `${new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2 }).format(n * 100)} %`;
 
@@ -116,7 +118,7 @@ export default async function RechenwerkPage() {
             <IconUpload className="h-4 w-4 flex-none text-muted" />
             <span className="text-xs font-medium">Aktualisierte Amazon-Gebühren als PDF:</span>
             <input type="file" name="file" accept=".pdf" required className="text-sm" />
-            <button className="btn-primary text-xs">Extrahieren & prüfen</button>
+            <SubmitButton className="btn-primary text-xs" pendingLabel="Liest PDF & extrahiert Tabellen…" progress>Extrahieren & prüfen</SubmitButton>
           </form>
 
           {pending && (
@@ -125,7 +127,7 @@ export default async function RechenwerkPage() {
                 <>
                   <p className="text-sm font-medium text-bad">✕ Extraktion fehlgeschlagen: {pending.error}</p>
                   <p className="mt-1 text-xs text-muted">{pending.fileName} · {new Date(pending.extractedAt).toLocaleString("de-DE")} · {pending.extractedBy}</p>
-                  <form action={discardPendingFeeConfig} className="mt-2"><button className="btn-ghost text-xs">Ausblenden</button></form>
+                  <form action={discardPendingFeeConfig} className="mt-2"><SubmitButton className="btn-ghost text-xs">Ausblenden</SubmitButton></form>
                 </>
               ) : (
                 <>
@@ -144,9 +146,9 @@ export default async function RechenwerkPage() {
                   )}
                   <div className="mt-3 flex gap-2">
                     {pending.changes.length > 0 && (
-                      <form action={applyPendingFeeConfig}><button className="btn-primary text-xs">Übernehmen — rechnet ab sofort</button></form>
+                      <form action={applyPendingFeeConfig}><SubmitButton className="btn-primary text-xs">Übernehmen — rechnet ab sofort</SubmitButton></form>
                     )}
-                    <form action={discardPendingFeeConfig}><button className="btn-ghost text-xs">Verwerfen</button></form>
+                    <form action={discardPendingFeeConfig}><SubmitButton className="btn-ghost text-xs">Verwerfen</SubmitButton></form>
                   </div>
                 </>
               )}
@@ -199,7 +201,7 @@ export default async function RechenwerkPage() {
 
           {feeState.source === "override" && (
             <form action={resetFeeConfigAction} className="mt-4">
-              <button className="btn-ghost text-xs">Auf Workbook-Standard zurücksetzen</button>
+              <SubmitButton className="btn-ghost text-xs">Auf Workbook-Standard zurücksetzen</SubmitButton>
             </form>
           )}
           <p className="mt-3 text-[11px] text-muted">

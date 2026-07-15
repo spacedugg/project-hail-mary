@@ -4,6 +4,7 @@ import { getDb, schema } from "@/db/client";
 import { createOptimizerOrder } from "@/app/actions";
 import { OsShell } from "@/components/shell";
 import { IconContent, IconArrowRight, IconSparkle } from "@/components/icons";
+import { SubmitButton } from "@/components/submit-button";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,7 @@ export default async function OptimizerPage() {
             <input name="brandName" placeholder="Marke/Hersteller (optional)" className={`${input} w-56`} />
             <input name="name" placeholder="Produkt/Auftrag *" required className={`${input} min-w-64 flex-1`} />
             <input name="asin" placeholder="ASIN (B0…, optional)" className={`${input} w-44 font-mono`} />
-            <button className="btn-primary">Auftrag anlegen</button>
+            <SubmitButton className="btn-primary">Auftrag anlegen</SubmitButton>
           </form>
           <p className="mt-2 text-xs text-muted">Bestehende ASIN? Nach dem Anlegen direkt „Von Amazon importieren" — Neuprodukt: Produkt-Wahrheit von Hand füllen.</p>
         </section>

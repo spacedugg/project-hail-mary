@@ -5,6 +5,7 @@ import { seedDemoDataAction, wipeAllDataAction } from "@/app/actions";
 import Link from "next/link";
 import { OsShell } from "@/components/shell";
 import { IconUsers, IconSearch, IconArrowRight } from "@/components/icons";
+import { SubmitButton } from "@/components/submit-button";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +51,7 @@ export default async function EinstellungenPage({
                 <span className="mb-1 block text-xs font-medium text-muted">E-Mail (fest)</span>
                 <div className={`${input} cursor-not-allowed bg-background text-muted`}>{session.email}</div>
               </div>
-              <button className="btn-dark">Speichern</button>
+              <SubmitButton className="btn-dark">Speichern</SubmitButton>
             </form>
           </section>
 
@@ -65,7 +66,7 @@ export default async function EinstellungenPage({
                 <span className="mb-1 block text-xs font-medium text-muted">Neues Passwort (min. 8 Zeichen)</span>
                 <input name="next" type="password" required minLength={8} autoComplete="new-password" className={input} />
               </label>
-              <button className="btn-dark">Ändern</button>
+              <SubmitButton className="btn-dark">Ändern</SubmitButton>
             </form>
           </section>
 
@@ -78,11 +79,11 @@ export default async function EinstellungenPage({
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <form action={seedDemoDataAction}>
-                <button className="btn-primary text-xs">Demo-Marke anlegen (Jahr 2026)</button>
+                <SubmitButton className="btn-primary text-xs" pendingLabel="Legt Demo-Daten an…" progress>Demo-Marke anlegen (Jahr 2026)</SubmitButton>
               </form>
               <form action={wipeAllDataAction} className="flex items-center gap-2">
                 <input name="confirm" placeholder="Zum Bestätigen: LÖSCHEN" className={`${input} w-52 text-xs`} />
-                <button className="btn-ghost text-xs !text-bad">Alle Marken & Daten löschen</button>
+                <SubmitButton className="btn-ghost text-xs !text-bad">Alle Marken & Daten löschen</SubmitButton>
               </form>
             </div>
           </section>

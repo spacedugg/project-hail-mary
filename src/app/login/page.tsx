@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { login, register } from "@/app/auth-actions";
 import { getSessionUser } from "@/lib/auth/session";
 import { IconSparkle, IconArrowRight } from "@/components/icons";
+import { SubmitButton } from "@/components/submit-button";
 
 export const dynamic = "force-dynamic";
 
@@ -59,9 +60,9 @@ export default async function LoginPage({
                 <span className="mb-1 block text-xs font-medium text-muted">Passwort (min. 8 Zeichen)</span>
                 <input name="password" type="password" required minLength={8} autoComplete="new-password" className={input} />
               </label>
-              <button className="btn-primary w-full justify-center py-2.5">
+              <SubmitButton className="btn-primary w-full justify-center py-2.5">
                 Konto anlegen <IconArrowRight className="h-4 w-4" />
-              </button>
+              </SubmitButton>
               <p className="text-center text-[11px] text-muted">Agentur-intern · erstes Konto wird Admin</p>
             </form>
           ) : (
@@ -74,9 +75,9 @@ export default async function LoginPage({
                 <span className="mb-1 block text-xs font-medium text-muted">Passwort</span>
                 <input name="password" type="password" required autoComplete="current-password" className={input} />
               </label>
-              <button className="btn-primary w-full justify-center py-2.5">
+              <SubmitButton className="btn-primary w-full justify-center py-2.5">
                 Anmelden <IconArrowRight className="h-4 w-4" />
-              </button>
+              </SubmitButton>
             </form>
           )}
         </div>

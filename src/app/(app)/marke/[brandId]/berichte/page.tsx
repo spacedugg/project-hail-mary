@@ -1,6 +1,7 @@
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { uploadReport } from "@/app/actions";
+import { SubmitButton } from "@/components/submit-button";
 
 export const dynamic = "force-dynamic";
 
@@ -45,9 +46,9 @@ export default async function BerichtePage({ params }: { params: Promise<{ brand
             <span className="text-neutral-400">–</span>
             <input type="date" name="periodEnd" required className={input} />
             <input type="file" name="file" accept=".csv,.txt" required className="text-sm" />
-            <button className="btn-primary">
+            <SubmitButton className="btn-primary" pendingLabel="Parst & rechnet…" progress>
               Hochladen & auswerten
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </section>
