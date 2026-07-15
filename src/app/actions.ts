@@ -436,9 +436,10 @@ export async function scrapeReviewsAction(formData: FormData) {
 
   const { scrapeReviews } = await import("@/lib/reviews/apify");
   let reviews: Array<{ asin: string; rating: number; title: string; body: string }> = [];
+  let notes: string[] = [];
   let source: "apify" | "mock" = "apify";
   try {
-    reviews = await scrapeReviews(asins, { domain: product.marketplace });
+    ({ reviews, notes } = await scrapeReviews(asins, { domain: product.marketplace }));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("APIFY_API_KEY")) {
@@ -465,7 +466,7 @@ export async function scrapeReviewsAction(formData: FormData) {
     starCounts[star] += 1;
     perAsin[r.asin] = (perAsin[r.asin] ?? 0) + 1;
   }
-  await db.insert(schema.reviewScrapes).values({ id: id(), productId, source, asins, reviews, starCounts, perAsin });
+  await db.insert(schema.reviewScrapes).values({ id: id(), productId, source, asins, reviews, starCounts, perAsin, notes });
   revalidatePath(`/produkte/${productId}`);
 }
 

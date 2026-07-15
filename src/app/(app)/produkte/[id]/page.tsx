@@ -259,7 +259,7 @@ export default async function ProductPage({
         </h2>
         <p className="mt-1 text-xs text-neutral-500">
           Zwei Schritte: <b>1.</b> Reviews <b>dieser ASIN</b>{product.asin ? <> (<span className="font-mono">{product.asin}</span>)</> : " — dafür oben eine ASIN hinterlegen"} scrapen
-          (optional Wettbewerber dazu) — die Datenbasis erscheint als Sterne-Verteilung. <b>2.</b> Analyse auslösen → Findings-Dashboard.
+          (optional Wettbewerber dazu) — je Sterne-Klasse ein eigener Lauf mit bis zu 100 der aktuellsten Reviews, die Datenbasis erscheint als Sterne-Verteilung. <b>2.</b> Analyse auslösen → Findings-Dashboard.
         </p>
 
         {/* Schritt 1 · Scrape */}
@@ -296,7 +296,14 @@ export default async function ProductPage({
                 );
               })}
             </div>
-            <p className="mt-2 text-[11px] text-muted">1–3 ★ speisen die Pain Points, 4–5 ★ die Kaufauslöser der Analyse.</p>
+            <p className="mt-2 text-[11px] text-muted">Je Sterne-Klasse werden bis zu 100 der aktuellsten Reviews geholt (Scrape-Maximum). 1–3 ★ speisen die Pain Points, 4–5 ★ die Kaufauslöser der Analyse.</p>
+            {(scrape.notes?.length ?? 0) > 0 && (
+              <div className="mt-2 space-y-0.5">
+                {scrape.notes!.map((n, i) => (
+                  <p key={i} className="text-[11px] text-warn">△ {n}</p>
+                ))}
+              </div>
+            )}
 
             {/* Schritt 2 · Analyse */}
             <form action={analyzeReviewsAction} className="mt-3 flex flex-wrap items-center gap-2">

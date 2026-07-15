@@ -1,0 +1,1 @@
+ALTER TABLE `review_scrapes` ADD `notes` text;

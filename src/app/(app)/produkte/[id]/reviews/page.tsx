@@ -70,6 +70,14 @@ export default async function ReviewDashboard({ params }: { params: Promise<{ id
               </div>
             </div>
           </div>
+          <p className="mt-2 text-[11px] text-muted">Je Sterne-Klasse ein eigener Scrape-Lauf mit bis zu 100 der aktuellsten Reviews (Scrape-Maximum).</p>
+          {(scrape?.notes?.length ?? 0) > 0 && (
+            <div className="mt-1.5 space-y-0.5">
+              {scrape!.notes!.map((n, i) => (
+                <p key={i} className="text-[11px] text-warn">△ {n}</p>
+              ))}
+            </div>
+          )}
           {scrape && (
             <div className="mt-4 space-y-1.5">
               {(["5", "4", "3", "2", "1"] as const).map((star) => {

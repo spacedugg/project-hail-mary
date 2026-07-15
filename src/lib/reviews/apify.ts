@@ -5,15 +5,21 @@ import type { ReviewInsightsPayload } from "@/db/schema";
 /**
  * Review-Insights via Apify — Neubau der (defekten) temoa-os-Variante,
  * damit diese Version dort übernommen werden kann (D39).
- * Verbesserungen ggü. Bestand: (a) ALLE Ratings scrapen — 1–3★ speisen Pain
- * Points, 4–5★ die Kaufauslöser (Bestand filterte 1–4 und verlor Trigger);
+ * Verbesserungen ggü. Bestand: (a) je Sterne-Klasse ein eigener Lauf (D72):
+ * Apify liefert max. 100 Reviews pro Scrape — mit filterByStar one_star …
+ * five_star holen 5 parallele Läufe bis zu 5×100 der AKTUELLSTEN Reviews
+ * (sortBy "recent"), statt dass 5★-Masse alles andere verdrängt;
  * (b) robustes Rating-Parsing (Zahl ODER "4,0 von 5 Sternen"-String);
- * (c) klare Fehlerbilder statt silent fallback.
+ * (c) klare Fehlerbilder statt silent fallback — scheitert eine Klasse,
+ * läuft der Rest weiter und die Lücke wird als Notiz ausgewiesen.
  */
 
 const ACTOR = "axesso_data~amazon-reviews-scraper";
 
 export type RawReview = { asin: string; rating: number; title: string; body: string };
+
+/** Apify-Werte für filterByStar, Index 0 → 1★ … Index 4 → 5★. */
+const STAR_FILTERS = ["one_star", "two_star", "three_star", "four_star", "five_star"] as const;
 
 function parseRating(v: unknown): number {
   if (typeof v === "number") return v;
@@ -24,53 +30,87 @@ function parseRating(v: unknown): number {
   return 0;
 }
 
-export async function scrapeReviews(
+/** Ein Sterne-Klassen-Lauf: alle ASINs, gefiltert auf eine Klasse, aktuellste zuerst. */
+async function runStarClass(
+  apiKey: string,
   asins: string[],
-  opts: { domain?: string; maxPages?: number } = {},
+  filterByStar: (typeof STAR_FILTERS)[number],
+  starValue: number,
+  domain: string,
 ): Promise<RawReview[]> {
-  const apiKey = process.env.APIFY_API_KEY;
-  if (!apiKey) throw new Error("APIFY_API_KEY fehlt (Env) — Review-Scrape nicht möglich.");
-  const valid = asins.map((a) => a.trim().toUpperCase()).filter((a) => /^B[A-Z0-9]{9}$/.test(a)).slice(0, 6);
-  if (valid.length === 0) throw new Error("Keine gültigen ASINs (Format B + 9 Zeichen).");
-
-  const input = valid.map((asin) => ({
+  const input = asins.map((asin) => ({
     asin,
-    domainCode: opts.domain ?? "de",
-    maxPages: opts.maxPages ?? 3, // 3 Seiten/ASIN reichen für Insights und bleiben im Zeit-Budget
+    domainCode: domain,
+    sortBy: "recent", // gibt es mehr als das Scrape-Maximum, gewinnen die aktuellsten
+    maxPages: 10, // 10 Seiten ≈ 100 Reviews = Maximum pro Scrape
+    filterByStar,
     reviewerType: "all_reviews",
     formatType: "current_format",
     mediaType: "all_contents",
   }));
 
   // Zeit-Budget: Vercel-Function max. 60 s → Apify synchron auf 50 s begrenzen
-  let res: Response;
-  try {
-    res = await fetch(
-      `https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?timeout=50`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ input }),
-        signal: AbortSignal.timeout(55_000),
-      },
-    );
-  } catch (e) {
-    if (e instanceof Error && e.name === "TimeoutError")
-      throw new Error("Review-Scrape hat das Zeit-Budget (55 s) überschritten — mit weniger Wettbewerber-ASINs erneut versuchen.");
-    throw e;
-  }
-  if (res.status === 408) throw new Error("Apify-Lauf hat das Zeit-Budget überschritten — mit weniger ASINs erneut versuchen.");
-  if (!res.ok) throw new Error(`Apify ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  const res = await fetch(
+    `https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?timeout=50`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ input }),
+      signal: AbortSignal.timeout(55_000),
+    },
+  );
+  if (res.status === 408) throw new Error("Zeitlimit");
+  if (!res.ok) throw new Error(`Apify ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const items = (await res.json()) as Array<Record<string, unknown>>;
 
   return items
     .map((it) => ({
       asin: String(it.asin ?? it.ASIN ?? ""),
-      rating: parseRating(it.rating ?? it.ratingScore),
+      // Fehlt das Rating im Item, ist die Klasse durch den Filter trotzdem bekannt
+      rating: parseRating(it.rating ?? it.ratingScore) || starValue,
       title: String(it.title ?? "").trim(),
       body: String(it.text ?? it.body ?? it.review ?? "").trim(),
     }))
-    .filter((r) => r.rating > 0 && r.body.length > 10);
+    .filter((r) => r.body.length > 10);
+}
+
+export async function scrapeReviews(
+  asins: string[],
+  opts: { domain?: string } = {},
+): Promise<{ reviews: RawReview[]; notes: string[] }> {
+  const apiKey = process.env.APIFY_API_KEY;
+  if (!apiKey) throw new Error("APIFY_API_KEY fehlt (Env) — Review-Scrape nicht möglich.");
+  const valid = asins.map((a) => a.trim().toUpperCase()).filter((a) => /^B[A-Z0-9]{9}$/.test(a)).slice(0, 6);
+  if (valid.length === 0) throw new Error("Keine gültigen ASINs (Format B + 9 Zeichen).");
+  const domain = opts.domain ?? "de";
+
+  const results = await Promise.allSettled(
+    STAR_FILTERS.map((filter, i) => runStarClass(apiKey, valid, filter, i + 1, domain)),
+  );
+
+  const reviews: RawReview[] = [];
+  const notes: string[] = [];
+  results.forEach((r, i) => {
+    const star = i + 1;
+    if (r.status === "fulfilled") {
+      reviews.push(...r.value);
+    } else {
+      const why =
+        r.reason instanceof Error && (r.reason.name === "TimeoutError" || r.reason.message === "Zeitlimit")
+          ? "ins Zeitlimit gelaufen"
+          : `fehlgeschlagen (${r.reason instanceof Error ? r.reason.message : String(r.reason)})`;
+      notes.push(`${star}★-Lauf ${why} — diese Klasse fehlt in der Datenbasis.`);
+    }
+  });
+
+  if (reviews.length === 0) {
+    throw new Error(
+      notes.length > 0
+        ? `Alle Sterne-Klassen-Läufe sind fehlgeschlagen: ${notes[0]}`
+        : "Scrape lieferte keine verwertbaren Reviews (evtl. keine Bewertungen vorhanden).",
+    );
+  }
+  return { reviews, notes };
 }
 
 // ── Insights-Extraktion (LLM, Schema aus temoa-audit / SALVAGE §7) ──────────

@@ -202,6 +202,8 @@ export const reviewScrapes = sqliteTable("review_scrapes", {
   /** Verteilung 1–5 Sterne (gerundet) — die sichtbare Datenbasis. */
   starCounts: text("star_counts", { mode: "json" }).$type<Record<string, number>>().notNull(),
   perAsin: text("per_asin", { mode: "json" }).$type<Record<string, number>>().notNull(),
+  /** Ehrlichkeits-Notizen, z. B. „3★-Lauf ins Zeitlimit gelaufen" (D72). */
+  notes: text("notes", { mode: "json" }).$type<string[]>(),
   createdAt: ts("created_at").notNull(),
 });
 
