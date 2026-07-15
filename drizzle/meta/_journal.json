@@ -57,6 +57,13 @@
       "when": 1784109442671,
       "tag": "0007_brand-kind",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1784122521492,
+      "tag": "0008_review-scrapes",
+      "breakpoints": true
     }
   ]
 }

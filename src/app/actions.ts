@@ -418,40 +418,86 @@ export async function uploadCerebro(formData: FormData) {
 
 // ── Review-Insights via Apify (Neubau der defekten temoa-os-Variante) ────────
 
-export async function runReviewInsights(formData: FormData) {
+/**
+ * Bewertungs-Analyse in ZWEI bewussten Schritten (D71):
+ * 1. Scrape — Reviews der eigenen ASIN (+ optionale Wettbewerber) holen und
+ *    mit sichtbarer Datenbasis speichern (Reviews je Sterne-Zahl, je ASIN).
+ * 2. Analyse — KI wertet den gespeicherten Scrape aus (Pain Points,
+ *    Kaufauslöser, O-Töne) → eigenes Findings-Dashboard.
+ */
+export async function scrapeReviewsAction(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
   const competitorAsins = String(formData.get("competitorAsins") ?? "")
     .split(/[\s,;]+/).filter(Boolean);
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return;
-
-  const { scrapeReviews, extractInsights } = await import("@/lib/reviews/apify");
   const asins = [product.asin, ...competitorAsins].filter(Boolean) as string[];
 
-  let payload, confidence = "low", dataBasis = "apify_scrape", errorMsg: string | null = null;
+  const { scrapeReviews } = await import("@/lib/reviews/apify");
+  let reviews: Array<{ asin: string; rating: number; title: string; body: string }> = [];
+  let source: "apify" | "mock" = "apify";
   try {
-    const reviews = await scrapeReviews(asins, { domain: product.marketplace });
-    const res = await extractInsights(reviews, asins.map((a) => `amazon.${product.marketplace}/dp/${a}`), dataBasis);
-    payload = res.payload;
-    confidence = res.confidence;
+    reviews = await scrapeReviews(asins, { domain: product.marketplace });
   } catch (e) {
-    errorMsg = e instanceof Error ? e.message : String(e);
-    // Ohne APIFY_API_KEY: Mock-Insights, klar gekennzeichnet (Dev-Modus)
-    if (errorMsg.includes("APIFY_API_KEY")) {
-      const res = await extractInsights([], ["mock"], "none");
-      payload = res.payload;
-      dataBasis = "none";
-      errorMsg = null;
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("APIFY_API_KEY")) {
+      // Demo-Modus: klar gekennzeichneter Mock-Scrape, damit der Flow testbar bleibt
+      source = "mock";
+      reviews = [
+        { asin: asins[0] ?? "B000000000", rating: 5, title: "Mock", body: "hält wirklich 24h kalt, bin begeistert" },
+        { asin: asins[0] ?? "B000000000", rating: 4, title: "Mock", body: "gute Qualität, passt in den Becherhalter" },
+        { asin: asins[0] ?? "B000000000", rating: 2, title: "Mock", body: "Dichtung tropft nach zwei Wochen in der Tasche" },
+        { asin: asins[0] ?? "B000000000", rating: 1, title: "Mock", body: "kam zerkratzt an" },
+      ];
+    } else {
+      redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Review-Scrape: ${msg}`)}#reviews`);
     }
   }
-  if (payload) {
+  if (reviews.length === 0) {
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Review-Scrape: 0 Reviews gefunden — ASIN prüfen (neues Produkt ohne Bewertungen?).")}#reviews`);
+  }
+
+  const starCounts: Record<string, number> = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
+  const perAsin: Record<string, number> = {};
+  for (const r of reviews) {
+    const star = String(Math.min(5, Math.max(1, Math.round(r.rating))));
+    starCounts[star] += 1;
+    perAsin[r.asin] = (perAsin[r.asin] ?? 0) + 1;
+  }
+  await db.insert(schema.reviewScrapes).values({ id: id(), productId, source, asins, reviews, starCounts, perAsin });
+  revalidatePath(`/produkte/${productId}`);
+}
+
+export async function analyzeReviewsAction(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const db = await getDb();
+  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  if (!product) return;
+  const scrape = await db.query.reviewScrapes.findFirst({
+    where: eq(schema.reviewScrapes.productId, productId),
+    orderBy: desc(schema.reviewScrapes.createdAt),
+  });
+  if (!scrape) {
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Erst Reviews scrapen (Schritt 1), dann analysieren.")}#reviews`);
+  }
+
+  const { extractInsights } = await import("@/lib/reviews/apify");
+  const dataBasis = scrape!.source === "apify" ? "apify_scrape" : "none";
+  try {
+    const res = await extractInsights(
+      scrape!.reviews,
+      scrape!.asins.map((a) => `amazon.${product.marketplace}/dp/${a}`),
+      dataBasis,
+    );
     await db.insert(schema.reviewInsights).values({
-      id: id(), productId, dataBasis, confidence, payload,
+      id: id(), productId, dataBasis, confidence: res.confidence, payload: res.payload,
     });
+  } catch (e) {
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Review-Analyse: ${e instanceof Error ? e.message : String(e)}`)}#reviews`);
   }
   revalidatePath(`/produkte/${productId}`);
-  if (errorMsg) redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Review-Analyse: ${errorMsg}`)}#reviews`);
+  redirect(`/produkte/${productId}/reviews`);
 }
 
 // ── Handlungen (D45): aus Analysen ableiten + Status pflegen ─────────────────

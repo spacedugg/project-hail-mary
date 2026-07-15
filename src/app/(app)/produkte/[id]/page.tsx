@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { saveFacts, saveKeywords, deriveKeywordsFromSov, generateContent, uploadCerebro, runReviewInsights, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc } from "@/app/actions";
+import { saveFacts, saveKeywords, deriveKeywordsFromSov, generateContent, uploadCerebro, scrapeReviewsAction, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
@@ -51,6 +51,10 @@ export default async function ProductPage({
   const insights = await db.query.reviewInsights.findFirst({
     where: eq(schema.reviewInsights.productId, id),
     orderBy: desc(schema.reviewInsights.createdAt),
+  });
+  const scrape = await db.query.reviewScrapes.findFirst({
+    where: eq(schema.reviewScrapes.productId, id),
+    orderBy: desc(schema.reviewScrapes.createdAt),
   });
   const uploads = await db.query.reportUploads.findMany({
     where: eq(schema.reportUploads.brandId, product.brandId),
@@ -251,27 +255,61 @@ export default async function ProductPage({
       {/* 2c · Review-Insights */}
       <section id="reviews" className="mt-4 card p-4">
         <h2 className="sect-h">
-          2c · Bewertungs-Analyse {insights && <span className="ml-1 pill pill-good">✓ {insights.dataBasis} · {insights.confidence}</span>}
+          2c · Bewertungs-Analyse {insights && <span className="ml-1 pill pill-good">✓ analysiert · {insights.confidence}</span>}
         </h2>
         <p className="mt-1 text-xs text-neutral-500">
-          Analysiert automatisch die Bewertungen <b>dieser ASIN</b>{product.asin ? <> (<span className="font-mono">{product.asin}</span>)</> : " — dafür oben eine ASIN hinterlegen"} — keine Neueingabe nötig.
-          Optional Wettbewerber-ASINs ergänzen. Schritt 1: Reviews werden gescrapt · Schritt 2: KI wertet Pain Points & Kaufauslöser mit O-Tönen aus.
+          Zwei Schritte: <b>1.</b> Reviews <b>dieser ASIN</b>{product.asin ? <> (<span className="font-mono">{product.asin}</span>)</> : " — dafür oben eine ASIN hinterlegen"} scrapen
+          (optional Wettbewerber dazu) — die Datenbasis erscheint als Sterne-Verteilung. <b>2.</b> Analyse auslösen → Findings-Dashboard.
         </p>
-        <form action={runReviewInsights} className="mt-3 flex flex-wrap items-center gap-2">
+
+        {/* Schritt 1 · Scrape */}
+        <form action={scrapeReviewsAction} className="mt-3 flex flex-wrap items-center gap-2">
           <input type="hidden" name="productId" value={product.id} />
           <input name="competitorAsins" placeholder="Optional: Wettbewerber-ASINs (Leerzeichen-getrennt)" className={`${input} flex-1`} />
-          <SubmitButton className="btn-dark" disabled={!product.asin} pendingLabel="Schritt 1/2: Scrapt Reviews… dann KI-Auswertung" progress>Reviews scrapen & auswerten</SubmitButton>
+          <SubmitButton className="btn-dark" disabled={!product.asin} pendingLabel="Scrapt Reviews…" progress>
+            {scrape ? "Neu scrapen" : "1 · Reviews scrapen"}
+          </SubmitButton>
         </form>
-        {insights && (
-          <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
-            <div>
-              <div className="font-medium text-red-600">Pain Points</div>
-              <ul className="mt-1 space-y-0.5">{insights.payload.painPoints.slice(0, 5).map((p, i) => <li key={i}>· {p.label}{p.frequencyPct ? ` (${p.frequencyPct} %)` : ""}</li>)}</ul>
+
+        {/* Datenbasis: Sterne-Verteilung + je ASIN */}
+        {scrape && (
+          <div className="mt-3 rounded-xl bg-background p-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="text-xs font-semibold">
+                Datenbasis: {scrape.reviews.length} Reviews · {scrape.createdAt.toLocaleDateString("de-DE")}
+                {scrape.source !== "apify" && <span className="ml-1 pill pill-warn">Demo-Daten (kein Scrape-Key)</span>}
+              </span>
+              <span className="text-[11px] text-muted">{Object.entries(scrape.perAsin).map(([a, n]) => `${a}: ${n}`).join(" · ")}</span>
             </div>
-            <div>
-              <div className="font-medium text-emerald-600">Kaufauslöser</div>
-              <ul className="mt-1 space-y-0.5">{insights.payload.buyingTriggers.slice(0, 5).map((t, i) => <li key={i}>· {t.label}{t.frequencyPct ? ` (${t.frequencyPct} %)` : ""}</li>)}</ul>
+            <div className="mt-2 space-y-1">
+              {(["5", "4", "3", "2", "1"] as const).map((star) => {
+                const n = scrape.starCounts[star] ?? 0;
+                const max = Math.max(...Object.values(scrape.starCounts), 1);
+                return (
+                  <div key={star} className="flex items-center gap-2 text-xs tabular-nums">
+                    <span className="w-8 flex-none text-muted">{star} ★</span>
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-hair">
+                      <div className="bar-fill h-full rounded-full" style={{ width: `${(n / max) * 100}%`, background: Number(star) >= 4 ? "var(--cat-2)" : Number(star) === 3 ? "var(--warn)" : "var(--bad)" }} />
+                    </div>
+                    <span className="w-10 flex-none text-right font-medium">{n}</span>
+                  </div>
+                );
+              })}
             </div>
+            <p className="mt-2 text-[11px] text-muted">1–3 ★ speisen die Pain Points, 4–5 ★ die Kaufauslöser der Analyse.</p>
+
+            {/* Schritt 2 · Analyse */}
+            <form action={analyzeReviewsAction} className="mt-3 flex flex-wrap items-center gap-2">
+              <input type="hidden" name="productId" value={product.id} />
+              <SubmitButton className="btn-primary" pendingLabel="KI wertet Pain Points & Kaufauslöser aus…" progress>
+                2 · Analyse starten
+              </SubmitButton>
+              {insights && (
+                <Link href={`/produkte/${product.id}/reviews`} className="btn-ghost !text-primary-strong text-xs">
+                  Findings-Dashboard öffnen →
+                </Link>
+              )}
+            </form>
           </div>
         )}
       </section>

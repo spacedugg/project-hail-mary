@@ -186,6 +186,25 @@ export type ValidationReport = {
 };
 
 /** Review-Insights (Output-Kontrakt aus temoa-audit, SALVAGE §7). */
+/**
+ * Roh-Scrape der Bewertungen (D71) — eigener Schritt VOR der Analyse:
+ * der Nutzer sieht die Datenbasis (Reviews je Sterne-Zahl, je ASIN),
+ * bevor er die KI-Auswertung auslöst.
+ */
+export const reviewScrapes = sqliteTable("review_scrapes", {
+  id: text("id").primaryKey(),
+  productId: text("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  source: text("source").$type<"apify" | "mock" | "seed">().notNull().default("apify"),
+  asins: text("asins", { mode: "json" }).$type<string[]>().notNull(),
+  reviews: text("reviews", { mode: "json" }).$type<Array<{ asin: string; rating: number; title: string; body: string }>>().notNull(),
+  /** Verteilung 1–5 Sterne (gerundet) — die sichtbare Datenbasis. */
+  starCounts: text("star_counts", { mode: "json" }).$type<Record<string, number>>().notNull(),
+  perAsin: text("per_asin", { mode: "json" }).$type<Record<string, number>>().notNull(),
+  createdAt: ts("created_at").notNull(),
+});
+
 export const reviewInsights = sqliteTable("review_insights", {
   id: text("id").primaryKey(),
   productId: text("product_id")
