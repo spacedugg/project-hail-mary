@@ -510,6 +510,16 @@ export async function analyzeReviewsAction(formData: FormData) {
     redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Erst Reviews scrapen (Schritt 1), dann analysieren.")}#reviews`);
   }
 
+  // Derselbe Scrape wird nie doppelt analysiert (D79) — direkt zum Dashboard.
+  // Altbestand ohne scrapeId: Analyse nach dem Scrape gilt als dessen Analyse.
+  const existing = await db.query.reviewInsights.findFirst({
+    where: eq(schema.reviewInsights.productId, productId),
+    orderBy: desc(schema.reviewInsights.createdAt),
+  });
+  if (existing && (existing.scrapeId === scrape!.id || (!existing.scrapeId && existing.createdAt > scrape!.createdAt))) {
+    redirect(`/produkte/${productId}/reviews`);
+  }
+
   const { extractInsights } = await import("@/lib/reviews/apify");
   const dataBasis = scrape!.source === "apify" ? "apify_scrape" : "none";
   try {
@@ -519,7 +529,7 @@ export async function analyzeReviewsAction(formData: FormData) {
       dataBasis,
     );
     await db.insert(schema.reviewInsights).values({
-      id: id(), productId, dataBasis, confidence: res.confidence, payload: res.payload,
+      id: id(), productId, scrapeId: scrape!.id, dataBasis, confidence: res.confidence, payload: res.payload,
     });
   } catch (e) {
     redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Review-Analyse: ${e instanceof Error ? e.message : String(e)}`)}#reviews`);

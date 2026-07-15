@@ -100,6 +100,11 @@ export default async function ProductPage({
   const parentBrand = await db.query.brands.findFirst({ where: eq(schema.brands.id, product.brandId) });
   const backHref = parentBrand?.kind === "workbench" ? "/optimizer" : `/marke/${product.brandId}/katalog`;
   const hasFacts = Boolean(f.productType || f.dimensions || f.materials?.length || f.usps?.length || f.targetAudience || f.certifications?.length);
+  // Der aktuelle Scrape ist analysiert (D79) → kein Analyse-Button mehr, nur Dashboard.
+  // Altbestand ohne scrapeId: Analyse nach dem Scrape gilt als dessen Analyse.
+  const scrapeAnalyzed = Boolean(
+    insights && scrape && (insights.scrapeId === scrape.id || (!insights.scrapeId && insights.createdAt > scrape.createdAt)),
+  );
 
   return (
     <main className="w-full p-8">
@@ -364,17 +369,24 @@ export default async function ProductPage({
                 </div>
               )}
 
-              <form action={analyzeReviewsAction} className="mt-3 flex flex-wrap items-center gap-2">
-                <input type="hidden" name="productId" value={product.id} />
-                <SubmitButton className="btn-primary" pendingLabel="KI wertet Pain Points & Kaufauslöser aus…" progress>
-                  2 · Analyse starten
-                </SubmitButton>
-                {insights && (
-                  <Link href={`/produkte/${product.id}/reviews`} className="btn-ghost !text-primary-strong text-xs">
+              {scrapeAnalyzed ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <Link href={`/produkte/${product.id}/reviews`} className="btn-primary text-xs">
                     Findings-Dashboard öffnen →
                   </Link>
-                )}
-              </form>
+                  <span className="text-[11px] text-muted">Dieser Scrape ist analysiert — für eine neue Analyse erst neu scrapen (z. B. mit weiteren ASINs).</span>
+                </div>
+              ) : (
+                <form action={analyzeReviewsAction} className="mt-3 flex flex-wrap items-center gap-2">
+                  <input type="hidden" name="productId" value={product.id} />
+                  <SubmitButton className="btn-primary" pendingLabel="KI wertet Pain Points & Kaufauslöser aus…" progress>
+                    2 · Analyse starten
+                  </SubmitButton>
+                  {insights && (
+                    <span className="text-[11px] text-muted">Neuer Scrape seit der letzten Analyse — Analyse aktualisieren.</span>
+                  )}
+                </form>
+              )}
             </div>
           )}
         </section>

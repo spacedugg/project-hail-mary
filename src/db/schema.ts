@@ -256,6 +256,8 @@ export const reviewInsights = sqliteTable("review_insights", {
   productId: text("product_id")
     .notNull()
     .references(() => products.id, { onDelete: "cascade" }),
+  /** Auf welchem Scrape die Analyse lief (D79) — derselbe Scrape wird nie doppelt analysiert. */
+  scrapeId: text("scrape_id").references(() => reviewScrapes.id, { onDelete: "set null" }),
   dataBasis: text("data_basis").notNull(), // uploaded_csv | apify_scrape | none
   confidence: text("confidence").notNull(), // high | medium | low
   payload: text("payload", { mode: "json" }).$type<ReviewInsightsPayload>().notNull(),
