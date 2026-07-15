@@ -67,7 +67,8 @@ export default async function AnalysePage({ params }: { params: Promise<{ id: st
     reviewInsights: insights?.payload ?? null,
   });
 
-  const scoreColor = analysis.overall >= 80 ? "text-emerald-600" : analysis.overall >= 60 ? "text-amber-600" : "text-red-600";
+  const scoreColor = analysis.overall === null ? "text-muted" : analysis.overall >= 80 ? "text-emerald-600" : analysis.overall >= 60 ? "text-amber-600" : "text-red-600";
+  const measurable = analysis.dimensions.some((d) => d.measured);
   const fmt = (n: number) => new Intl.NumberFormat("de-DE").format(n);
 
   return (
@@ -79,8 +80,14 @@ export default async function AnalysePage({ params }: { params: Promise<{ id: st
         <div className="mt-1 flex items-end justify-between gap-4">
           <h1 className="page-title">{product.name}</h1>
           <div className="text-right">
-            <div className={`text-4xl font-bold tabular-nums ${scoreColor}`}>{analysis.overall}<span className="text-base font-normal text-neutral-400">/100</span></div>
-            <div className="text-[10px] uppercase tracking-wide text-neutral-500">Gesamt (Ø gemessener Dimensionen)</div>
+            {analysis.overall !== null ? (
+              <>
+                <div className={`text-4xl font-bold tabular-nums ${scoreColor}`}>{analysis.overall}<span className="text-base font-normal text-neutral-400">/100</span></div>
+                <div className="text-[10px] uppercase tracking-wide text-neutral-500">Gesamt (Ø gemessener Dimensionen)</div>
+              </>
+            ) : (
+              <div className="text-sm font-medium text-muted">Noch keine Messung möglich</div>
+            )}
           </div>
         </div>
         {product.asin && <p className="font-mono text-xs text-neutral-500">{product.asin} · amazon.{product.marketplace}</p>}
@@ -131,6 +138,14 @@ export default async function AnalysePage({ params }: { params: Promise<{ id: st
         </section>
       )}
 
+      {!measurable && (
+        <div className="mt-6 card border-dashed p-6 text-sm text-muted">
+          Hier gibt es noch nichts zu analysieren: weder importiertes Original-Listing noch erstellter Content.
+          Erst auf der Produktseite „Listing von Amazon laden" (ASIN vorhanden) oder Texte erstellen — dann misst
+          die Analyse jede Sektion gegen die Regeln und zeigt echte Scores.
+        </div>
+      )}
+
       <section className="mt-6">
         <h2 className="sect-h">Dimensionen</h2>
         <div className="mt-2 space-y-3">
@@ -139,15 +154,21 @@ export default async function AnalysePage({ params }: { params: Promise<{ id: st
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium">{d.label}</h3>
                 <div className="flex items-center gap-2">
-                  <span className="tag">
-                    {d.evidence === "deterministic" ? "gemessen" : d.evidence === "llm" ? "KI-Rubrik" : "Experte"}
-                  </span>
-                  <span className="text-lg font-semibold tabular-nums">{d.score}</span>
+                  {d.measured ? (
+                    <>
+                      <span className="tag">{d.evidence === "deterministic" ? "gemessen" : d.evidence === "llm" ? "KI-Rubrik" : "Experte"}</span>
+                      <span className="text-lg font-semibold tabular-nums">{d.score}</span>
+                    </>
+                  ) : (
+                    <span className="pill pill-neutral">nicht messbar — Inhalt fehlt</span>
+                  )}
                 </div>
               </div>
-              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-hair">
-                <div className={`h-full ${d.score >= 80 ? "bg-emerald-500" : d.score >= 60 ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${d.score}%` }} />
-              </div>
+              {d.measured && (
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-hair">
+                  <div className={`h-full ${d.score >= 80 ? "bg-emerald-500" : d.score >= 60 ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${d.score}%` }} />
+                </div>
+              )}
               {d.findings.length > 0 && (
                 <ul className="mt-2 space-y-0.5">
                   {d.findings.slice(0, 6).map((f, i) => <li key={i} className="text-xs text-neutral-600 dark:text-neutral-400">· {f}</li>)}

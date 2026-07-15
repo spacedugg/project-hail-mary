@@ -1,4 +1,5 @@
 import { generateForRecipe, resolveRecipe } from "@/lib/llm/registry";
+import { parseLlmJson } from "@/lib/llm/json";
 import type { ReviewInsightsPayload } from "@/db/schema";
 
 /**
@@ -120,12 +121,10 @@ export async function extractInsights(
     const res = await generateForRecipe("reviews.pain-points", {
       system: INSIGHTS_SYSTEM,
       messages: [{ role: "user", content: insightsPrompt(reviews) }],
-      maxTokens: 2000,
+      maxTokens: 4000,
       temperature: 0,
     });
-    const cleaned = res.text.trim().replace(/^```(?:json)?/m, "").replace(/```\s*$/m, "");
-    const start = cleaned.indexOf("{");
-    core = JSON.parse(cleaned.slice(start, cleaned.lastIndexOf("}") + 1));
+    core = parseLlmJson(res.text);
   }
 
   const confidence = reviews.length >= 60 ? "high" : reviews.length >= 20 ? "medium" : "low";

@@ -616,6 +616,16 @@ export async function importListingFromAmazon(formData: FormData) {
     title: snap.title, bullets: snap.bullets, description: snap.description,
     imageUrls: snap.imageUrls, raw: snap.raw,
   });
+
+  // Produkt-Fakten automatisch aus dem Import extrahieren (D70) — nur leere
+  // Felder; scheitert leise (Import bleibt gültig, Felder bleiben prüfbar)
+  try {
+    const { extractFactsFromListing } = await import("@/lib/analysis/factsFromListing");
+    const facts = await extractFactsFromListing(snap, product.facts);
+    if (facts) await db.update(schema.products).set({ facts }).where(eq(schema.products.id, productId));
+  } catch {
+    // Autofill ist Komfort, kein Blocker
+  }
   revalidatePath(`/produkte/${productId}`);
 }
 
@@ -624,6 +634,8 @@ export async function uploadListingCsv(formData: FormData) {
   const file = formData.get("file") as File | null;
   if (!productId || !file) return;
   const db = await getDb();
+  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  if (!product) return;
   const { parseListingCsv } = await import("@/lib/scrape/apifyProduct");
   const snap = parseListingCsv(await file.text());
   await db.insert(schema.listingSnapshots).values({
@@ -631,6 +643,16 @@ export async function uploadListingCsv(formData: FormData) {
     title: snap.title, bullets: snap.bullets, description: snap.description,
     imageUrls: snap.imageUrls, raw: snap.raw,
   });
+
+  // Produkt-Fakten automatisch aus dem Import extrahieren (D70) — nur leere
+  // Felder; scheitert leise (Import bleibt gültig, Felder bleiben prüfbar)
+  try {
+    const { extractFactsFromListing } = await import("@/lib/analysis/factsFromListing");
+    const facts = await extractFactsFromListing(snap, product.facts);
+    if (facts) await db.update(schema.products).set({ facts }).where(eq(schema.products.id, productId));
+  } catch {
+    // Autofill ist Komfort, kein Blocker
+  }
   revalidatePath(`/produkte/${productId}`);
 }
 

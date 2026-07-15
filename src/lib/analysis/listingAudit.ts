@@ -20,14 +20,17 @@ export type ListingSnapshot = {
 export type AnalysisDimension = {
   key: string;
   label: string;
-  score: number; // 0–100
+  score: number; // 0–100 — nur aussagekräftig wenn measured
+  /** false = kein Inhalt vorhanden → NICHT bewertbar (kein Fassaden-Score, D70) */
+  measured: boolean;
   evidence: "deterministic" | "llm" | "manual";
   findings: string[]; // kundentaugliche Sätze
   issues: ValidationIssue[];
 };
 
 export type ListingAnalysis = {
-  overall: number;
+  /** null = noch nichts messbar (kein Inhalt) — Anzeige zeigt Leerzustand statt Zahl */
+  overall: number | null;
   dimensions: AnalysisDimension[];
   sov: null | {
     brandSOV: number;
@@ -67,26 +70,33 @@ export function analyzeListing(input: {
   const allText = [snapshot.title, ...snapshot.bullets, snapshot.description].join(" ");
   const ctx = { facts, primaryKeywords, competitorBrands: [] };
 
+  // Fehlender Inhalt ist NICHT bewertbar — nie ein Fassaden-Score (D70)
+  const missing = (key: string, label: string, was: string) =>
+    dims.push({ key, label, score: 0, measured: false, evidence: "deterministic", findings: [`Noch kein ${was} vorhanden — Original-Listing laden oder Content erstellen.`], issues: [] });
+
   // 1 · Titel (deterministisch)
-  {
+  if (!snapshot.title.trim()) missing("title", "Titel", "Titel");
+  else {
     const issues = validateTitle(snapshot.title, ctx);
-    const findings = issues.map((i) => i.message);
-    dims.push({ key: "title", label: "Titel", score: scoreFromIssues(issues), evidence: "deterministic", findings, issues });
+    dims.push({ key: "title", label: "Titel", score: scoreFromIssues(issues), measured: true, evidence: "deterministic", findings: issues.map((i) => i.message), issues });
   }
   // 2 · Bullets (deterministisch)
-  {
+  if (snapshot.bullets.filter((b) => b.trim()).length === 0) missing("bullets", "Bullet Points", "Bullet-Set");
+  else {
     const issues = validateBullets(snapshot.bullets, ctx);
-    dims.push({ key: "bullets", label: "Bullet Points", score: scoreFromIssues(issues), evidence: "deterministic", findings: issues.map((i) => i.message), issues });
+    dims.push({ key: "bullets", label: "Bullet Points", score: scoreFromIssues(issues), measured: true, evidence: "deterministic", findings: issues.map((i) => i.message), issues });
   }
   // 3 · Beschreibung
-  {
+  if (!snapshot.description.trim()) missing("description", "Beschreibung", "Beschreibung");
+  else {
     const issues = validateDescription(snapshot.description, snapshot.bullets, ctx);
-    dims.push({ key: "description", label: "Beschreibung", score: scoreFromIssues(issues), evidence: "deterministic", findings: issues.map((i) => i.message), issues });
+    dims.push({ key: "description", label: "Beschreibung", score: scoreFromIssues(issues), measured: true, evidence: "deterministic", findings: issues.map((i) => i.message), issues });
   }
   // 4 · Backend
-  {
+  if (!snapshot.backendKeywords.trim()) missing("backend", "Backend-Keywords", "Backend-Keyword-Feld");
+  else {
     const issues = validateBackendKeywords(snapshot.backendKeywords, allText, ctx);
-    dims.push({ key: "backend", label: "Backend-Keywords", score: scoreFromIssues(issues), evidence: "deterministic", findings: issues.map((i) => i.message), issues });
+    dims.push({ key: "backend", label: "Backend-Keywords", score: scoreFromIssues(issues), measured: true, evidence: "deterministic", findings: issues.map((i) => i.message), issues });
   }
 
   // 5 · SEO-Abdeckung: Quick-Wins & Revenue-Gap-Keywords im sichtbaren Text? (deterministisch)
@@ -99,7 +109,7 @@ export function analyzeListing(input: {
       `${covered.length} von ${gaps.length} Top-Umsatzlücken-Keywords sind im Listing abgedeckt (${pct} %).`,
       ...missing.map((m) => `Fehlt im Text: „${m.keyword}" (SV ${m.sv}, Lücke ~${Math.round(m.fullRevGap)} €/Mo. → ${m.lever})`),
     ];
-    dims.push({ key: "seo-coverage", label: "Keyword-Abdeckung (Profit-Hebel)", score: pct, evidence: "deterministic", findings, issues: [] });
+    dims.push({ key: "seo-coverage", label: "Keyword-Abdeckung (Profit-Hebel)", score: pct, measured: true, evidence: "deterministic", findings, issues: [] });
     if (missing.length) recs.push(`Die ${missing.length} wichtigsten Umsatzlücken-Keywords in Titel/Bullets einarbeiten (größter Hebel: „${missing[0].keyword}").`);
   }
 
@@ -114,7 +124,7 @@ export function analyzeListing(input: {
       `${addressed.length} von ${top.length} Top-Pain-Points werden in den Bullets adressiert.`,
       ...missing.map((p) => `Nicht adressiert: „${p.label}"${p.frequencyPct ? ` (${p.frequencyPct} % der kritischen Stimmen)` : ""}`),
     ];
-    dims.push({ key: "voc", label: "Kundenstimmen-Abgleich", score: pct, evidence: "deterministic", findings, issues: [] });
+    dims.push({ key: "voc", label: "Kundenstimmen-Abgleich", score: pct, measured: true, evidence: "deterministic", findings, issues: [] });
     if (missing[0]) recs.push(`Häufigsten Kunden-Einwand („${missing[0].label}") prominent in Bullet 1–2 entkräften.`);
   }
 
@@ -124,7 +134,10 @@ export function analyzeListing(input: {
     if (errs.length) recs.push(`${d.label}: ${errs.length} harte Regelverstöße beheben (${errs[0].message}${errs.length > 1 ? " …" : ""}).`);
   }
 
-  const overall = Math.round(dims.reduce((s, d) => s + d.score, 0) / Math.max(1, dims.length));
+  const measuredDims = dims.filter((d) => d.measured);
+  const overall = measuredDims.length
+    ? Math.round(measuredDims.reduce((s, d) => s + d.score, 0) / measuredDims.length)
+    : null;
 
   return {
     overall,

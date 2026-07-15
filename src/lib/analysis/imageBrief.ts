@@ -57,7 +57,7 @@ export function buildImageBrief(input: {
 
   return `# Creative Brief — ${asin ?? "NEU"} (${brand} ${productName})
 
-**Marketplace:** amazon.de · **Tone:** Premium-deutsch, nüchtern · **Quelle:** hail-mary Listing-Analyse (Score ${analysis.overall}/100)
+**Marketplace:** amazon.de · **Tone:** Premium-deutsch, nüchtern · **Quelle:** hail-mary Listing-Analyse (${analysis.overall !== null ? `Score ${analysis.overall}/100` : "noch ohne messbaren Content"})
 
 ---
 

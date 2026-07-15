@@ -87,28 +87,30 @@ export default async function ProductPage({
           {product.asin && <span className="font-mono text-sm text-neutral-500">{product.asin} · amazon.{product.marketplace}</span>}
         </h1>
         <div className="flex flex-none gap-2">
-          <Link href={`/produkte/${product.id}/briefs`} className="btn-ghost font-medium">
-            Creative-Briefs
-          </Link>
-          <Link href={`/produkte/${product.id}/analyse`} className="btn-ghost !text-primary-strong font-medium">
-            Analyse öffnen →
-          </Link>
+          {snapshot || versions.length > 0 ? (
+            <>
+              <Link href={`/produkte/${product.id}/briefs`} className="btn-ghost font-medium">Creative-Briefs</Link>
+              <Link href={`/produkte/${product.id}/analyse`} className="btn-ghost !text-primary-strong font-medium">Analyse öffnen →</Link>
+            </>
+          ) : (
+            <span className="text-xs text-muted">Analyse & Briefs werden aktiv, sobald ein Listing geladen oder Content erstellt ist.</span>
+          )}
         </div>
       </div>
 
       {fehler && <p className="mt-4 rounded-xl bg-[rgb(220_38_38/0.08)] px-3 py-2 text-sm text-bad">✕ {fehler}</p>}
 
-      {/* 0 · Original-Listing (Import) */}
+      {/* 0 · Original-Listing laden */}
       <section className="mt-6 card p-4">
         <h2 className="sect-h">
-          0 · Original-Listing (Import) {snapshot && <span className="ml-1 pill pill-good">✓ {snapshot.source} · {snapshot.createdAt.toLocaleDateString("de-DE")}</span>}
+          0 · Original-Listing laden {snapshot && <span className="ml-1 pill pill-good">✓ {snapshot.source} · {snapshot.createdAt.toLocaleDateString("de-DE")}</span>}
         </h2>
-        <p className="mt-1 text-xs text-neutral-500">Bestehende ASIN? Daten importieren statt tippen — als „Vorher" für Analyse & Vergleich.</p>
+        <p className="mt-1 text-xs text-neutral-500">ASIN reicht: Titel, Bullets, Beschreibung und Bilder werden geladen und die Produkt-Fakten unten automatisch daraus befüllt — als „Vorher" für Analyse & Vergleich. Alternativ Helium-10-Export hochladen.</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <form action={importListingFromAmazon}>
             <input type="hidden" name="productId" value={product.id} />
-            <SubmitButton disabled={!product.asin} className="btn-dark disabled:opacity-40" pendingLabel="Importiert von Amazon…" progress>
-              Von Amazon importieren (Apify)
+            <SubmitButton disabled={!product.asin} className="btn-dark disabled:opacity-40" pendingLabel="Lädt Listing & extrahiert Fakten…" progress>
+              Listing von Amazon laden
             </SubmitButton>
           </form>
           <form action={uploadListingCsv} className="flex items-center gap-2">
@@ -157,14 +159,19 @@ export default async function ProductPage({
 
       {/* 1 · Produkt-Wahrheit */}
       <section className="mt-6 card p-4">
-        <h2 className="sect-h">1 · Produkt-Wahrheit (Pflicht)</h2>
+        <h2 className="sect-h">1 · Produkt-Fakten — die Grundlage für Texte & Briefs</h2>
+        <p className="mt-1 text-xs text-neutral-500">
+          Wird beim Listing-Import automatisch befüllt (nur leere Felder) — hier nur prüfen und korrigieren.
+          Diese Fakten sind die einzige Wahrheitsquelle der Generierung: Materialien/Maße gegen Erfindungen (Reference-Fidelity),
+          USPs für die Bullet-Verteilung (jede genau 1×), Zielgruppe für Szenen im Bild-Brief und die Ansprache der Texte.
+        </p>
         <form action={saveFacts} className="mt-3 grid grid-cols-2 gap-2">
           <input type="hidden" name="productId" value={product.id} />
           <input name="productType" defaultValue={f.productType} placeholder="Produkttyp (z. B. Trinkflasche)" className={input} />
           <input name="dimensions" defaultValue={f.dimensions} placeholder="Maße/Menge (z. B. 750 ml)" className={input} />
           <input name="materials" defaultValue={f.materials?.join(" | ")} placeholder="Materialien, ehrlich, | -getrennt" className={`${input} col-span-2`} />
           <input name="usps" defaultValue={f.usps?.join(" | ")} placeholder="USPs (| -getrennt) — jede wird genau 1× verwendet" className={`${input} col-span-2`} />
-          <input name="targetAudience" defaultValue={f.targetAudience} placeholder="Zielgruppe" className={input} />
+          <input name="targetAudience" defaultValue={f.targetAudience} placeholder="Zielgruppe/Nutzungskontext — steuert Bild-Brief-Szenen & Text-Ansprache" className={input} />
           <input name="certifications" defaultValue={f.certifications?.join(" | ")} placeholder="Zertifikate/Normen (nur echte)" className={input} />
           <SubmitButton className="col-span-2 btn-dark">
             Speichern
@@ -244,13 +251,16 @@ export default async function ProductPage({
       {/* 2c · Review-Insights */}
       <section id="reviews" className="mt-4 card p-4">
         <h2 className="sect-h">
-          2c · Review-Insights (Apify) {insights && <span className="ml-1 pill pill-good">✓ {insights.dataBasis} · {insights.confidence}</span>}
+          2c · Bewertungs-Analyse {insights && <span className="ml-1 pill pill-good">✓ {insights.dataBasis} · {insights.confidence}</span>}
         </h2>
-        <p className="mt-1 text-xs text-neutral-500">Scrapt Reviews der eigenen ASIN + bis 5 Wettbewerber (amazon.{product.marketplace}) → Pain Points & Kaufauslöser mit O-Tönen. Braucht APIFY_API_KEY (ohne: Mock).</p>
+        <p className="mt-1 text-xs text-neutral-500">
+          Analysiert automatisch die Bewertungen <b>dieser ASIN</b>{product.asin ? <> (<span className="font-mono">{product.asin}</span>)</> : " — dafür oben eine ASIN hinterlegen"} — keine Neueingabe nötig.
+          Optional Wettbewerber-ASINs ergänzen. Schritt 1: Reviews werden gescrapt · Schritt 2: KI wertet Pain Points & Kaufauslöser mit O-Tönen aus.
+        </p>
         <form action={runReviewInsights} className="mt-3 flex flex-wrap items-center gap-2">
           <input type="hidden" name="productId" value={product.id} />
-          <input name="competitorAsins" placeholder="Wettbewerber-ASINs (Leerzeichen-getrennt)" className={`${input} flex-1`} />
-          <SubmitButton className="btn-dark" pendingLabel="Scrapt & analysiert Reviews…" progress>Reviews analysieren</SubmitButton>
+          <input name="competitorAsins" placeholder="Optional: Wettbewerber-ASINs (Leerzeichen-getrennt)" className={`${input} flex-1`} />
+          <SubmitButton className="btn-dark" disabled={!product.asin} pendingLabel="Schritt 1/2: Scrapt Reviews… dann KI-Auswertung" progress>Reviews scrapen & auswerten</SubmitButton>
         </form>
         {insights && (
           <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
