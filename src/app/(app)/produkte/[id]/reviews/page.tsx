@@ -43,7 +43,6 @@ export default async function ReviewDashboard({ params }: { params: Promise<{ id
   const p = insight.payload;
   const maxPain = Math.max(...p.painPoints.map((x) => x.frequencyPct ?? 0), 1);
   const maxTrig = Math.max(...p.buyingTriggers.map((x) => x.frequencyPct ?? 0), 1);
-  const starMax = scrape ? Math.max(...Object.values(scrape.starCounts), 1) : 1;
 
   return (
     <main className="w-full p-8">
@@ -65,12 +64,23 @@ export default async function ReviewDashboard({ params }: { params: Promise<{ id
             <div>
               <div className="text-sm font-semibold">Datenbasis</div>
               <div className="text-xs text-muted">
-                {p.stats.reviewsTotal} Reviews{p.stats.ratingAvg !== null && <> · Ø {p.stats.ratingAvg} ★</>} · Konfidenz {insight.confidence}
+                {scrape?.amazonTotals?.reviewsTotal != null ? (
+                  <>
+                    Auf Amazon: <b>{fmt(scrape.amazonTotals.reviewsTotal)} Bewertungen</b>
+                    {scrape.amazonTotals.ratingAvg != null && <> · Ø {new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(scrape.amazonTotals.ratingAvg)} ★</>}
+                    {" — davon "}{p.stats.reviewsTotal} gescraped
+                  </>
+                ) : (
+                  <>Stichprobe: {p.stats.reviewsTotal} Reviews gescraped</>
+                )}
+                {" · Konfidenz "}{insight.confidence}
                 {insight.dataBasis !== "apify_scrape" && <span className="ml-1 pill pill-warn">Demo-Daten</span>}
               </div>
             </div>
           </div>
-          <p className="mt-2 text-[11px] text-muted">Je Sterne-Klasse ein eigener Scrape-Lauf mit bis zu 100 der aktuellsten Reviews (Scrape-Maximum).</p>
+          <p className="mt-2 text-[11px] text-muted">
+            Je Sterne-Klasse ein eigener Scrape-Lauf mit bis zu 100 der aktuellsten Reviews (Scrape-Maximum) — die Stichprobe bildet nicht das Verhältnis der Gesamtverteilung ab.
+          </p>
           {(scrape?.notes?.length ?? 0) > 0 && (
             <div className="mt-1.5 space-y-0.5">
               {scrape!.notes!.map((n, i) => (
@@ -78,22 +88,29 @@ export default async function ReviewDashboard({ params }: { params: Promise<{ id
               ))}
             </div>
           )}
-          {scrape && (
+          {scrape?.amazonTotals?.dist ? (
             <div className="mt-4 space-y-1.5">
               {(["5", "4", "3", "2", "1"] as const).map((star) => {
+                const pct = scrape.amazonTotals!.dist![star] ?? 0;
                 const n = scrape.starCounts[star] ?? 0;
                 return (
                   <div key={star} className="flex items-center gap-2 text-xs tabular-nums">
                     <span className="w-8 flex-none text-muted">{star} ★</span>
                     <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-hair">
-                      <div className="bar-fill h-full rounded-full" style={{ width: `${(n / starMax) * 100}%`, background: Number(star) >= 4 ? "var(--cat-2)" : Number(star) === 3 ? "var(--warn)" : "var(--bad)" }} />
+                      <div className="bar-fill h-full rounded-full" style={{ width: `${pct}%`, background: Number(star) >= 4 ? "var(--cat-2)" : Number(star) === 3 ? "var(--warn)" : "var(--bad)" }} />
                     </div>
-                    <span className="w-12 flex-none text-right font-semibold">{fmt(n)}</span>
+                    <span className="w-32 flex-none text-right font-semibold">{pct} % · {fmt(n)} gescraped</span>
                   </div>
                 );
               })}
             </div>
-          )}
+          ) : scrape ? (
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {(["5", "4", "3", "2", "1"] as const).map((star) => (
+                <span key={star} className="rounded-full bg-hair px-2.5 py-1 text-xs tabular-nums">{star} ★ · {fmt(scrape.starCounts[star] ?? 0)} gescraped</span>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="card p-5">
           <div className="text-sm font-semibold">Quellen</div>

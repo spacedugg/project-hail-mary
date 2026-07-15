@@ -278,32 +278,53 @@ export default async function ProductPage({
           </SubmitButton>
         </form>
 
-        {/* Datenbasis: Sterne-Verteilung + je ASIN */}
+        {/* Datenbasis (D74): echte Amazon-Zahlen neben der Stichprobe — nie trügerisch */}
         {scrape && (
           <div className="mt-3 rounded-xl bg-background p-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <span className="text-xs font-semibold">
-                Datenbasis: {scrape.reviews.length} Reviews · {scrape.createdAt.toLocaleDateString("de-DE")}
+                {scrape.amazonTotals?.reviewsTotal != null ? (
+                  <>
+                    Auf Amazon: {new Intl.NumberFormat("de-DE").format(scrape.amazonTotals.reviewsTotal)} Bewertungen
+                    {scrape.amazonTotals.ratingAvg != null && <> · Ø {new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(scrape.amazonTotals.ratingAvg)} ★</>}
+                    {" — davon "}{scrape.reviews.length} gescraped
+                  </>
+                ) : (
+                  <>Stichprobe: {scrape.reviews.length} Reviews gescraped</>
+                )}
+                {" · "}{scrape.createdAt.toLocaleDateString("de-DE")}
                 {scrape.source !== "apify" && <span className="ml-1 pill pill-warn">Demo-Daten (kein Scrape-Key)</span>}
               </span>
               <span className="text-[11px] text-muted">{Object.entries(scrape.perAsin).map(([a, n]) => `${a}: ${n}`).join(" · ")}</span>
             </div>
-            <div className="mt-2 space-y-1">
-              {(["5", "4", "3", "2", "1"] as const).map((star) => {
-                const n = scrape.starCounts[star] ?? 0;
-                const max = Math.max(...Object.values(scrape.starCounts), 1);
-                return (
-                  <div key={star} className="flex items-center gap-2 text-xs tabular-nums">
-                    <span className="w-8 flex-none text-muted">{star} ★</span>
-                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-hair">
-                      <div className="bar-fill h-full rounded-full" style={{ width: `${(n / max) * 100}%`, background: Number(star) >= 4 ? "var(--cat-2)" : Number(star) === 3 ? "var(--warn)" : "var(--bad)" }} />
+            {scrape.amazonTotals?.dist ? (
+              /* Echte Amazon-Verteilung (%) als Balken; die Stichprobe steht als Zahl daneben */
+              <div className="mt-2 space-y-1">
+                {(["5", "4", "3", "2", "1"] as const).map((star) => {
+                  const pct = scrape.amazonTotals!.dist![star] ?? 0;
+                  const n = scrape.starCounts[star] ?? 0;
+                  return (
+                    <div key={star} className="flex items-center gap-2 text-xs tabular-nums">
+                      <span className="w-8 flex-none text-muted">{star} ★</span>
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-hair">
+                        <div className="bar-fill h-full rounded-full" style={{ width: `${pct}%`, background: Number(star) >= 4 ? "var(--cat-2)" : Number(star) === 3 ? "var(--warn)" : "var(--bad)" }} />
+                      </div>
+                      <span className="w-32 flex-none text-right font-medium">{pct} % · {n} gescraped</span>
                     </div>
-                    <span className="w-10 flex-none text-right font-medium">{n}</span>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="mt-2 text-[11px] text-muted">Je Sterne-Klasse werden bis zu 100 der aktuellsten Reviews geholt (Scrape-Maximum). 1–3 ★ speisen die Pain Points, 4–5 ★ die Kaufauslöser der Analyse.</p>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Ohne echte Verteilung KEINE Verhältnis-Balken — die Stichprobe ist je Klasse gedeckelt und würde ein falsches Verhältnis suggerieren */
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {(["5", "4", "3", "2", "1"] as const).map((star) => (
+                  <span key={star} className="rounded-full bg-hair px-2.5 py-1 text-xs tabular-nums">{star} ★ · {scrape.starCounts[star] ?? 0} gescraped</span>
+                ))}
+              </div>
+            )}
+            <p className="mt-2 text-[11px] text-muted">
+              Je Sterne-Klasse werden bis zu 100 der aktuellsten Reviews geholt (Scrape-Maximum) — die Stichprobe bildet daher <b>nicht</b> das Verhältnis der Gesamtverteilung ab. Die Analyse wertet alle Klassen auf Pain Points <b>und</b> Kaufauslöser aus.
+            </p>
             {(scrape.notes?.length ?? 0) > 0 && (
               <div className="mt-2 space-y-0.5">
                 {scrape.notes!.map((n, i) => (

@@ -199,9 +199,20 @@ export const reviewScrapes = sqliteTable("review_scrapes", {
   source: text("source").$type<"apify" | "mock" | "seed">().notNull().default("apify"),
   asins: text("asins", { mode: "json" }).$type<string[]>().notNull(),
   reviews: text("reviews", { mode: "json" }).$type<Array<{ asin: string; rating: number; title: string; body: string }>>().notNull(),
-  /** Verteilung 1–5 Sterne (gerundet) — die sichtbare Datenbasis. */
+  /** Verteilung 1–5 Sterne der GESCRAPTEN Reviews (Stichprobe, je Klasse gedeckelt) — nicht die Amazon-Gesamtverteilung. */
   starCounts: text("star_counts", { mode: "json" }).$type<Record<string, number>>().notNull(),
   perAsin: text("per_asin", { mode: "json" }).$type<Record<string, number>>().notNull(),
+  /**
+   * Echte Amazon-Zahlen zum Scrape-Zeitpunkt (D74) — Gesamt-Bewertungen, Ø-Rating,
+   * Verteilung in % je Klasse. Trennt die Wahrheit („1.343 · Ø 4,6") von der
+   * Stichprobe („182 gescraped"), damit die Datenbasis nie trügerisch wirkt.
+   */
+  amazonTotals: text("amazon_totals", { mode: "json" }).$type<{
+    reviewsTotal: number | null;
+    ratingAvg: number | null;
+    dist: Record<string, number> | null;
+    asOf: string;
+  }>(),
   /** Ehrlichkeits-Notizen, z. B. „3★-Lauf ins Zeitlimit gelaufen" (D72). */
   notes: text("notes", { mode: "json" }).$type<string[]>(),
   createdAt: ts("created_at").notNull(),

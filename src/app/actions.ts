@@ -435,6 +435,14 @@ export async function scrapeReviewsAction(formData: FormData) {
   const asins = [product.asin, ...competitorAsins].filter(Boolean) as string[];
 
   const { scrapeReviews } = await import("@/lib/reviews/apify");
+  const { scrapeProduct } = await import("@/lib/scrape/apifyProduct");
+
+  // Echte Amazon-Gesamtzahlen parallel zum Review-Scrape holen (D74): die
+  // Stichprobe (je Klasse gedeckelt) muss neben der Wahrheit stehen.
+  const totalsPromise = product.asin
+    ? scrapeProduct(product.asin, product.marketplace, { timeoutSec: 50 }).catch(() => null)
+    : Promise.resolve(null);
+
   let reviews: Array<{ asin: string; rating: number; title: string; body: string }> = [];
   let notes: string[] = [];
   let source: "apify" | "mock" = "apify";
@@ -466,7 +474,26 @@ export async function scrapeReviewsAction(formData: FormData) {
     starCounts[star] += 1;
     perAsin[r.asin] = (perAsin[r.asin] ?? 0) + 1;
   }
-  await db.insert(schema.reviewScrapes).values({ id: id(), productId, source, asins, reviews, starCounts, perAsin, notes });
+
+  // Wahrheit neben die Stichprobe stellen (D74): Live-Zahlen; wenn der Lauf
+  // scheitert, Fallback auf den letzten Listing-Import (mit dessen Datum).
+  let amazonTotals: { reviewsTotal: number | null; ratingAvg: number | null; dist: Record<string, number> | null; asOf: string } | null = null;
+  const live = source === "apify" ? await totalsPromise : null;
+  if (live && (live.reviewsTotal !== null || live.ratingAvg !== null)) {
+    amazonTotals = { reviewsTotal: live.reviewsTotal, ratingAvg: live.ratingAvg, dist: live.ratingDist, asOf: new Date().toISOString() };
+  } else if (source === "apify") {
+    const snap = await db.query.listingSnapshots.findFirst({
+      where: eq(schema.listingSnapshots.productId, productId),
+      orderBy: desc(schema.listingSnapshots.createdAt),
+    });
+    if (snap && (snap.reviewsTotal !== null || snap.ratingAvg !== null)) {
+      amazonTotals = { reviewsTotal: snap.reviewsTotal, ratingAvg: snap.ratingAvg, dist: snap.ratingDist, asOf: snap.createdAt.toISOString() };
+    } else {
+      notes = [...notes, "Amazon-Gesamtzahlen (Bewertungen gesamt, Ø) konnten nicht geladen werden — Anzeige zeigt nur die Stichprobe."];
+    }
+  }
+
+  await db.insert(schema.reviewScrapes).values({ id: id(), productId, source, asins, reviews, starCounts, perAsin, notes, amazonTotals });
   revalidatePath(`/produkte/${productId}`);
 }
 
