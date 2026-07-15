@@ -782,16 +782,24 @@ export async function importListingFromAmazon(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
-  if (!product?.asin) throw new Error("Produkt hat keine ASIN — Import nicht möglich.");
+  if (!product?.asin) {
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Produkt hat keine ASIN — Import nicht möglich.")}`);
+  }
 
+  // Fehler landen als Banner an der Seite, nie als Server-Fehlerseite (D78)
   const { scrapeProduct } = await import("@/lib/scrape/apifyProduct");
-  const snap = await scrapeProduct(product.asin, product.marketplace);
+  let snap: Awaited<ReturnType<typeof scrapeProduct>>;
+  try {
+    snap = await scrapeProduct(product!.asin!, product!.marketplace, { timeoutSec: 50 });
+  } catch (e) {
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Listing-Import: ${e instanceof Error ? e.message : String(e)}`)}`);
+  }
   await db.insert(schema.listingSnapshots).values({
     id: id(), productId, source: "apify",
-    title: snap.title, bullets: snap.bullets, description: snap.description,
-    imageUrls: snap.imageUrls,
-    reviewsTotal: snap.reviewsTotal, ratingAvg: snap.ratingAvg, ratingDist: snap.ratingDist,
-    raw: snap.raw,
+    title: snap!.title, bullets: snap!.bullets, description: snap!.description,
+    imageUrls: snap!.imageUrls,
+    reviewsTotal: snap!.reviewsTotal, ratingAvg: snap!.ratingAvg, ratingDist: snap!.ratingDist,
+    raw: snap!.raw,
   });
 
   // Produkt-Fakten automatisch aus dem Import extrahieren (D70) — nur leere
@@ -814,11 +822,16 @@ export async function uploadListingCsv(formData: FormData) {
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return;
   const { parseListingCsv } = await import("@/lib/scrape/apifyProduct");
-  const snap = parseListingCsv(await file.text());
+  let snap: ReturnType<typeof parseListingCsv>;
+  try {
+    snap = parseListingCsv(await file.text());
+  } catch (e) {
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`CSV-Import: ${e instanceof Error ? e.message : String(e)}`)}`);
+  }
   await db.insert(schema.listingSnapshots).values({
     id: id(), productId, source: "h10_csv",
-    title: snap.title, bullets: snap.bullets, description: snap.description,
-    imageUrls: snap.imageUrls, raw: snap.raw,
+    title: snap!.title, bullets: snap!.bullets, description: snap!.description,
+    imageUrls: snap!.imageUrls, raw: snap!.raw,
   });
 
   // Produkt-Fakten automatisch aus dem Import extrahieren (D70) — nur leere

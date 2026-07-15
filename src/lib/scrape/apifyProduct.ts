@@ -79,17 +79,28 @@ export async function scrapeProduct(
   const apiKey = process.env.APIFY_API_KEY;
   if (!apiKey) throw new Error("APIFY_API_KEY fehlt (Env) — Produkt-Import nicht möglich.");
   const actor = process.env.APIFY_PRODUCT_ACTOR ?? DEFAULT_ACTOR;
-  const timeoutSec = opts.timeoutSec ?? 180;
+  // Zeit-Budget: Vercel-Function max. 60 s — NIE höher defaulten (D78; das
+  // 180-s-Default hat den Import in Produktion mitten im Lauf gekillt).
+  const timeoutSec = opts.timeoutSec ?? 50;
 
-  const res = await fetch(
-    `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?timeout=${timeoutSec}`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ input: [{ asin: asin.toUpperCase(), domainCode: domain }] }),
-      signal: AbortSignal.timeout((timeoutSec + 5) * 1000),
-    },
-  );
+  let res: Response;
+  try {
+    res = await fetch(
+      `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?timeout=${timeoutSec}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({ input: [{ asin: asin.toUpperCase(), domainCode: domain }] }),
+        signal: AbortSignal.timeout((timeoutSec + 5) * 1000),
+      },
+    );
+  } catch (e) {
+    if (e instanceof Error && e.name === "TimeoutError")
+      throw new Error(`Listing-Import hat das Zeit-Budget (${timeoutSec} s) überschritten — bitte erneut versuchen.`);
+    throw e;
+  }
+  if (res.status === 408)
+    throw new Error("Der Scrape-Lauf hat das Zeit-Budget überschritten — bitte erneut versuchen.");
   if (!res.ok)
     throw new Error(
       `Apify ${res.status} (Actor ${actor}): ${(await res.text()).slice(0, 250)} — ggf. anderen Actor via APIFY_PRODUCT_ACTOR setzen.`,
