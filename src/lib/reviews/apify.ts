@@ -120,16 +120,20 @@ const INSIGHTS_SYSTEM =
   "Antworte AUSSCHLIESSLICH mit validem JSON nach dem geforderten Schema. Zitate wortwörtlich (verbatim) aus den Reviews übernehmen.";
 
 function insightsPrompt(reviews: RawReview[]): string {
-  const neg = reviews.filter((r) => r.rating <= 3).slice(0, 150);
+  // Gruppierung nur zur Orientierung — die Sterne-Zahl ist KEIN Filter (D75):
+  // Pain Points stecken oft in 4–5★ („gut, aber…"), Kaufauslöser auch in
+  // kritischen Reviews (was trotz Enttäuschung überzeugt hat).
+  const crit = reviews.filter((r) => r.rating <= 3).slice(0, 150);
   const pos = reviews.filter((r) => r.rating >= 4).slice(0, 150);
   const fmt = (rs: RawReview[]) => rs.map((r) => `[${r.rating}★ ${r.asin}] ${r.title}: ${r.body}`).join("\n").slice(0, 22000);
-  return `NEGATIVE/KRITISCHE REVIEWS (Pain Points):
-${fmt(neg) || "(keine)"}
+  return `REVIEWS 1–3★:
+${fmt(crit) || "(keine)"}
 
-POSITIVE REVIEWS (Kaufauslöser):
+REVIEWS 4–5★:
 ${fmt(pos) || "(keine)"}
 
-AUFGABE: Extrahiere 8–12 Pain Points (aus kritischen) und 6–10 Kaufauslöser (aus positiven), je mit Häufigkeit und 1–3 verbatim-Zitaten. Dazu Kundensprache zum Übernehmen (wörtliche Formulierungen) und Sprache zum Vermeiden.
+AUFGABE: Extrahiere 8–12 Pain Points und 6–10 Kaufauslöser, je mit Häufigkeit und 1–3 verbatim-Zitaten. Dazu Kundensprache zum Übernehmen (wörtliche Formulierungen) und Sprache zum Vermeiden.
+WICHTIG: Werte ALLE Reviews auf BEIDES aus. Pain Points finden sich auch in 4–5★-Reviews (Einschränkungen, „gut, aber…", Wünsche) — das sind oft die wertvollsten, weil sie von überzeugten Käufern kommen. Kaufauslöser finden sich auch in 1–3★-Reviews (was trotz Enttäuschung überzeugt hat, warum gekauft wurde). Die Sterne-Zahl ist Kontext für die Gewichtung, kein Filter.
 JSON-Schema:
 {"painPoints":[{"label":"...","frequencyPct":N,"mentionCount":N,"quotes":["..."]}],
  "buyingTriggers":[{"label":"...","frequencyPct":N,"mentionCount":N,"quotes":["..."]}],

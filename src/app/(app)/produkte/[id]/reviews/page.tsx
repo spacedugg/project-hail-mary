@@ -123,7 +123,7 @@ export default async function ReviewDashboard({ params }: { params: Promise<{ id
             ))}
             {!scrape && p.sources.map((s) => <li key={s} className="truncate text-xs text-muted">{s}</li>)}
           </ul>
-          <p className="mt-3 text-[11px] text-muted">1–3 ★ → Pain Points · 4–5 ★ → Kaufauslöser</p>
+          <p className="mt-3 text-[11px] text-muted">Alle Sterne-Klassen fließen in Pain Points UND Kaufauslöser ein — ein „gut, aber…" in 4★ ist oft der wertvollste Pain Point.</p>
         </div>
       </div>
 
