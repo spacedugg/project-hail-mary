@@ -4,17 +4,29 @@ import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { analyzeListing, type ListingSnapshot } from "@/lib/analysis/listingAudit";
 import { buildImageBrief } from "@/lib/analysis/imageBrief";
+import { runDeepAuditAction } from "@/app/actions";
+import { SubmitButton } from "@/components/submit-button";
 import type { SovAudit } from "@/lib/sov/audit";
 
 export const dynamic = "force-dynamic";
+// Tiefen-Audit (LLM) braucht mehr als das Vercel-Default-Zeitbudget
+export const maxDuration = 60;
 
 /**
  * Präsentationsfertige Listing-Analyse (kundentauglich, druckfreundlich):
- * live berechnet aus Content-Versionen + SOV-Audit + Review-Insights.
+ * live berechnet aus Content-Versionen (Fallback: importiertes Original-
+ * Listing) + SOV-Audit + Review-Insights; darüber das Tiefen-Audit (D76).
  * Jede Dimension weist ihre Evidenz-Klasse aus (kein Fassaden-Score).
  */
-export default async function AnalysePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AnalysePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ fehler?: string }>;
+}) {
   const { id } = await params;
+  const { fehler } = await searchParams;
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, id) });
   if (!product) notFound();
@@ -24,16 +36,27 @@ export default async function AnalysePage({ params }: { params: Promise<{ id: st
     where: eq(schema.contentVersions.productId, id),
     orderBy: desc(schema.contentVersions.createdAt),
   });
-  // Kundenfertige Sicht: freigegebene Version bevorzugt, sonst neuester Entwurf
+  const original = await db.query.listingSnapshots.findFirst({
+    where: eq(schema.listingSnapshots.productId, id),
+    orderBy: desc(schema.listingSnapshots.createdAt),
+  });
+  // Kundenfertige Sicht: freigegebene Version bevorzugt, sonst neuester Entwurf,
+  // sonst das importierte ORIGINAL-Listing (Audit-Fall: Ist-Stand bewerten)
   const latest = (t: string) =>
     (versions.find((v) => v.type === t && v.status === "approved") ?? versions.find((v) => v.type === t))
       ?.payload as Record<string, unknown> | undefined;
   const snapshot: ListingSnapshot = {
-    title: (latest("title")?.text as string) ?? "",
-    bullets: (latest("bullets")?.items as string[]) ?? [],
-    description: (latest("description")?.text as string) ?? "",
+    title: (latest("title")?.text as string) || original?.title || "",
+    bullets: ((latest("bullets")?.items as string[]) ?? []).length
+      ? ((latest("bullets")?.items as string[]) ?? [])
+      : (original?.bullets ?? []),
+    description: (latest("description")?.text as string) || original?.description || "",
     backendKeywords: (latest("backend_keywords")?.text as string) ?? "",
   };
+  const deepAudit = await db.query.deepAudits.findFirst({
+    where: eq(schema.deepAudits.productId, id),
+    orderBy: desc(schema.deepAudits.createdAt),
+  });
 
   const kws = await db.query.keywords.findMany({ where: eq(schema.keywords.productId, id) });
   const insights = await db.query.reviewInsights.findFirst({
@@ -93,6 +116,87 @@ export default async function AnalysePage({ params }: { params: Promise<{ id: st
         {product.asin && <p className="font-mono text-xs text-neutral-500">{product.asin} · amazon.{product.marketplace}</p>}
       </header>
 
+      {fehler && <p className="mt-4 rounded-xl bg-[rgb(220_38_38/0.08)] px-3 py-2 text-sm text-bad print:hidden">✕ {fehler}</p>}
+
+      {/* Tiefen-Audit (D76): 8 Dimensionen nach temoa-audit-Spec, USPs & Zielgruppe hergeleitet */}
+      <section className="mt-6">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="sect-h">Tiefen-Audit (KI) {deepAudit && <span className="ml-1 pill pill-good">✓ {deepAudit.createdAt.toLocaleDateString("de-DE")}</span>}</h2>
+          <form action={runDeepAuditAction} className="print:hidden">
+            <input type="hidden" name="productId" value={product.id} />
+            <SubmitButton className={deepAudit ? "btn-ghost text-xs" : "btn-primary text-xs"} pendingLabel="KI bewertet 8 Dimensionen…" progress>
+              {deepAudit ? "Neu bewerten" : "Tiefen-Audit starten"}
+            </SubmitButton>
+          </form>
+        </div>
+        {!deepAudit && (
+          <p className="mt-1 text-xs text-muted">
+            Bewertet das Listing in 8 Dimensionen (Aktuell / Probleme / Empfehlung) und leitet USPs, Zielgruppe und
+            Positionierung aus echten Daten her — Listing-Inhalt und Kundenstimmen, nicht aus manuell getippten Feldern.
+            Voraussetzung: Listing geladen <b>und</b> Bewertungs-Analyse gefahren (optional mit Wettbewerber-ASINs — je mehr Stimmen, desto belastbarer).
+            {!insights && <> <span className="text-warn">△ Bewertungs-Analyse fehlt noch (Produktseite, Sektion 2c).</span></>}
+          </p>
+        )}
+        {deepAudit && (
+          <>
+            <div className="stagger mt-2 grid gap-3 lg:grid-cols-3">
+              <div className="card p-4 lg:col-span-1">
+                <h3 className="text-sm font-semibold">Hergeleitete USPs</h3>
+                <ul className="mt-2 space-y-1">
+                  {deepAudit.payload.derived.usps.map((u, i) => <li key={i} className="text-xs">✓ {u}</li>)}
+                  {deepAudit.payload.derived.usps.length === 0 && <li className="text-xs text-muted">—</li>}
+                </ul>
+              </div>
+              <div className="card p-4">
+                <h3 className="text-sm font-semibold">Zielgruppe (aus Reviews)</h3>
+                <p className="mt-2 text-xs">{deepAudit.payload.derived.zielgruppe || "—"}</p>
+              </div>
+              <div className="card p-4">
+                <h3 className="text-sm font-semibold">Positionierung</h3>
+                <p className="mt-2 text-xs">{deepAudit.payload.derived.positionierung || "—"}</p>
+              </div>
+            </div>
+            <div className="stagger mt-3 grid gap-3 lg:grid-cols-2">
+              {deepAudit.payload.dimensions.map((d) => (
+                <div key={d.key} className="card p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-medium">{d.label}</h3>
+                    {d.score10 !== null ? (
+                      <span className={`text-lg font-semibold tabular-nums ${d.score10 >= 8 ? "text-emerald-600" : d.score10 >= 5 ? "text-amber-600" : "text-red-600"}`}>
+                        {new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(d.score10)}<span className="text-xs font-normal text-neutral-400">/10</span>
+                      </span>
+                    ) : (
+                      <span className="pill pill-neutral">nicht bewertbar</span>
+                    )}
+                  </div>
+                  {d.score10 !== null && (
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-hair">
+                      <div className={`bar-fill h-full rounded-full ${d.score10 >= 8 ? "bg-emerald-500" : d.score10 >= 5 ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${d.score10 * 10}%` }} />
+                    </div>
+                  )}
+                  {d.aktuell && <p className="mt-2 text-xs text-neutral-600 dark:text-neutral-400">{d.aktuell}</p>}
+                  {d.probleme.length > 0 && (
+                    <ul className="mt-2 space-y-0.5">
+                      {d.probleme.map((p, i) => <li key={i} className="text-xs text-bad">✕ {p}</li>)}
+                    </ul>
+                  )}
+                  {d.empfehlung && <p className="mt-2 text-xs"><b>→</b> {d.empfehlung}</p>}
+                </div>
+              ))}
+            </div>
+            {deepAudit.payload.topActions.length > 0 && (
+              <div className="anim-in mt-3 card p-4">
+                <h3 className="text-sm font-semibold">Wichtigste Maßnahmen (priorisiert)</h3>
+                <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm">
+                  {deepAudit.payload.topActions.map((a, i) => <li key={i}>{a}</li>)}
+                </ol>
+              </div>
+            )}
+            <p className="mt-2 text-[11px] text-muted">Datenbasis: {deepAudit.dataBasis.join(" · ")} · KI-Rubrik (Modell gepinnt) — nicht bewertbare Dimensionen werden nie gescored.</p>
+          </>
+        )}
+      </section>
+
       {analysis.sov && (
         <section className="mt-6">
           <h2 className="sect-h">Markt-Position (Share of Voice)</h2>
@@ -147,7 +251,7 @@ export default async function AnalysePage({ params }: { params: Promise<{ id: st
       )}
 
       <section className="mt-6">
-        <h2 className="sect-h">Dimensionen</h2>
+        <h2 className="sect-h">Regel-Messung (deterministisch)</h2>
         <div className="mt-2 space-y-3">
           {analysis.dimensions.map((d) => (
             <div key={d.key} className="card p-3">

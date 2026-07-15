@@ -170,11 +170,12 @@ export default async function ProductPage({
 
       {/* 1 · Produkt-Wahrheit */}
       <section className="mt-6 card p-4">
-        <h2 className="sect-h">1 · Produkt-Fakten — die Grundlage für Texte & Briefs</h2>
+        <h2 className="sect-h">1 · Produkt-Fakten (Prüf-Ansicht) — niemand tippt hier</h2>
         <p className="mt-1 text-xs text-neutral-500">
-          Wird beim Listing-Import automatisch befüllt (nur leere Felder) — hier nur prüfen und korrigieren.
-          Diese Fakten sind die einzige Wahrheitsquelle der Generierung: Materialien/Maße gegen Erfindungen (Reference-Fidelity),
-          USPs für die Bullet-Verteilung (jede genau 1×), Zielgruppe für Szenen im Bild-Brief und die Ansprache der Texte.
+          Wird automatisch befüllt: Materialien/Maße aus dem Listing-Import, USPs und Zielgruppe leitet das
+          Tiefen-Audit aus Listing + Kundenstimmen her (nur leere Felder, Hand-Korrekturen gewinnen). Hier nur
+          gegenlesen und korrigieren — die Analyse selbst hängt an den echten Daten (Listing, Reviews, SOV), nicht an
+          diesen Feldern; gebraucht werden sie als Wahrheits-Anker der Text-Generierung (Reference-Fidelity, USP-Verteilung, Bild-Brief-Szenen).
         </p>
         <form action={saveFacts} className="mt-3 grid grid-cols-2 gap-2">
           <input type="hidden" name="productId" value={product.id} />

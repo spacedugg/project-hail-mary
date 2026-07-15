@@ -99,6 +99,15 @@ export const RECHENWERK: KpiGruppe[] = [
     ],
   },
   {
+    titel: "Bewertungs-Analyse & Tiefen-Audit",
+    eintraege: [
+      { name: "Review-Scrape je Sterne-Klasse", formel: "5 parallele Läufe (filterByStar 1★–5★), je bis zu 100 der AKTUELLSTEN Reviews (sortBy recent, Scrape-Maximum); Teilausfälle als Notiz, nie stiller Abbruch", quelle: "Nutzer-Vorgabe D72 (Actor-JSON)", code: "src/lib/reviews/apify.ts" },
+      { name: "Datenbasis-Anzeige", formel: "echte Amazon-Zahlen (Gesamt-Bewertungen, Ø, Verteilung %) NEBEN der Stichprobe; Verhältnis-Balken nur aus der echten Verteilung — die Stichprobe ist je Klasse gedeckelt und bildet kein Verhältnis ab", quelle: "Ehrlichkeits-Prinzip D74", code: "src/app/actions.ts (scrapeReviewsAction)" },
+      { name: "Pain Points / Kaufauslöser", formel: "aus ALLEN Sterne-Klassen (Sterne-Zahl = Kontext, kein Filter); Häufigkeit + verbatim-Zitate; Konfidenz: ≥60 Reviews high, ≥20 medium, sonst low", quelle: "temoa-audit review-insights-Schema (SALVAGE §7) + D75", code: "src/lib/reviews/apify.ts (extractInsights)" },
+      { name: "Tiefen-Audit (8 Dimensionen)", formel: "Titel · Bullets · Beschreibung · Backend · Bilder · A+ · Bewertungs-Sockel · Preis, je ‚Aktuell / Probleme / Empfehlung' + Score 0–10; bewertbar ist NUR, wofür Daten vorliegen (erzwingt der Code, nie das LLM); USPs/Zielgruppe/Positionierung werden aus Listing + Kundenstimmen HERGELEITET", quelle: "temoa-audit 8-Dim-Spec (SALVAGE §7) — Struktur portiert, Umsetzung neu (‚LLM generiert, Code erzwingt')", code: "src/lib/analysis/deepAudit.ts", hinweis: "Pflicht-Datenbasis: Listing-Inhalt + Bewertungs-Analyse (optional Wettbewerber)." },
+    ],
+  },
+  {
     titel: "Handlungen (€-Hebel)",
     eintraege: [
       { name: "SOV-Umsatzlücken", formel: "Hebel = Korridor-Obergrenze der Top-Lücken", quelle: "D45/temoa-tools-beta", code: "src/app/actions.ts (syncBrandActions)" },

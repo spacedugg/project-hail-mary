@@ -1,0 +1,185 @@
+import { generateForRecipe, resolveRecipe } from "@/lib/llm/registry";
+import { parseLlmJson } from "@/lib/llm/json";
+import type { DeepAuditDimension, DeepAuditPayload, ReviewInsightsPayload } from "@/db/schema";
+
+/**
+ * Tiefen-Audit (D76) — Port der temoa-audit-Spezifikation (SALVAGE §7:
+ * 8-Dimensionen-Audit „Aktuell / Probleme / Empfehlung", USPs & Zielgruppe
+ * HERGELEITET statt manuell getippt), aber mit unserer Architektur-These:
+ * „LLM generiert, Code erzwingt."
+ *
+ * - Das LLM bewertet NUR Dimensionen, für die echte Daten vorliegen; der Code
+ *   bestimmt die bewertbare Menge und setzt alles andere ehrlich auf
+ *   „nicht bewertbar" (kein Fassaden-Score, D70).
+ * - Pflicht-Datenbasis: Listing-Inhalt + Review-Insights (Bewertungs-Analyse
+ *   zuerst — im besten Fall inkl. Wettbewerber-ASINs). Der Aufrufer gated.
+ */
+
+export type DeepAuditInput = {
+  productName: string;
+  asin: string | null;
+  title: string;
+  bullets: string[];
+  description: string;
+  backendKeywords: string;
+  imageCount: number | null;
+  basics: { reviewsTotal: number | null; ratingAvg: number | null; dist: Record<string, number> | null } | null;
+  priceEur: number | null;
+  reviewInsights: ReviewInsightsPayload;
+  primaryKeywords: string[];
+  topGaps: Array<{ keyword: string; sv: number; fullRevGap: number }>;
+};
+
+export const DIM_LABELS: Record<DeepAuditDimension["key"], string> = {
+  title: "Titel",
+  bullets: "Bullet Points",
+  description: "Beschreibung",
+  backend: "Backend-Keywords",
+  images: "Bilder",
+  aplus: "A+ Content",
+  reviews: "Bewertungs-Sockel",
+  price: "Preisstrategie",
+};
+
+/** Welche Dimensionen sind mit den vorliegenden Daten überhaupt bewertbar? Entscheidet der CODE. */
+export function assessableDims(input: DeepAuditInput): Set<DeepAuditDimension["key"]> {
+  const s = new Set<DeepAuditDimension["key"]>();
+  if (input.title.trim()) s.add("title");
+  if (input.bullets.some((b) => b.trim())) s.add("bullets");
+  if (input.description.trim()) s.add("description");
+  if (input.backendKeywords.trim()) s.add("backend"); // im Original-Scrape unsichtbar — nur mit eigener Version
+  if (input.imageCount !== null) s.add("images");
+  if (input.basics && (input.basics.reviewsTotal !== null || input.basics.ratingAvg !== null)) s.add("reviews");
+  if (input.priceEur !== null) s.add("price");
+  // aplus: im Tool (noch) nicht erfassbar → nie bewertbar, ehrlich ausgewiesen
+  return s;
+}
+
+const NOT_ASSESSABLE: Record<DeepAuditDimension["key"], string> = {
+  title: "Kein Titel geladen.",
+  bullets: "Keine Bullet Points geladen.",
+  description: "Keine Beschreibung geladen.",
+  backend: "Backend-Keywords sind von außen nicht sichtbar — erst mit eigener Content-Version bewertbar.",
+  images: "Keine Bild-Daten — Original-Listing laden.",
+  aplus: "A+-Inhalte werden vom Import (noch) nicht erfasst — Bewertung folgt mit der Bild-Phase.",
+  reviews: "Keine Amazon-Gesamtzahlen (Bewertungen, Ø) vorhanden — Listing-Import oder Review-Scrape liefert sie.",
+  price: "Kein Preis im Produkt hinterlegt.",
+};
+
+const SYSTEM =
+  "Du bist Senior-Amazon-Listing-Stratege einer deutschen Agentur. Du bewertest ein Listing NUR anhand der gelieferten Daten — nichts erfinden, keine Annahmen als Fakten ausgeben. " +
+  "Antworte AUSSCHLIESSLICH mit validem JSON nach dem geforderten Schema, auf Deutsch, konkret und kundentauglich.";
+
+function buildPrompt(input: DeepAuditInput, dims: Set<DeepAuditDimension["key"]>): string {
+  const ri = input.reviewInsights;
+  const pains = ri.painPoints.slice(0, 8).map((p) => `- ${p.label}${p.frequencyPct ? ` (${p.frequencyPct} %)` : ""}${p.quotes[0] ? ` — „${p.quotes[0]}"` : ""}`).join("\n");
+  const trigs = ri.buyingTriggers.slice(0, 8).map((t) => `- ${t.label}${t.frequencyPct ? ` (${t.frequencyPct} %)` : ""}${t.quotes[0] ? ` — „${t.quotes[0]}"` : ""}`).join("\n");
+  const dimList = [...dims].map((k) => `"${k}" (${DIM_LABELS[k]})`).join(", ");
+  return `PRODUKT: ${input.productName}${input.asin ? ` (${input.asin})` : ""}
+
+LISTING (Ist-Stand):
+TITEL: ${input.title || "(fehlt)"}
+BULLETS:
+${input.bullets.map((b) => `• ${b}`).join("\n") || "(fehlen)"}
+BESCHREIBUNG: ${input.description.slice(0, 3000) || "(fehlt)"}
+${input.backendKeywords ? `BACKEND-KEYWORDS: ${input.backendKeywords}` : ""}
+BILDER: ${input.imageCount !== null ? `${input.imageCount} von 7 Slots belegt (Bildinhalte liegen dir NICHT vor — bewerte nur die Anzahl/Slot-Nutzung)` : "unbekannt"}
+BEWERTUNGS-SOCKEL: ${input.basics ? `${input.basics.reviewsTotal ?? "?"} Bewertungen · Ø ${input.basics.ratingAvg ?? "?"} ★${input.basics.dist ? ` · Verteilung ${Object.entries(input.basics.dist).map(([s, p]) => `${s}★ ${p}%`).join(", ")}` : ""}` : "unbekannt"}
+${input.priceEur !== null ? `PREIS: ${input.priceEur} €` : ""}
+
+KUNDENSTIMMEN (aus der Bewertungs-Analyse — Primärquelle für USPs & Zielgruppe):
+Pain Points:
+${pains || "(keine)"}
+Kaufauslöser:
+${trigs || "(keine)"}
+Kundensprache: ${ri.languageToBorrow.slice(0, 8).map((w) => `„${w}"`).join(", ") || "—"}
+
+${input.primaryKeywords.length ? `PRIMÄR-KEYWORDS: ${input.primaryKeywords.slice(0, 15).join(", ")}` : ""}
+${input.topGaps.length ? `TOP-UMSATZLÜCKEN (SOV): ${input.topGaps.slice(0, 5).map((g) => `„${g.keyword}" (SV ${g.sv}, ~${Math.round(g.fullRevGap)} €/Mo)`).join("; ")}` : ""}
+
+AUFGABE:
+1. LEITE aus Listing + Kundenstimmen her (nicht erfinden): 3–6 USPs (belegbar aus Daten), Zielgruppe (wer kauft wirklich, laut Reviews), Positionierung (1 Satz: wofür steht das Produkt im Markt).
+2. Bewerte NUR diese Dimensionen: ${dimList}. Je Dimension: score10 (0–10, ehrlich), aktuell (2–3 Sätze Ist-Stand), probleme (2–4 konkrete Punkte, mit Bezug auf Keywords/Pain Points wo passend), empfehlung (1–2 Sätze, umsetzbar).
+3. topActions: die 3–5 wichtigsten Maßnahmen über alle Dimensionen, priorisiert nach Hebel.
+
+JSON-Schema:
+{"derived":{"usps":["..."],"zielgruppe":"...","positionierung":"..."},
+ "dimensions":[{"key":"title","score10":N,"aktuell":"...","probleme":["..."],"empfehlung":"..."}],
+ "topActions":["..."]}`;
+}
+
+/** Deterministische Durchsetzung: nur bewertbare Keys, Scores geklemmt, Rest ehrlich null. */
+export function enforceDeepAudit(
+  raw: Partial<DeepAuditPayload>,
+  dims: Set<DeepAuditDimension["key"]>,
+): DeepAuditPayload {
+  const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const strs = (v: unknown, max: number) => (Array.isArray(v) ? v.map(str).filter(Boolean).slice(0, max) : []);
+  const byKey = new Map<string, DeepAuditDimension>();
+  for (const d of Array.isArray(raw.dimensions) ? raw.dimensions : []) {
+    if (!d || typeof d !== "object" || !dims.has(d.key)) continue; // nie mehr bewerten, als Daten da sind
+    byKey.set(d.key, {
+      key: d.key,
+      label: DIM_LABELS[d.key],
+      score10: typeof d.score10 === "number" ? Math.max(0, Math.min(10, Math.round(d.score10 * 10) / 10)) : null,
+      aktuell: str(d.aktuell),
+      probleme: strs(d.probleme, 4),
+      empfehlung: str(d.empfehlung),
+    });
+  }
+  const order: DeepAuditDimension["key"][] = ["title", "bullets", "description", "backend", "images", "aplus", "reviews", "price"];
+  const dimensions: DeepAuditDimension[] = order.map(
+    (key) =>
+      byKey.get(key) ?? {
+        key,
+        label: DIM_LABELS[key],
+        score10: null,
+        aktuell: dims.has(key) ? "Vom Modell nicht bewertet." : NOT_ASSESSABLE[key],
+        probleme: [],
+        empfehlung: "",
+      },
+  );
+  return {
+    derived: {
+      usps: strs(raw.derived?.usps, 6),
+      zielgruppe: str(raw.derived?.zielgruppe),
+      positionierung: str(raw.derived?.positionierung),
+    },
+    dimensions,
+    topActions: strs(raw.topActions, 5),
+  };
+}
+
+export async function buildDeepAudit(input: DeepAuditInput): Promise<DeepAuditPayload> {
+  const dims = assessableDims(input);
+  const { provider } = resolveRecipe("listing.deep-audit");
+
+  let raw: Partial<DeepAuditPayload>;
+  if (provider.name === "mock") {
+    raw = {
+      derived: {
+        usps: ["Mock: hält 24 h kalt (aus Kaufauslösern belegt)", "Mock: passt in Standard-Becherhalter"],
+        zielgruppe: "Mock: Pendler & Outdoor-Nutzer, die Zuverlässigkeit über Design stellen.",
+        positionierung: "Mock: das Alltags-Arbeitstier unter den Trinkflaschen.",
+      },
+      dimensions: [...dims].map((key) => ({
+        key,
+        label: DIM_LABELS[key],
+        score10: 6,
+        aktuell: `Mock-Ist-Stand für ${DIM_LABELS[key]}.`,
+        probleme: ["Mock: Haupt-Keyword fehlt vorn", "Mock: Top-Pain-Point wird nicht adressiert"],
+        empfehlung: `Mock-Empfehlung für ${DIM_LABELS[key]}.`,
+      })),
+      topActions: ["Mock: Titel um Haupt-Keyword ergänzen", "Mock: Dichtungs-Einwand in Bullet 1 entkräften"],
+    };
+  } else {
+    const res = await generateForRecipe("listing.deep-audit", {
+      system: SYSTEM,
+      messages: [{ role: "user", content: buildPrompt(input, dims) }],
+      maxTokens: 6000,
+      temperature: 0.2,
+    });
+    raw = parseLlmJson(res.text);
+  }
+  return enforceDeepAudit(raw, dims);
+}

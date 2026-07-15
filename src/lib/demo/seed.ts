@@ -36,6 +36,8 @@ export async function wipeAllBrandData(db: Db): Promise<void> {
   await db.delete(schema.keywords);
   await db.delete(schema.contentVersions);
   await db.delete(schema.reviewInsights);
+  await db.delete(schema.reviewScrapes);
+  await db.delete(schema.deepAudits);
   await db.delete(schema.listingSnapshots);
   await db.delete(schema.actions);
   await db.delete(schema.reportUploads);

@@ -218,6 +218,39 @@ export const reviewScrapes = sqliteTable("review_scrapes", {
   createdAt: ts("created_at").notNull(),
 });
 
+/**
+ * Tiefen-Audit (D76) — die umfassende Listing-Analyse nach der temoa-audit-
+ * Spezifikation (8 Dimensionen, „Aktuell / Probleme / Empfehlung"), gespeist
+ * aus ECHTEN Daten (Listing-Snapshot, Review-Insights, SOV, Basics) statt aus
+ * manuell getippten Fakten-Feldern. USPs & Zielgruppe werden HERGELEITET.
+ */
+export const deepAudits = sqliteTable("deep_audits", {
+  id: text("id").primaryKey(),
+  productId: text("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  payload: text("payload", { mode: "json" }).$type<DeepAuditPayload>().notNull(),
+  /** Was tatsächlich eingeflossen ist (Transparenz, Anti-Blackbox). */
+  dataBasis: text("data_basis", { mode: "json" }).$type<string[]>().notNull(),
+  createdAt: ts("created_at").notNull(),
+});
+
+export type DeepAuditDimension = {
+  key: "title" | "bullets" | "description" | "backend" | "images" | "aplus" | "reviews" | "price";
+  label: string;
+  /** 0–10 — null = nicht bewertbar (Datenbasis fehlt); vom Code erzwungen, nie vom LLM behauptet. */
+  score10: number | null;
+  aktuell: string;
+  probleme: string[];
+  empfehlung: string;
+};
+
+export type DeepAuditPayload = {
+  derived: { usps: string[]; zielgruppe: string; positionierung: string };
+  dimensions: DeepAuditDimension[];
+  topActions: string[];
+};
+
 export const reviewInsights = sqliteTable("review_insights", {
   id: text("id").primaryKey(),
   productId: text("product_id")

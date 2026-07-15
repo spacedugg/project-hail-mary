@@ -528,6 +528,107 @@ export async function analyzeReviewsAction(formData: FormData) {
   redirect(`/produkte/${productId}/reviews`);
 }
 
+/**
+ * Tiefen-Audit (D76): umfassende 8-Dimensionen-Analyse nach temoa-audit-Spec.
+ * Pflicht-Datenbasis: Listing-Inhalt (Import oder eigene Versionen) UND eine
+ * Bewertungs-Analyse dieses Produkts (optional inkl. Wettbewerber-ASINs) —
+ * USPs & Zielgruppe werden aus echten Daten HERGELEITET, nie getippt.
+ */
+export async function runDeepAuditAction(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const db = await getDb();
+  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  if (!product) return;
+  const back = (msg: string) => redirect(`/produkte/${productId}/analyse?fehler=${encodeURIComponent(msg)}`);
+
+  const snapshot = await db.query.listingSnapshots.findFirst({
+    where: eq(schema.listingSnapshots.productId, productId),
+    orderBy: desc(schema.listingSnapshots.createdAt),
+  });
+  const versions = await db.query.contentVersions.findMany({
+    where: eq(schema.contentVersions.productId, productId),
+    orderBy: desc(schema.contentVersions.createdAt),
+  });
+  const latest = (t: string) =>
+    (versions.find((v) => v.type === t && v.status === "approved") ?? versions.find((v) => v.type === t))
+      ?.payload as Record<string, unknown> | undefined;
+  const title = (latest("title")?.text as string) || snapshot?.title || "";
+  const bullets = ((latest("bullets")?.items as string[]) ?? []).length
+    ? ((latest("bullets")?.items as string[]) ?? [])
+    : (snapshot?.bullets ?? []);
+  const description = (latest("description")?.text as string) || snapshot?.description || "";
+  if (!title && bullets.length === 0 && !description) {
+    back("Tiefen-Audit braucht Listing-Inhalt — erst ‚Listing von Amazon laden' (Sektion 0) oder Content erstellen.");
+  }
+
+  const insights = await db.query.reviewInsights.findFirst({
+    where: eq(schema.reviewInsights.productId, productId),
+    orderBy: desc(schema.reviewInsights.createdAt),
+  });
+  if (!insights) {
+    back("Tiefen-Audit braucht die Bewertungs-Analyse zuerst (Sektion 2c — Scrape, dann Analyse; optional Wettbewerber-ASINs dazu). Sie liefert Pain Points, Kaufauslöser und Kundensprache als Herleitungs-Basis.");
+  }
+
+  const scrape = await db.query.reviewScrapes.findFirst({
+    where: eq(schema.reviewScrapes.productId, productId),
+    orderBy: desc(schema.reviewScrapes.createdAt),
+  });
+  const kws = await db.query.keywords.findMany({ where: eq(schema.keywords.productId, productId) });
+  const uploads = await db.query.reportUploads.findMany({
+    where: eq(schema.reportUploads.brandId, product.brandId),
+    orderBy: desc(schema.reportUploads.createdAt),
+  });
+  const sovUpload = uploads.find(
+    (u) => u.reportType === "cerebro" && u.parseStatus === "ok" && (u.parsed as { productId?: string })?.productId === productId,
+  );
+  const sovAudit = (sovUpload?.parsed as { audit?: import("@/lib/sov/audit").SovAudit })?.audit ?? null;
+
+  // Bewertungs-Sockel: neueste Wahrheit gewinnt (Scrape-Totals vor Import-Basics)
+  const basics = scrape?.amazonTotals
+    ? { reviewsTotal: scrape.amazonTotals.reviewsTotal, ratingAvg: scrape.amazonTotals.ratingAvg, dist: scrape.amazonTotals.dist }
+    : snapshot && (snapshot.reviewsTotal !== null || snapshot.ratingAvg !== null)
+      ? { reviewsTotal: snapshot.reviewsTotal, ratingAvg: snapshot.ratingAvg, dist: snapshot.ratingDist }
+      : null;
+
+  const { buildDeepAudit } = await import("@/lib/analysis/deepAudit");
+  try {
+    const payload = await buildDeepAudit({
+      productName: product.name,
+      asin: product.asin,
+      title,
+      bullets,
+      description,
+      backendKeywords: (latest("backend_keywords")?.text as string) ?? "",
+      imageCount: snapshot?.imageUrls ? snapshot.imageUrls.length : null,
+      basics,
+      priceEur: product.price !== null ? product.price / 100 : null,
+      reviewInsights: insights!.payload,
+      primaryKeywords: kws.filter((k) => k.tier === "primary").map((k) => k.keyword),
+      topGaps: (sovAudit?.topDemandGaps ?? []).map((g) => ({ keyword: g.keyword, sv: g.sv, fullRevGap: g.fullRevGap })),
+    });
+
+    const dataBasis = [
+      snapshot ? `Listing-Import (${snapshot.source}, ${snapshot.createdAt.toLocaleDateString("de-DE")})` : "eigene Content-Versionen",
+      `Review-Insights (${insights!.dataBasis}, Konfidenz ${insights!.confidence})`,
+      ...(basics ? ["Amazon-Basics (Bewertungen gesamt, Ø)"] : []),
+      ...(kws.length ? [`${kws.length} Keywords`] : []),
+      ...(sovAudit ? ["SOV-Audit"] : []),
+    ];
+    await db.insert(schema.deepAudits).values({ id: id(), productId, payload, dataBasis });
+
+    // Hergeleitete USPs/Zielgruppe in LEERE Fakten-Felder übernehmen (Prüf-Ansicht, D70-Regel)
+    const f = { ...product.facts };
+    let changed = false;
+    if ((!f.usps || f.usps.length === 0) && payload.derived.usps.length) { f.usps = payload.derived.usps; changed = true; }
+    if (!f.targetAudience && payload.derived.zielgruppe) { f.targetAudience = payload.derived.zielgruppe; changed = true; }
+    if (changed) await db.update(schema.products).set({ facts: f }).where(eq(schema.products.id, productId));
+  } catch (e) {
+    back(`Tiefen-Audit: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  revalidatePath(`/produkte/${productId}/analyse`);
+  revalidatePath(`/produkte/${productId}`);
+}
+
 // ── Handlungen (D45): aus Analysen ableiten + Status pflegen ─────────────────
 
 export async function syncBrandActions(formData: FormData) {
