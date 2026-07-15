@@ -60,7 +60,10 @@ async function runStarClass(
     },
   );
   if (res.status === 408) throw new Error("Zeitlimit");
-  if (!res.ok) throw new Error(`Apify ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  if (!res.ok) {
+    const { friendlyApifyError } = await import("@/lib/scrape/apifyError");
+    throw new Error(friendlyApifyError(res.status, await res.text(), ACTOR));
+  }
   const items = (await res.json()) as Array<Record<string, unknown>>;
 
   return items

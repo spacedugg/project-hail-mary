@@ -101,10 +101,10 @@ export async function scrapeProduct(
   }
   if (res.status === 408)
     throw new Error("Der Scrape-Lauf hat das Zeit-Budget überschritten — bitte erneut versuchen.");
-  if (!res.ok)
-    throw new Error(
-      `Apify ${res.status} (Actor ${actor}): ${(await res.text()).slice(0, 250)} — ggf. anderen Actor via APIFY_PRODUCT_ACTOR setzen.`,
-    );
+  if (!res.ok) {
+    const { friendlyApifyError } = await import("./apifyError");
+    throw new Error(friendlyApifyError(res.status, await res.text(), actor));
+  }
   const items = (await res.json()) as Array<Record<string, unknown>>;
   const it = items[0];
   if (!it) throw new Error("Apify lieferte keine Daten für diese ASIN.");
