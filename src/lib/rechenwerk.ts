@@ -117,7 +117,7 @@ export const KOMBI_KENNZAHLEN: KombiKennzahl[] = [
   { name: "ACoS/TACoS-Ampel", aus: "Ads-Bericht + Margen-Kalkulation (oder Hand-Marge)", formel: "Schwelle = Account-Marge (Hand) VOR Ø Break-even-ACoS der Produkt-Kalkulationen" },
   { name: "Perioden-Diagnose", aus: "Business + Ads (+ SOV & SQP als Ursachen-Signale)", formel: "ln-Zerlegung Umsatz = Sitzungen × CVR × AOV + Quer-Abgleich der Module" },
   { name: "Handlungs-Hebel (€)", aus: "Cerebro + Search-Term + Ads + SQP", formel: "je Handlung eigene Quelle: SOV-Korridor, Wasted Spend − ASIN-Anteil, Überspend über Ziel-ACoS, SQP-Potenzial" },
-  { name: "Review-Datenbasis", aus: "Produkt-Crawler/Scrape (kein Amazon-Bericht — ASIN reicht)", formel: "Amazon-Gesamtzahlen (reviewsCount/Ø/Verteilung) NEBEN der Scrape-Stichprobe (je ASIN × Sterne-Klasse bis zu 100)" },
+  { name: "Review-Datenbasis", aus: "Listing-Import (Gesamtzahlen) + Review-Scrape (Stichprobe)", formel: "Amazon-Gesamtzahlen (reviewsCount/Ø/Verteilung) aus dem letzten Listing-Import NEBEN der Scrape-Stichprobe (je ASIN × Sterne-Klasse bis zu 100) — beim Review-Scrape läuft kein zusätzlicher Produkt-Crawler (D100)" },
 ];
 
 export const RECHENWERK: KpiGruppe[] = [
