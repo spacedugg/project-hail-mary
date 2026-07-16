@@ -117,7 +117,7 @@ export const KOMBI_KENNZAHLEN: KombiKennzahl[] = [
   { name: "ACoS/TACoS-Ampel", aus: "Ads-Bericht + Margen-Kalkulation (oder Hand-Marge)", formel: "Schwelle = Account-Marge (Hand) VOR Ø Break-even-ACoS der Produkt-Kalkulationen" },
   { name: "Perioden-Diagnose", aus: "Business + Ads (+ SOV & SQP als Ursachen-Signale)", formel: "ln-Zerlegung Umsatz = Sitzungen × CVR × AOV + Quer-Abgleich der Module" },
   { name: "Handlungs-Hebel (€)", aus: "Cerebro + Search-Term + Ads + SQP", formel: "je Handlung eigene Quelle: SOV-Korridor, Wasted Spend − ASIN-Anteil, Überspend über Ziel-ACoS, SQP-Potenzial" },
-  { name: "Review-Datenbasis", aus: "Produkt-Crawler/Scrape (kein Amazon-Bericht — ASIN reicht)", formel: "Amazon-Gesamtzahlen (reviewsCount/Ø/Verteilung) NEBEN der Scrape-Stichprobe (5×100 je Sterne-Klasse)" },
+  { name: "Review-Datenbasis", aus: "Produkt-Crawler/Scrape (kein Amazon-Bericht — ASIN reicht)", formel: "Amazon-Gesamtzahlen (reviewsCount/Ø/Verteilung) NEBEN der Scrape-Stichprobe (je ASIN × Sterne-Klasse bis zu 100)" },
 ];
 
 export const RECHENWERK: KpiGruppe[] = [
@@ -218,7 +218,7 @@ export const RECHENWERK: KpiGruppe[] = [
   {
     titel: "Bewertungs-Analyse & Tiefen-Audit",
     eintraege: [
-      { name: "Review-Scrape je Sterne-Klasse", formel: "5 parallele Läufe (filterByStar 1★–5★), je bis zu 100 der AKTUELLSTEN Reviews (sortBy recent, Scrape-Maximum); Teilausfälle als Notiz, nie stiller Abbruch", quelle: "Nutzer-Vorgabe D72 (Actor-JSON)", code: "src/lib/reviews/apify.ts" },
+      { name: "Review-Scrape je Sterne-Klasse", formel: "je ASIN UND je Sterne-Klasse (filterByStar 1★–5★) eine EIGENE parallele Anfrage — 2 ASINs = 10 Läufe —, je bis zu 100 der AKTUELLSTEN Reviews (sortBy recent, Scrape-Maximum); Teilausfälle als Notiz je ASIN+Klasse, nie stiller Abbruch", quelle: "Nutzer-Vorgabe D72/D96 (Actor-JSON)", code: "src/lib/reviews/apify.ts" },
       { name: "Datenbasis-Anzeige", formel: "echte Amazon-Zahlen (Gesamt-Bewertungen, Ø, Verteilung %) NEBEN der Stichprobe; Verhältnis-Balken nur aus der echten Verteilung — die Stichprobe ist je Klasse gedeckelt und bildet kein Verhältnis ab", quelle: "Ehrlichkeits-Prinzip D74", code: "src/app/actions.ts (scrapeReviewsAction)" },
       { name: "Pain Points / Kaufauslöser", formel: "aus ALLEN Sterne-Klassen (Sterne-Zahl = Kontext, kein Filter); Häufigkeit + verbatim-Zitate; Konfidenz: ≥60 Reviews high, ≥20 medium, sonst low", quelle: "temoa-audit review-insights-Schema (SALVAGE §7) + D75", code: "src/lib/reviews/apify.ts (extractInsights)" },
       { name: "Tiefen-Audit (8 Dimensionen)", formel: "Titel · Bullets · Beschreibung · Backend · Bilder · A+ · Bewertungs-Sockel · Preis, je ‚Aktuell / Probleme / Empfehlung' + Score 0–10; bewertbar ist NUR, wofür Daten vorliegen (erzwingt der Code, nie das LLM); USPs/Zielgruppe/Positionierung werden aus Listing + Kundenstimmen HERGELEITET", quelle: "temoa-audit 8-Dim-Spec (SALVAGE §7) — Struktur portiert, Umsetzung neu (‚LLM generiert, Code erzwingt')", code: "src/lib/analysis/deepAudit.ts", hinweis: "Pflicht-Datenbasis: Listing-Inhalt + Bewertungs-Analyse (optional Wettbewerber)." },

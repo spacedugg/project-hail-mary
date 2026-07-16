@@ -357,7 +357,7 @@ export default async function ProductPage({
             icon={<IconReviews />}
             chip="chip-violet"
             title="Bewertungs-Analyse"
-            sub="1 · Reviews scrapen (je Sterne-Klasse bis zu 100 aktuellste) — 2 · Analyse → Findings-Dashboard."
+            sub="1 · Reviews scrapen: je ASIN und Sterne-Klasse (1★–5★) eine eigene Anfrage, jeweils die bis zu 100 aktuellsten — 2 · Analyse → Findings-Dashboard."
             right={insights ? <span className="pill pill-good">✓ analysiert · {insights.confidence}</span> : undefined}
           />
 

@@ -5,13 +5,14 @@ import type { ReviewInsightsPayload } from "@/db/schema";
 /**
  * Review-Insights via Apify — Neubau der (defekten) temoa-os-Variante,
  * damit diese Version dort übernommen werden kann (D39).
- * Verbesserungen ggü. Bestand: (a) je Sterne-Klasse ein eigener Lauf (D72):
- * Apify liefert max. 100 Reviews pro Scrape — mit filterByStar one_star …
- * five_star holen 5 parallele Läufe bis zu 5×100 der AKTUELLSTEN Reviews
- * (sortBy "recent"), statt dass 5★-Masse alles andere verdrängt;
+ * Verbesserungen ggü. Bestand: (a) je ASIN UND je Sterne-Klasse ein EIGENER
+ * Lauf (D72/D96, Nutzer-Vorgabe): Apify liefert max. 100 Reviews pro Scrape —
+ * 2 ASINs bedeuten also 10 parallele Anfragen (2 × 1★…5★), jede holt bis zu
+ * 100 der AKTUELLSTEN Reviews (sortBy "recent"). So verdrängt weder die
+ * 5★-Masse die kritischen Klassen noch eine reviewstarke ASIN die anderen;
  * (b) robustes Rating-Parsing (Zahl ODER "4,0 von 5 Sternen"-String);
- * (c) klare Fehlerbilder statt silent fallback — scheitert eine Klasse,
- * läuft der Rest weiter und die Lücke wird als Notiz ausgewiesen.
+ * (c) klare Fehlerbilder statt silent fallback — scheitert ein Lauf,
+ * läuft der Rest weiter und die Lücke wird je ASIN+Klasse ausgewiesen.
  */
 
 // Per Env austauschbar (D84) — Achtung: ein anderer Actor braucht i. d. R. auch ein anderes Input-Schema
@@ -31,15 +32,15 @@ function parseRating(v: unknown): number {
   return 0;
 }
 
-/** Ein Sterne-Klassen-Lauf: alle ASINs, gefiltert auf eine Klasse, aktuellste zuerst. */
+/** EIN Lauf = EINE ASIN × EINE Sterne-Klasse (D96), aktuellste zuerst, bis zu 100 Reviews. */
 async function runStarClass(
   apiKey: string,
-  asins: string[],
+  asin: string,
   filterByStar: (typeof STAR_FILTERS)[number],
   starValue: number,
   domain: string,
 ): Promise<RawReview[]> {
-  const input = asins.map((asin) => ({
+  const input = [{
     asin,
     domainCode: domain,
     sortBy: "recent", // gibt es mehr als das Scrape-Maximum, gewinnen die aktuellsten
@@ -48,7 +49,7 @@ async function runStarClass(
     reviewerType: "all_reviews",
     formatType: "current_format",
     mediaType: "all_contents",
-  }));
+  }];
 
   // Zeit-Budget: Vercel-Function max. 60 s → Apify synchron auf 50 s begrenzen
   const res = await fetch(
@@ -69,7 +70,7 @@ async function runStarClass(
 
   return items
     .map((it) => ({
-      asin: String(it.asin ?? it.ASIN ?? ""),
+      asin: String(it.asin ?? it.ASIN ?? asin),
       // Fehlt das Rating im Item, ist die Klasse durch den Filter trotzdem bekannt
       rating: parseRating(it.rating ?? it.ratingScore) || starValue,
       title: String(it.title ?? "").trim(),
@@ -88,14 +89,19 @@ export async function scrapeReviews(
   if (valid.length === 0) throw new Error("Keine gültigen ASINs (Format B + 9 Zeichen).");
   const domain = opts.domain ?? "de";
 
+  // D96 (Nutzer-Vorgabe): je ASIN × Sterne-Klasse eine EIGENE Anfrage —
+  // 2 ASINs = 10 parallele Läufe, jeder bis zu 100 aktuellste Reviews.
+  const laeufe = valid.flatMap((asin) =>
+    STAR_FILTERS.map((filter, i) => ({ asin, filter, star: i + 1 })),
+  );
   const results = await Promise.allSettled(
-    STAR_FILTERS.map((filter, i) => runStarClass(apiKey, valid, filter, i + 1, domain)),
+    laeufe.map((l) => runStarClass(apiKey, l.asin, l.filter, l.star, domain)),
   );
 
   const reviews: RawReview[] = [];
   const notes: string[] = [];
   results.forEach((r, i) => {
-    const star = i + 1;
+    const { asin, star } = laeufe[i];
     if (r.status === "fulfilled") {
       reviews.push(...r.value);
     } else {
@@ -103,7 +109,7 @@ export async function scrapeReviews(
         r.reason instanceof Error && (r.reason.name === "TimeoutError" || r.reason.message === "Zeitlimit")
           ? "ins Zeitlimit gelaufen"
           : `fehlgeschlagen (${r.reason instanceof Error ? r.reason.message : String(r.reason)})`;
-      notes.push(`${star}★-Lauf ${why} — diese Klasse fehlt in der Datenbasis.`);
+      notes.push(`${asin} ${star}★-Lauf ${why} — diese Klasse fehlt in der Datenbasis.`);
     }
   });
 
