@@ -1,6 +1,5 @@
 import { getDb } from "@/db/client";
 import { getSessionUser } from "@/lib/auth/session";
-import { updateProfile, changePassword } from "@/app/auth-actions";
 import { seedDemoDataAction, wipeAllDataAction } from "@/app/actions";
 import Link from "next/link";
 import { OsShell } from "@/components/shell";
@@ -9,7 +8,11 @@ import { SubmitButton } from "@/components/submit-button";
 
 export const dynamic = "force-dynamic";
 
-/** Einstellungen (D57): eigenes Profil + Passwort; Team-Übersicht. */
+/**
+ * Tool-Einstellungen (D57/D86) — alles, was für ALLE gilt: Daten & Formeln,
+ * Team, Demo & Zurücksetzen. Persönliches (Name, Passwort) liegt getrennt
+ * unter „Mein Konto" (Zahnrad neben dem Namen in der Sidebar).
+ */
 export default async function EinstellungenPage({
   searchParams,
 }: {
@@ -24,8 +27,8 @@ export default async function EinstellungenPage({
   return (
     <OsShell>
       <main className="w-full p-8">
-        <h1 className="page-title">Einstellungen</h1>
-        <p className="page-sub">Dein Profil und das Agentur-Team. Rollen & Rechte folgen mit der Kunden-Freischaltung.</p>
+        <h1 className="page-title">Tool-Einstellungen</h1>
+        <p className="page-sub">Gilt für das ganze Tool und alle im Team. Persönliches (Name, Passwort) findest du unter „Mein Konto" — das Zahnrad neben deinem Namen.</p>
 
         {fehler && <p className="mt-4 rounded-xl bg-[rgb(220_38_38/0.08)] px-3 py-2 text-sm text-bad">{fehler}</p>}
         {ok && <p className="mt-4 rounded-xl bg-[rgb(22_163_74/0.08)] px-3 py-2 text-sm text-good">✓ {ok}</p>}
@@ -39,36 +42,6 @@ export default async function EinstellungenPage({
             </div>
             <span className="inline-flex items-center gap-1 text-xs font-medium text-primary-strong transition group-hover:gap-2">öffnen <IconArrowRight className="h-3.5 w-3.5" /></span>
           </Link>
-
-          <section className="card p-5">
-            <h2 className="sect-h">Profil</h2>
-            <form action={updateProfile} className="mt-3 flex flex-wrap items-end gap-2">
-              <label className="block min-w-56 flex-1">
-                <span className="mb-1 block text-xs font-medium text-muted">Name</span>
-                <input name="name" defaultValue={session.name} required className={input} />
-              </label>
-              <div className="min-w-56 flex-1">
-                <span className="mb-1 block text-xs font-medium text-muted">E-Mail (fest)</span>
-                <div className={`${input} cursor-not-allowed bg-background text-muted`}>{session.email}</div>
-              </div>
-              <SubmitButton className="btn-dark">Speichern</SubmitButton>
-            </form>
-          </section>
-
-          <section className="card p-5">
-            <h2 className="sect-h">Passwort ändern</h2>
-            <form action={changePassword} className="mt-3 flex flex-wrap items-end gap-2">
-              <label className="block min-w-56 flex-1">
-                <span className="mb-1 block text-xs font-medium text-muted">Aktuelles Passwort</span>
-                <input name="current" type="password" required autoComplete="current-password" className={input} />
-              </label>
-              <label className="block min-w-56 flex-1">
-                <span className="mb-1 block text-xs font-medium text-muted">Neues Passwort (min. 8 Zeichen)</span>
-                <input name="next" type="password" required minLength={8} autoComplete="new-password" className={input} />
-              </label>
-              <SubmitButton className="btn-dark">Ändern</SubmitButton>
-            </form>
-          </section>
 
           <section className="card p-5">
             <h2 className="sect-h">Demo & Zurücksetzen</h2>

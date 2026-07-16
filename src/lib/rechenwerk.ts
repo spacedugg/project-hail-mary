@@ -23,6 +23,8 @@ export type KpiGruppe = { titel: string; eintraege: KpiEintrag[] };
 export type BerichtEintrag = {
   name: string;
   status: "Pflicht" | "empfohlen" | "optional" | "geplant";
+  /** Woher der Bericht kommt (D86): Seller Central, Amazon Ads Konsole oder Helium 10. */
+  plattform: "Seller Central" | "Ads-Konsole" | "Helium 10" | "Amazon (PDF)";
   quelle: string; // wo ziehen (Seller Central / Helium 10 / …)
   turnus: string;
   liefert: string; // Kennzahlen direkt aus DIESEM Bericht
@@ -33,6 +35,7 @@ export const BERICHTE: BerichtEintrag[] = [
   {
     name: "Business Report (Verkäufe & Traffic)",
     status: "Pflicht",
+    plattform: "Seller Central",
     quelle: "Seller Central → Berichte → Geschäftsberichte → ‚Verkäufe und Besucherzahlen – Detailseite' (nach Datum)",
     turnus: "je Periode — monatlich empfohlen, lückenlos",
     liefert: "Umsatz, Bestellungen, Einheiten, Sitzungen, CVR, Einheiten-CVR, Buybox %, AOV",
@@ -41,7 +44,8 @@ export const BERICHTE: BerichtEintrag[] = [
   {
     name: "Ads-/Kampagnenbericht (Sponsored Products)",
     status: "Pflicht",
-    quelle: "Seller Central → Werbung → Berichte → Sponsored Products → Berichtstyp ‚Kampagne'",
+    plattform: "Ads-Konsole",
+    quelle: "Amazon Ads Konsole (advertising.amazon.de) → Berichte → Sponsored Products → Berichtstyp ‚Kampagne'",
     turnus: "je Periode — Zeitraum deckungsgleich zum Business Report",
     liefert: "Spend, PPC-Umsatz, ACoS, ROAS, CTR, CPC, PPC-CR, Impressionen, Ziel-ACoS (aus Portfolio-Namen)",
     imTool: "Marke → Berichte",
@@ -49,7 +53,8 @@ export const BERICHTE: BerichtEintrag[] = [
   {
     name: "Search-Term-Report (Suchbegriffe)",
     status: "empfohlen",
-    quelle: "Seller Central → Werbung → Berichte → Sponsored Products → Berichtstyp ‚Suchbegriff'",
+    plattform: "Ads-Konsole",
+    quelle: "Amazon Ads Konsole (advertising.amazon.de) → Berichte → Sponsored Products → Berichtstyp ‚Suchbegriff'",
     turnus: "monatlich oder quartalsweise",
     liefert: "Wasted Spend, Negativ-Kandidaten, N-Gram-Wurzeln, ASIN-Ziele ohne Conversion",
     imTool: "Marke → Berichte",
@@ -57,6 +62,7 @@ export const BERICHTE: BerichtEintrag[] = [
   {
     name: "SQP (Search Query Performance)",
     status: "empfohlen",
+    plattform: "Seller Central",
     quelle: "Seller Central → Marken → Marken-Analysen → Suchanfragen-Leistung (braucht Markenregistrierung)",
     turnus: "monatlich",
     liefert: "Eure CTR/CVR vs. Markt, verlorene Käufe, Umsatzpotenzial je Suchanfrage",
@@ -65,6 +71,7 @@ export const BERICHTE: BerichtEintrag[] = [
   {
     name: "Cerebro-Export (Helium 10)",
     status: "optional",
+    plattform: "Helium 10",
     quelle: "Helium 10 → Cerebro → eigene ASIN + Wettbewerber-ASINs → CSV-Export",
     turnus: "je Listing-Projekt / bei Bedarf",
     liefert: "SOV, Quick-Wins, Umsatzlücken, Opportunity-Matrix, Keyword-Tiering (primary→Titel …)",
@@ -73,6 +80,7 @@ export const BERICHTE: BerichtEintrag[] = [
   {
     name: "Flat-File-Kategorievorlage",
     status: "optional",
+    plattform: "Seller Central",
     quelle: "Seller Central → Katalog → Produkte per Upload hinzufügen → Vorlage der Kategorie",
     turnus: "bei Amazon-Vorlagen-Änderung (jeweils NEUSTE Vorlage)",
     liefert: "keine Kennzahl — Ziel-Format für upload-fertige Flat Files",
@@ -81,6 +89,7 @@ export const BERICHTE: BerichtEintrag[] = [
   {
     name: "Amazon-Gebühren-PDF",
     status: "optional",
+    plattform: "Amazon (PDF)",
     quelle: "Amazon-Ankündigungen/Hilfeseiten (Amazon verschickt Gebühren-Änderungen als PDF — keine öffentliche Tabellen-API)",
     turnus: "bei Gebühren-Änderung",
     liefert: "Verkaufsgebühr-Sätze, Lager- und Entsorgungs-Tabellen des Margen-Rechners",
@@ -89,6 +98,7 @@ export const BERICHTE: BerichtEintrag[] = [
   {
     name: "Retouren-/Payments-Bericht",
     status: "geplant",
+    plattform: "Seller Central",
     quelle: "Seller Central → Berichte → Zahlungen bzw. Retouren",
     turnus: "—",
     liefert: "Retourenquote (steht NICHT im Business Report — deshalb bewusst noch keine Retourenquote im Cockpit, kein Platzhalter)",

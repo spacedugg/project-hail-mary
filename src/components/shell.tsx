@@ -37,7 +37,11 @@ export function DemoBanner() {
   );
 }
 
-/** Profil-Bereich unten in der Sidebar: Avatar, Name, Einstellungen, Abmelden. */
+/**
+ * Fuß jeder Sidebar (D86): Tool-Einstellungen IMMER ganz unten, direkt über
+ * der Person. Zahnrad neben dem Namen = „Mein Konto" (persönlich) — bewusst
+ * getrennt von den tool-weiten Einstellungen.
+ */
 async function ProfileFooter() {
   const user = await getSessionUser();
   if (!user) return null;
@@ -48,23 +52,28 @@ async function ProfileFooter() {
     .join("")
     .toUpperCase();
   return (
-    <div className="mt-auto border-t border-hair p-2.5">
-      <div className="flex items-center gap-2.5 rounded-xl p-1.5">
-        <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-gradient-to-br from-[#8f6dff] to-[#5b3fd4] text-[11px] font-semibold text-white shadow-[0_4px_10px_rgb(124_92_252/0.35)]">
-          {initials}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-xs font-semibold leading-tight">{user.name}</div>
-          <div className="truncate text-[10px] text-muted">{user.email}</div>
+    <div className="mt-auto border-t border-hair">
+      <div className="px-1 pt-1">
+        <SideNav items={[{ href: "/einstellungen", label: "Tool-Einstellungen", icon: <IconSettings />, alsoMatch: "/rechenwerk" }]} />
+      </div>
+      <div className="border-t border-hair p-2.5">
+        <div className="flex items-center gap-2.5 rounded-xl p-1.5">
+          <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-gradient-to-br from-[#8f6dff] to-[#5b3fd4] text-[11px] font-semibold text-white shadow-[0_4px_10px_rgb(124_92_252/0.35)]">
+            {initials}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-xs font-semibold leading-tight">{user.name}</div>
+            <div className="truncate text-[10px] text-muted">{user.email}</div>
+          </div>
+          <Link href="/konto" title="Mein Konto (persönliche Einstellungen)" className="rounded-lg p-1.5 text-muted transition hover:bg-primary-soft hover:text-primary-strong">
+            <IconSettings className="h-4 w-4" />
+          </Link>
+          <form action={logout}>
+            <button title="Abmelden" className="rounded-lg p-1.5 text-muted transition hover:bg-[rgb(220_38_38/0.08)] hover:text-bad">
+              <IconLogout className="h-4 w-4" />
+            </button>
+          </form>
         </div>
-        <Link href="/einstellungen" title="Einstellungen" className="rounded-lg p-1.5 text-muted transition hover:bg-primary-soft hover:text-primary-strong">
-          <IconSettings className="h-4 w-4" />
-        </Link>
-        <form action={logout}>
-          <button title="Abmelden" className="rounded-lg p-1.5 text-muted transition hover:bg-[rgb(220_38_38/0.08)] hover:text-bad">
-            <IconLogout className="h-4 w-4" />
-          </button>
-        </form>
       </div>
     </div>
   );
@@ -146,8 +155,6 @@ export function OsShell({ children }: { children: React.ReactNode }) {
             <div className="px-2 pb-1 text-[10px] uppercase tracking-wide text-muted">Werkzeuge</div>
           </div>
           <SideNav items={[{ href: "/optimizer", label: "Listing Optimizer", icon: <IconContent />, alsoMatch: "/produkte/" }]} />
-          <div className="mx-3 mt-2 border-t border-hair pt-2" />
-          <SideNav items={[{ href: "/einstellungen", label: "Einstellungen", icon: <IconSettings />, alsoMatch: "/rechenwerk" }]} />
         </div>
         <ProfileFooter />
       </aside>

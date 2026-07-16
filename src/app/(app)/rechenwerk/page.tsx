@@ -53,7 +53,7 @@ export default async function RechenwerkPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-hair text-left text-[11px] uppercase text-neutral-500">
-                  <th className="py-1 pr-3">Bericht</th><th className="pr-3">Priorität</th><th className="pr-3">Wo ziehen</th><th className="pr-3">Turnus</th><th className="pr-3">Liefert</th><th>Im Tool</th>
+                  <th className="py-1 pr-3">Bericht</th><th className="pr-3">Priorität</th><th className="pr-3">Plattform</th><th className="pr-3">Wo ziehen</th><th className="pr-3">Turnus</th><th className="pr-3">Liefert</th><th>Im Tool</th>
                 </tr>
               </thead>
               <tbody>
@@ -62,6 +62,9 @@ export default async function RechenwerkPage() {
                     <td className="py-2 pr-3 font-medium">{b.name}</td>
                     <td className="pr-3">
                       <span className={`pill ${b.status === "Pflicht" ? "pill-bad" : b.status === "empfohlen" ? "pill-warn" : "pill-neutral"}`}>{b.status}</span>
+                    </td>
+                    <td className="pr-3 whitespace-nowrap">
+                      <span className={`pill ${b.plattform === "Seller Central" ? "chip-violet" : b.plattform === "Ads-Konsole" ? "chip-teal" : b.plattform === "Helium 10" ? "chip-pink" : "pill-neutral"}`}>{b.plattform}</span>
                     </td>
                     <td className="pr-3 text-xs text-muted">{b.quelle}</td>
                     <td className="pr-3 text-xs">{b.turnus}</td>

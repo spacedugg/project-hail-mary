@@ -70,7 +70,7 @@ export async function updateProfile(formData: FormData) {
   const db = await getDb();
   await db.update(schema.users).set({ name }).where(eq(schema.users.id, session.id));
   await setSessionCookie({ ...session, name });
-  revalidatePath("/einstellungen");
+  revalidatePath("/konto");
 }
 
 export async function changePassword(formData: FormData) {
@@ -78,13 +78,13 @@ export async function changePassword(formData: FormData) {
   if (!session) redirect("/login");
   const current = String(formData.get("current") ?? "");
   const next = String(formData.get("next") ?? "");
-  if (next.length < 8) redirect(`/einstellungen?fehler=${encodeURIComponent("Neues Passwort braucht mindestens 8 Zeichen.")}`);
+  if (next.length < 8) redirect(`/konto?fehler=${encodeURIComponent("Neues Passwort braucht mindestens 8 Zeichen.")}`);
 
   const db = await getDb();
   const user = await db.query.users.findFirst({ where: eq(schema.users.id, session.id) });
   if (!user || !verifyPassword(current, user.passwordHash)) {
-    redirect(`/einstellungen?fehler=${encodeURIComponent("Aktuelles Passwort falsch.")}`);
+    redirect(`/konto?fehler=${encodeURIComponent("Aktuelles Passwort falsch.")}`);
   }
   await db.update(schema.users).set({ passwordHash: hashPassword(next) }).where(eq(schema.users.id, session.id));
-  redirect(`/einstellungen?ok=${encodeURIComponent("Passwort geändert.")}`);
+  redirect(`/konto?ok=${encodeURIComponent("Passwort geändert.")}`);
 }
