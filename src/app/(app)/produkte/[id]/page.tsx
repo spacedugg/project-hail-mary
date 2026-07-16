@@ -419,12 +419,19 @@ export default async function ProductPage({
                   ))}
                 </div>
               )}
-              <p className="mt-2 text-[11px] text-muted">Stichprobe je Klasse gedeckelt — sie bildet kein Gesamtverhältnis ab. Alle Klassen fließen in Pain Points und Kaufauslöser ein.</p>
+              <p className="mt-2 text-[11px] text-muted">
+                Gescraped werden geschriebene Rezensionen (je ASIN und Sterne-Klasse die bis zu 100 aktuellsten).
+                Amazons Gesamtzahl zählt auch Sterne-Bewertungen OHNE Text mit — die Stichprobe ist deshalb oft deutlich
+                kleiner als die Gesamtzahl, ohne dass etwas fehlt. Sie bildet kein Gesamtverhältnis ab; alle Klassen
+                fließen in Pain Points und Kaufauslöser ein.
+              </p>
               {(scrape.notes?.length ?? 0) > 0 && (
                 <div className="mt-2 space-y-0.5">
-                  {scrape.notes!.map((n, i) => (
-                    <p key={i} className="text-[11px] text-warn">△ {n}</p>
-                  ))}
+                  {scrape.notes!.map((n, i) =>
+                    /fehl|Zeitlimit/.test(n)
+                      ? <p key={i} className="text-[11px] text-warn">△ {n}</p>
+                      : <p key={i} className="text-[11px] text-muted">ℹ {n}</p>,
+                  )}
                 </div>
               )}
 

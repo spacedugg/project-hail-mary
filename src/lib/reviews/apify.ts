@@ -51,14 +51,17 @@ async function runStarClass(
     mediaType: "all_contents",
   }];
 
-  // Zeit-Budget: Vercel-Function max. 60 s → Apify synchron auf 50 s begrenzen
+  // Zeit-Budget (D102): Vercel-Function max. 60 s — jeder Lauf bekommt 40 s
+  // (Abbruch 45 s), damit nach den parallelen Läufen sicher Zeit bleibt,
+  // Ergebnis + Notizen zu speichern und eine RÜCKMELDUNG zu geben (vorher
+  // 50/55 s: bei Verzögerung beendete Vercel die Funktion kommentarlos).
   const res = await fetch(
-    `https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?timeout=50`,
+    `https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?timeout=40`,
     {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({ input }),
-      signal: AbortSignal.timeout(55_000),
+      signal: AbortSignal.timeout(45_000),
     },
   );
   if (res.status === 408) throw new Error("Zeitlimit");
@@ -100,10 +103,14 @@ export async function scrapeReviews(
 
   const reviews: RawReview[] = [];
   const notes: string[] = [];
+  const jeAsinKlasse = new Map<string, number[]>(); // asin → [n1★ … n5★]
   results.forEach((r, i) => {
     const { asin, star } = laeufe[i];
     if (r.status === "fulfilled") {
       reviews.push(...r.value);
+      const zaehler = jeAsinKlasse.get(asin) ?? [0, 0, 0, 0, 0];
+      zaehler[star - 1] = r.value.length;
+      jeAsinKlasse.set(asin, zaehler);
     } else {
       const why =
         r.reason instanceof Error && (r.reason.name === "TimeoutError" || r.reason.message === "Zeitlimit")
@@ -112,6 +119,15 @@ export async function scrapeReviews(
       notes.push(`${asin} ${star}★-Lauf ${why} — diese Klasse fehlt in der Datenbasis.`);
     }
   });
+
+  // Ehrliche Aufschlüsselung je ASIN (D102): jeder Lauf holt die bis zu 100
+  // aktuellsten GESCHRIEBENEN Rezensionen seiner Klasse. Weniger als 100
+  // heißt: mehr Text-Rezensionen waren für diese Klasse nicht erreichbar —
+  // Amazons Gesamtzahl zählt auch Sterne-Bewertungen OHNE Text mit.
+  for (const [asin, zaehler] of jeAsinKlasse) {
+    const teile = zaehler.map((n, i) => `${i + 1}★ ${n}`).reverse().join(" · ");
+    notes.push(`${asin}: ${teile} geschriebene Rezensionen geholt (je Klasse max. 100 der aktuellsten).`);
+  }
 
   if (reviews.length === 0) {
     throw new Error(
