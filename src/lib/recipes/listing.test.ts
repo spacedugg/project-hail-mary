@@ -49,6 +49,8 @@ describe("listing recipes (mock)", () => {
     const bytes = new TextEncoder().encode(res.payload.text!).length;
     expect(bytes).toBeLessThanOrEqual(249);
     expect(res.issues.filter((i) => i.rule === "backend.max-bytes")).toEqual([]);
+    // Satzzeichen werden deterministisch entfernt (Blog 07/2026: Amazon ignoriert sie)
+    expect(res.payload.text).not.toMatch(/[,;.!?:]/);
   });
 
   it("Titel enthält Hauptkeyword im Mobile-Fenster", async () => {

@@ -135,6 +135,10 @@ describe("validateBackendKeywords", () => {
       "backend.visible-duplicate",
     );
   });
+  it("Satzzeichen verschwenden Bytes — WARNUNG (Blog 07/2026: Amazon ignoriert sie)", () => {
+    expect(validateBackendKeywords("salatschüssel; backschüssel.", "", ctx).map((i) => i.rule)).toContain("backend.punctuation");
+    expect(validateBackendKeywords("salatschüssel backschüssel prep bowl", "", ctx).map((i) => i.rule)).not.toContain("backend.punctuation");
+  });
 });
 
 describe("validateListing (Gesamt-Gate)", () => {

@@ -147,10 +147,10 @@ JSON: {"highlights": "...", "rationale": [{"part": "...", "source": "..."}]}`;
       return `${ctx}
 
 AUFGABE: Backend-Suchbegriffe (generische Keywords).
-REGELN (knowledge/content/backend-keywords.md):
-- Einzelwörter, Leerzeichen-getrennt, KEINE Kommas. Max ${RULES.backendKeywords.maxBytes} Bytes UTF-8.
-- KEIN Wort, das schon in Titel/Bullets sichtbar ist. Keine Markennamen. Singular ODER Plural, nie beides.
-- Priorität: (1) Invisible-Keywords, (2) Rest-Long-Tails, (3) echte Kundensprache/Synonyme/Regionalbegriffe.
+REGELN (knowledge/content/backend-keywords.md + Blog 07/2026):
+- Einzelwörter, Leerzeichen-getrennt, KEINE Kommas, KEINE Satzzeichen (Amazon ignoriert sie — verschwendete Bytes). Max ${RULES.backendKeywords.maxBytes} Bytes UTF-8 — bei Überschreitung ignoriert Amazon das GESAMTE Feld.
+- KEIN Wort, das schon in Titel/Bullets sichtbar ist (Main Keywords hier = verschwendeter Platz). Keine Markennamen (Policy + Account Health). Singular ODER Plural, nie beides.
+- Priorität: (1) Invisible-Keywords, (2) Rest-Long-Tails, (3) Synonyme/Abkürzungen/andere Schreibweisen (Titel „Edelstahl Rührschüssel" → Backend „salatschüssel backschüssel teigschüssel"), (4) ENGLISCHE Suchbegriffe auf amazon.de („mixing bowl" statt „rührschüssel"), (5) Kundensprache/Regionalbegriffe. KEINE Tippfehler (Amazon fängt sie ab).
 - BUDGET AUSNUTZEN: möglichst nah an ${RULES.backendKeywords.maxBytes} Bytes (nie darüber).
 - POOL: ${kw.backendPool.join(", ")}
 JSON: {"backend": "wort1 wort2 wort3 ...", "rationale": [{"part": "<Wortgruppe>", "source": "<Herleitung: invisible/Long-Tail/Kundensprache>"}]}`;
@@ -316,8 +316,9 @@ export async function generateSection(
       return { section, payload: { items, rationale: extractRationale(parsed, items.join(" ")) }, issues: validateBullets(items, ctx), raw, provider: provider.name, model };
     }
     case "backend": {
-      // Deterministische Byte-Durchsetzung NACH dem LLM (temoa-os-Muster)
-      const text = trimToBytesByWord(String(parsed.backend ?? "").replace(/,/g, " ").replace(/\s+/g, " ").trim(), RULES.backendKeywords.maxBytes);
+      // Deterministische Byte-Durchsetzung NACH dem LLM (temoa-os-Muster);
+      // Satzzeichen raus (Amazon ignoriert sie — verschwendete Bytes, Blog 07/2026)
+      const text = trimToBytesByWord(String(parsed.backend ?? "").replace(/[,;.!?:„“‚’"']/g, " ").replace(/\s+/g, " ").trim(), RULES.backendKeywords.maxBytes);
       const visible = [
         typeof inputs.approved?.title === "string" ? inputs.approved.title : "",
         ...(Array.isArray(inputs.approved?.bullets) ? inputs.approved.bullets : []),

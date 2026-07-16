@@ -149,6 +149,10 @@ export function validateBackendKeywords(
     issues.push(issue("backend.budget", "warning", `Nur ${bytes} von ${RULES.backendKeywords.maxBytes} B genutzt — Budget ausschöpfen.`));
   if (t.includes(","))
     issues.push(issue("backend.commas", "error", "Kommas sind nicht erlaubt — Einzelwörter mit Leerzeichen."));
+  // Amazon ignoriert Satzzeichen (Blog 07/2026) — jedes davon ist verschwendetes Byte
+  const satzzeichen = t.match(/[;.!?:„“‚’"']/g);
+  if (satzzeichen)
+    issues.push(issue("backend.punctuation", "warning", `Satzzeichen verschwenden Bytes (Amazon ignoriert sie): ${[...new Set(satzzeichen)].join(" ")}`));
 
   // Dedup gegen sichtbaren Text (Wortstamm; Bindestrich-Komposita zerlegen)
   const visible = new Set(
