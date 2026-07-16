@@ -103,6 +103,7 @@ export const RECIPE_MODELS: Record<string, { provider: string; model: string }> 
   "listing.deep-audit": { provider: "anthropic", model: "claude-sonnet-5" },
   "listing.scrape": { provider: "anthropic", model: "claude-sonnet-5" },
   "keywords.filter": { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
+  "keywords.brands": { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
   "facts.extract": { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
 };
 

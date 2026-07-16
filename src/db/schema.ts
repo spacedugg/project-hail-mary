@@ -134,6 +134,16 @@ export const keywords = sqliteTable("keywords", {
   searchVolume: integer("search_volume"),
   tier: text("tier").$type<KeywordTier>(),
   source: text("source").notNull().default("manual"), // manual | cerebro | sov_quick_win | sov_revenue_gap | sov_invisible
+  /**
+   * Relevanz-Filter (D87): irrelevante Keywords fliegen beim Import raus —
+   * gekennzeichnet statt gelöscht (prüfbar, wieder aufnehmbar). Gründe z. B.
+   * ‚Marke: Nuk', ‚Maß weicht ab: 140×80 (Produkt: 200×150)', ‚Anzahl weicht
+   * ab: 10 Stück (Produkt: 20)', ‚manuell ausgeschlossen'. Ein Grund mit
+   * Präfix „manuell" ist eine Nutzer-Entscheidung — Auto-Läufe überschreiben
+   * sie nie.
+   */
+  ausgeschlossen: integer("ausgeschlossen", { mode: "boolean" }).notNull().default(false),
+  ausschlussGrund: text("ausschluss_grund"),
   meta: text("meta", { mode: "json" }).$type<Record<string, unknown>>(),
   createdAt: ts("created_at").notNull(),
 });

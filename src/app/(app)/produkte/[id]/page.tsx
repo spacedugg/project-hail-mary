@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { saveKeywords, deriveKeywordsFromSov, generateContent, uploadCerebro, scrapeReviewsAction, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc } from "@/app/actions";
+import { saveKeywords, deriveKeywordsFromSov, generateContent, uploadCerebro, scrapeReviewsAction, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc, toggleKeywordRelevanz } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
@@ -239,32 +239,64 @@ export default async function ProductPage({
               icon={<IconSearch />}
               chip="chip-pink"
               title="Keyword-Basis"
-              sub="primary → Titel · secondary → Bullets · Rest → Backend."
-              right={kws.length > 0 ? <span className="pill pill-neutral">{kws.length} Keywords</span> : undefined}
+              sub="primary → Titel · secondary → Bullets · Rest → Backend. Irrelevantes wird automatisch aussortiert."
+              right={kws.length > 0 ? <span className="pill pill-neutral">{kws.filter((k) => !k.ausgeschlossen).length} aktiv</span> : undefined}
             />
             {sovUpload && (
               <form action={deriveKeywordsFromSov} className="mt-3">
                 <input type="hidden" name="productId" value={product.id} />
-                <SubmitButton className="btn-primary text-xs">
+                <SubmitButton className="btn-primary text-xs" pendingLabel="Leitet ab & prüft Relevanz…" progress>
                   Aus SOV-Audit ableiten{kws.filter((k) => k.source === "cerebro").length ? " (aktualisieren)" : ""}
                 </SubmitButton>
               </form>
             )}
             {(["primary", "secondary", "tertiary", "backend"] as const).map((tier) => {
-              const inTier = kws.filter((k) => k.tier === tier && k.source !== "manual");
+              const inTier = kws.filter((k) => k.tier === tier && k.source !== "manual" && !k.ausgeschlossen);
               if (inTier.length === 0) return null;
               return (
                 <div key={tier} className="mt-3">
                   <div className="text-[10px] uppercase tracking-wide text-neutral-400">{tier} · {inTier.length}</div>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {inTier.slice(0, 16).map((k) => (
-                      <span key={k.id} className="tag">{k.keyword}{k.searchVolume ? ` · ${fmt(k.searchVolume)}` : ""}</span>
+                      <form key={k.id} action={toggleKeywordRelevanz} className="inline-flex">
+                        <input type="hidden" name="keywordId" value={k.id} />
+                        <input type="hidden" name="productId" value={product.id} />
+                        <input type="hidden" name="aktion" value="ausschliessen" />
+                        <span className="tag group/kw inline-flex items-center gap-1">
+                          {k.keyword}{k.searchVolume ? ` · ${fmt(k.searchVolume)}` : ""}
+                          <button title="Als irrelevant ausschließen" className="text-neutral-400 transition hover:text-bad">×</button>
+                        </span>
+                      </form>
                     ))}
                     {inTier.length > 16 && <span className="text-[10px] text-neutral-400">… +{inTier.length - 16}</span>}
                   </div>
                 </div>
               );
             })}
+            {/* Aussortierte Keywords (D87): gekennzeichnet statt gelöscht — prüfbar & wieder aufnehmbar */}
+            {kws.some((k) => k.ausgeschlossen) && (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs text-warn">
+                  △ Aussortiert ({kws.filter((k) => k.ausgeschlossen).length}) — Marken, abweichende Maße/Anzahlen · prüfen & ggf. wieder aufnehmen
+                </summary>
+                <ul className="mt-2 space-y-1">
+                  {kws.filter((k) => k.ausgeschlossen).map((k) => (
+                    <li key={k.id} className="flex items-center justify-between gap-2 rounded-lg bg-background px-2 py-1 text-xs">
+                      <span className="min-w-0">
+                        <b>{k.keyword}</b>{k.searchVolume ? <span className="text-muted"> · SV {fmt(k.searchVolume)}</span> : ""}
+                        <span className="block text-[11px] text-muted">{k.ausschlussGrund}</span>
+                      </span>
+                      <form action={toggleKeywordRelevanz} className="flex-none">
+                        <input type="hidden" name="keywordId" value={k.id} />
+                        <input type="hidden" name="productId" value={product.id} />
+                        <input type="hidden" name="aktion" value="aufnehmen" />
+                        <SubmitButton className="btn-ghost px-2 py-0.5 text-[11px]">↩ aufnehmen</SubmitButton>
+                      </form>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
             <details className="mt-3" open={kws.length > 0 && kws.every((k) => k.source === "manual")}>
               <summary className="cursor-pointer text-xs text-muted hover:text-foreground">
                 Manuelle Keywords ({kws.filter((k) => k.source === "manual").length})

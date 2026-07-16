@@ -62,7 +62,7 @@ export default async function AnalysePage({
     orderBy: desc(schema.reviewScrapes.createdAt),
   });
 
-  const kws = await db.query.keywords.findMany({ where: eq(schema.keywords.productId, id) });
+  const kws = (await db.query.keywords.findMany({ where: eq(schema.keywords.productId, id) })).filter((k) => !k.ausgeschlossen);
   const insights = await db.query.reviewInsights.findFirst({
     where: eq(schema.reviewInsights.productId, id),
     orderBy: desc(schema.reviewInsights.createdAt),

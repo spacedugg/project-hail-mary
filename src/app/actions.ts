@@ -86,12 +86,29 @@ export async function saveKeywords(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
   const raw = String(formData.get("keywords") ?? "");
   const db = await getDb();
+  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  if (!product) return;
   const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
   await db.delete(schema.keywords).where(and(eq(schema.keywords.productId, productId), eq(schema.keywords.source, "manual")));
+
+  // Relevanz-Check auch für Hand-Eingaben (D87) — nur die schnellen,
+  // deterministischen Regeln (Maße/Anzahl); Marken-LLM läuft beim SOV-Import.
+  const snapshot = await db.query.listingSnapshots.findFirst({
+    where: eq(schema.listingSnapshots.productId, productId),
+    orderBy: desc(schema.listingSnapshots.createdAt),
+  });
+  const { pruefeMasseUndAnzahl } = await import("@/lib/keywords/relevanz");
+  const ctx = {
+    massText: [product.facts.dimensions, snapshot?.title, product.name].filter(Boolean).join(" · "),
+    produktName: product.name,
+    eigeneMarke: null,
+  };
+
   // v0-Tiering nach Reihenfolge: 1–3 primary, 4–13 secondary, 14–18 tertiary, Rest backend
   const rows = lines.map((line, i) => {
     const [kw, vol] = line.split(/[;\t]/).map((s) => s?.trim());
     const tier = i < 3 ? "primary" : i < 13 ? "secondary" : i < 18 ? "tertiary" : "backend";
+    const grund = kw ? pruefeMasseUndAnzahl(kw, ctx) : null;
     return {
       id: id(),
       productId,
@@ -99,6 +116,8 @@ export async function saveKeywords(formData: FormData) {
       searchVolume: vol ? parseInt(vol.replace(/\D/g, ""), 10) || null : null,
       tier: tier as "primary" | "secondary" | "tertiary" | "backend",
       source: "manual",
+      ausgeschlossen: grund !== null,
+      ausschlussGrund: grund,
     };
   });
   if (rows.length) await db.insert(schema.keywords).values(rows);
@@ -302,19 +321,68 @@ export async function deriveKeywordsFromSov(formData: FormData) {
 
   const existing = await db.query.keywords.findMany({ where: eq(schema.keywords.productId, productId) });
   const manual = new Set(existing.filter((k) => k.source === "manual").map((k) => k.keyword.toLowerCase().trim()));
+  // Manuelle Relevanz-Entscheidungen überleben jeden Re-Lauf (D87)
+  const manuelleUrteile = new Map(
+    existing
+      .filter((k) => k.ausschlussGrund?.startsWith("manuell"))
+      .map((k) => [k.keyword.toLowerCase().trim(), { ausgeschlossen: k.ausgeschlossen, grund: k.ausschlussGrund! }]),
+  );
+
+  // Relevanz-Filter (D87): Marken / abweichende Maße / abweichende Anzahlen
+  const brand = await db.query.brands.findFirst({ where: eq(schema.brands.id, product.brandId) });
+  const snapshot = await db.query.listingSnapshots.findFirst({
+    where: eq(schema.listingSnapshots.productId, productId),
+    orderBy: desc(schema.listingSnapshots.createdAt),
+  });
+  const { pruefeRelevanz } = await import("@/lib/keywords/relevanz");
+  const kandidaten = tiered.filter((k) => !manual.has(k.keyword.toLowerCase().trim()));
+  let urteile = new Map<string, string | null>();
+  try {
+    const res = await pruefeRelevanz(kandidaten.map((k) => k.keyword), {
+      massText: [product.facts.dimensions, snapshot?.title, product.name].filter(Boolean).join(" · "),
+      produktName: product.name,
+      eigeneMarke: brand?.kind === "workbench" ? null : brand?.name ?? null,
+    });
+    urteile = new Map(res.map((u) => [u.keyword.toLowerCase(), u.grund]));
+  } catch (e) {
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Keyword-Relevanz-Prüfung: ${e instanceof Error ? e.message : String(e)}`)}`);
+  }
 
   await db.delete(schema.keywords).where(and(eq(schema.keywords.productId, productId), eq(schema.keywords.source, "cerebro")));
-  const rows = tiered
-    .filter((k) => !manual.has(k.keyword.toLowerCase().trim()))
-    .map((k) => ({
+  const rows = kandidaten.map((k) => {
+    const key = k.keyword.toLowerCase().trim();
+    const manuell = manuelleUrteile.get(key);
+    const autoGrund = urteile.get(key) ?? null;
+    return {
       id: id(),
       productId,
       keyword: k.keyword,
       searchVolume: k.searchVolume,
       tier: k.tier,
       source: "cerebro",
-    }));
+      ausgeschlossen: manuell ? manuell.ausgeschlossen : autoGrund !== null,
+      ausschlussGrund: manuell ? manuell.grund : autoGrund,
+    };
+  });
   if (rows.length) await db.insert(schema.keywords).values(rows);
+  revalidatePath(`/produkte/${productId}`);
+}
+
+/** Relevanz-Entscheidung von Hand (D87): ausschließen oder wieder aufnehmen — überschreibt Auto-Läufe dauerhaft. */
+export async function toggleKeywordRelevanz(formData: FormData) {
+  const keywordId = String(formData.get("keywordId") ?? "");
+  const productId = String(formData.get("productId") ?? "");
+  const aktion = String(formData.get("aktion") ?? "");
+  if (!keywordId || !productId) return;
+  const db = await getDb();
+  await db
+    .update(schema.keywords)
+    .set(
+      aktion === "aufnehmen"
+        ? { ausgeschlossen: false, ausschlussGrund: "manuell wieder aufgenommen" }
+        : { ausgeschlossen: true, ausschlussGrund: "manuell ausgeschlossen" },
+    )
+    .where(eq(schema.keywords.id, keywordId));
   revalidatePath(`/produkte/${productId}`);
 }
 
@@ -326,7 +394,8 @@ export async function generateContent(formData: FormData) {
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return;
   const brand = await db.query.brands.findFirst({ where: eq(schema.brands.id, product.brandId) });
-  const kws = await db.query.keywords.findMany({ where: eq(schema.keywords.productId, productId) });
+  // Nur relevante Keywords fließen in die Generierung (D87)
+  const kws = (await db.query.keywords.findMany({ where: eq(schema.keywords.productId, productId) })).filter((k) => !k.ausgeschlossen);
   const insights = await db.query.reviewInsights.findFirst({
     where: eq(schema.reviewInsights.productId, productId),
     orderBy: desc(schema.reviewInsights.createdAt),
@@ -610,7 +679,7 @@ export async function runDeepAuditAction(formData: FormData) {
     where: eq(schema.reviewScrapes.productId, productId),
     orderBy: desc(schema.reviewScrapes.createdAt),
   });
-  const kws = await db.query.keywords.findMany({ where: eq(schema.keywords.productId, productId) });
+  const kws = (await db.query.keywords.findMany({ where: eq(schema.keywords.productId, productId) })).filter((k) => !k.ausgeschlossen);
   const uploads = await db.query.reportUploads.findMany({
     where: eq(schema.reportUploads.brandId, product.brandId),
     orderBy: desc(schema.reportUploads.createdAt),
@@ -706,7 +775,7 @@ export async function syncBrandActions(formData: FormData) {
     });
     if (versions.length === 0) continue;
     const latest = (t: string) => versions.find((v) => v.type === t)?.payload as Record<string, unknown> | undefined;
-    const kws = await db.query.keywords.findMany({ where: eq(schema.keywords.productId, product.id) });
+    const kws = (await db.query.keywords.findMany({ where: eq(schema.keywords.productId, product.id) })).filter((k) => !k.ausgeschlossen);
     const insight = await db.query.reviewInsights.findFirst({
       where: eq(schema.reviewInsights.productId, product.id),
       orderBy: desc(schema.reviewInsights.createdAt),
@@ -966,7 +1035,7 @@ export async function saveContentManual(formData: FormData) {
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return;
-  const kws = await db.query.keywords.findMany({ where: eq(schema.keywords.productId, productId) });
+  const kws = (await db.query.keywords.findMany({ where: eq(schema.keywords.productId, productId) })).filter((k) => !k.ausgeschlossen);
   const versions = await db.query.contentVersions.findMany({
     where: eq(schema.contentVersions.productId, productId),
     orderBy: desc(schema.contentVersions.createdAt),

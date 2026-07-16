@@ -204,6 +204,15 @@ export const RECHENWERK: KpiGruppe[] = [
     ],
   },
   {
+    titel: "Keyword-Relevanz (Cerebro-Import & Hand-Eingabe)",
+    eintraege: [
+      { name: "Marken-Keywords", formel: "Keywords mit Marken-/Herstellernamen (fremde UND eigene Marke) werden aussortiert — Kunden suchen dort gezielt eine Marke, keine Kategorie; Erkennung per KI-Klassifikation, der Code übernimmt nur Keywords, die wirklich in der Liste stehen; ohne API-Key bleibt die Regel passiv (nie raten bei Ausschlüssen)", quelle: "Nutzer-Regel D87", code: "src/lib/keywords/relevanz.ts (erkenneMarkenKeywords)" },
+      { name: "Abweichende Maße", formel: "Keyword-Maße (200x150, 750 ml, 1 l, 80 cm — Paare reihenfolge-unabhängig, Einheiten normiert, 5 % Toleranz) gegen die bekannten Produkt-Maße (Fakten-Feld ‚Maße/Menge' + Titel); Abweichung → aussortiert. Kennt das Tool KEINE Produkt-Maße, filtert die Regel nicht", quelle: "Nutzer-Regel D87 (Krabbeldecken-Beispiel: 200×150 behält, 140×80 fliegt)", code: "src/lib/keywords/relevanz.ts (pruefeMasseUndAnzahl)" },
+      { name: "Abweichende Anzahl", formel: "Stückzahlen im Keyword (10 stück, 20er pack, 3er set) gegen die Produkt-Anzahl; Abweichung → aussortiert (Kabelbinder-Beispiel: 20er behält, ‚10 stück' fliegt)", quelle: "Nutzer-Regel D87", code: "src/lib/keywords/relevanz.ts" },
+      { name: "Kennzeichnen statt löschen", formel: "Aussortierte Keywords bleiben gespeichert (mit Grund) und sind in der Werkbank prüfbar/wieder aufnehmbar; manuelle Entscheidungen (Präfix ‚manuell') überschreibt kein Auto-Lauf; ausgeschlossene Keywords fließen NICHT in Tiering, Texte, Backend, Audit oder Briefs", quelle: "Nutzer-Vorgabe D87 (Transparenz)", code: "src/app/actions.ts (deriveKeywordsFromSov, toggleKeywordRelevanz)" },
+    ],
+  },
+  {
     titel: "Bewertungs-Analyse & Tiefen-Audit",
     eintraege: [
       { name: "Review-Scrape je Sterne-Klasse", formel: "5 parallele Läufe (filterByStar 1★–5★), je bis zu 100 der AKTUELLSTEN Reviews (sortBy recent, Scrape-Maximum); Teilausfälle als Notiz, nie stiller Abbruch", quelle: "Nutzer-Vorgabe D72 (Actor-JSON)", code: "src/lib/reviews/apify.ts" },

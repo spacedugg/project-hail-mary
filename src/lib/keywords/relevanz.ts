@@ -1,0 +1,176 @@
+import { generateForRecipe, resolveRecipe } from "@/lib/llm/registry";
+import { parseLlmJson } from "@/lib/llm/json";
+
+/**
+ * Keyword-Relevanz-Filter (D87): irrelevante Keywords fliegen beim Import
+ * raus — GEKENNZEICHNET statt gelöscht, damit man prüfen und wieder aufnehmen
+ * kann. Drei Regel-Klassen:
+ *
+ * 1. MASSE (deterministisch): enthält ein Keyword ein Maß (200x150, 750 ml,
+ *    1 l, 80 cm …), das von KEINEM bekannten Produkt-Maß gedeckt ist, fliegt
+ *    es raus. Bekannte Maße kommen aus Produkt-Fakten (dimensions) + Titel.
+ *    Kennt das Tool KEINE Produkt-Maße, filtert diese Regel NICHT (ehrlich
+ *    passiv statt raten).
+ * 2. ANZAHL (deterministisch): analog für Stückzahlen (10 stück, 20er pack,
+ *    3er set …) gegen die bekannte Produkt-Anzahl.
+ * 3. MARKEN (LLM + Code erzwingt): Marken-Suchbegriffe (fremde UND eigene
+ *    Marke) verzerren die Optimierung — Haiku markiert Kandidaten, der Code
+ *    übernimmt nur Keywords, die wirklich in der Liste stehen. Ohne API-Key
+ *    wird diese Regel übersprungen (kein Mock-Raten bei Ausschlüssen).
+ *
+ * Manuelle Entscheidungen (Grund-Präfix „manuell") überschreibt kein Auto-Lauf.
+ */
+
+export type RelevanzUrteil = { keyword: string; grund: string | null };
+
+// ── Maße ─────────────────────────────────────────────────────────────────────
+
+type Mass = { a: number; b?: number; einheit: string };
+
+const EINHEIT_NORM: Record<string, { faktor: number; basis: string }> = {
+  mm: { faktor: 0.1, basis: "cm" },
+  cm: { faktor: 1, basis: "cm" },
+  m: { faktor: 100, basis: "cm" },
+  ml: { faktor: 1, basis: "ml" },
+  l: { faktor: 1000, basis: "ml" },
+  liter: { faktor: 1000, basis: "ml" },
+  g: { faktor: 1, basis: "g" },
+  kg: { faktor: 1000, basis: "g" },
+  zoll: { faktor: 2.54, basis: "cm" },
+  "\"": { faktor: 2.54, basis: "cm" },
+};
+
+const num = (s: string) => parseFloat(s.replace(",", "."));
+
+/** Alle Maße aus einem Text ziehen: Paare (200x150cm) und Einzelwerte (750 ml). */
+export function extractMasse(text: string): Mass[] {
+  const out: Mass[] = [];
+  const t = ` ${text.toLowerCase()} `;
+
+  // Paare: 200x150 cm, 200 × 150, 200*150
+  const pair = /(\d+(?:[.,]\d+)?)\s*[x×*]\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m|zoll)?\b/g;
+  for (const m of t.matchAll(pair)) {
+    const einheit = m[3] ?? "cm"; // Amazon-Konvention: Maßpaare ohne Einheit sind cm
+    const norm = EINHEIT_NORM[einheit];
+    if (!norm || norm.basis !== "cm") continue;
+    const [a, b] = [num(m[1]) * norm.faktor, num(m[2]) * norm.faktor].sort((x, y) => y - x);
+    out.push({ a, b, einheit: "cm" });
+  }
+
+  // Einzelwerte mit Einheit: 750 ml, 1 l, 500g, 80 cm — NICHT Teil eines Paares
+  const single = /(?<![x×*]\s*)(?<![\d.,])(\d+(?:[.,]\d+)?)\s*(mm|cm|m|ml|l|liter|g|kg|zoll)\b(?!\s*[x×*])/g;
+  for (const m of t.matchAll(single)) {
+    const norm = EINHEIT_NORM[m[2]];
+    if (!norm) continue;
+    out.push({ a: num(m[1]) * norm.faktor, einheit: norm.basis });
+  }
+  return out;
+}
+
+const gleich = (x: number, y: number) => Math.abs(x - y) / Math.max(x, y, 1) <= 0.05; // 5 % Toleranz (Rundungen)
+
+function massGedeckt(kw: Mass, produkt: Mass[]): boolean {
+  return produkt.some((p) => {
+    if (p.einheit !== kw.einheit) return false;
+    if (kw.b !== undefined) return p.b !== undefined && gleich(p.a, kw.a) && gleich(p.b, kw.b);
+    // Einzelwert im Keyword: gedeckt, wenn er einer Produkt-Seite/-Größe entspricht
+    return gleich(p.a, kw.a) || (p.b !== undefined && gleich(p.b, kw.a));
+  });
+}
+
+// ── Anzahl ───────────────────────────────────────────────────────────────────
+
+/** "20 stück", "10er pack", "3er set", "2x", "4 teilig" → Zahl. */
+export function extractAnzahlen(text: string): number[] {
+  const out: number[] = [];
+  const t = ` ${text.toLowerCase()} `;
+  for (const m of t.matchAll(/(\d+)\s*(?:er[\s-]?)?(?:stück|stk|pack|set|teilig|paar|rollen?|beutel)\b/g)) out.push(parseInt(m[1], 10));
+  for (const m of t.matchAll(/(\d+)\s*x\s(?![\d])/g)) out.push(parseInt(m[1], 10)); // "2x kabelbinder", nicht "200x150"
+  return out.filter((n) => n > 0 && n < 100000);
+}
+
+// ── Haupt-Prüfung (deterministisch) ─────────────────────────────────────────
+
+export type ProduktKontext = {
+  /** Freitext, aus dem Maße/Anzahl des Produkts gezogen werden (facts.dimensions + Titel). */
+  massText: string;
+  produktName: string;
+  eigeneMarke: string | null;
+};
+
+export function pruefeMasseUndAnzahl(keyword: string, ctx: ProduktKontext): string | null {
+  const produktMasse = extractMasse(ctx.massText);
+  const kwMasse = extractMasse(keyword);
+  if (produktMasse.length > 0 && kwMasse.length > 0) {
+    const fremd = kwMasse.find((k) => !massGedeckt(k, produktMasse));
+    if (fremd) {
+      const fmt = (m: Mass) => (m.b !== undefined ? `${m.a}×${m.b} ${m.einheit}` : `${m.a} ${m.einheit}`);
+      return `Maß weicht ab: ${fmt(fremd)} (Produkt: ${produktMasse.map(fmt).join(", ")})`;
+    }
+  }
+
+  const produktAnzahlen = extractAnzahlen(ctx.massText);
+  const kwAnzahlen = extractAnzahlen(keyword);
+  if (produktAnzahlen.length > 0 && kwAnzahlen.length > 0) {
+    const fremd = kwAnzahlen.find((n) => !produktAnzahlen.includes(n));
+    if (fremd !== undefined) return `Anzahl weicht ab: ${fremd} Stück (Produkt: ${produktAnzahlen.join("/")})`;
+  }
+  return null;
+}
+
+// ── Marken-Erkennung (LLM, Code erzwingt) ────────────────────────────────────
+
+export async function erkenneMarkenKeywords(
+  keywords: string[],
+  ctx: ProduktKontext,
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (keywords.length === 0) return out;
+  const { provider } = resolveRecipe("keywords.brands");
+  if (provider.name === "mock") return out; // ohne Key keine Marken-Regel — nie raten bei Ausschlüssen
+
+  // Eigene Marke deterministisch (Wort-Grenze), bevor das LLM ran muss
+  if (ctx.eigeneMarke) {
+    const re = new RegExp(`(^|\\s)${ctx.eigeneMarke.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\s|$)`);
+    for (const kw of keywords) if (re.test(kw.toLowerCase())) out.set(kw.toLowerCase(), `eigene Marke: ${ctx.eigeneMarke}`);
+  }
+
+  const offen = keywords.filter((k) => !out.has(k.toLowerCase()));
+  // Batches, damit auch große Listen (500+) durchlaufen
+  for (let i = 0; i < offen.length; i += 250) {
+    const batch = offen.slice(i, i + 250);
+    const res = await generateForRecipe("keywords.brands", {
+      system:
+        "Du erkennst Marken-Suchbegriffe in Amazon-Keyword-Listen (DE). Ein Marken-Keyword enthält einen Marken-/Herstellernamen " +
+        "(z. B. ‚nuk schnuller', ‚wmf topf'). KEINE Marken sind Gattungsbegriffe, Materialien, Maße. Antworte NUR mit JSON.",
+      messages: [
+        {
+          role: "user",
+          content: `Produkt: ${ctx.produktName}\nKeywords:\n${batch.join("\n")}\n\nGib die Marken-Keywords zurück:\n{"marken": [{"keyword": "exakt wie in der Liste", "marke": "erkannter Markenname"}]}`,
+        },
+      ],
+      maxTokens: 4000,
+      temperature: 0,
+    });
+    const parsed = parseLlmJson<{ marken?: Array<{ keyword?: string; marke?: string }> }>(res.text);
+    const imBatch = new Set(batch.map((k) => k.toLowerCase()));
+    for (const m of parsed.marken ?? []) {
+      const kw = String(m.keyword ?? "").toLowerCase().trim();
+      // Code erzwingt: nur Keywords, die wirklich in der Liste stehen
+      if (kw && imBatch.has(kw) && m.marke) out.set(kw, `Marke: ${String(m.marke).trim()}`);
+    }
+  }
+  return out;
+}
+
+/**
+ * Komplettlauf über eine Keyword-Liste: deterministische Regeln + Marken-LLM.
+ * Liefert je Keyword den Ausschluss-Grund oder null (relevant).
+ */
+export async function pruefeRelevanz(keywords: string[], ctx: ProduktKontext): Promise<RelevanzUrteil[]> {
+  const marken = await erkenneMarkenKeywords(keywords, ctx);
+  return keywords.map((kw) => ({
+    keyword: kw,
+    grund: marken.get(kw.toLowerCase()) ?? pruefeMasseUndAnzahl(kw, ctx),
+  }));
+}

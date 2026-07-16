@@ -36,7 +36,7 @@ export default async function BriefsPage({ params }: { params: Promise<{ id: str
     backendKeywords: (latest("backend_keywords")?.text as string) ?? "",
   };
 
-  const kws = await db.query.keywords.findMany({ where: eq(schema.keywords.productId, id) });
+  const kws = (await db.query.keywords.findMany({ where: eq(schema.keywords.productId, id) })).filter((k) => !k.ausgeschlossen);
   const primaryKeywords = kws.filter((k) => k.tier === "primary").map((k) => k.keyword);
   const insights = await db.query.reviewInsights.findFirst({
     where: eq(schema.reviewInsights.productId, id),
