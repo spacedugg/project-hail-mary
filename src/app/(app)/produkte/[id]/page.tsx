@@ -6,6 +6,7 @@ import { saveKeywords, deriveKeywordsFromSov, generateContent, uploadCerebro, sc
 import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
+import { AsinChips } from "@/components/asin-chips";
 import { IconUpload, IconCheck, IconSearch, IconReviews, IconContent, IconEuro } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
@@ -360,10 +361,11 @@ export default async function ProductPage({
             right={insights ? <span className="pill pill-good">✓ analysiert · {insights.confidence}</span> : undefined}
           />
 
-          <form action={scrapeReviewsAction} className="mt-4 flex flex-wrap items-center gap-2">
+          {/* Chip-Eingabe (D95): Haupt-ASIN vorbelegt (entfernbar), Wettbewerber per Leertaste/Komma als Chips */}
+          <form action={scrapeReviewsAction} className="mt-4 flex flex-wrap items-start gap-2">
             <input type="hidden" name="productId" value={product.id} />
-            <input name="competitorAsins" placeholder="Optional: Wettbewerber-ASINs" className={`${input} flex-1`} />
-            <SubmitButton className="btn-dark" disabled={!product.asin} pendingLabel="Scrapt Reviews…" progress>
+            <AsinChips name="asins" mainAsin={product.asin} />
+            <SubmitButton className="btn-dark flex-none" disabled={!product.asin} pendingLabel="Scrapt Reviews…" progress>
               {scrape ? "Neu scrapen" : "1 · Reviews scrapen"}
             </SubmitButton>
           </form>

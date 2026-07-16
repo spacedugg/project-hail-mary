@@ -640,12 +640,20 @@ export async function deleteKeywordBasis(formData: FormData) {
  */
 export async function scrapeReviewsAction(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
-  const competitorAsins = String(formData.get("competitorAsins") ?? "")
-    .split(/[\s,;]+/).filter(Boolean);
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return;
-  const asins = [product.asin, ...competitorAsins].filter(Boolean) as string[];
+
+  // Chip-Eingabe (D95): `asins` ist die KOMPLETTE Liste — die Haupt-ASIN ist
+  // als Chip vorbelegt (Default mit dabei), kann aber bewusst entfernt werden.
+  // Fallback `competitorAsins` (altes Feld): dort kam die Haupt-ASIN dazu.
+  const chipListe = String(formData.get("asins") ?? "").split(/[\s,;]+/).filter(Boolean);
+  const asins = chipListe.length
+    ? chipListe
+    : ([product.asin, ...String(formData.get("competitorAsins") ?? "").split(/[\s,;]+/).filter(Boolean)].filter(Boolean) as string[]);
+  if (asins.length === 0) {
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Review-Scrape: keine ASIN angegeben — mindestens einen ASIN-Chip stehen lassen.")}#reviews`);
+  }
 
   // Redundanz-Guard (D81): identische ASIN-Menge, jünger als 24 h → kein
   // Doppel-Scrape derselben Daten; neue ASINs oder Wartezeit schalten frei.
