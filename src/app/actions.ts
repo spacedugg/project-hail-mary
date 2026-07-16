@@ -599,6 +599,36 @@ export async function uploadCerebro(formData: FormData) {
   redirect(`/produkte/${productId}?hinweis=${encodeURIComponent(`Keyword-Basis ${uebernommen > 0 ? "zusammengeführt" : "erstellt"}: ${keywordCount} Keywords, davon ${aussortiert} als irrelevant aussortiert (unten prüfbar).${mergeInfo} ${sovInfo}`)}`);
 }
 
+/**
+ * Keyword-Basis löschen (D94, Nutzer-Vorgabe): das bewusste Gegenstück zur
+ * Zusammenführung (D93). Entfernt alle Upload-Keywords des Produkts UND die
+ * zugehörigen Cerebro-Uploads (inkl. SOV-Audit — es stammt aus derselben
+ * Datei, ein Geister-Audit ohne Basis wäre unehrlich). Manuelle Keywords
+ * bleiben erhalten. Alles per neuem Upload wiederherstellbar.
+ */
+export async function deleteKeywordBasis(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const db = await getDb();
+  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  if (!product) return;
+
+  const zuLoeschen = await db.query.keywords.findMany({
+    where: and(eq(schema.keywords.productId, productId), eq(schema.keywords.source, "cerebro")),
+  });
+  await db.delete(schema.keywords).where(and(eq(schema.keywords.productId, productId), eq(schema.keywords.source, "cerebro")));
+
+  const uploads = await db.query.reportUploads.findMany({
+    where: and(eq(schema.reportUploads.brandId, product.brandId), eq(schema.reportUploads.reportType, "cerebro")),
+  });
+  const eigene = uploads.filter((u) => (u.parsed as { productId?: string } | null)?.productId === productId);
+  for (const u of eigene) {
+    await db.delete(schema.reportUploads).where(eq(schema.reportUploads.id, u.id));
+  }
+
+  revalidatePath(`/produkte/${productId}`);
+  redirect(`/produkte/${productId}?hinweis=${encodeURIComponent(`Keyword-Basis gelöscht: ${zuLoeschen.length} Keywords und ${eigene.length} Upload(s) inkl. SOV-Audit entfernt. Manuelle Keywords bleiben. Neuer Upload startet eine frische Basis.`)}`);
+}
+
 // ── Review-Insights via Apify (Neubau der defekten temoa-os-Variante) ────────
 
 /**

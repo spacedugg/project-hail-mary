@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { saveKeywords, deriveKeywordsFromSov, generateContent, uploadCerebro, scrapeReviewsAction, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc, toggleKeywordRelevanz } from "@/app/actions";
+import { saveKeywords, deriveKeywordsFromSov, generateContent, uploadCerebro, scrapeReviewsAction, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
@@ -316,6 +316,20 @@ export default async function ProductPage({
                     </li>
                   ))}
                 </ul>
+              </details>
+            )}
+            {/* Basis löschen (D94): bewusstes Gegenstück zur Zusammenführung — zweistufig statt Sofort-Klick */}
+            {kws.some((k) => k.source === "cerebro") && (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs text-muted hover:text-bad">Basis komplett löschen …</summary>
+                <form action={deleteKeywordBasis} className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-background p-3">
+                  <input type="hidden" name="productId" value={product.id} />
+                  <p className="min-w-0 flex-1 text-[11px] text-muted">
+                    Entfernt alle {kws.filter((k) => k.source === "cerebro").length} Upload-Keywords dieses Produkts samt SOV-Audit —
+                    manuelle Keywords bleiben. Danach startet der nächste Upload eine frische Basis (statt zusammenzuführen).
+                  </p>
+                  <SubmitButton className="btn-ghost flex-none text-xs !text-bad" pendingLabel="Löscht Basis…">Ja, Basis löschen</SubmitButton>
+                </form>
               </details>
             )}
             <details className="mt-3" open={kws.length > 0 && kws.every((k) => k.source === "manual")}>
