@@ -123,13 +123,16 @@ JSON: {"title": "...", "rationale": [{"part": "<Bestandteil>", "source": "<Herle
       return `${ctx}
 
 AUFGABE: Schreibe genau ${RULES.bullets.count} Bullet Points.
-REGELN (knowledge/content/bullets.md, Ausschöpfungs-Prinzip 07/2026):
+REGELN (knowledge/content/bullets.md + Blog 07/2026):
 - Jeder Bullet: HEADLINE IN VERSALIEN (3–5 Wörter) + Doppelpunkt + max. 3 Sätze.
+- BENEFIT ZUERST (erste 5–8 Wörter): die Headline IST eine kurze Benefit-Aussage, NIE ein Feature-Name („BLEIBT JAHRELANG SCHARF", nicht „GEHÄRTETER EDELSTAHL"). Kunden kaufen, was Features ihnen bringen.
+- Satzbau je Bullet: Benefit-Aussage → Feature als Beleg im selben Gedanken → Konkretes hinten dran (Material, Maß, Prüfnorm, Garantie oder Use Case).
+- DREI JOBS je Bullet: einen wahrscheinlichen Einwand entkräften + einen konkreten Use Case bestätigen + ein Secondary Keyword NATÜRLICH unterbringen. Keyword-Stapeln auf Kosten der Lesbarkeit verliert alle drei — Kunden scannen in 2 Sekunden.
 - BUDGET AUSNUTZEN: Ziel ≥${RULES.bullets.utilizationMinBytes} Bytes pro Bullet, hartes Max ${RULES.bullets.hardMaxChars} Zeichen — so viel Substanz wie möglich, kein Füllwort-Padding.
 - Slot-Logik: 1 HOOK (stärkster USP) · 2 PROBLEM→BENEFIT (häufigster Pain Point!) · 3 TRUST (Material/Norm mit Beleg) · 4 USAGE · 5 CLOSE (Lieferumfang/Erwartungsmanagement). Häufigster Pain Point darf nach vorn rücken.
-- Benefit vor Feature. Jede USP aus dem USP-SET genau EINMAL über alle Bullets. Keine Emojis.
+- Jede USP aus dem USP-SET genau EINMAL über alle Bullets. Keine Emojis.
 - SECONDARY-Keywords natürlich verteilen: ${kw.secondary.join(", ")}
-- BEGRÜNDUNG: pro Bullet 1 Eintrag — welcher Slot, welcher Pain Point/USP/Keyword-Beleg dahintersteht.
+- BEGRÜNDUNG: pro Bullet 1 Eintrag — welcher Slot, welcher Einwand/Use Case/Pain Point/USP/Keyword-Beleg dahintersteht.
 JSON: {"bullets": ["...", "...", "...", "...", "..."], "rationale": [{"part": "<Headline>", "source": "<Slot + Herleitung>"}]}`;
     case "highlights":
       return `${ctx}

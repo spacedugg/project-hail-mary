@@ -1,6 +1,6 @@
 # Bullet Points — kanonische SPEC + RECIPE (DE)
 
-> Abgeglichen aus: temoa-os `buildPrompt.js` (Slot-Logik, Bytes), Blog 25 (Käuferfragen zuerst) + Blog 06/07/15, seo-os Scorecard, sales-room Bullet-Presets (13 „Vorher"-Issues), marketplaceadpros (RUFUS-3-Fragen), temoa-audit Brand-Voice.
+> Abgeglichen aus: temoa-os `buildPrompt.js` (Slot-Logik, Bytes), Blog 25 (Käuferfragen zuerst) + Blog 06/07/15, seo-os Scorecard, sales-room Bullet-Presets (13 „Vorher"-Issues), marketplaceadpros (RUFUS-3-Fragen), temoa-audit Brand-Voice, **Blog Bullets/Backend 07/2026 (knowledge/sources/blog-bullets-backend-2026-07.md)**.
 
 ## SPEC (hart, deterministisch prüfbar)
 
@@ -28,6 +28,10 @@ Default-Slots (temoa-os), jeder beantwortet eine RUFUS-Frage (marketplaceadpros)
 
 Weitere Recipe-Regeln:
 - **Benefit vor Feature** — Feature ist der Beleg, Nutzen die Aussage (Blog, sales-room-Presets: „Feature-first statt Benefit-first" ist Top-Issue).
+- **Benefit in die ersten 5–8 Wörter** (Blog 07/2026): die VERSALIEN-Headline IST diese kurze Benefit-Aussage — nie ein Feature-Name („BLEIBT JAHRELANG SCHARF", nicht „GEHÄRTETER EDELSTAHL"). Kunden scannen; Titel/Hauptbild haben schon geklickt, die Bullets bestätigen den Kauf oder schicken zurück in die Suche.
+- **Benefit + Feature im selben Satz, Konkretes hinten dran** (Blog 07/2026): nach der Benefit-Aussage das Feature als Beleg, am Ende harte Fakten — Material, Maß, Prüfnorm, Garantie oder Use Case. Muster: „Bleibt jahrelang scharf im täglichen Einsatz. Gehärteter Edelstahl mit dreifach geschliffener Klinge. 20 cm Klinge. 10 Jahre Garantie."
+- **Drei Jobs je Bullet** (Blog 07/2026): jeder Bullet entkräftet einen wahrscheinlichen Einwand, bestätigt einen konkreten Use Case UND bringt ein Secondary Keyword natürlich unter — für Kunden (Kauf-Fragen), Algorithmus (Keyword-Einordnung) und Rufus (Use Case). Keyword-Stapeln auf Kosten der Lesbarkeit verliert alle drei.
+- **Zeichenlimit ist kategorieabhängig** (Blog 07/2026) — unser hartes Max (500 Zeichen) ist die konservative Obergrenze; das Prinzip (Benefit → Feature → Konkretes) gilt in jeder Kategorie.
 - **Kundensprache übernehmen:** Formulierungen nah an `language_to_borrow_from_real_reviews` (verbatim-nah), vermeiden was in `language_to_avoid` steht.
 - **2-Sekunden-Scanbarkeit:** Headline allein muss die Botschaft tragen (sales-room-Preset-Issue).
 - Konkrete Zahlen statt Adjektive („hält 24 h kalt" statt „lange kalt").
