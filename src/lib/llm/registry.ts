@@ -24,12 +24,27 @@ export interface LlmProvider {
 
 // ── Provider: Anthropic ──────────────────────────────────────────────────────
 
+/**
+ * Sonnet 5 / Opus 4.7+ / Fable lehnen Sampling-Parameter (temperature/top_p/
+ * top_k) mit 400 ab — NIE mitsenden (D83; war die Wurzel der toten
+ * „Generieren"-Buttons in Produktion). Haiku 4.5 & ältere akzeptieren sie.
+ */
+const SAMPLING_UNSUPPORTED = /^claude-(sonnet-5|opus-4-[7-9]|fable|mythos)/;
+
 class AnthropicProvider implements LlmProvider {
   readonly name = "anthropic";
 
   async generate(model: string, req: LlmRequest): Promise<LlmResponse> {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY fehlt (Env).");
+
+    const body: Record<string, unknown> = {
+      model,
+      system: req.system,
+      messages: req.messages,
+      max_tokens: req.maxTokens ?? 2000,
+    };
+    if (!SAMPLING_UNSUPPORTED.test(model)) body.temperature = req.temperature ?? 0.4;
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -38,13 +53,7 @@ class AnthropicProvider implements LlmProvider {
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
       },
-      body: JSON.stringify({
-        model,
-        system: req.system,
-        messages: req.messages,
-        max_tokens: req.maxTokens ?? 2000,
-        temperature: req.temperature ?? 0.4,
-      }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
     const data = (await res.json()) as { content: Array<{ type: string; text?: string }> };
@@ -92,6 +101,7 @@ export const RECIPE_MODELS: Record<string, { provider: string; model: string }> 
   "listing.qa": { provider: "anthropic", model: "claude-sonnet-5" },
   "reviews.pain-points": { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
   "listing.deep-audit": { provider: "anthropic", model: "claude-sonnet-5" },
+  "listing.scrape": { provider: "anthropic", model: "claude-sonnet-5" },
   "keywords.filter": { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
   "facts.extract": { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
 };

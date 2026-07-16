@@ -138,7 +138,7 @@ export async function extractFeeConfigFromPdf(pdfBase64: string, current: FeeCon
     body: JSON.stringify({
       model,
       max_tokens: 4000,
-      temperature: 0,
+      // KEIN temperature: Sonnet 5 lehnt Sampling-Parameter mit 400 ab (D83)
       messages: [
         {
           role: "user",
