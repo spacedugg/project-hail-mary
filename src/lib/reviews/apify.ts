@@ -14,7 +14,8 @@ import type { ReviewInsightsPayload } from "@/db/schema";
  * läuft der Rest weiter und die Lücke wird als Notiz ausgewiesen.
  */
 
-const ACTOR = "axesso_data~amazon-reviews-scraper";
+// Per Env austauschbar (D84) — Achtung: ein anderer Actor braucht i. d. R. auch ein anderes Input-Schema
+const ACTOR = process.env.APIFY_REVIEWS_ACTOR ?? "axesso_data~amazon-reviews-scraper";
 
 export type RawReview = { asin: string; rating: number; title: string; body: string };
 

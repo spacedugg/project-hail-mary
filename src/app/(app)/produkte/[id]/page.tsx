@@ -140,7 +140,7 @@ export default async function ProductPage({
             right={
               <>
                 {snapshot && <span className="pill pill-good">✓ {snapshot.createdAt.toLocaleDateString("de-DE")}</span>}
-                {snapshot && ["apify", "anthropic"].includes(snapshot.source) && Date.now() - snapshot.createdAt.getTime() < 24 * 60 * 60 * 1000 ? (
+                {snapshot && ["apify", "anthropic", "crawler"].includes(snapshot.source) && Date.now() - snapshot.createdAt.getTime() < 24 * 60 * 60 * 1000 ? (
                   <span className="text-[11px] text-muted">Stand von heute — neu laden ab morgen</span>
                 ) : (
                   <form action={importListingFromAmazon}>
