@@ -14,6 +14,28 @@ const norm = (s: string) => s.toLowerCase();
 const trifft = (q: string, ...felder: Array<string | undefined>) =>
   felder.some((f) => f && norm(f).includes(q));
 
+/** Textmarker (D90): der Suchbegriff wird in JEDEM Treffer-Feld gehighlightet — das Auge landet sofort. */
+function Mark({ text, q }: { text: string; q: string }) {
+  if (!q || !text) return <>{text}</>;
+  const lower = norm(text);
+  const parts: React.ReactNode[] = [];
+  let i = 0;
+  let idx = lower.indexOf(q);
+  let key = 0;
+  while (idx !== -1) {
+    if (idx > i) parts.push(text.slice(i, idx));
+    parts.push(
+      <mark key={key++} className="rounded-sm bg-yellow-200 px-0.5 font-semibold text-inherit dark:bg-yellow-600/60">
+        {text.slice(idx, idx + q.length)}
+      </mark>,
+    );
+    i = idx + q.length;
+    idx = lower.indexOf(q, i);
+  }
+  parts.push(text.slice(i));
+  return <>{parts}</>;
+}
+
 function SuchFeld({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
   return (
     <input
@@ -52,17 +74,17 @@ export function BerichteSuche({ berichte }: { berichte: BerichtEintrag[] }) {
           <tbody>
             {gefiltert.map((b) => (
               <tr key={b.name} className="border-b border-hair align-top last:border-0">
-                <td className="py-2 pr-3 font-medium">{b.name}</td>
+                <td className="py-2 pr-3 font-medium"><Mark text={b.name} q={query} /></td>
                 <td className="pr-3">
                   <span className={`pill ${b.status === "Pflicht" ? "pill-bad" : b.status === "empfohlen" ? "pill-warn" : "pill-neutral"}`}>{b.status}</span>
                 </td>
                 <td className="pr-3 whitespace-nowrap">
-                  <span className={`pill ${b.plattform === "Seller Central" ? "chip-violet" : b.plattform === "Ads-Konsole" ? "chip-teal" : b.plattform === "Helium 10" ? "chip-pink" : "pill-neutral"}`}>{b.plattform}</span>
+                  <span className={`pill ${b.plattform === "Seller Central" ? "chip-violet" : b.plattform === "Ads-Konsole" ? "chip-teal" : b.plattform === "Helium 10" ? "chip-pink" : "pill-neutral"}`}><Mark text={b.plattform} q={query} /></span>
                 </td>
-                <td className="pr-3 text-xs text-muted">{b.quelle}</td>
-                <td className="pr-3 text-xs">{b.turnus}</td>
-                <td className="pr-3 text-xs">{b.liefert}</td>
-                <td className="text-xs text-muted">{b.imTool}</td>
+                <td className="pr-3 text-xs text-muted"><Mark text={b.quelle} q={query} /></td>
+                <td className="pr-3 text-xs"><Mark text={b.turnus} q={query} /></td>
+                <td className="pr-3 text-xs"><Mark text={b.liefert} q={query} /></td>
+                <td className="text-xs text-muted"><Mark text={b.imTool} q={query} /></td>
               </tr>
             ))}
             {gefiltert.length === 0 && (
@@ -116,11 +138,11 @@ export function KpiSuche({ gruppen, kombi }: { gruppen: KpiGruppe[]; kombi: Komb
               <tbody>
                 {treffer.map((e, i) => (
                   <tr key={`${e.gruppe}-${e.name}-${i}`} className="border-b border-hair align-top last:border-0">
-                    <td className="py-2 pr-3 font-medium">{e.name}</td>
-                    <td className="pr-3 text-neutral-700 dark:text-neutral-300">{e.formel}{e.hinweis && <span className="block text-xs text-muted">{e.hinweis}</span>}</td>
-                    <td className="pr-3 text-xs">{e.gruppe}</td>
-                    <td className="pr-3 text-xs text-muted">{e.quelle}</td>
-                    <td className="font-mono text-[11px] text-muted">{e.code}</td>
+                    <td className="py-2 pr-3 font-medium"><Mark text={e.name} q={query} /></td>
+                    <td className="pr-3 text-neutral-700 dark:text-neutral-300"><Mark text={e.formel} q={query} />{e.hinweis && <span className="block text-xs text-muted"><Mark text={e.hinweis} q={query} /></span>}</td>
+                    <td className="pr-3 text-xs"><Mark text={e.gruppe} q={query} /></td>
+                    <td className="pr-3 text-xs text-muted"><Mark text={e.quelle} q={query} /></td>
+                    <td className="font-mono text-[11px] text-muted"><Mark text={e.code} q={query} /></td>
                   </tr>
                 ))}
                 {treffer.length === 0 && (
