@@ -194,7 +194,13 @@ export async function extractInsights(
       maxTokens: 4000,
       temperature: 0,
     });
-    core = parseLlmJson(res.text);
+    // Struktur ERZWINGEN statt blind speichern (D103): kaputte/abweichende
+    // LLM-Antworten crashten das Findings-Dashboard beim Rendern.
+    const { normalisiereInsights } = await import("./insights");
+    core = normalisiereInsights(parseLlmJson(res.text));
+    if (core.painPoints.length === 0 && core.buyingTriggers.length === 0) {
+      throw new Error("Die Analyse lieferte kein verwertbares Ergebnis (keine Findings im Antwort-JSON) — bitte erneut starten.");
+    }
   }
 
   const confidence = reviews.length >= 60 ? "high" : reviews.length >= 20 ? "medium" : "low";

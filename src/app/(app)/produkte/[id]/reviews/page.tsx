@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { IconReviews, IconCheck, IconContent } from "@/components/icons";
+import { normalisierePayload } from "@/lib/reviews/insights";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,9 @@ export default async function ReviewDashboard({ params }: { params: Promise<{ id
     );
   }
 
-  const p = insight.payload;
+  // Lese-Schutz (D103): auch ein kaputt gespeicherter Payload (ältere
+  // LLM-Antwort ohne erzwungene Struktur) darf die Seite nie crashen.
+  const p = normalisierePayload(insight.payload);
   const maxPain = Math.max(...p.painPoints.map((x) => x.frequencyPct ?? 0), 1);
   const maxTrig = Math.max(...p.buyingTriggers.map((x) => x.frequencyPct ?? 0), 1);
 
