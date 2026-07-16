@@ -457,12 +457,13 @@ export async function scrapeReviewsAction(formData: FormData) {
   }
 
   const { scrapeReviews } = await import("@/lib/reviews/apify");
-  const { scrapeProduct } = await import("@/lib/scrape/apifyProduct");
+  const { scrapeProductViaAnthropic } = await import("@/lib/scrape/anthropicProduct");
 
   // Echte Amazon-Gesamtzahlen parallel zum Review-Scrape holen (D74): die
   // Stichprobe (je Klasse gedeckelt) muss neben der Wahrheit stehen.
+  // Über die Anthropic-API (D82) — braucht keine Apify-Actor-Freigabe.
   const totalsPromise = product.asin
-    ? scrapeProduct(product.asin, product.marketplace, { timeoutSec: 50 }).catch(() => null)
+    ? scrapeProductViaAnthropic(product.asin, product.marketplace, { timeoutSec: 50 }).catch(() => null)
     : Promise.resolve(null);
 
   let reviews: Array<{ asin: string; rating: number; title: string; body: string }> = [];
@@ -842,20 +843,28 @@ export async function importListingFromAmazon(formData: FormData) {
     where: eq(schema.listingSnapshots.productId, productId),
     orderBy: desc(schema.listingSnapshots.createdAt),
   });
-  if (lastSnap && lastSnap.source === "apify" && Date.now() - lastSnap.createdAt.getTime() < 24 * 60 * 60 * 1000) {
+  if (lastSnap && ["apify", "anthropic"].includes(lastSnap.source) && Date.now() - lastSnap.createdAt.getTime() < 24 * 60 * 60 * 1000) {
     redirect(`/produkte/${productId}?hinweis=${encodeURIComponent("Das Listing wurde in den letzten 24 h bereits geladen (Stand unten). Amazon-Änderungen sind frühestens morgen sinnvoll neu zu ziehen.")}`);
   }
 
-  // Fehler landen als Banner an der Seite, nie als Server-Fehlerseite (D78)
-  const { scrapeProduct } = await import("@/lib/scrape/apifyProduct");
-  let snap: Awaited<ReturnType<typeof scrapeProduct>>;
+  // Standard-Weg ist die Anthropic-API (D82, Nutzer-Vorgabe: kein Produkt-Actor);
+  // Apify bleibt als Env-Override (LISTING_IMPORT_PROVIDER=apify) erhalten.
+  // Fehler landen als Banner an der Seite, nie als Server-Fehlerseite (D78).
+  const useApify = process.env.LISTING_IMPORT_PROVIDER === "apify";
+  let snap: import("@/lib/scrape/apifyProduct").ProductSnapshot;
   try {
-    snap = await scrapeProduct(product!.asin!, product!.marketplace, { timeoutSec: 50 });
+    if (useApify) {
+      const { scrapeProduct } = await import("@/lib/scrape/apifyProduct");
+      snap = await scrapeProduct(product!.asin!, product!.marketplace, { timeoutSec: 50 });
+    } else {
+      const { scrapeProductViaAnthropic } = await import("@/lib/scrape/anthropicProduct");
+      snap = await scrapeProductViaAnthropic(product!.asin!, product!.marketplace, { timeoutSec: 50 });
+    }
   } catch (e) {
     redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Listing-Import: ${e instanceof Error ? e.message : String(e)}`)}`);
   }
   await db.insert(schema.listingSnapshots).values({
-    id: id(), productId, source: "apify",
+    id: id(), productId, source: useApify ? "apify" : "anthropic",
     title: snap!.title, bullets: snap!.bullets, description: snap!.description,
     imageUrls: snap!.imageUrls,
     reviewsTotal: snap!.reviewsTotal, ratingAvg: snap!.ratingAvg, ratingDist: snap!.ratingDist,
