@@ -517,22 +517,27 @@ export async function uploadCerebro(formData: FormData) {
   let keywordCount = 0, aussortiert = 0, hasCompetitors = false;
   try {
     // keepUnranked: für die Keyword-Basis zählen auch Keywords OHNE Ranking
+    // und OHNE Suchvolumen (SV 0 = Helium 10 kennt keins, D92)
     const alleRows = parseCerebroCsv(await file.text(), product.asin, { keepUnranked: true });
-    if (alleRows.length === 0) throw new Error("Keine Keyword-Zeilen mit Suchvolumen gefunden — ist das der Cerebro-Export?");
+    if (alleRows.length === 0) throw new Error("Keine Keyword-Zeilen gefunden — ist das der Cerebro-Export?");
     hasCompetitors = alleRows.some((r) => Object.keys(r.compRanks).length > 0);
 
+    // Das SOV-Audit ist Volumen-gewichtet und braucht Ränge — nur diese
+    // Teilmenge fließt hinein. ALLE anderen Zeilen bleiben Teil der Basis.
+    const fuerSov = (r: (typeof alleRows)[number]) =>
+      r.sv > 0 && (r.mainRank > 0 || Object.values(r.compRanks).some((x) => x > 0));
+
     if (hasCompetitors) {
-      const ranked = alleRows.filter((r) => r.mainRank > 0 || Object.values(r.compRanks).some((x) => x > 0));
-      audit = computeSovAudit(ranked, { price, mainAsin: product.asin });
+      audit = computeSovAudit(alleRows.filter(fuerSov), { price, mainAsin: product.asin });
     }
 
     // Keyword-Basis IMMER — mit Audit über das SOV-Tiering, sonst nach Suchvolumen.
-    // Unrankende Keywords fließen als `extra` mit ein (D91) — für die Basis
-    // sind gerade Keywords OHNE eigenes Ranking interessant.
+    // Zeilen, die das Audit ausklammert (kein Rang oder kein SV), fließen als
+    // `extra` mit ein (D91/D92) — Score 0 sortiert sie ehrlich ans Ende (Backend).
     let kandidaten: KeywordKandidat[];
     if (audit) {
       const unranked = alleRows
-        .filter((r) => !(r.mainRank > 0 || Object.values(r.compRanks).some((x) => x > 0)))
+        .filter((r) => !fuerSov(r))
         .map((r) => ({ keyword: r.keyword, sv: r.sv }));
       const { deriveKeywordTiers } = await import("@/lib/sov/tiering");
       kandidaten = deriveKeywordTiers(audit, unranked).tiered.map((k) => ({

@@ -188,7 +188,12 @@ export function parseCerebroCsv(
     const cols = parseCsvLine(line);
     const keyword = (cols[kwIdx] ?? "").trim();
     const sv = parseNum(cols[svIdx]);
-    if (!keyword || sv <= 0) continue;
+    if (!keyword) continue;
+    // SV 0/„-" heißt nur: Helium 10 kennt kein Volumen — die Zeile ist trotzdem
+    // ein echtes Keyword (Real-Export B0CLY13LNW: 56 von 266 Zeilen betroffen).
+    // Für die Keyword-BASIS behalten (keepUnranked); nur der SOV-Pfad ist
+    // Volumen-gewichtet und braucht sv > 0.
+    if (sv <= 0 && !opts.keepUnranked) continue;
 
     const compRanks: Record<string, number> = {};
     let mainRank = rankIdx >= 0 ? parseRank(cols[rankIdx]) : 0;

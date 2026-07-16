@@ -172,7 +172,7 @@ export const RECHENWERK: KpiGruppe[] = [
       { name: "Keyword-Sales → monatlich", formel: "Cerebro-KS (wöchentlich) × 4,36", quelle: "temoa-tools-beta WEEKLY_TO_MONTHLY", code: "src/lib/sov/audit.ts" },
       { name: "Opportunity-Score", formel: "Gap×0,45 + KS×0,25 + SV×0,15 + CPR-Leichtigkeit×0,15; Priorität ≥0,6 High / ≥0,35 Medium", quelle: "temoa-tools-beta", code: "src/lib/sov/audit.ts" },
       { name: "Umsatz-Korridor", formel: "Lücken-Potenzial × 20 % (low) / 60 % (base) / 95 % (high) — Korridor, keine Garantie", quelle: "temoa-tools-beta", code: "src/lib/sov/audit.ts" },
-      { name: "Keyword-Tiering", formel: "Rang = Suchvolumen × Cluster-Relevanzgewicht (Tiebreak Opportunity-Score); Schnitte: 1–3 primary → Titel, 4–13 secondary → Bullets, 14–18 tertiary → Beschreibung, Rest Backend; Brand-Alternatives ausgeschlossen (Fremdmarken-Verbot)", quelle: "D51 + Backend-Spec (Amazon-Policy)", code: "src/lib/sov/tiering.ts" },
+      { name: "Keyword-Tiering", formel: "Rang = Suchvolumen × Cluster-Relevanzgewicht (Tiebreak Opportunity-Score) — BERECHNET, unabhängig von der CSV-Zeilenfolge (Cerebro sortiert nach Competitor Performance Score); Schnitte: 1–3 primary → Titel, 4–13 secondary → Bullets, 14–18 tertiary → Beschreibung, Rest Backend; Brand-Alternatives ausgeschlossen (Fremdmarken-Verbot); Keywords ohne Suchvolumen (SV 0/‚-') bleiben erhalten und sortieren mit Score 0 ans Ende (Backend)", quelle: "D51/D92 + Backend-Spec (Amazon-Policy)", code: "src/lib/sov/tiering.ts" },
     ],
   },
   {
