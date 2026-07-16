@@ -227,7 +227,7 @@ export async function wipeAllDataAction(formData: FormData) {
   const { wipeAllBrandData } = await import("@/lib/demo/seed");
   await wipeAllBrandData(db);
   revalidatePath("/", "layout");
-  redirect(`/einstellungen?ok=${encodeURIComponent("Alle Marken und Daten gelöscht — Konten und Rechenwerk blieben erhalten.")}`);
+  redirect(`/einstellungen?ok=${encodeURIComponent("Alle Marken und Daten gelöscht — Konten und die Einstellungen unter Daten & Formeln blieben erhalten.")}`);
 }
 
 export async function seedDemoDataAction() {

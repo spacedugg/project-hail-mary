@@ -15,6 +15,101 @@ export type KpiEintrag = {
 
 export type KpiGruppe = { titel: string; eintraege: KpiEintrag[] };
 
+/**
+ * Berichte-Register (D85): WELCHE Berichte wir uns ziehen, wo man sie zieht
+ * und welche Kennzahlen sie liefern — der Überblick, der unnötige Berichte
+ * vermeidet. Kombinierte Kennzahlen (aus mehreren Berichten) stehen separat.
+ */
+export type BerichtEintrag = {
+  name: string;
+  status: "Pflicht" | "empfohlen" | "optional" | "geplant";
+  quelle: string; // wo ziehen (Seller Central / Helium 10 / …)
+  turnus: string;
+  liefert: string; // Kennzahlen direkt aus DIESEM Bericht
+  imTool: string; // wo er hochgeladen/genutzt wird
+};
+
+export const BERICHTE: BerichtEintrag[] = [
+  {
+    name: "Business Report (Verkäufe & Traffic)",
+    status: "Pflicht",
+    quelle: "Seller Central → Berichte → Geschäftsberichte → ‚Verkäufe und Besucherzahlen – Detailseite' (nach Datum)",
+    turnus: "je Periode — monatlich empfohlen, lückenlos",
+    liefert: "Umsatz, Bestellungen, Einheiten, Sitzungen, CVR, Einheiten-CVR, Buybox %, AOV",
+    imTool: "Marke → Berichte",
+  },
+  {
+    name: "Ads-/Kampagnenbericht (Sponsored Products)",
+    status: "Pflicht",
+    quelle: "Seller Central → Werbung → Berichte → Sponsored Products → Berichtstyp ‚Kampagne'",
+    turnus: "je Periode — Zeitraum deckungsgleich zum Business Report",
+    liefert: "Spend, PPC-Umsatz, ACoS, ROAS, CTR, CPC, PPC-CR, Impressionen, Ziel-ACoS (aus Portfolio-Namen)",
+    imTool: "Marke → Berichte",
+  },
+  {
+    name: "Search-Term-Report (Suchbegriffe)",
+    status: "empfohlen",
+    quelle: "Seller Central → Werbung → Berichte → Sponsored Products → Berichtstyp ‚Suchbegriff'",
+    turnus: "monatlich oder quartalsweise",
+    liefert: "Wasted Spend, Negativ-Kandidaten, N-Gram-Wurzeln, ASIN-Ziele ohne Conversion",
+    imTool: "Marke → Berichte",
+  },
+  {
+    name: "SQP (Search Query Performance)",
+    status: "empfohlen",
+    quelle: "Seller Central → Marken → Marken-Analysen → Suchanfragen-Leistung (braucht Markenregistrierung)",
+    turnus: "monatlich",
+    liefert: "Eure CTR/CVR vs. Markt, verlorene Käufe, Umsatzpotenzial je Suchanfrage",
+    imTool: "Marke → Berichte",
+  },
+  {
+    name: "Cerebro-Export (Helium 10)",
+    status: "optional",
+    quelle: "Helium 10 → Cerebro → eigene ASIN + Wettbewerber-ASINs → CSV-Export",
+    turnus: "je Listing-Projekt / bei Bedarf",
+    liefert: "SOV, Quick-Wins, Umsatzlücken, Opportunity-Matrix, Keyword-Tiering (primary→Titel …)",
+    imTool: "Produkt-Werkbank → SOV-Report",
+  },
+  {
+    name: "Flat-File-Kategorievorlage",
+    status: "optional",
+    quelle: "Seller Central → Katalog → Produkte per Upload hinzufügen → Vorlage der Kategorie",
+    turnus: "bei Amazon-Vorlagen-Änderung (jeweils NEUSTE Vorlage)",
+    liefert: "keine Kennzahl — Ziel-Format für upload-fertige Flat Files",
+    imTool: "Marke → Flat Files",
+  },
+  {
+    name: "Amazon-Gebühren-PDF",
+    status: "optional",
+    quelle: "Amazon-Ankündigungen/Hilfeseiten (Amazon verschickt Gebühren-Änderungen als PDF — keine öffentliche Tabellen-API)",
+    turnus: "bei Gebühren-Änderung",
+    liefert: "Verkaufsgebühr-Sätze, Lager- und Entsorgungs-Tabellen des Margen-Rechners",
+    imTool: "Einstellungen → Daten & Formeln (diese Seite)",
+  },
+  {
+    name: "Retouren-/Payments-Bericht",
+    status: "geplant",
+    quelle: "Seller Central → Berichte → Zahlungen bzw. Retouren",
+    turnus: "—",
+    liefert: "Retourenquote (steht NICHT im Business Report — deshalb bewusst noch keine Retourenquote im Cockpit, kein Platzhalter)",
+    imTool: "noch nicht integriert",
+  },
+];
+
+/** Kennzahlen, die erst aus der KOMBINATION mehrerer Quellen entstehen. */
+export type KombiKennzahl = { name: string; aus: string; formel: string };
+
+export const KOMBI_KENNZAHLEN: KombiKennzahl[] = [
+  { name: "TACoS", aus: "Ads-Bericht + Business Report", formel: "Spend (Ads) ÷ Gesamtumsatz (Business) × 100" },
+  { name: "PPC-Anteil", aus: "Ads-Bericht + Business Report", formel: "PPC-Orders (Ads) ÷ Bestellungen (Business) × 100" },
+  { name: "Organisch-Umsatz", aus: "Ads-Bericht + Business Report", formel: "max(0, Umsatz − PPC-Umsatz) — Näherung, kein Cent-Ledger" },
+  { name: "Organische CR", aus: "Ads-Bericht + Business Report", formel: "max(0, Bestellungen − PPC-Orders) ÷ Sitzungen × 100" },
+  { name: "ACoS/TACoS-Ampel", aus: "Ads-Bericht + Margen-Kalkulation (oder Hand-Marge)", formel: "Schwelle = Account-Marge (Hand) VOR Ø Break-even-ACoS der Produkt-Kalkulationen" },
+  { name: "Perioden-Diagnose", aus: "Business + Ads (+ SOV & SQP als Ursachen-Signale)", formel: "ln-Zerlegung Umsatz = Sitzungen × CVR × AOV + Quer-Abgleich der Module" },
+  { name: "Handlungs-Hebel (€)", aus: "Cerebro + Search-Term + Ads + SQP", formel: "je Handlung eigene Quelle: SOV-Korridor, Wasted Spend − ASIN-Anteil, Überspend über Ziel-ACoS, SQP-Potenzial" },
+  { name: "Review-Datenbasis", aus: "Produkt-Crawler/Scrape (kein Amazon-Bericht — ASIN reicht)", formel: "Amazon-Gesamtzahlen (reviewsCount/Ø/Verteilung) NEBEN der Scrape-Stichprobe (5×100 je Sterne-Klasse)" },
+];
+
 export const RECHENWERK: KpiGruppe[] = [
   {
     titel: "Business Report (Verkäufe & Traffic)",

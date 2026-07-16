@@ -567,7 +567,7 @@ export default async function ProductPage({
               </label>
               <div className="col-span-2 flex items-end justify-between gap-2 sm:col-span-2">
                 <SubmitButton className="btn-primary">Berechnen & speichern</SubmitButton>
-                <Link href="/rechenwerk" className="text-xs text-primary-strong underline">Formeln im Rechenwerk</Link>
+                <Link href="/rechenwerk" className="text-xs text-primary-strong underline">Formeln unter Daten & Formeln</Link>
               </div>
             </form>
           </details>

@@ -34,8 +34,8 @@ export default async function EinstellungenPage({
           <Link href="/rechenwerk" className="card group flex items-center gap-3 p-5">
             <span className="icon-chip chip-violet"><IconSearch /></span>
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold">Rechenwerk — wie das Tool rechnet</div>
-              <div className="text-xs text-muted">Alle KPI-Formeln mit Quelle, Content-Regeln, Amazon-Gebühren-Tabellen (live & austauschbar). Anti-Blackbox.</div>
+              <div className="text-sm font-semibold">Daten & Formeln — was wir ziehen, wie das Tool rechnet</div>
+              <div className="text-xs text-muted">Berichte-Register (welche Berichte, welche Kennzahlen daraus), alle KPI-Formeln mit Quelle, Content-Regeln, Gebühren-Tabellen (live & austauschbar).</div>
             </div>
             <span className="inline-flex items-center gap-1 text-xs font-medium text-primary-strong transition group-hover:gap-2">öffnen <IconArrowRight className="h-3.5 w-3.5" /></span>
           </Link>

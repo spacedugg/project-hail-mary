@@ -1,5 +1,5 @@
 import { OsShell } from "@/components/shell";
-import { RECHENWERK } from "@/lib/rechenwerk";
+import { RECHENWERK, BERICHTE, KOMBI_KENNZAHLEN } from "@/lib/rechenwerk";
 import { RULES } from "@/lib/validation/rules";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
@@ -34,11 +34,77 @@ export default async function RechenwerkPage() {
   return (
     <OsShell>
       <main className="w-full p-8">
-        <h1 className="page-title">Rechenwerk</h1>
+        <h1 className="page-title">Daten & Formeln</h1>
         <p className="page-sub">
-          Wie das Tool rechnet — jede Formel mit Quelle und Code-Ort, jede Regel, jede Gebühren-Tabelle.
-          Die Tabellen sind live: was hier steht, rechnet ab sofort. Damit bleibt das Tool nachvollziehbar statt Blackbox.
+          Welche Berichte wir uns ziehen, welche Kennzahlen daraus entstehen und wie jede Formel rechnet — mit Quelle und Code-Ort.
+          Die Gebühren-Tabellen sind live: was hier steht, rechnet ab sofort. Damit bleibt das Tool nachvollziehbar statt Blackbox.
         </p>
+
+        {/* Berichte-Register (D85): welche Berichte wir ziehen und was sie liefern */}
+        <section className="mt-8 card p-4">
+          <div className="flex items-center gap-2.5">
+            <span className="icon-chip chip-violet"><IconUpload /></span>
+            <div>
+              <h2 className="text-sm font-semibold">Berichte — was wir uns von Amazon ziehen</h2>
+              <p className="text-xs text-muted">Nur diese Berichte braucht das Tool. Alles andere ist unnötig.</p>
+            </div>
+          </div>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-hair text-left text-[11px] uppercase text-neutral-500">
+                  <th className="py-1 pr-3">Bericht</th><th className="pr-3">Priorität</th><th className="pr-3">Wo ziehen</th><th className="pr-3">Turnus</th><th className="pr-3">Liefert</th><th>Im Tool</th>
+                </tr>
+              </thead>
+              <tbody>
+                {BERICHTE.map((b) => (
+                  <tr key={b.name} className="border-b border-hair align-top last:border-0">
+                    <td className="py-2 pr-3 font-medium">{b.name}</td>
+                    <td className="pr-3">
+                      <span className={`pill ${b.status === "Pflicht" ? "pill-bad" : b.status === "empfohlen" ? "pill-warn" : "pill-neutral"}`}>{b.status}</span>
+                    </td>
+                    <td className="pr-3 text-xs text-muted">{b.quelle}</td>
+                    <td className="pr-3 text-xs">{b.turnus}</td>
+                    <td className="pr-3 text-xs">{b.liefert}</td>
+                    <td className="text-xs text-muted">{b.imTool}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-[11px] text-muted">
+            Listing-Inhalte, Bilder und Bewertungen brauchen KEINEN Bericht — die holt das Tool per Scrape, die ASIN reicht.
+          </p>
+        </section>
+
+        {/* Kombinierte Kennzahlen: entstehen erst aus mehreren Quellen */}
+        <section className="mt-3 card p-4">
+          <div className="flex items-center gap-2.5">
+            <span className="icon-chip chip-teal"><IconCheck /></span>
+            <div>
+              <h2 className="text-sm font-semibold">Kombinierte Kennzahlen — brauchen mehrere Quellen</h2>
+              <p className="text-xs text-muted">Fehlt eine der Quellen, fehlt die Kennzahl — das Tool zeigt dann den Nachlade-Hinweis statt einer Schätzung.</p>
+            </div>
+          </div>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-hair text-left text-[11px] uppercase text-neutral-500">
+                  <th className="py-1 pr-3">Kennzahl</th><th className="pr-3">Entsteht aus</th><th>Formel / Regel</th>
+                </tr>
+              </thead>
+              <tbody>
+                {KOMBI_KENNZAHLEN.map((k) => (
+                  <tr key={k.name} className="border-b border-hair align-top last:border-0">
+                    <td className="py-2 pr-3 font-medium">{k.name}</td>
+                    <td className="pr-3 text-xs">{k.aus}</td>
+                    <td className="text-xs text-neutral-700 dark:text-neutral-300">{k.formel}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
         {/* KPI-Register */}
         <section className="mt-8">
