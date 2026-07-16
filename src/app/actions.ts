@@ -514,13 +514,28 @@ export async function uploadCerebro(formData: FormData) {
 
   const { parseCerebroCsv, computeSovAudit } = await import("@/lib/sov/audit");
   let parseStatus = "ok", parseError: string | null = null, audit = null;
-  let keywordCount = 0, aussortiert = 0, hasCompetitors = false;
+  let keywordCount = 0, aussortiert = 0, hasCompetitors = false, uebernommen = 0;
   try {
     // keepUnranked: für die Keyword-Basis zählen auch Keywords OHNE Ranking
     // und OHNE Suchvolumen (SV 0 = Helium 10 kennt keins, D92)
     const alleRows = parseCerebroCsv(await file.text(), product.asin, { keepUnranked: true });
     if (alleRows.length === 0) throw new Error("Keine Keyword-Zeilen gefunden — ist das der Cerebro-Export?");
     hasCompetitors = alleRows.some((r) => Object.keys(r.compRanks).length > 0);
+
+    // Zusammenführung statt Ersetzen (D93, Nutzer-Vorgabe): eine bestehende
+    // Basis geht durch einen weiteren Upload NIE verloren. Keywords aus
+    // früheren Uploads, die in der NEUEN Datei fehlen, bleiben Teil der Basis
+    // (mit ihrem gespeicherten Suchvolumen). Identische Keywords doppeln sich
+    // nicht — die neue Datei gewinnt (frischere Daten). Löschen ist eine
+    // eigene, bewusste Aktion (deleteKeywordBasis).
+    const bestehend = await db.query.keywords.findMany({
+      where: and(eq(schema.keywords.productId, productId), eq(schema.keywords.source, "cerebro")),
+    });
+    const imFile = new Set(alleRows.map((r) => r.keyword.toLowerCase().trim()));
+    const uebernahme = bestehend
+      .filter((k) => !imFile.has(k.keyword.toLowerCase().trim()))
+      .map((k) => ({ keyword: k.keyword, sv: k.searchVolume ?? 0 }));
+    uebernommen = uebernahme.length;
 
     // Das SOV-Audit ist Volumen-gewichtet und braucht Ränge — nur diese
     // Teilmenge fließt hinein. ALLE anderen Zeilen bleiben Teil der Basis.
@@ -536,9 +551,10 @@ export async function uploadCerebro(formData: FormData) {
     // `extra` mit ein (D91/D92) — Score 0 sortiert sie ehrlich ans Ende (Backend).
     let kandidaten: KeywordKandidat[];
     if (audit) {
-      const unranked = alleRows
-        .filter((r) => !fuerSov(r))
-        .map((r) => ({ keyword: r.keyword, sv: r.sv }));
+      const unranked = [
+        ...alleRows.filter((r) => !fuerSov(r)).map((r) => ({ keyword: r.keyword, sv: r.sv })),
+        ...uebernahme,
+      ];
       const { deriveKeywordTiers } = await import("@/lib/sov/tiering");
       kandidaten = deriveKeywordTiers(audit, unranked).tiered.map((k) => ({
         keyword: k.keyword,
@@ -553,7 +569,7 @@ export async function uploadCerebro(formData: FormData) {
         gesehen.add(key);
         return true;
       });
-      kandidaten = svTiering(einmalig.map((r) => ({ keyword: r.keyword, sv: r.sv })));
+      kandidaten = svTiering([...einmalig.map((r) => ({ keyword: r.keyword, sv: r.sv })), ...uebernahme]);
     }
     keywordCount = kandidaten.length;
     aussortiert = await keywordBasisSchreiben(db, product, kandidaten);
@@ -579,7 +595,8 @@ export async function uploadCerebro(formData: FormData) {
   const sovInfo = hasCompetitors
     ? "SOV-Audit erstellt (Sichtbarkeit & Analyse)."
     : "Kein SOV-Audit — der Export enthält keine Wettbewerber-ASIN-Spalten (für SOV in Cerebro Wettbewerber mitexportieren).";
-  redirect(`/produkte/${productId}?hinweis=${encodeURIComponent(`Keyword-Basis erstellt: ${keywordCount} Keywords, davon ${aussortiert} als irrelevant aussortiert (unten prüfbar). ${sovInfo}`)}`);
+  const mergeInfo = uebernommen > 0 ? ` Zusammengeführt: ${uebernommen} Keywords aus früheren Uploads übernommen, Duplikate nur einmal.` : "";
+  redirect(`/produkte/${productId}?hinweis=${encodeURIComponent(`Keyword-Basis ${uebernommen > 0 ? "zusammengeführt" : "erstellt"}: ${keywordCount} Keywords, davon ${aussortiert} als irrelevant aussortiert (unten prüfbar).${mergeInfo} ${sovInfo}`)}`);
 }
 
 // ── Review-Insights via Apify (Neubau der defekten temoa-os-Variante) ────────

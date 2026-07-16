@@ -253,12 +253,15 @@ export default async function ProductPage({
               <input type="file" name="file" accept=".csv" required className="text-sm" />
               <input name="price" type="number" step="0.01" placeholder="Ø-Preis € (45)" className={`${input} w-36`} />
               <SubmitButton className="btn-primary" pendingLabel="Liest Export, filtert Relevanz…" progress>
-                {kws.some((k) => k.source === "cerebro") ? "Export neu hochladen" : "Keyword-Export hochladen"}
+                {kws.some((k) => k.source === "cerebro") ? "Weiteren Export dazuladen" : "Keyword-Export hochladen"}
               </SubmitButton>
             </form>
             <p className="mt-2 text-[11px] text-muted">
               Eine Datei, alles drin: Keyword-Basis entsteht immer (inkl. Relevanz-Filter — Marken, abweichende Maße/Anzahlen).
               Enthält der Export Wettbewerber-ASIN-Spalten, entsteht daraus zusätzlich das SOV-Audit — nichts wird doppelt hochgeladen.
+              {kws.some((k) => k.source === "cerebro") && (
+                <> Ein weiterer Upload ersetzt nichts: neue Datei und bestehende Basis werden zusammengeführt, identische Keywords erscheinen nur einmal.</>
+              )}
             </p>
             {sovUpload && kws.filter((k) => k.source === "cerebro").length === 0 && (
               <form action={deriveKeywordsFromSov} className="mt-3">
