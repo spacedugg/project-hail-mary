@@ -97,9 +97,9 @@ export async function saveKeywords(formData: FormData) {
     where: eq(schema.listingSnapshots.productId, productId),
     orderBy: desc(schema.listingSnapshots.createdAt),
   });
-  const { pruefeMasseUndAnzahl } = await import("@/lib/keywords/relevanz");
+  const { pruefeProduktAttribute } = await import("@/lib/keywords/relevanz");
   const ctx = {
-    massText: [product.facts.dimensions, snapshot?.title, product.name].filter(Boolean).join(" · "),
+    attributText: [product.facts.dimensions, snapshot?.title, product.name].filter(Boolean).join(" · "),
     produktName: product.name,
     eigeneMarke: null,
   };
@@ -108,7 +108,7 @@ export async function saveKeywords(formData: FormData) {
   const rows = lines.map((line, i) => {
     const [kw, vol] = line.split(/[;\t]/).map((s) => s?.trim());
     const tier = i < 3 ? "primary" : i < 13 ? "secondary" : i < 18 ? "tertiary" : "backend";
-    const grund = kw ? pruefeMasseUndAnzahl(kw, ctx) : null;
+    const grund = kw ? pruefeProduktAttribute(kw, ctx) : null;
     return {
       id: id(),
       productId,
@@ -447,7 +447,7 @@ async function keywordBasisSchreiben(
   const { pruefeRelevanz } = await import("@/lib/keywords/relevanz");
   const kandidaten = kandidatenListe.filter((k) => !manual.has(k.keyword.toLowerCase().trim()));
   const res = await pruefeRelevanz(kandidaten.map((k) => k.keyword), {
-    massText: [product.facts.dimensions, snapshot?.title, product.name].filter(Boolean).join(" · "),
+    attributText: [product.facts.dimensions, snapshot?.title, product.name].filter(Boolean).join(" · "),
     produktName: product.name,
     eigeneMarke: brand?.kind === "workbench" ? null : brand?.name ?? null,
   });
@@ -469,6 +469,17 @@ async function keywordBasisSchreiben(
       ausschlussGrund: manuell ? manuell.grund : autoGrund,
     };
   });
+
+  // Tiers NACH dem Relevanz-Filter vergeben (D91): Aussortierte (z. B.
+  // Marken-Keywords mit Top-Suchvolumen) verbrauchen keine primary-Plätze —
+  // sonst rutscht das Kopf-Keyword („krabbelmatte") fälschlich in secondary.
+  const tierAt = (i: number) =>
+    (i < 3 ? "primary" : i < 13 ? "secondary" : i < 18 ? "tertiary" : "backend") as KeywordKandidat["tier"];
+  let aktivIdx = 0;
+  for (const r of rows) {
+    if (!r.ausgeschlossen) r.tier = tierAt(aktivIdx++);
+  }
+
   if (rows.length) await db.insert(schema.keywords).values(rows);
   return rows.filter((r) => r.ausgeschlossen).length;
 }
@@ -515,11 +526,16 @@ export async function uploadCerebro(formData: FormData) {
       audit = computeSovAudit(ranked, { price, mainAsin: product.asin });
     }
 
-    // Keyword-Basis IMMER — mit Audit über das SOV-Tiering, sonst nach Suchvolumen
+    // Keyword-Basis IMMER — mit Audit über das SOV-Tiering, sonst nach Suchvolumen.
+    // Unrankende Keywords fließen als `extra` mit ein (D91) — für die Basis
+    // sind gerade Keywords OHNE eigenes Ranking interessant.
     let kandidaten: KeywordKandidat[];
     if (audit) {
+      const unranked = alleRows
+        .filter((r) => !(r.mainRank > 0 || Object.values(r.compRanks).some((x) => x > 0)))
+        .map((r) => ({ keyword: r.keyword, sv: r.sv }));
       const { deriveKeywordTiers } = await import("@/lib/sov/tiering");
-      kandidaten = deriveKeywordTiers(audit).tiered.map((k) => ({
+      kandidaten = deriveKeywordTiers(audit, unranked).tiered.map((k) => ({
         keyword: k.keyword,
         searchVolume: k.searchVolume,
         tier: k.tier as KeywordKandidat["tier"],

@@ -36,4 +36,21 @@ describe("deriveKeywordTiers", () => {
     const { tiered } = deriveKeywordTiers(audit([kw("a", 100, 1.0, "Core Category", 0.2), kw("b", 100, 1.0, "Core Category", 0.8)]));
     expect(tiered[0].keyword).toBe("b");
   });
+
+  it("unrankende Kopf-Keywords (extra, D91) werden per Score einsortiert — ‚krabbelmatte' wird primary", () => {
+    const { tiered } = deriveKeywordTiers(
+      audit([kw("krabbelmatte baby", 4400, 1.0), kw("spielmatte kinder", 3600, 1.0)]),
+      [{ keyword: "krabbelmatte", sv: 22000 }], // niemand rankt darauf — trotzdem Basis-Keyword Nr. 1
+    );
+    expect(tiered[0]).toMatchObject({ keyword: "krabbelmatte", tier: "primary" });
+  });
+
+  it("extra-Keywords dedupen gegen das Audit und Brand-Terme fliegen auch dort", () => {
+    const { tiered } = deriveKeywordTiers(
+      audit([kw("krabbelmatte", 22000, 1.0)]),
+      [{ keyword: "Krabbelmatte", sv: 22000 }, { keyword: "krabbelmatte konkurrenz alternative", sv: 9000 }],
+    );
+    expect(tiered.filter((k) => k.keyword.toLowerCase() === "krabbelmatte")).toHaveLength(1);
+    expect(tiered.some((k) => k.keyword.includes("alternative"))).toBe(false);
+  });
 });

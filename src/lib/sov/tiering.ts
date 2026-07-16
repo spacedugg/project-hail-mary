@@ -12,7 +12,7 @@
  *   Rest → Backend (inkl. „unsichtbarer" High-SV-Keywords ohne Ranking)
  */
 
-import type { SovAudit } from "./audit";
+import { clusterKeyword, relevanceWeight, type SovAudit } from "./audit";
 
 export type TieredKeyword = {
   keyword: string;
@@ -25,12 +25,34 @@ export type TieringResult = {
   excludedBrandTerms: string[]; // ausgeschlossen wegen Fremdmarken-Verdacht
 };
 
-export function deriveKeywordTiers(audit: SovAudit): TieringResult {
+/**
+ * `extra` (D91): Keywords OHNE Ranking (die das SOV-Formelwerk zu Recht
+ * ausklammert) gehören trotzdem in die Keyword-BASIS — sie werden mit
+ * demselben Score (SV × Cluster-Relevanzgewicht) einsortiert. So kann ein
+ * Kopf-Keyword wie „krabbelmatte" primary werden, auch wenn (noch) keine
+ * der ASINs darauf rankt.
+ */
+export function deriveKeywordTiers(
+  audit: SovAudit,
+  extra: Array<{ keyword: string; sv: number }> = [],
+): TieringResult {
   const excluded = audit.keywords.filter((k) => k.cluster === "Brand Alternatives");
-  const candidates = audit.keywords
-    .filter((k) => k.cluster !== "Brand Alternatives")
-    .map((k) => ({ ...k, score: k.sv * k.relevanceWeight }))
-    .sort((a, b) => b.score - a.score || b.oppScore - a.oppScore);
+  const bekannt = new Set(audit.keywords.map((k) => k.keyword.toLowerCase()));
+
+  const extraCandidates = extra
+    .filter((e) => !bekannt.has(e.keyword.toLowerCase()))
+    .map((e) => {
+      const cluster = clusterKeyword(e.keyword);
+      return { keyword: e.keyword, sv: e.sv, cluster, score: e.sv * relevanceWeight(cluster), oppScore: 0 };
+    })
+    .filter((e) => e.cluster !== "Brand Alternatives");
+
+  const candidates = [
+    ...audit.keywords
+      .filter((k) => k.cluster !== "Brand Alternatives")
+      .map((k) => ({ keyword: k.keyword, sv: k.sv, score: k.sv * k.relevanceWeight, oppScore: k.oppScore })),
+    ...extraCandidates,
+  ].sort((a, b) => b.score - a.score || b.oppScore - a.oppScore);
 
   const tierAt = (i: number): TieredKeyword["tier"] =>
     i < 3 ? "primary" : i < 13 ? "secondary" : i < 18 ? "tertiary" : "backend";

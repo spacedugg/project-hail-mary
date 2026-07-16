@@ -89,17 +89,67 @@ export function extractAnzahlen(text: string): number[] {
   return out.filter((n) => n > 0 && n < 100000);
 }
 
+// ── Farben & Formen (D91) ────────────────────────────────────────────────────
+
+/**
+ * Farbwort → Farbfamilie. Ton-Varianten (hellgrau/dunkelgrau) zählen zur
+ * selben Familie wie die Grundfarbe — konservativ, damit nichts fälschlich
+ * fliegt. Wort-Grenzen verhindern Treffer IN Wörtern.
+ */
+const FARB_FAMILIE: Record<string, string> = {
+  weiß: "weiß", weiss: "weiß", schwarz: "schwarz",
+  grau: "grau", hellgrau: "grau", dunkelgrau: "grau", anthrazit: "grau",
+  beige: "beige", creme: "beige", sand: "beige", natur: "natur",
+  braun: "braun", taupe: "braun",
+  rosa: "rosa", pink: "rosa", altrosa: "rosa",
+  rot: "rot", bordeaux: "rot", weinrot: "rot",
+  orange: "orange", terracotta: "orange",
+  gelb: "gelb", senf: "gelb", senfgelb: "gelb",
+  gold: "gold", silber: "silber",
+  grün: "grün", gruen: "grün", mint: "grün", salbei: "grün", oliv: "grün", khaki: "grün",
+  blau: "blau", hellblau: "blau", dunkelblau: "blau", navy: "blau", marine: "blau",
+  türkis: "türkis", tuerkis: "türkis", petrol: "türkis",
+  lila: "lila", violett: "lila", flieder: "lila",
+  bunt: "bunt", mehrfarbig: "bunt", regenbogen: "bunt",
+};
+
+/** Formwort → Form-Gruppe. eckig/rechteckig/quadratisch = EINE Gruppe (konservativ). */
+const FORM_GRUPPE: Record<string, string> = {
+  rund: "rund", kreisrund: "rund", kreis: "rund",
+  eckig: "eckig", rechteckig: "eckig", quadratisch: "eckig", viereckig: "eckig",
+  oval: "oval", halbrund: "halbrund",
+  sechseckig: "sechseckig", hexagon: "sechseckig", achteckig: "achteckig",
+  dreieckig: "dreieckig",
+};
+
+function extractAusWoerterbuch(text: string, buch: Record<string, string>): Set<string> {
+  const out = new Set<string>();
+  for (const wort of ` ${text.toLowerCase()} `.split(/[^a-zäöüß]+/)) {
+    const familie = buch[wort];
+    if (familie) out.add(familie);
+  }
+  return out;
+}
+
+export const extractFarben = (text: string) => extractAusWoerterbuch(text, FARB_FAMILIE);
+export const extractFormen = (text: string) => extractAusWoerterbuch(text, FORM_GRUPPE);
+
 // ── Haupt-Prüfung (deterministisch) ─────────────────────────────────────────
 
 export type ProduktKontext = {
-  /** Freitext, aus dem Maße/Anzahl des Produkts gezogen werden (facts.dimensions + Titel). */
-  massText: string;
+  /** Freitext, aus dem die Produkt-Attribute (Maße, Anzahl, Farbe, Form) gezogen werden — Fakten + Titel + Name. */
+  attributText: string;
   produktName: string;
   eigeneMarke: string | null;
 };
 
-export function pruefeMasseUndAnzahl(keyword: string, ctx: ProduktKontext): string | null {
-  const produktMasse = extractMasse(ctx.massText);
+/**
+ * Deterministische Attribut-Prüfung: Maß, Anzahl, Farbe, Form des Keywords
+ * gegen die bekannten Produkt-Attribute. Jede Regel filtert NUR, wenn das
+ * Produkt-Attribut bekannt ist (ehrlich passiv statt raten).
+ */
+export function pruefeProduktAttribute(keyword: string, ctx: ProduktKontext): string | null {
+  const produktMasse = extractMasse(ctx.attributText);
   const kwMasse = extractMasse(keyword);
   if (produktMasse.length > 0 && kwMasse.length > 0) {
     const fremd = kwMasse.find((k) => !massGedeckt(k, produktMasse));
@@ -109,11 +159,25 @@ export function pruefeMasseUndAnzahl(keyword: string, ctx: ProduktKontext): stri
     }
   }
 
-  const produktAnzahlen = extractAnzahlen(ctx.massText);
+  const produktAnzahlen = extractAnzahlen(ctx.attributText);
   const kwAnzahlen = extractAnzahlen(keyword);
   if (produktAnzahlen.length > 0 && kwAnzahlen.length > 0) {
     const fremd = kwAnzahlen.find((n) => !produktAnzahlen.includes(n));
     if (fremd !== undefined) return `Anzahl weicht ab: ${fremd} Stück (Produkt: ${produktAnzahlen.join("/")})`;
+  }
+
+  const produktFarben = extractFarben(ctx.attributText);
+  if (produktFarben.size > 0 && !produktFarben.has("bunt")) {
+    const kwFarben = extractFarben(keyword);
+    const fremd = [...kwFarben].find((f) => !produktFarben.has(f));
+    if (fremd) return `Farbe weicht ab: ${fremd} (Produkt: ${[...produktFarben].join("/")})`;
+  }
+
+  const produktFormen = extractFormen(ctx.attributText);
+  if (produktFormen.size > 0) {
+    const kwFormen = extractFormen(keyword);
+    const fremd = [...kwFormen].find((f) => !produktFormen.has(f));
+    if (fremd) return `Form weicht ab: ${fremd} (Produkt: ${[...produktFormen].join("/")})`;
   }
   return null;
 }
@@ -171,6 +235,6 @@ export async function pruefeRelevanz(keywords: string[], ctx: ProduktKontext): P
   const marken = await erkenneMarkenKeywords(keywords, ctx);
   return keywords.map((kw) => ({
     keyword: kw,
-    grund: marken.get(kw.toLowerCase()) ?? pruefeMasseUndAnzahl(kw, ctx),
+    grund: marken.get(kw.toLowerCase()) ?? pruefeProduktAttribute(kw, ctx),
   }));
 }

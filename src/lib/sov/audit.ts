@@ -90,7 +90,7 @@ export function clusterKeyword(kw: string): string {
 }
 
 /** Relevanz: Score je Cluster (script.js:1463) → Gewicht (1465) */
-function relevanceWeight(cluster: string): number {
+export function relevanceWeight(cluster: string): number {
   const score: Record<string, number> = {
     "Core Category": 5, "German Category": 4, "Problem / Solution": 3,
     "Usage Intent": 3, Longtail: 3, "Brand Alternatives": 2, "Discovery Terms": 2,
