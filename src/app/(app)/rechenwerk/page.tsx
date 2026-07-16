@@ -1,5 +1,6 @@
 import { OsShell } from "@/components/shell";
 import { RECHENWERK, BERICHTE, KOMBI_KENNZAHLEN } from "@/lib/rechenwerk";
+import { BerichteSuche, KpiSuche } from "@/components/register-suche";
 import { RULES } from "@/lib/validation/rules";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
@@ -49,32 +50,7 @@ export default async function RechenwerkPage() {
               <p className="text-xs text-muted">Nur diese Berichte braucht das Tool. Alles andere ist unnötig.</p>
             </div>
           </div>
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-hair text-left text-[11px] uppercase text-neutral-500">
-                  <th className="py-1 pr-3">Bericht</th><th className="pr-3">Priorität</th><th className="pr-3">Plattform</th><th className="pr-3">Wo ziehen</th><th className="pr-3">Turnus</th><th className="pr-3">Liefert</th><th>Im Tool</th>
-                </tr>
-              </thead>
-              <tbody>
-                {BERICHTE.map((b) => (
-                  <tr key={b.name} className="border-b border-hair align-top last:border-0">
-                    <td className="py-2 pr-3 font-medium">{b.name}</td>
-                    <td className="pr-3">
-                      <span className={`pill ${b.status === "Pflicht" ? "pill-bad" : b.status === "empfohlen" ? "pill-warn" : "pill-neutral"}`}>{b.status}</span>
-                    </td>
-                    <td className="pr-3 whitespace-nowrap">
-                      <span className={`pill ${b.plattform === "Seller Central" ? "chip-violet" : b.plattform === "Ads-Konsole" ? "chip-teal" : b.plattform === "Helium 10" ? "chip-pink" : "pill-neutral"}`}>{b.plattform}</span>
-                    </td>
-                    <td className="pr-3 text-xs text-muted">{b.quelle}</td>
-                    <td className="pr-3 text-xs">{b.turnus}</td>
-                    <td className="pr-3 text-xs">{b.liefert}</td>
-                    <td className="text-xs text-muted">{b.imTool}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <BerichteSuche berichte={BERICHTE} />
           <p className="mt-2 text-[11px] text-muted">
             Listing-Inhalte, Bilder und Bewertungen brauchen KEINEN Bericht — die holt das Tool per Scrape, die ASIN reicht.
           </p>
@@ -109,38 +85,13 @@ export default async function RechenwerkPage() {
           </div>
         </section>
 
-        {/* KPI-Register */}
+        {/* KPI-Register — durchsuchbar inkl. kombinierter Kennzahlen (D88) */}
         <section className="mt-8">
           <div className="flex items-center gap-2.5">
             <span className="icon-chip chip-violet"><IconSearch /></span>
             <h2 className="text-sm font-semibold">KPI- & Formel-Register</h2>
           </div>
-          <div className="stagger mt-3 space-y-3">
-            {RECHENWERK.map((g) => (
-              <details key={g.titel} className="card p-4">
-                <summary className="cursor-pointer text-sm font-semibold">{g.titel} <span className="ml-1 text-xs font-normal text-muted">· {g.eintraege.length} Größen</span></summary>
-                <div className="mt-3 overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-hair text-left text-[11px] uppercase text-neutral-500">
-                        <th className="py-1 pr-3">Größe</th><th className="pr-3">Formel / Regel</th><th className="pr-3">Quelle</th><th>Rechnet in</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {g.eintraege.map((e) => (
-                        <tr key={e.name} className="border-b border-hair align-top last:border-0">
-                          <td className="py-2 pr-3 font-medium">{e.name}</td>
-                          <td className="pr-3 text-neutral-700 dark:text-neutral-300">{e.formel}{e.hinweis && <span className="block text-xs text-muted">{e.hinweis}</span>}</td>
-                          <td className="pr-3 text-xs text-muted">{e.quelle}</td>
-                          <td className="font-mono text-[11px] text-muted">{e.code}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </details>
-            ))}
-          </div>
+          <KpiSuche gruppen={RECHENWERK} kombi={KOMBI_KENNZAHLEN} />
         </section>
 
         {/* Content-Limits — LIVE aus den RULES */}
