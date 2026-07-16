@@ -60,4 +60,14 @@ describe("listing recipes (mock)", () => {
     const res = await generateSection("bullets", inputs);
     expect(Array.isArray(res.issues)).toBe(true);
   });
+
+  it("erkannte Fremdmarken erreichen das Gate — Marke im Text wird als Fehler geflaggt (D97)", async () => {
+    const res = await generateSection("title", {
+      ...inputs,
+      // Template-Titel = Marke + Hauptkeyword → „Hydro Flask" landet im Text
+      keywords: { ...inputs.keywords, primary: ["Hydro Flask Trinkflasche"] },
+      competitorBrands: ["Hydro Flask"],
+    });
+    expect(res.issues.map((i) => i.rule)).toContain("title.competitor-brand");
+  });
 });

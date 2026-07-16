@@ -38,6 +38,12 @@ export type RecipeInputs = {
   voiceTone?: string | null;
   /** Bereits freigegebene Sektionen als Kontext. */
   approved?: Partial<Record<ListingSection, string | string[]>>;
+  /**
+   * Fremdmarken aus dem Keyword-Relevanz-Filter (D87: grund „Marke: XY") —
+   * Amazon-Verbot (knowledge/content/backend-keywords.md). Fließt ins Prompt
+   * (Warnung) UND ins Validation-Gate (Code erzwingt), D97.
+   */
+  competitorBrands?: string[];
 };
 
 export type TitleRationale = Array<{ part: string; source: string; verified: boolean }>;
@@ -74,6 +80,9 @@ function contextBlock(inputs: RecipeInputs): string {
     f.targetAudience ? `ZIELGRUPPE: ${f.targetAudience}` : "",
     f.certifications?.length ? `ZERTIFIKATE/NORMEN (nur diese nennen): ${f.certifications.join(", ")}` : "",
     `TONALITÄT: ${inputs.voiceTone || VOICE_DEFAULT}`,
+    inputs.competitorBrands?.length
+      ? `FREMDMARKEN (Amazon-Verbot — dürfen NIRGENDS im Text auftauchen, auch nicht im Backend): ${[...new Set(inputs.competitorBrands)].slice(0, 12).join(", ")}`
+      : "",
   ];
   if (ri) {
     const pp = ri.painPoints.slice(0, 5).map((p) => `${p.label}${p.frequencyPct ? ` (${p.frequencyPct}%)` : ""}`);
@@ -279,7 +288,8 @@ export async function generateSection(
   const ctx = {
     facts: inputs.facts,
     primaryKeywords: inputs.keywords.primary,
-    competitorBrands: [],
+    // Erkannte Fremdmarken (Relevanz-Filter) — das Gate flaggt jedes Vorkommen (D97)
+    competitorBrands: inputs.competitorBrands ?? [],
   };
 
   switch (section) {

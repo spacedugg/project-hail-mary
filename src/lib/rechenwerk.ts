@@ -182,6 +182,8 @@ export const RECHENWERK: KpiGruppe[] = [
       { name: "Ausschöpfungs-Prinzip", formel: "Unterausnutzung der Limits = WARNUNG (blockiert nicht), harte Verstöße = FEHLER (blockieren Freigabe)", quelle: "Nutzer-Vorgabe D41", code: "src/lib/validation/gate.ts" },
       { name: "Begründungs-Pflicht", formel: "jeder Textbestandteil trägt Herleitung (Teil ← Quelle); Behauptungen werden deterministisch gegen den Text verifiziert (≥50 % Wort-Überlappung = belegt)", quelle: "D40/D41", code: "src/lib/recipes/listing.ts" },
       { name: "USP-Einmal-Verwendung", formel: "jede USP genau 1× über alle Bullets (Wortstamm-Dedup, Bindestrich-Komposita gesplittet)", quelle: "Nutzer-Feedback (Briefing-Wiederholungen)", code: "src/lib/validation/gate.ts" },
+      { name: "Fremdmarken-Blacklist", formel: "vom Keyword-Relevanz-Filter erkannte Fremdmarken (Grund ‚Marke: XY') fließen als Verbotsliste in Prompt UND Gate — jedes Vorkommen in Titel/Bullets/Backend/Beschreibung = FEHLER (auch bei Handarbeit)", quelle: "Amazon-Policy (backend-keywords.md) + D87-Erkennung, verdrahtet D97", code: "src/lib/recipes/listing.ts + src/lib/validation/gate.ts" },
+      { name: "Keyword-Reihenfolge im Prompt", formel: "Keywords erreichen die Text-Generierung in Tiering-Reihenfolge (SV × Cluster-Relevanzgewicht) — primary[0] ist damit wirklich das Hauptkeyword, nicht zufällige DB-Reihenfolge", quelle: "Tiering-Formel D51/D92, verdrahtet D97", code: "src/app/actions.ts (nachTieringScore)" },
     ],
   },
   {

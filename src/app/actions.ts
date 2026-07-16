@@ -348,6 +348,35 @@ export async function toggleKeywordRelevanz(formData: FormData) {
   revalidatePath(`/produkte/${productId}`);
 }
 
+/**
+ * Fremdmarken, die der Keyword-Relevanz-Filter bereits erkannt hat (D87:
+ * ausschlussGrund „Marke: XY") — als Blacklist für Prompt UND Validation-Gate
+ * (D97). Die eigene Marke („eigene Marke: …") gehört NICHT auf die Blacklist.
+ */
+function fremdmarkenAusKeywords(kws: Array<{ ausschlussGrund: string | null }>): string[] {
+  return [
+    ...new Set(
+      kws
+        .map((k) => k.ausschlussGrund ?? "")
+        .filter((g) => g.startsWith("Marke: "))
+        .map((g) => g.slice("Marke: ".length).trim())
+        .filter(Boolean),
+    ),
+  ];
+}
+
+/**
+ * Keywords in Tiering-Reihenfolge (D97): sortiert nach demselben Score wie
+ * die Tier-Vergabe (SV × Cluster-Relevanzgewicht, src/lib/sov/tiering.ts) —
+ * nicht nach zufälliger DB-Reihenfolge. So ist primary[0] wirklich das
+ * Hauptkeyword, das Titel-Prompt und -Gate verlangen.
+ */
+async function nachTieringScore<K extends { keyword: string; searchVolume: number | null }>(kws: K[]): Promise<K[]> {
+  const { clusterKeyword, relevanceWeight } = await import("@/lib/sov/audit");
+  const score = (k: K) => (k.searchVolume ?? 0) * relevanceWeight(clusterKeyword(k.keyword));
+  return [...kws].sort((a, b) => score(b) - score(a));
+}
+
 export async function generateContent(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
   const section = String(formData.get("section") ?? "") as ListingSection;
@@ -356,8 +385,9 @@ export async function generateContent(formData: FormData) {
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return;
   const brand = await db.query.brands.findFirst({ where: eq(schema.brands.id, product.brandId) });
-  // Nur relevante Keywords fließen in die Generierung (D87)
-  const kws = (await db.query.keywords.findMany({ where: eq(schema.keywords.productId, productId) })).filter((k) => !k.ausgeschlossen);
+  // Nur relevante Keywords fließen in die Generierung (D87) — in Tiering-Reihenfolge (D97)
+  const alleKws = await db.query.keywords.findMany({ where: eq(schema.keywords.productId, productId) });
+  const kws = await nachTieringScore(alleKws.filter((k) => !k.ausgeschlossen));
   const insights = await db.query.reviewInsights.findFirst({
     where: eq(schema.reviewInsights.productId, productId),
     orderBy: desc(schema.reviewInsights.createdAt),
@@ -389,6 +419,7 @@ export async function generateContent(formData: FormData) {
       title: latest("title")?.text as string | undefined,
       bullets: latest("bullets")?.items as string[] | undefined,
     },
+    competitorBrands: fremdmarkenAusKeywords(alleKws),
   };
 
   // Fehler (API, Zeitbudget, kaputtes JSON) als Banner, nie als Fehlerseite (D81)
@@ -1181,7 +1212,8 @@ export async function saveContentManual(formData: FormData) {
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return;
-  const kws = (await db.query.keywords.findMany({ where: eq(schema.keywords.productId, productId) })).filter((k) => !k.ausgeschlossen);
+  const alleKws = await db.query.keywords.findMany({ where: eq(schema.keywords.productId, productId) });
+  const kws = await nachTieringScore(alleKws.filter((k) => !k.ausgeschlossen));
   const versions = await db.query.contentVersions.findMany({
     where: eq(schema.contentVersions.productId, productId),
     orderBy: desc(schema.contentVersions.createdAt),
@@ -1190,7 +1222,8 @@ export async function saveContentManual(formData: FormData) {
   const ctx = {
     facts: product.facts,
     primaryKeywords: kws.filter((k) => k.tier === "primary").map((k) => k.keyword),
-    competitorBrands: [],
+    // Auch Handarbeit läuft gegen die Fremdmarken-Blacklist (D97)
+    competitorBrands: fremdmarkenAusKeywords(alleKws),
   };
 
   const gate = await import("@/lib/validation/gate");
