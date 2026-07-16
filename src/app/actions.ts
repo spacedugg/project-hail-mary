@@ -240,7 +240,7 @@ export async function wipeAllDataAction(formData: FormData) {
   const { getSessionUser } = await import("@/lib/auth/session");
   if (!(await getSessionUser())) return;
   if (String(formData.get("confirm") ?? "").trim().toUpperCase() !== "LÖSCHEN") {
-    redirect(`/einstellungen?fehler=${encodeURIComponent("Zum Löschen bitte exakt LÖSCHEN eintippen.")}`);
+    redirect(`/einstellungen?fehler=${encodeURIComponent("Zum Löschen bitte exakt LÖSCHEN eintippen.")}&code=SET-01`);
   }
   const db = await getDb();
   const { wipeAllBrandData } = await import("@/lib/demo/seed");
@@ -325,7 +325,7 @@ export async function deriveKeywordsFromSov(formData: FormData) {
       tier: k.tier as "primary" | "secondary" | "tertiary" | "backend",
     })));
   } catch (e) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Keyword-Relevanz-Prüfung: ${e instanceof Error ? e.message : String(e)}`)}`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Keyword-Relevanz-Prüfung: ${e instanceof Error ? e.message : String(e)}`)}&code=KW-02`);
   }
   revalidatePath(`/produkte/${productId}`);
 }
@@ -427,7 +427,7 @@ export async function generateContent(formData: FormData) {
   try {
     result = await generateSection(section, inputs);
   } catch (e) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Text-Generierung (${section}): ${e instanceof Error ? e.message : String(e)}`)}`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Text-Generierung (${section}): ${e instanceof Error ? e.message : String(e)}`)}&code=GEN-01`);
   }
 
   const dbType = section === "backend" ? "backend_keywords" : section === "highlights" ? "item_highlights" : section;
@@ -621,7 +621,7 @@ export async function uploadCerebro(formData: FormData) {
   });
   revalidatePath(`/produkte/${productId}`);
   if (parseStatus === "error") {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Keyword-Export: ${parseError}`)}`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Keyword-Export: ${parseError}`)}&code=KW-01`);
   }
   const sovInfo = hasCompetitors
     ? "SOV-Audit erstellt (Sichtbarkeit & Analyse)."
@@ -683,7 +683,7 @@ export async function scrapeReviewsAction(formData: FormData) {
     ? chipListe
     : ([product.asin, ...String(formData.get("competitorAsins") ?? "").split(/[\s,;]+/).filter(Boolean)].filter(Boolean) as string[]);
   if (asins.length === 0) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Review-Scrape: keine ASIN angegeben — mindestens einen ASIN-Chip stehen lassen.")}#reviews`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Review-Scrape: keine ASIN angegeben — mindestens einen ASIN-Chip stehen lassen.")}&code=REV-04#reviews`);
   }
 
   // Redundanz-Guard (D81): identische ASIN-Menge, jünger als 24 h → kein
@@ -721,11 +721,11 @@ export async function scrapeReviewsAction(formData: FormData) {
         { asin: asins[0] ?? "B000000000", rating: 1, title: "Mock", body: "kam zerkratzt an" },
       ];
     } else {
-      redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Review-Scrape: ${msg}`)}#reviews`);
+      redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Review-Scrape: ${msg}`)}&code=${msg.includes("Zeitlimit") ? "REV-01" : "REV-03"}#reviews`);
     }
   }
   if (reviews.length === 0) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Review-Scrape: 0 Reviews gefunden — ASIN prüfen (neues Produkt ohne Bewertungen?).")}#reviews`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Review-Scrape: 0 Reviews gefunden — ASIN prüfen (neues Produkt ohne Bewertungen?).")}&code=REV-02#reviews`);
   }
 
   const starCounts: Record<string, number> = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
@@ -767,7 +767,7 @@ export async function analyzeReviewsAction(formData: FormData) {
     orderBy: desc(schema.reviewScrapes.createdAt),
   });
   if (!scrape) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Erst Reviews scrapen (Schritt 1), dann analysieren.")}#reviews`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Erst Reviews scrapen (Schritt 1), dann analysieren.")}&code=REV-05#reviews`);
   }
 
   // Derselbe Scrape wird nie doppelt analysiert (D79) — direkt zum Dashboard.
@@ -792,7 +792,7 @@ export async function analyzeReviewsAction(formData: FormData) {
       id: id(), productId, scrapeId: scrape!.id, dataBasis, confidence: res.confidence, payload: res.payload,
     });
   } catch (e) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Review-Analyse: ${e instanceof Error ? e.message : String(e)}`)}#reviews`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Review-Analyse: ${e instanceof Error ? e.message : String(e)}`)}&code=ANA-01#reviews`);
   }
   revalidatePath(`/produkte/${productId}`);
   redirect(`/produkte/${productId}/reviews`);
@@ -809,7 +809,7 @@ export async function runDeepAuditAction(formData: FormData) {
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return;
-  const back = (msg: string) => redirect(`/produkte/${productId}/analyse?fehler=${encodeURIComponent(msg)}`);
+  const back = (msg: string) => redirect(`/produkte/${productId}/analyse?fehler=${encodeURIComponent(msg)}&code=AUD-01`);
 
   const snapshot = await db.query.listingSnapshots.findFirst({
     where: eq(schema.listingSnapshots.productId, productId),
@@ -1072,7 +1072,7 @@ export async function importListingFromAmazon(formData: FormData) {
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product?.asin) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Produkt hat keine ASIN — Import nicht möglich.")}`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Produkt hat keine ASIN — Import nicht möglich.")}&code=IMP-02`);
   }
 
   // Redundanz-Guard (D81): erfolgreicher Import jünger als 24 h → kein Doppel-Import
@@ -1118,7 +1118,7 @@ export async function importListingFromAmazon(formData: FormData) {
       }
     }
   } catch (e) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Listing-Import: ${e instanceof Error ? e.message : String(e)}`)}`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Listing-Import: ${e instanceof Error ? e.message : String(e)}`)}&code=IMP-01`);
   }
   await db.insert(schema.listingSnapshots).values({
     id: id(), productId, source,
@@ -1152,7 +1152,7 @@ export async function uploadListingCsv(formData: FormData) {
   try {
     snap = parseListingCsv(await file.text());
   } catch (e) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`CSV-Import: ${e instanceof Error ? e.message : String(e)}`)}`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`CSV-Import: ${e instanceof Error ? e.message : String(e)}`)}&code=CSV-01`);
   }
   await db.insert(schema.listingSnapshots).values({
     id: id(), productId, source: "h10_csv",

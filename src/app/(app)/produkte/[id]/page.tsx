@@ -7,6 +7,8 @@ import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
 import { AsinChips } from "@/components/asin-chips";
+import { FehlerPopup } from "@/components/fehler-popup";
+import { fehlerInfo } from "@/lib/fehlercodes";
 import { IconUpload, IconCheck, IconSearch, IconReviews, IconContent, IconEuro } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
@@ -57,10 +59,10 @@ export default async function ProductPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ fehler?: string; hinweis?: string }>;
+  searchParams: Promise<{ fehler?: string; code?: string; hinweis?: string }>;
 }) {
   const { id } = await params;
-  const { fehler, hinweis } = await searchParams;
+  const { fehler, code, hinweis } = await searchParams;
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, id) });
   if (!product) notFound();
@@ -127,7 +129,7 @@ export default async function ProductPage({
         </div>
       </div>
 
-      {fehler && <p className="mt-4 rounded-xl bg-[rgb(220_38_38/0.08)] px-3 py-2 text-sm text-bad">✕ {fehler}</p>}
+      {fehler && <FehlerPopup message={fehler} {...fehlerInfo(code)} />}
       {hinweis && <p className="mt-4 rounded-xl bg-[var(--primary-soft)] px-3 py-2 text-sm text-primary-strong">ℹ {hinweis}</p>}
 
       <div className="stagger mt-6 space-y-3">

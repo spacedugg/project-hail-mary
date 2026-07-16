@@ -6,6 +6,8 @@ import { analyzeListing, type ListingSnapshot } from "@/lib/analysis/listingAudi
 import { buildImageBrief } from "@/lib/analysis/imageBrief";
 import { runDeepAuditAction } from "@/app/actions";
 import { SubmitButton } from "@/components/submit-button";
+import { FehlerPopup } from "@/components/fehler-popup";
+import { fehlerInfo } from "@/lib/fehlercodes";
 import type { SovAudit } from "@/lib/sov/audit";
 
 export const dynamic = "force-dynamic";
@@ -23,10 +25,10 @@ export default async function AnalysePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ fehler?: string; hinweis?: string }>;
+  searchParams: Promise<{ fehler?: string; code?: string; hinweis?: string }>;
 }) {
   const { id } = await params;
-  const { fehler, hinweis } = await searchParams;
+  const { fehler, code, hinweis } = await searchParams;
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, id) });
   if (!product) notFound();
@@ -120,7 +122,7 @@ export default async function AnalysePage({
         {product.asin && <p className="font-mono text-xs text-neutral-500">{product.asin} · amazon.{product.marketplace}</p>}
       </header>
 
-      {fehler && <p className="mt-4 rounded-xl bg-[rgb(220_38_38/0.08)] px-3 py-2 text-sm text-bad print:hidden">✕ {fehler}</p>}
+      {fehler && <FehlerPopup message={fehler} {...fehlerInfo(code)} />}
       {hinweis && <p className="mt-4 rounded-xl bg-[var(--primary-soft)] px-3 py-2 text-sm text-primary-strong print:hidden">ℹ {hinweis}</p>}
 
       {/* Tiefen-Audit (D76): 8 Dimensionen nach temoa-audit-Spec, USPs & Zielgruppe hergeleitet.

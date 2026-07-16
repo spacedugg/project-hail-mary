@@ -2,6 +2,8 @@ import { getSessionUser } from "@/lib/auth/session";
 import { updateProfile, changePassword } from "@/app/auth-actions";
 import { OsShell } from "@/components/shell";
 import { SubmitButton } from "@/components/submit-button";
+import { FehlerPopup } from "@/components/fehler-popup";
+import { fehlerInfo } from "@/lib/fehlercodes";
 
 export const dynamic = "force-dynamic";
 
@@ -13,9 +15,9 @@ export const dynamic = "force-dynamic";
 export default async function KontoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ fehler?: string; ok?: string }>;
+  searchParams: Promise<{ fehler?: string; code?: string; ok?: string }>;
 }) {
-  const { fehler, ok } = await searchParams;
+  const { fehler, code, ok } = await searchParams;
   const session = (await getSessionUser())!;
   const input = "input-base";
 
@@ -25,7 +27,7 @@ export default async function KontoPage({
         <h1 className="page-title">Mein Konto</h1>
         <p className="page-sub">Deine persönlichen Einstellungen — nur für dich. Tool-weite Einstellungen findest du unten in der Sidebar.</p>
 
-        {fehler && <p className="mt-4 rounded-xl bg-[rgb(220_38_38/0.08)] px-3 py-2 text-sm text-bad">{fehler}</p>}
+        {fehler && <FehlerPopup message={fehler} {...fehlerInfo(code)} />}
         {ok && <p className="mt-4 rounded-xl bg-[rgb(22_163_74/0.08)] px-3 py-2 text-sm text-good">✓ {ok}</p>}
 
         <div className="stagger mt-6 space-y-4">

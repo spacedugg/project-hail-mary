@@ -5,6 +5,8 @@ import Link from "next/link";
 import { OsShell } from "@/components/shell";
 import { IconUsers, IconSearch, IconArrowRight } from "@/components/icons";
 import { SubmitButton } from "@/components/submit-button";
+import { FehlerPopup } from "@/components/fehler-popup";
+import { fehlerInfo } from "@/lib/fehlercodes";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +18,9 @@ export const dynamic = "force-dynamic";
 export default async function EinstellungenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ fehler?: string; ok?: string }>;
+  searchParams: Promise<{ fehler?: string; code?: string; ok?: string }>;
 }) {
-  const { fehler, ok } = await searchParams;
+  const { fehler, code, ok } = await searchParams;
   const session = (await getSessionUser())!;
   const db = await getDb();
   const team = await db.query.users.findMany();
@@ -30,7 +32,7 @@ export default async function EinstellungenPage({
         <h1 className="page-title">Tool-Einstellungen</h1>
         <p className="page-sub">Gilt für das ganze Tool und alle im Team. Persönliches (Name, Passwort) findest du unter „Mein Konto" — das Zahnrad neben deinem Namen.</p>
 
-        {fehler && <p className="mt-4 rounded-xl bg-[rgb(220_38_38/0.08)] px-3 py-2 text-sm text-bad">{fehler}</p>}
+        {fehler && <FehlerPopup message={fehler} {...fehlerInfo(code)} />}
         {ok && <p className="mt-4 rounded-xl bg-[rgb(22_163_74/0.08)] px-3 py-2 text-sm text-good">✓ {ok}</p>}
 
         <div className="stagger mt-6 space-y-4">
