@@ -318,53 +318,15 @@ export async function deriveKeywordsFromSov(formData: FormData) {
 
   const { deriveKeywordTiers } = await import("@/lib/sov/tiering");
   const { tiered } = deriveKeywordTiers(audit);
-
-  const existing = await db.query.keywords.findMany({ where: eq(schema.keywords.productId, productId) });
-  const manual = new Set(existing.filter((k) => k.source === "manual").map((k) => k.keyword.toLowerCase().trim()));
-  // Manuelle Relevanz-Entscheidungen überleben jeden Re-Lauf (D87)
-  const manuelleUrteile = new Map(
-    existing
-      .filter((k) => k.ausschlussGrund?.startsWith("manuell"))
-      .map((k) => [k.keyword.toLowerCase().trim(), { ausgeschlossen: k.ausgeschlossen, grund: k.ausschlussGrund! }]),
-  );
-
-  // Relevanz-Filter (D87): Marken / abweichende Maße / abweichende Anzahlen
-  const brand = await db.query.brands.findFirst({ where: eq(schema.brands.id, product.brandId) });
-  const snapshot = await db.query.listingSnapshots.findFirst({
-    where: eq(schema.listingSnapshots.productId, productId),
-    orderBy: desc(schema.listingSnapshots.createdAt),
-  });
-  const { pruefeRelevanz } = await import("@/lib/keywords/relevanz");
-  const kandidaten = tiered.filter((k) => !manual.has(k.keyword.toLowerCase().trim()));
-  let urteile = new Map<string, string | null>();
   try {
-    const res = await pruefeRelevanz(kandidaten.map((k) => k.keyword), {
-      massText: [product.facts.dimensions, snapshot?.title, product.name].filter(Boolean).join(" · "),
-      produktName: product.name,
-      eigeneMarke: brand?.kind === "workbench" ? null : brand?.name ?? null,
-    });
-    urteile = new Map(res.map((u) => [u.keyword.toLowerCase(), u.grund]));
+    await keywordBasisSchreiben(db, product, tiered.map((k) => ({
+      keyword: k.keyword,
+      searchVolume: k.searchVolume,
+      tier: k.tier as "primary" | "secondary" | "tertiary" | "backend",
+    })));
   } catch (e) {
     redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Keyword-Relevanz-Prüfung: ${e instanceof Error ? e.message : String(e)}`)}`);
   }
-
-  await db.delete(schema.keywords).where(and(eq(schema.keywords.productId, productId), eq(schema.keywords.source, "cerebro")));
-  const rows = kandidaten.map((k) => {
-    const key = k.keyword.toLowerCase().trim();
-    const manuell = manuelleUrteile.get(key);
-    const autoGrund = urteile.get(key) ?? null;
-    return {
-      id: id(),
-      productId,
-      keyword: k.keyword,
-      searchVolume: k.searchVolume,
-      tier: k.tier,
-      source: "cerebro",
-      ausgeschlossen: manuell ? manuell.ausgeschlossen : autoGrund !== null,
-      ausschlussGrund: manuell ? manuell.grund : autoGrund,
-    };
-  });
-  if (rows.length) await db.insert(schema.keywords).values(rows);
   revalidatePath(`/produkte/${productId}`);
 }
 
@@ -456,8 +418,79 @@ export async function generateContent(formData: FormData) {
   revalidatePath(`/produkte/${productId}`);
 }
 
-// ── SOV: Cerebro-CSV-Upload → Audit (portiertes Formelwerk) ──────────────────
+// ── Keyword-Basis: Cerebro-Export → Keywords IMMER, SOV wenn Wettbewerber ────
 
+type KeywordKandidat = { keyword: string; searchVolume: number | null; tier: "primary" | "secondary" | "tertiary" | "backend" };
+
+/**
+ * Gemeinsamer Schreibweg der Keyword-Basis (D87/D89): Relevanz-Filter,
+ * manuelle Entscheidungen überleben, Ausschlüsse gekennzeichnet statt gelöscht.
+ */
+async function keywordBasisSchreiben(
+  db: Awaited<ReturnType<typeof getDb>>,
+  product: { id: string; name: string; brandId: string; facts: ProductFacts },
+  kandidatenListe: KeywordKandidat[],
+) {
+  const existing = await db.query.keywords.findMany({ where: eq(schema.keywords.productId, product.id) });
+  const manual = new Set(existing.filter((k) => k.source === "manual").map((k) => k.keyword.toLowerCase().trim()));
+  const manuelleUrteile = new Map(
+    existing
+      .filter((k) => k.ausschlussGrund?.startsWith("manuell"))
+      .map((k) => [k.keyword.toLowerCase().trim(), { ausgeschlossen: k.ausgeschlossen, grund: k.ausschlussGrund! }]),
+  );
+
+  const brand = await db.query.brands.findFirst({ where: eq(schema.brands.id, product.brandId) });
+  const snapshot = await db.query.listingSnapshots.findFirst({
+    where: eq(schema.listingSnapshots.productId, product.id),
+    orderBy: desc(schema.listingSnapshots.createdAt),
+  });
+  const { pruefeRelevanz } = await import("@/lib/keywords/relevanz");
+  const kandidaten = kandidatenListe.filter((k) => !manual.has(k.keyword.toLowerCase().trim()));
+  const res = await pruefeRelevanz(kandidaten.map((k) => k.keyword), {
+    massText: [product.facts.dimensions, snapshot?.title, product.name].filter(Boolean).join(" · "),
+    produktName: product.name,
+    eigeneMarke: brand?.kind === "workbench" ? null : brand?.name ?? null,
+  });
+  const urteile = new Map(res.map((u) => [u.keyword.toLowerCase(), u.grund]));
+
+  await db.delete(schema.keywords).where(and(eq(schema.keywords.productId, product.id), eq(schema.keywords.source, "cerebro")));
+  const rows = kandidaten.map((k) => {
+    const key = k.keyword.toLowerCase().trim();
+    const manuell = manuelleUrteile.get(key);
+    const autoGrund = urteile.get(key) ?? null;
+    return {
+      id: id(),
+      productId: product.id,
+      keyword: k.keyword,
+      searchVolume: k.searchVolume,
+      tier: k.tier,
+      source: "cerebro",
+      ausgeschlossen: manuell ? manuell.ausgeschlossen : autoGrund !== null,
+      ausschlussGrund: manuell ? manuell.grund : autoGrund,
+    };
+  });
+  if (rows.length) await db.insert(schema.keywords).values(rows);
+  return rows.filter((r) => r.ausgeschlossen).length;
+}
+
+/** Tiering ohne SOV-Audit: nach Suchvolumen — 1–3 primary, 4–13 secondary, 14–18 tertiary, Rest backend (v0-Konvention). */
+function svTiering(list: Array<{ keyword: string; sv: number }>): KeywordKandidat[] {
+  return [...list]
+    .sort((a, b) => b.sv - a.sv)
+    .map((k, i) => ({
+      keyword: k.keyword,
+      searchVolume: k.sv || null,
+      tier: (i < 3 ? "primary" : i < 13 ? "secondary" : i < 18 ? "tertiary" : "backend") as KeywordKandidat["tier"],
+    }));
+}
+
+/**
+ * EIN Upload für alles (D89, Nutzer-Vorgabe „Ordnung reinbringen"):
+ * Der Helium-10-Cerebro-Export der zu optimierenden ASIN ist DIE Keyword-Quelle.
+ * → Keyword-Basis entsteht IMMER (inkl. Relevanz-Filter D87, ohne Zweitklick).
+ * → SOV-Audit entsteht ZUSÄTZLICH, wenn der Export Wettbewerber-ASIN-Spalten hat.
+ * Kein separater SOV-Upload, nichts Doppeltes.
+ */
 export async function uploadCerebro(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
   const file = formData.get("file") as File | null;
@@ -470,9 +503,39 @@ export async function uploadCerebro(formData: FormData) {
 
   const { parseCerebroCsv, computeSovAudit } = await import("@/lib/sov/audit");
   let parseStatus = "ok", parseError: string | null = null, audit = null;
+  let keywordCount = 0, aussortiert = 0, hasCompetitors = false;
   try {
-    const rows = parseCerebroCsv(await file.text(), product.asin);
-    audit = computeSovAudit(rows, { price, mainAsin: product.asin });
+    // keepUnranked: für die Keyword-Basis zählen auch Keywords OHNE Ranking
+    const alleRows = parseCerebroCsv(await file.text(), product.asin, { keepUnranked: true });
+    if (alleRows.length === 0) throw new Error("Keine Keyword-Zeilen mit Suchvolumen gefunden — ist das der Cerebro-Export?");
+    hasCompetitors = alleRows.some((r) => Object.keys(r.compRanks).length > 0);
+
+    if (hasCompetitors) {
+      const ranked = alleRows.filter((r) => r.mainRank > 0 || Object.values(r.compRanks).some((x) => x > 0));
+      audit = computeSovAudit(ranked, { price, mainAsin: product.asin });
+    }
+
+    // Keyword-Basis IMMER — mit Audit über das SOV-Tiering, sonst nach Suchvolumen
+    let kandidaten: KeywordKandidat[];
+    if (audit) {
+      const { deriveKeywordTiers } = await import("@/lib/sov/tiering");
+      kandidaten = deriveKeywordTiers(audit).tiered.map((k) => ({
+        keyword: k.keyword,
+        searchVolume: k.searchVolume,
+        tier: k.tier as KeywordKandidat["tier"],
+      }));
+    } else {
+      const gesehen = new Set<string>();
+      const einmalig = alleRows.filter((r) => {
+        const key = r.keyword.toLowerCase();
+        if (gesehen.has(key)) return false;
+        gesehen.add(key);
+        return true;
+      });
+      kandidaten = svTiering(einmalig.map((r) => ({ keyword: r.keyword, sv: r.sv })));
+    }
+    keywordCount = kandidaten.length;
+    aussortiert = await keywordBasisSchreiben(db, product, kandidaten);
   } catch (e) {
     parseStatus = "error";
     parseError = e instanceof Error ? e.message : String(e);
@@ -484,11 +547,18 @@ export async function uploadCerebro(formData: FormData) {
     marketplace: product.marketplace,
     reportType: "cerebro",
     fileName: file.name,
-    parsed: audit ? { productId, audit } : null,
+    parsed: parseStatus === "ok" ? { productId, audit, hasCompetitors, keywordCount } : null,
     parseStatus,
     parseError,
   });
   revalidatePath(`/produkte/${productId}`);
+  if (parseStatus === "error") {
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Keyword-Export: ${parseError}`)}`);
+  }
+  const sovInfo = hasCompetitors
+    ? "SOV-Audit erstellt (Sichtbarkeit & Analyse)."
+    : "Kein SOV-Audit — der Export enthält keine Wettbewerber-ASIN-Spalten (für SOV in Cerebro Wettbewerber mitexportieren).";
+  redirect(`/produkte/${productId}?hinweis=${encodeURIComponent(`Keyword-Basis erstellt: ${keywordCount} Keywords, davon ${aussortiert} als irrelevant aussortiert (unten prüfbar). ${sovInfo}`)}`);
 }
 
 // ── Review-Insights via Apify (Neubau der defekten temoa-os-Variante) ────────

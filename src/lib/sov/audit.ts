@@ -161,7 +161,11 @@ const parseRank = (s: string | undefined): number => {
   return n > 0 ? Math.round(n) : 0;
 };
 
-export function parseCerebroCsv(text: string, mainAsin?: string | null): CerebroRow[] {
+export function parseCerebroCsv(
+  text: string,
+  mainAsin?: string | null,
+  opts: { keepUnranked?: boolean } = {},
+): CerebroRow[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return [];
   const header = parseCsvLine(lines[0]).map((h) => h.trim());
@@ -194,7 +198,9 @@ export function parseCerebroCsv(text: string, mainAsin?: string | null): Cerebro
       else compRanks[h] = r;
     }
     const anyRank = mainRank > 0 || Object.values(compRanks).some((r) => r > 0);
-    if (!anyRank) continue; // Zeilenfilter Pass 1
+    // Zeilenfilter Pass 1 (SOV braucht Ränge) — für die reine KEYWORD-BASIS
+    // sind gerade unrankende Keywords interessant (keepUnranked, D89)
+    if (!anyRank && !opts.keepUnranked) continue;
 
     rows.push({
       keyword, sv, mainRank,

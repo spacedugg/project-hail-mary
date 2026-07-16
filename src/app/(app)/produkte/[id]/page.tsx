@@ -6,7 +6,7 @@ import { saveKeywords, deriveKeywordsFromSov, generateContent, uploadCerebro, sc
 import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
-import { IconUpload, IconCheck, IconSearch, IconSichtbarkeit, IconReviews, IconContent, IconEuro } from "@/components/icons";
+import { IconUpload, IconCheck, IconSearch, IconReviews, IconContent, IconEuro } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 // Apify-Scrapes & LLM-Generierung brauchen mehr als das Vercel-Default-Zeitbudget
@@ -232,21 +232,39 @@ export default async function ProductPage({
           )}
         </section>
 
-        {/* Keywords + SOV nebeneinander */}
-        <div className="grid gap-3 lg:grid-cols-2">
-          <section className="card p-5">
+        {/* Keyword-Basis (D89): EIN Upload — Cerebro-Export → Keywords immer, SOV wenn Wettbewerber drin */}
+        <section className="card p-5">
             <CardHead
               icon={<IconSearch />}
               chip="chip-pink"
-              title="Keyword-Basis"
-              sub="primary → Titel · secondary → Bullets · Rest → Backend. Irrelevantes wird automatisch aussortiert."
-              right={kws.length > 0 ? <span className="pill pill-neutral">{kws.filter((k) => !k.ausgeschlossen).length} aktiv</span> : undefined}
+              title="Keyword-Basis (Helium 10 Cerebro)"
+              sub="Cerebro-Export der zu optimierenden ASIN hochladen — optional mit Wettbewerber-ASINs, dann entsteht zusätzlich das SOV-Audit."
+              right={
+                <>
+                  {kws.length > 0 && <span className="pill pill-neutral">{kws.filter((k) => !k.ausgeschlossen).length} aktiv</span>}
+                  {sovUpload && ((sovUpload.parsed as { audit?: unknown })?.audit
+                    ? <span className="pill pill-good">✓ SOV-Audit</span>
+                    : <span className="pill pill-neutral">ohne SOV (keine Wettbewerber im Export)</span>)}
+                </>
+              }
             />
-            {sovUpload && (
+            <form action={uploadCerebro} className="mt-4 flex flex-wrap items-center gap-2">
+              <input type="hidden" name="productId" value={product.id} />
+              <input type="file" name="file" accept=".csv" required className="text-sm" />
+              <input name="price" type="number" step="0.01" placeholder="Ø-Preis € (45)" className={`${input} w-36`} />
+              <SubmitButton className="btn-primary" pendingLabel="Liest Export, filtert Relevanz…" progress>
+                {kws.some((k) => k.source === "cerebro") ? "Export neu hochladen" : "Keyword-Export hochladen"}
+              </SubmitButton>
+            </form>
+            <p className="mt-2 text-[11px] text-muted">
+              Eine Datei, alles drin: Keyword-Basis entsteht immer (inkl. Relevanz-Filter — Marken, abweichende Maße/Anzahlen).
+              Enthält der Export Wettbewerber-ASIN-Spalten, entsteht daraus zusätzlich das SOV-Audit — nichts wird doppelt hochgeladen.
+            </p>
+            {sovUpload && kws.filter((k) => k.source === "cerebro").length === 0 && (
               <form action={deriveKeywordsFromSov} className="mt-3">
                 <input type="hidden" name="productId" value={product.id} />
-                <SubmitButton className="btn-primary text-xs" pendingLabel="Leitet ab & prüft Relevanz…" progress>
-                  Aus SOV-Audit ableiten{kws.filter((k) => k.source === "cerebro").length ? " (aktualisieren)" : ""}
+                <SubmitButton className="btn-ghost text-xs" pendingLabel="Leitet ab & prüft Relevanz…" progress>
+                  Keywords aus dem vorhandenen Upload ableiten
                 </SubmitButton>
               </form>
             )}
@@ -313,27 +331,7 @@ export default async function ProductPage({
                 <SubmitButton className="mt-2 btn-dark text-xs">Speichern</SubmitButton>
               </form>
             </details>
-          </section>
-
-          <section className="card p-5">
-            <CardHead
-              icon={<IconSichtbarkeit />}
-              chip="chip-amber"
-              title="SOV-Report (optional)"
-              sub="Cerebro-Export hochladen → Quick-Wins & Umsatzlücken."
-              right={sovUpload ? <span className="pill pill-good">✓ {sovUpload.fileName}</span> : undefined}
-            />
-            <form action={uploadCerebro} className="mt-3 flex flex-wrap items-center gap-2">
-              <input type="hidden" name="productId" value={product.id} />
-              <input type="file" name="file" accept=".csv" required className="text-sm" />
-              <input name="price" type="number" step="0.01" placeholder="Ø-Preis € (45)" className={`${input} w-36`} />
-              <SubmitButton className="btn-dark text-xs" pendingLabel="Wertet aus…">Auswerten</SubmitButton>
-            </form>
-            {uploads.find((u) => u.reportType === "cerebro" && u.parseStatus === "error") && !sovUpload && (
-              <p className="mt-2 text-xs text-red-600">Letzter Upload fehlgeschlagen: {uploads.find((u) => u.parseStatus === "error")?.parseError}</p>
-            )}
-          </section>
-        </div>
+        </section>
 
         {/* Bewertungs-Analyse */}
         <section id="reviews" className="card p-5">
