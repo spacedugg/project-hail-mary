@@ -1,0 +1,209 @@
+<title>temoa OS — Projektplan</title>
+<style>
+  :root {
+    --bg: #f7f8f7; --card: #ffffff; --ink: #20302c; --muted: #5c6b67; --hair: #e2e6e4;
+    --teal: #2f9e8f; --teal-soft: rgb(47 158 143 / 0.11); --violet: #6f63c2; --violet-soft: rgb(111 99 194 / 0.11);
+    --good: #2f9e6a; --good-soft: rgb(47 158 106 / 0.12);
+    --part: #a07a1f; --part-soft: rgb(160 122 31 / 0.13);
+    --open: #5c6b67; --open-soft: rgb(92 107 103 / 0.12);
+    --blocked: #bf4040; --blocked-soft: rgb(191 64 64 / 0.11);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #171c1b; --card: #1f2624; --ink: #e8ecea; --muted: #9fb0ab; --hair: #313b38;
+      --teal: #4cc2b1; --violet: #9a8fe0; --good: #55c08a; --part: #d3a93f; --open: #9fb0ab; --blocked: #e07b7b; }
+  }
+  :root[data-theme="dark"] { --bg: #171c1b; --card: #1f2624; --ink: #e8ecea; --muted: #9fb0ab; --hair: #313b38;
+    --teal: #4cc2b1; --violet: #9a8fe0; --good: #55c08a; --part: #d3a93f; --open: #9fb0ab; --blocked: #e07b7b; }
+  :root[data-theme="light"] { --bg: #f7f8f7; --card: #ffffff; --ink: #20302c; --muted: #5c6b67; --hair: #e2e6e4;
+    --teal: #2f9e8f; --violet: #6f63c2; --good: #2f9e6a; --part: #a07a1f; --open: #5c6b67; --blocked: #bf4040; }
+
+  body { background: var(--bg); color: var(--ink); font: 15px/1.55 ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+    margin: 0; padding: 40px 20px 72px; }
+  main { max-width: 980px; margin: 0 auto; }
+  h1, h2, h3 { text-wrap: balance; margin: 0; }
+  .eyebrow { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--teal); font-weight: 700; }
+  h1 { font-size: 30px; line-height: 1.15; margin-top: 6px; }
+  .sub { color: var(--muted); max-width: 62ch; margin-top: 8px; }
+  section { margin-top: 44px; }
+  h2 { font-size: 19px; margin-bottom: 4px; }
+  .h2sub { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
+
+  .vision { border-left: 3px solid var(--teal); background: var(--card); border-radius: 0 14px 14px 0;
+    padding: 18px 22px; margin-top: 18px; max-width: 74ch; box-shadow: 0 1px 2px rgb(0 0 0 / 0.04); }
+  .vision p { margin: 0; font-size: 16px; line-height: 1.6; }
+  .vision b { color: var(--teal); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 11px;
+    font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+  .chip::before { content: ""; width: 7px; height: 7px; border-radius: 999px; background: currentColor; }
+  .c-good { color: var(--good); background: var(--good-soft); }
+  .c-part { color: var(--part); background: var(--part-soft); }
+  .c-open { color: var(--open); background: var(--open-soft); }
+  .c-blocked { color: var(--blocked); background: var(--blocked-soft); }
+
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+  .card { background: var(--card); border: 1px solid var(--hair); border-radius: 14px; padding: 16px 18px; }
+  .card h3 { font-size: 14.5px; display: flex; align-items: baseline; gap: 8px; }
+  .card h3 .nr { color: var(--muted); font-weight: 600; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .card ul { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .card li { display: flex; gap: 8px; font-size: 13px; align-items: flex-start; }
+  .dot { flex: none; width: 8px; height: 8px; border-radius: 999px; margin-top: 5.5px; }
+  .d-good { background: var(--good); } .d-part { background: var(--part); }
+  .d-open { background: var(--open); opacity: 0.55; } .d-blocked { background: var(--blocked); }
+  .card li span { color: var(--muted); } .card li .done { color: var(--ink); }
+
+  /* Sprint-Zeitschiene: Nummerierung = echte Reihenfolge */
+  .sprints { display: flex; flex-direction: column; gap: 0; margin-top: 4px; }
+  .sprint { display: grid; grid-template-columns: 56px 1fr; gap: 0 18px; position: relative; padding-bottom: 22px; }
+  .sprint::before { content: ""; position: absolute; left: 27px; top: 34px; bottom: -2px; width: 2px; background: var(--hair); }
+  .sprint:last-child::before { display: none; }
+  .snum { width: 54px; height: 30px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px; background: var(--teal-soft); color: var(--teal); font-variant-numeric: tabular-nums; }
+  .sprint.blocked-sprint .snum { background: var(--blocked-soft); color: var(--blocked); }
+  .sbody { background: var(--card); border: 1px solid var(--hair); border-radius: 14px; padding: 14px 18px; }
+  .sbody h3 { font-size: 14.5px; }
+  .sbody .outcome { color: var(--muted); font-size: 13px; margin: 4px 0 8px; max-width: 70ch; }
+  .sbody .abnahme { font-size: 12.5px; border-top: 1px dashed var(--hair); padding-top: 8px; margin-top: 2px; color: var(--muted); }
+  .abnahme b { color: var(--good); font-weight: 700; }
+  .tag { display: inline-block; border-radius: 6px; padding: 1px 7px; font-size: 11px; font-weight: 700; vertical-align: 1px; }
+  .t-block { background: var(--blocked-soft); color: var(--blocked); }
+
+  .rules { counter-reset: r; display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    list-style: none; margin: 0; padding: 0; }
+  .rules li { background: var(--card); border: 1px solid var(--hair); border-radius: 12px; padding: 11px 14px;
+    font-size: 13px; color: var(--muted); }
+  .rules li b { color: var(--ink); display: block; margin-bottom: 2px; font-size: 13px; }
+
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--hair);
+    border-radius: 14px; overflow: hidden; font-size: 13.5px; }
+  .tablewrap { overflow-x: auto; border-radius: 14px; }
+  th { text-align: left; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+    padding: 10px 14px; border-bottom: 1px solid var(--hair); font-weight: 700; }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--hair); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.eid { font-weight: 700; color: var(--violet); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  footer { margin-top: 44px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--hair); padding-top: 14px; }
+  a { color: var(--teal); }
+</style>
+
+<main>
+  <div class="eyebrow">temoa OS · Projektplan · Stand 20.07.2026</div>
+  <h1>Vision, Baustand, Sprints — auf einer Seite</h1>
+  <p class="sub">Verbindliche Quelle: <code>docs/PROJEKTPLAN.md</code> im Repo (fortgeschrieben nach jedem Sprint). Fundament: Scope-Session 07.07. + realer Baustand D1–D103.</p>
+
+  <section>
+    <h2>Vision</h2>
+    <div class="vision">
+      <p><b>temoa OS ist das interne Amazon-Betriebssystem der Agentur.</b> Alle verstreuten Datenquellen — Seller Central, Ads-Konsole, Helium 10, Reviews, Listings — fließen in ein Tool, das sie in priorisierte Maßnahmen und fertigen Content übersetzt, vom Account bis zur ASIN. Jede Zahl trägt Formel und Quelle. Jeder generierte Text besteht ein deterministisches Prüf-Gate. Keine Fassaden-Daten. Zuerst intern; Kunden-Accounts sind Zielbild, nicht v1.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Die sechs Säulen + Fundament</h2>
+    <p class="h2sub">Ehrlicher Ist-Stand je Säule — was läuft, was fehlt, was auf Input wartet.</p>
+    <div class="legend">
+      <span class="chip c-good">fertig &amp; im Einsatz</span>
+      <span class="chip c-part">teilweise</span>
+      <span class="chip c-open">offen</span>
+      <span class="chip c-blocked">blockiert — braucht euren Input</span>
+    </div>
+    <div class="grid">
+      <div class="card"><h3><span class="nr">1</span>Performance &amp; Wirtschaftlichkeit</h3><ul>
+        <li><i class="dot d-good"></i><span class="done">Cockpit, Trends, Perioden-Diagnose, Margen-Rechner, Break-even-ACoS, Gebühren-PDF</span></li>
+        <li><i class="dot d-open"></i><span>Retourenquote (braucht Retouren-Bericht) → S2</span></li>
+      </ul></div>
+      <div class="card"><h3><span class="nr">2</span>Sichtbarkeit &amp; Wettbewerb</h3><ul>
+        <li><i class="dot d-good"></i><span class="done">SOV-Audit, Keyword-Basis mit Relevanz-Filter, Tiering, Zusammenführen/Löschen</span></li>
+        <li><i class="dot d-open"></i><span>SQP-Szenario-Rechner → S2</span></li>
+      </ul></div>
+      <div class="card"><h3><span class="nr">3</span>Content-AI</h3><ul>
+        <li><i class="dot d-good"></i><span class="done">Titel, Bullets, Highlights, Backend, Beschreibung, Q&amp;A — mit Gate + Begründungen</span></li>
+        <li><i class="dot d-blocked"></i><span>Bilder &amp; A+ — braucht Hauptbild-Prompt + Regeln → S3</span></li>
+        <li><i class="dot d-open"></i><span>Content-Performance-Monitoring</span></li>
+      </ul></div>
+      <div class="card"><h3><span class="nr">4</span>Listing-Diagnose</h3><ul>
+        <li><i class="dot d-good"></i><span class="done">Tiefen-Audit (8 Dimensionen), Analyse-Seite, Bild-Briefs</span></li>
+        <li><i class="dot d-part"></i><span>Score-Verdichtung · Bild-Audit offen</span></li>
+      </ul></div>
+      <div class="card"><h3><span class="nr">5</span>Advertising / PPC</h3><ul>
+        <li><i class="dot d-good"></i><span class="done">Search-Term-Analyse (Wasted Spend, Negativ-Kandidaten, N-Grams), Ziel-ACoS</span></li>
+        <li><i class="dot d-open"></i><span>Kampagnen-Templates, Gebots-Workflow → S5</span></li>
+      </ul></div>
+      <div class="card"><h3><span class="nr">6</span>Reviews / Voice of Customer</h3><ul>
+        <li><i class="dot d-good"></i><span class="done">Scrape je ASIN × Sterne-Klasse, Findings-Dashboard, fließt in Content</span></li>
+        <li><i class="dot d-blocked"></i><span>Review-Actor ersetzen (Name + Input-JSON) → S1</span></li>
+      </ul></div>
+      <div class="card"><h3><span class="nr">∑</span>Intelligenz-Schicht</h3><ul>
+        <li><i class="dot d-part"></i><span>Handlungs-Hebel in € vorhanden — Advisor + Alerts → S4</span></li>
+      </ul></div>
+      <div class="card"><h3><span class="nr">⌂</span>Fundament</h3><ul>
+        <li><i class="dot d-good"></i><span class="done">Auth, Team, Fehlercode-Popups, Daten &amp; Formeln, 128 Tests</span></li>
+        <li><i class="dot d-open"></i><span>Marketplace-Switcher, SP-API → S6</span></li>
+      </ul></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Sprint-Plan — 1 Woche, 1 Outcome, 1 prüfbare Abnahme</h2>
+    <p class="h2sub">Reihenfolge S3–S6 ist Vorschlag; wird je Sprint-Wechsel gemeinsam bestätigt.</p>
+    <div class="sprints">
+      <div class="sprint blocked-sprint"><div class="snum">S1</div><div class="sbody">
+        <h3>Optimizer verlässlich <span class="tag t-block">braucht E1</span></h3>
+        <p class="outcome">Ein echtes Kundenprodukt wird komplett durchoptimiert, ohne dass irgendwo etwas hakt: Review-Actor tauschen, End-zu-End-Härtung der Werkbank.</p>
+        <p class="abnahme"><b>Abnahme:</b> 3 echte ASINs von Import bis freigegebenem Content ohne Fehlercode; Review-Ausbeute plausibel gegen die Amazon-Seite.</p>
+      </div></div>
+      <div class="sprint"><div class="snum">S2</div><div class="sbody">
+        <h3>Monats-Rhythmus Reporting</h3>
+        <p class="outcome">Der Monatsbericht eines Kunden entsteht komplett im Tool: Retouren-Bericht + Retourenquote, SQP-Szenario-Rechner, geführter Monats-Upload.</p>
+        <p class="abnahme"><b>Abnahme:</b> Ein kompletter Kundenmonat hochgeladen → Cockpit, Diagnose und Hebel-Liste stimmen mit der Handrechnung überein.</p>
+      </div></div>
+      <div class="sprint blocked-sprint"><div class="snum">S3</div><div class="sbody">
+        <h3>Content Phase 2: Bilder &amp; A+ <span class="tag t-block">braucht E2</span></h3>
+        <p class="outcome">Bild-Briefs werden zu fertigen Bild-Prompts; A+ wird generiert und geprüft wie Bullets — sobald eure Quellen (Hauptbild-Prompt, A+-Regeln) da sind.</p>
+        <p class="abnahme"><b>Abnahme:</b> Für 1 Produkt entstehen Hauptbild-Prompt + A+-Entwürfe aus echten Daten, regelkonform geprüft.</p>
+      </div></div>
+      <div class="sprint"><div class="snum">S4</div><div class="sbody">
+        <h3>Intelligenz-Schicht v1</h3>
+        <p class="outcome">Das Tool nennt pro Marke die 3 wichtigsten Maßnahmen mit €-Hebel und Begründung; erste Alerts auf Ausreißer.</p>
+        <p class="abnahme"><b>Abnahme:</b> Advisor nennt 3 Maßnahmen mit Quelle, Formel, €-Korridor; Alert feuert auf präparierten Ausreißer.</p>
+      </div></div>
+      <div class="sprint"><div class="snum">S5</div><div class="sbody">
+        <h3>PPC-Ausbau</h3>
+        <p class="outcome">Search-Term-Findings werden zu umsetzbaren Kampagnen-Änderungen: Negativ-/Gebots-Checkliste mit Export, Struktur-Vorschlag aus dem Keyword-Tiering.</p>
+        <p class="abnahme"><b>Abnahme:</b> Aus einem echten Search-Term-Report entsteht eine exportierbare Negativliste + Struktur-Vorschlag.</p>
+      </div></div>
+      <div class="sprint"><div class="snum">S6</div><div class="sbody">
+        <h3>Skalierung</h3>
+        <p class="outcome">Marketplace-Switcher auf Markenebene, kategoriedynamische Fakten-Felder, SP-API-Spike (Gebühren-Schätzung als erster Adapter).</p>
+        <p class="abnahme"><b>Abnahme:</b> Produkt auf amazon.fr angelegt + importiert; API-Gebührenschätzung gegen PDF-Tabellen geprüft.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Arbeitsregeln — gelten in jedem Sprint</h2>
+    <ul class="rules">
+      <li><b>Keine Annahmen ohne Herleitung</b>Parser &amp; Regeln nur mit echter Beispieldatei oder Quellen-Dokument. Blockiert heißt blockiert.</li>
+      <li><b>LLM generiert, Code erzwingt</b>Jede LLM-Antwort läuft durch Normalisierung + deterministisches Gate.</li>
+      <li><b>Ehrliche Daten</b>Keine Fassaden-Scores; Stichprobe ≠ Gesamtzahl wird ausgewiesen.</li>
+      <li><b>Fehler als Popup mit Code</b>Nie eine nackte Fehlerseite; Buttons nur klickbar, wenn sie Neues erzeugen.</li>
+      <li><b>Anti-Blackbox</b>Neue Formel ⇒ Eintrag in Daten &amp; Formeln im selben Commit.</li>
+      <li><b>Ein Feature = ein Commit</b>Mit Tests; DECISIONS.md wird fortgeschrieben.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Offene Entscheidungen — liegen bei euch</h2>
+    <div class="tablewrap"><table>
+      <tr><th>Nr</th><th>Entscheidung</th><th>Blockiert</th></tr>
+      <tr><td class="eid">E1</td><td>Review-Actor: Name + Beispiel-Input-JSON (wie beim Listing-Crawler)</td><td>Sprint 1</td></tr>
+      <tr><td class="eid">E2</td><td>Hauptbild-Prompt + A+-/Bild-Regeln als Quellen-Material</td><td>Sprint 3</td></tr>
+      <tr><td class="eid">E3</td><td>Tier-Schnitte 3/13/18 und Cluster-Gewichte bestätigen oder ändern</td><td>—</td></tr>
+      <tr><td class="eid">E4</td><td>Sprint-Reihenfolge S3–S6 bestätigen oder umsortieren</td><td>Planung</td></tr>
+    </table></div>
+  </section>
+
+  <footer>Bewusst NICHT in v1: Market-Share-/Pricing-Intelligence, Forecasts, Lagerbestand, API-Write-back, Custom Dashboards, externe Kunden-Accounts, Multi-Marktplatz jenseits DE (bis S6). Bleibt Zielbild — blockiert nichts.</footer>
+</main>
