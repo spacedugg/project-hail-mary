@@ -39,9 +39,9 @@ Praxis-bestätigt sind bisher NUR: Login/Team, Marken- & Produkt-Verwaltung, Feh
 | Login, Team-Verwaltung, Mein Konto | ✅ | Zugriffsschutz; jeder im Team arbeitet unter eigenem Namen |
 | Marken- & Produkt-Verwaltung | ✅ | Struktur: Marke → Produkt (ASIN) — alles hängt daran |
 | Fehler-Popups mit Fehlercode + Lösung | ✅ | Kein stiller Abbruch; jeder Fehler ist verständlich und behebbar |
-| „Daten & Formeln"-Register (durchsuchbar) | ✅ | Jede Zahl im Tool nachrechenbar — Vertrauen, Schulung neuer Teammitglieder |
-| Gebühren-Update per Amazon-PDF (Diff-Vorschau → bestätigte Übernahme) | ✅ | Amazon ändert Gebühren → PDF hochladen → Margen-Rechner rechnet sofort richtig |
-| Demo-Daten & Zurücksetzen | ✅ | Gefahrloses Ausprobieren und Vorführen |
+| „Daten & Formeln"-Register (durchsuchbar) | 🧪 | Jede Zahl im Tool nachrechenbar — Vertrauen, Schulung neuer Teammitglieder |
+| Gebühren-Update per Amazon-PDF (Diff-Vorschau → bestätigte Übernahme) | 🧪 | Amazon ändert Gebühren → PDF hochladen → Margen-Rechner rechnet sofort richtig |
+| Demo-Daten & Zurücksetzen | 🧪 | Gefahrloses Ausprobieren und Vorführen |
 | Marketplace-Umschalter auf Markenebene | ⬜ | Gleiche Marke auf .de/.fr/.it getrennt steuern |
 | Kategorie-dynamische Produkt-Fakten | ⬜ | Fakten-Felder passen sich der Produktkategorie an (Textil ≠ Elektronik) |
 | Mandanten & Rollen (Kunde sieht nur Seins) | ⬜ Stufe 3 | Voraussetzung fürs Kunden-Abo |
@@ -51,13 +51,13 @@ Praxis-bestätigt sind bisher NUR: Login/Team, Marken- & Produkt-Verwaltung, Feh
 
 | Feature | Status | Handlung/Nutzen |
 |---|---|---|
-| Business-Report-Import (Umsatz, Bestellungen, Sitzungen, CVR, Buybox, AOV) | ✅ | Faktenbasis jeder Monats-Entscheidung |
-| Ads-Report-Import (Spend, ACoS, ROAS, CTR, CPC, PPC-CR) | ✅ | PPC-Wirtschaftlichkeit je Periode |
-| KPI-Cockpit mit Kennzahlen-Kacheln | ✅ | Zustand des Accounts auf einen Blick |
-| Trend-Linien über Perioden (Umsatz, TACoS) | ✅ | Entwicklung erkennen: wirkt die Maßnahme? |
-| ACoS/TACoS-Ampel gegen Break-even | ✅ | Sofort-Entscheidung: Ads drosseln oder skalieren |
-| Perioden-Diagnose (Umsatz = Sitzungen × CVR × AOV zerlegt) | ✅ | WARUM lief der Monat schlechter → gezielte Gegenmaßnahme |
-| Margen-Rechner + Break-even-ACoS je Produkt | ✅ | Preis-/Gebots-Entscheidungen auf Profitbasis |
+| Business-Report-Import (Umsatz, Bestellungen, Sitzungen, CVR, Buybox, AOV) | 🧪 | Faktenbasis jeder Monats-Entscheidung |
+| Ads-Report-Import (Spend, ACoS, ROAS, CTR, CPC, PPC-CR) | 🧪 | PPC-Wirtschaftlichkeit je Periode |
+| KPI-Cockpit mit Kennzahlen-Kacheln | 🧪 | Zustand des Accounts auf einen Blick |
+| Trend-Linien über Perioden (Umsatz, TACoS) | 🧪 | Entwicklung erkennen: wirkt die Maßnahme? |
+| ACoS/TACoS-Ampel gegen Break-even | 🧪 | Sofort-Entscheidung: Ads drosseln oder skalieren |
+| Perioden-Diagnose (Umsatz = Sitzungen × CVR × AOV zerlegt) | 🧪 | WARUM lief der Monat schlechter → gezielte Gegenmaßnahme |
+| Margen-Rechner + Break-even-ACoS je Produkt | 🧪 | Preis-/Gebots-Entscheidungen auf Profitbasis |
 | Handlungs-Hebel in € (priorisierte Maßnahmen-Liste) | 🔶 | Was zuerst tun — nach Geldwirkung sortiert |
 | Retourenquote (braucht Retouren-/Payments-Bericht) | ⬜ S2 | Retourentreiber erkennen → Produkt/Content anpassen |
 | SQP-Szenario-Rechner (was bringt +1 % CVR bei Suchanfrage X?) | ⬜ S2 | Content-/PPC-Investition dahin, wo sie am meisten bringt |
@@ -71,22 +71,22 @@ Praxis-bestätigt sind bisher NUR: Login/Team, Marken- & Produkt-Verwaltung, Feh
 |---|---|---|
 | Cerebro-Import → Keyword-Basis (ein Upload, alles drin) | ✅ | DIE Keyword-Quelle je Produkt |
 | Relevanz-Filter: Fremdmarken (KI-erkannt), abweichende Maße/Anzahl/Farbe/Form | ✅ | Nur relevante Keywords fließen in Content — markiert statt gelöscht, per Klick zurückholbar |
-| Keyword-Einteilung auf Content-Plätze (Titel/Bullets/Beschreibung/Backend) | ✅ | Jedes Keyword an den Platz mit der größten Wirkung |
-| Mehrere Exporte zusammenführen / Basis komplett löschen | ✅ | Basis wächst über Uploads; Neustart ist bewusste Entscheidung |
-| Manuelle Keywords | ✅ | Eigenes Marktwissen ergänzt die Tool-Daten |
-| SOV-Audit: Sichtbarkeits-Anteil vs. Wettbewerber, Quick-Wins, Umsatzlücken | ✅ | Wo verlieren wir sichtbar Umsatz → gezielt rankende Keywords angreifen |
-| SQP-Auswertung (eigene CTR/CVR vs. Markt, verlorene Käufe) | ✅ | Suchanfragen mit Unterperformance → Content/PPC-Handlung |
+| Keyword-Einteilung auf Content-Plätze (Titel/Bullets/Beschreibung/Backend) | 🧪 | Jedes Keyword an den Platz mit der größten Wirkung |
+| Mehrere Exporte zusammenführen / Basis komplett löschen | 🧪 | Basis wächst über Uploads; Neustart ist bewusste Entscheidung |
+| Manuelle Keywords | 🧪 | Eigenes Marktwissen ergänzt die Tool-Daten |
+| SOV-Audit: Sichtbarkeits-Anteil vs. Wettbewerber, Quick-Wins, Umsatzlücken | 🧪 | Wo verlieren wir sichtbar Umsatz → gezielt rankende Keywords angreifen |
+| SQP-Auswertung (eigene CTR/CVR vs. Markt, verlorene Käufe) | 🧪 | Suchanfragen mit Unterperformance → Content/PPC-Handlung |
 
 ### Säule 3 — Content
 
 | Feature | Status | Handlung/Nutzen |
 |---|---|---|
 | Listing-Import von Amazon (Titel, Bullets, Bilder, Bewertungszahlen) | ✅ | Ist-Zustand als Arbeitsgrundlage, ohne Abtippen |
-| Text-Generierung: Titel, Bullets, Highlights, Backend, Beschreibung, Q&A | ✅ | Upload-fertiger Content aus Keywords + Review-Erkenntnissen |
-| Automatische Prüfung (Zeichen/Bytes, Keyword-Pflichten, Fremdmarken-Verbot, USP-Dopplung) | ✅ | Kein regelwidriger Content geht raus — Prüfung ist Code, nicht Meinung |
-| Begründung je Textbestandteil | ✅ | Nachvollziehbar, WARUM jeder Baustein drinsteht — fürs Kunden-Gespräch |
-| Manuelle Bearbeitung mit derselben Prüfung | ✅ | Handarbeit spielt nach denselben Regeln |
-| Versionen + Freigabe-Workflow | ✅ | Stände vergleichbar, nichts geht verloren |
+| Text-Generierung: Titel, Bullets, Highlights, Backend, Beschreibung, Q&A | 🔶 in Reparatur | Praxistest-Fehlschlag (GEN-01) behoben — Denk-Budget des Modells war zu knapp (D106); erneuter Praxistest nötig |
+| Automatische Prüfung (Zeichen/Bytes, Keyword-Pflichten, Fremdmarken-Verbot, USP-Dopplung) | 🧪 | Kein regelwidriger Content geht raus — Prüfung ist Code, nicht Meinung |
+| Begründung je Textbestandteil | 🧪 | Nachvollziehbar, WARUM jeder Baustein drinsteht — fürs Kunden-Gespräch |
+| Manuelle Bearbeitung mit derselben Prüfung | 🧪 | Handarbeit spielt nach denselben Regeln |
+| Versionen + Freigabe-Workflow | 🧪 | Stände vergleichbar, nichts geht verloren |
 | Flat-File-Erstellung (Amazon-Vorlage einlesen → Upload-Datei) | 🔶 | Content ohne Copy-Paste in Seller Central bringen |
 | A+-Content-Generierung (Basic & Premium: Module, Maße, Karussell-Regeln aus dem Agentur-Wissen) | ⬜ S3 | A+ hebt Conversion — Regeln liegen im Repo-Wissen vor |
 | Bild-Prompts (Hauptbild, Galerie) | 🔒 wartet auf euren Hauptbild-Prompt | Fertige Prompts für die Bild-Produktion |
@@ -96,9 +96,9 @@ Praxis-bestätigt sind bisher NUR: Login/Team, Marken- & Produkt-Verwaltung, Feh
 
 | Feature | Status | Handlung/Nutzen |
 |---|---|---|
-| Tiefen-Audit (8 Dimensionen: Titel, Bullets, Beschreibung, Backend, Bilder, A+, Reviews, Preis) | ✅ | Vollbild des Listings → priorisierte Baustellen |
-| Analyse-Seite mit Druck-Layout | ✅ | Kundentaugliche Aufbereitung |
-| Bild-Briefs (Vorgaben für Grafiker aus Daten) | ✅ | Grafiker bekommt Fakten statt Bauchgefühl |
+| Tiefen-Audit (8 Dimensionen: Titel, Bullets, Beschreibung, Backend, Bilder, A+, Reviews, Preis) | 🧪 | Vollbild des Listings → priorisierte Baustellen |
+| Analyse-Seite mit Druck-Layout | 🧪 | Kundentaugliche Aufbereitung |
+| Bild-Briefs (Vorgaben für Grafiker aus Daten) | 🧪 | Grafiker bekommt Fakten statt Bauchgefühl |
 | Bild-Audit (automatische visuelle Prüfung) | ⬜ später | Hauptbild = größter CRO-Hebel |
 | Echter Listing-Score (Engine statt Handeingabe) | ⬜ später | Vergleichbarkeit über Produkte und Zeit |
 
@@ -106,9 +106,9 @@ Praxis-bestätigt sind bisher NUR: Login/Team, Marken- & Produkt-Verwaltung, Feh
 
 | Feature | Status | Handlung/Nutzen |
 |---|---|---|
-| Search-Term-Analyse: Wasted Spend, Negativ-Kandidaten | ✅ | Geldvernichter finden → Negativliste (direkte Handlung) |
-| N-Gram-Wurzeln | ✅ | Bleibt NUR als Zulieferer der Negativliste (Feature-Filter) |
-| Ziel-ACoS aus Portfolio-Namen + Überspend-Erkennung | ✅ | Kampagnen über Ziel → Gebote senken |
+| Search-Term-Analyse: Wasted Spend, Negativ-Kandidaten | 🧪 | Geldvernichter finden → Negativliste (direkte Handlung) |
+| N-Gram-Wurzeln | 🧪 | Bleibt NUR als Zulieferer der Negativliste (Feature-Filter) |
+| Ziel-ACoS aus Portfolio-Namen + Überspend-Erkennung | 🧪 | Kampagnen über Ziel → Gebote senken |
 | Negativ-/Gebots-Empfehlungen als abarbeitbare Checkliste mit Export | ⬜ S5 | Vom Befund zur umgesetzten Änderung in der Ads-Konsole |
 | Kampagnen-Struktur-Vorschlag aus Keyword-Einteilung | ⬜ S5 | Neue Kampagnen konsistent und schnell aufsetzen |
 | Kampagnen-Anlage per Ads-API | 🔒 Stufe 2 | Struktur-Vorschlag direkt ins Konto schreiben |
@@ -117,10 +117,10 @@ Praxis-bestätigt sind bisher NUR: Login/Team, Marken- & Produkt-Verwaltung, Feh
 
 | Feature | Status | Handlung/Nutzen |
 |---|---|---|
-| Review-Scrape je ASIN × Sterne-Klasse (eigenes Produkt + Wettbewerber, ASIN-Chips) | ✅ | O-Töne als Rohstoff — auch vom Wettbewerb |
-| Ehrliche Datenbasis (Amazon-Gesamtzahlen neben der Stichprobe, Ausbeute je Lauf) | ✅ | Keine Selbsttäuschung über die Datenlage |
-| Findings-Dashboard: Pain Points, Kaufauslöser, Kundensprache, O-Töne | ✅ | Einwände in Bullets/Q&A behandeln, Kaufauslöser in Headlines |
-| Erkenntnisse fließen automatisch in Content + Bild-Briefs | ✅ | Kein Übertragen von Hand |
+| Review-Scrape je ASIN × Sterne-Klasse (eigenes Produkt + Wettbewerber, ASIN-Chips) | 🔶 in Reparatur | Einzel-ASIN lief im Praxistest; Mehr-ASIN-Abbruch behoben (Zeitbudget, D102) — erneuter Praxistest nötig |
+| Ehrliche Datenbasis (Amazon-Gesamtzahlen neben der Stichprobe, Ausbeute je Lauf) | 🧪 | Keine Selbsttäuschung über die Datenlage |
+| Findings-Dashboard: Pain Points, Kaufauslöser, Kundensprache, O-Töne | 🔶 in Reparatur | Crash im Praxistest behoben (KI-Antwort wird erzwungen geprüft, D103) — erneuter Praxistest nötig |
+| Erkenntnisse fließen automatisch in Content + Bild-Briefs | 🧪 | Kein Übertragen von Hand |
 | Review-Bezug: bleibt Scraping | ✅ entschieden | Amazons offizielle APIs liefern KEINE Review-Texte (auch nicht für Wettbewerber) — Scraping ist der einzige Weg; aktueller Stand bleibt |
 
 ### Intelligenz-Schicht (über allen Säulen)
