@@ -48,6 +48,7 @@
   .chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 11px; font-size: 11.5px; font-weight: 600; }
   .chip::before { content: ""; width: 7px; height: 7px; border-radius: 999px; background: currentColor; }
   .c-good { color: var(--good); background: var(--good-soft); }
+  .c-built { color: var(--violet); background: rgb(111 99 194 / 0.12); }
   .c-part { color: var(--part); background: var(--part-soft); }
   .c-open { color: var(--open); background: var(--open-soft); }
   .c-blocked { color: var(--blocked); background: var(--blocked-soft); }
@@ -61,7 +62,7 @@
   .frow .fnutz { color: var(--muted); }
   @media (max-width: 640px) { .frow { grid-template-columns: 16px 1fr; } .frow .fnutz { grid-column: 2; } }
   .dot { width: 8px; height: 8px; border-radius: 999px; position: relative; top: -1px; justify-self: center; }
-  .d-good { background: var(--good); } .d-part { background: var(--part); }
+  .d-good { background: var(--good); } .d-built { background: var(--violet); } .d-part { background: var(--part); }
   .d-open { background: var(--open); opacity: 0.55; } .d-blocked { background: var(--blocked); }
 
   .sprints { display: flex; flex-direction: column; margin-top: 4px; }
@@ -91,7 +92,7 @@
 </head>
 <body>
 <main>
-  <div class="eyebrow">temoa OS · Projektplan v2 · Stand 20.07.2026</div>
+  <div class="eyebrow">temoa OS · Projektplan v2.1 · Stand 20.07.2026</div>
   <h1>Vision, alle Features, Sprint-Plan</h1>
   <p class="sub">Verbindliche Quelle ist <code>docs/PROJEKTPLAN.md</code> im Repository — diese Seite ist die visuelle Zusammenfassung. Wird nach jedem Sprint fortgeschrieben.</p>
 
@@ -133,8 +134,9 @@
   <section>
     <h2>Alle Features einzeln</h2>
     <div class="legend">
-      <span class="chip c-good">fertig &amp; im Einsatz</span>
-      <span class="chip c-part">teilweise</span>
+      <span class="chip c-good">im Praxistest bestätigt — von euch im echten Einsatz durchgespielt</span>
+      <span class="chip c-built">gebaut &amp; automatisch getestet — Praxistest steht aus</span>
+      <span class="chip c-part">teilweise / in Reparatur</span>
       <span class="chip c-open">geplant</span>
       <span class="chip c-blocked">wartet auf Input oder Zulassung</span>
     </div>
@@ -143,19 +145,19 @@
       <div class="frow"><i class="dot d-good"></i><span class="fname">Login, Team, Mein Konto</span><span class="fnutz">Jeder arbeitet unter eigenem Namen</span></div>
       <div class="frow"><i class="dot d-good"></i><span class="fname">Marken- &amp; Produkt-Verwaltung</span><span class="fnutz">Struktur Marke → Produkt (ASIN) — alles hängt daran</span></div>
       <div class="frow"><i class="dot d-good"></i><span class="fname">Fehler-Popups mit Code + Lösung</span><span class="fnutz">Kein stiller Abbruch — jeder Fehler ist behebbar erklärt</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">„Daten &amp; Formeln"-Register</span><span class="fnutz">Jede Zahl im Tool ist nachrechenbar (durchsuchbar)</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Gebühren-Update per Amazon-PDF</span><span class="fnutz">PDF hochladen → Vorschau alt/neu → Margen-Rechner rechnet richtig</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">„Daten &amp; Formeln"-Register</span><span class="fnutz">Jede Zahl im Tool ist nachrechenbar (durchsuchbar)</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">Gebühren-Update per Amazon-PDF</span><span class="fnutz">PDF hochladen → Vorschau alt/neu → Margen-Rechner rechnet richtig</span></div>
       <div class="frow"><i class="dot d-open"></i><span class="fname">Marketplace-Umschalter je Marke</span><span class="fnutz">Gleiche Marke auf .de/.fr/.it getrennt steuern</span></div>
       <div class="frow"><i class="dot d-open"></i><span class="fname">Mandanten, Rollen, Abo</span><span class="fnutz">Stufe 3: Kunde sieht nur Seins und zahlt monatlich</span></div>
     </div>
 
     <div class="saeule"><h3>1 · Performance &amp; Wirtschaftlichkeit</h3>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Business-Report-Import</span><span class="fnutz">Umsatz, Bestellungen, Sitzungen, Conversion, Buybox, Warenkorbwert</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Ads-Report-Import</span><span class="fnutz">Werbekosten, ACoS, ROAS, Klickpreise je Periode</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">KPI-Cockpit + Trend-Linien</span><span class="fnutz">Zustand und Entwicklung auf einen Blick — wirkt die Maßnahme?</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">ACoS/TACoS-Ampel gegen Break-even</span><span class="fnutz">Sofort-Entscheidung: Werbung drosseln oder skalieren</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Perioden-Diagnose</span><span class="fnutz">WARUM lief der Monat schlechter: Besucher, Conversion oder Warenkorb?</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Margen-Rechner + Break-even-ACoS</span><span class="fnutz">Preis- und Gebots-Entscheidungen auf Profitbasis</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">Business-Report-Import</span><span class="fnutz">Umsatz, Bestellungen, Sitzungen, Conversion, Buybox, Warenkorbwert</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">Ads-Report-Import</span><span class="fnutz">Werbekosten, ACoS, ROAS, Klickpreise je Periode</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">KPI-Cockpit + Trend-Linien</span><span class="fnutz">Zustand und Entwicklung auf einen Blick — wirkt die Maßnahme?</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">ACoS/TACoS-Ampel gegen Break-even</span><span class="fnutz">Sofort-Entscheidung: Werbung drosseln oder skalieren</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">Perioden-Diagnose</span><span class="fnutz">WARUM lief der Monat schlechter: Besucher, Conversion oder Warenkorb?</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">Margen-Rechner + Break-even-ACoS</span><span class="fnutz">Preis- und Gebots-Entscheidungen auf Profitbasis</span></div>
       <div class="frow"><i class="dot d-part"></i><span class="fname">Handlungs-Hebel in €</span><span class="fnutz">Maßnahmen nach Geldwirkung sortiert</span></div>
       <div class="frow"><i class="dot d-open"></i><span class="fname">Retourenquote</span><span class="fnutz">Sprint 2 — braucht den Retouren-/Payments-Bericht</span></div>
       <div class="frow"><i class="dot d-open"></i><span class="fname">SQP-Szenario-Rechner</span><span class="fnutz">Sprint 2 — was bringt +1 % Conversion bei Suchanfrage X in €?</span></div>
@@ -166,18 +168,18 @@
     <div class="saeule"><h3>2 · Sichtbarkeit &amp; Wettbewerb</h3>
       <div class="frow"><i class="dot d-good"></i><span class="fname">Cerebro-Import → Keyword-Basis</span><span class="fnutz">Ein Upload — die Keyword-Quelle je Produkt</span></div>
       <div class="frow"><i class="dot d-good"></i><span class="fname">Relevanz-Filter</span><span class="fnutz">Fremdmarken (KI-erkannt), falsche Maße/Anzahl/Farbe/Form — markiert statt gelöscht</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Keyword-Einteilung auf Content-Plätze</span><span class="fnutz">Wichtigste Keywords in den Titel, dann Bullets, Beschreibung, Backend</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Uploads zusammenführen / Basis löschen</span><span class="fnutz">Basis wächst über mehrere Exporte; Neustart nur bewusst</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">SOV-Audit (Sichtbarkeits-Anteil)</span><span class="fnutz">Wo verlieren wir gegen Wettbewerber sichtbar Umsatz → Quick-Wins</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">SQP-Auswertung</span><span class="fnutz">Eigene Klick-/Kaufraten vs. Markt je Suchanfrage → verlorene Käufe</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">Keyword-Einteilung auf Content-Plätze</span><span class="fnutz">Wichtigste Keywords in den Titel, dann Bullets, Beschreibung, Backend</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">Uploads zusammenführen / Basis löschen</span><span class="fnutz">Basis wächst über mehrere Exporte; Neustart nur bewusst</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">SOV-Audit (Sichtbarkeits-Anteil)</span><span class="fnutz">Wo verlieren wir gegen Wettbewerber sichtbar Umsatz → Quick-Wins</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">SQP-Auswertung</span><span class="fnutz">Eigene Klick-/Kaufraten vs. Markt je Suchanfrage → verlorene Käufe</span></div>
     </div>
 
     <div class="saeule"><h3>3 · Content</h3>
       <div class="frow"><i class="dot d-good"></i><span class="fname">Listing-Import von Amazon</span><span class="fnutz">Ist-Zustand (Titel, Bullets, Bilder, Bewertungszahlen) ohne Abtippen</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Text-Generierung (6 Sektionen)</span><span class="fnutz">Titel, Bullets, Highlights, Backend, Beschreibung, Q&amp;A — aus Keywords + Review-Erkenntnissen</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Automatische Prüfung</span><span class="fnutz">Zeichen/Bytes, Keyword-Pflichten, Fremdmarken-Verbot — Prüfung ist Code, nicht Meinung</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Begründung je Textbestandteil</span><span class="fnutz">Fürs Kundengespräch: WARUM steht jeder Baustein drin</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Versionen + Freigabe</span><span class="fnutz">Stände vergleichbar, nichts geht verloren</span></div>
+      <div class="frow"><i class="dot d-part"></i><span class="fname">Text-Generierung (6 Sektionen)</span><span class="fnutz">Fehlschlag im Praxistest (GEN-01) behoben — Denk-Budget des KI-Modells war zu knapp; erneuter Praxistest nötig</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">Automatische Prüfung</span><span class="fnutz">Zeichen/Bytes, Keyword-Pflichten, Fremdmarken-Verbot — Prüfung ist Code, nicht Meinung</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">Begründung je Textbestandteil</span><span class="fnutz">Fürs Kundengespräch: WARUM steht jeder Baustein drin</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">Versionen + Freigabe</span><span class="fnutz">Stände vergleichbar, nichts geht verloren</span></div>
       <div class="frow"><i class="dot d-part"></i><span class="fname">Flat-File-Erstellung</span><span class="fnutz">Content ohne Copy-Paste in Seller Central bringen</span></div>
       <div class="frow"><i class="dot d-open"></i><span class="fname">A+-Content-Generierung</span><span class="fnutz">Sprint 3 — Basic/Premium-Regeln liegen im Agentur-Wissen vor</span></div>
       <div class="frow"><i class="dot d-blocked"></i><span class="fname">Bild-Prompts (Hauptbild, Galerie)</span><span class="fnutz">Wartet auf euren Hauptbild-Prompt als Vorlage</span></div>
@@ -185,25 +187,25 @@
     </div>
 
     <div class="saeule"><h3>4 · Listing-Diagnose</h3>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Tiefen-Audit (8 Dimensionen)</span><span class="fnutz">Titel bis Preisstrategie — priorisierte Baustellen je Listing</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Analyse-Seite (druckbar)</span><span class="fnutz">Kundentaugliche Aufbereitung</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Bild-Briefs</span><span class="fnutz">Grafiker bekommt Daten-Vorgaben statt Bauchgefühl</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">Tiefen-Audit (8 Dimensionen)</span><span class="fnutz">Titel bis Preisstrategie — priorisierte Baustellen je Listing</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">Analyse-Seite (druckbar)</span><span class="fnutz">Kundentaugliche Aufbereitung</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">Bild-Briefs</span><span class="fnutz">Grafiker bekommt Daten-Vorgaben statt Bauchgefühl</span></div>
       <div class="frow"><i class="dot d-open"></i><span class="fname">Bild-Audit + echter Listing-Score</span><span class="fnutz">Später — Hauptbild ist der größte Conversion-Hebel</span></div>
     </div>
 
     <div class="saeule"><h3>5 · Advertising / PPC</h3>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Search-Term-Analyse</span><span class="fnutz">Geldvernichter finden: Wasted Spend, Negativ-Kandidaten (N-Grams nur als Zulieferer)</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Ziel-ACoS + Überspend-Erkennung</span><span class="fnutz">Kampagnen über Ziel → Gebote senken</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">Search-Term-Analyse</span><span class="fnutz">Geldvernichter finden: Wasted Spend, Negativ-Kandidaten (N-Grams nur als Zulieferer)</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">Ziel-ACoS + Überspend-Erkennung</span><span class="fnutz">Kampagnen über Ziel → Gebote senken</span></div>
       <div class="frow"><i class="dot d-open"></i><span class="fname">Negativ-/Gebots-Checkliste mit Export</span><span class="fnutz">Sprint 5 — vom Befund zur umgesetzten Änderung</span></div>
       <div class="frow"><i class="dot d-open"></i><span class="fname">Kampagnen-Struktur-Vorschlag</span><span class="fnutz">Sprint 5 — aus der Keyword-Einteilung</span></div>
       <div class="frow"><i class="dot d-blocked"></i><span class="fname">Kampagnen-Anlage per Ads-API</span><span class="fnutz">Stufe 2 — Struktur direkt ins Konto schreiben</span></div>
     </div>
 
     <div class="saeule"><h3>6 · Reviews / Voice of Customer</h3>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Review-Scrape je ASIN × Sterne-Klasse</span><span class="fnutz">Eigenes Produkt + Wettbewerber; ehrliche Ausbeute je Lauf ausgewiesen</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Findings-Dashboard</span><span class="fnutz">Pain Points, Kaufauslöser, Kundensprache mit O-Tönen</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Automatischer Fluss in Content + Briefs</span><span class="fnutz">Einwände in Bullets/Q&amp;A, Kaufauslöser in Headlines — ohne Handarbeit</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Review-Bezug: bleibt Scraping (entschieden 20.07.)</span><span class="fnutz">Amazons offizielle APIs liefern keine Review-Texte — Scraping ist der einzige Weg</span></div>
+      <div class="frow"><i class="dot d-part"></i><span class="fname">Review-Scrape je ASIN × Sterne-Klasse</span><span class="fnutz">Einzel-ASIN lief im Praxistest; Mehr-ASIN-Abbruch behoben (Zeitbudget) — erneuter Praxistest nötig</span></div>
+      <div class="frow"><i class="dot d-part"></i><span class="fname">Findings-Dashboard</span><span class="fnutz">Crash im Praxistest behoben (KI-Antwort wird jetzt erzwungen geprüft) — erneuter Praxistest nötig</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">Automatischer Fluss in Content + Briefs</span><span class="fnutz">Einwände in Bullets/Q&amp;A, Kaufauslöser in Headlines — ohne Handarbeit</span></div>
+      <div class="frow"><i class="dot d-built"></i><span class="fname">Review-Bezug: bleibt Scraping (entschieden 20.07.)</span><span class="fnutz">Amazons offizielle APIs liefern keine Review-Texte — Scraping ist der einzige Weg</span></div>
     </div>
 
     <div class="saeule"><h3>Intelligenz-Schicht (über allen Säulen)</h3>
@@ -219,7 +221,7 @@
     <div class="sprints">
       <div class="sprint"><div class="snum">S1</div><div class="sbody">
         <h3>Optimizer verlässlich</h3>
-        <p class="outcome">Ein echtes Kundenprodukt wird komplett durchoptimiert, ohne dass etwas hakt. Review-Bezug bleibt Scraping (entschieden).</p>
+        <p class="outcome">Ein echtes Kundenprodukt wird komplett durchoptimiert, ohne dass etwas hakt. Jedes violette Feature des Optimizers wird dabei im echten Einsatz durchgespielt — erst dann wird es grün. Review-Bezug bleibt Scraping (entschieden).</p>
         <p class="abnahme"><b>Abnahme:</b> 3 echte Produkte von Import bis freigegebenem Content ohne Fehlermeldung.</p>
       </div></div>
       <div class="sprint"><div class="snum">S2</div><div class="sbody">

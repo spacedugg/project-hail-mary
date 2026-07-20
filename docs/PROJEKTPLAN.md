@@ -1,6 +1,6 @@
 # temoa OS — Projektplan (v2)
 
-> **Status:** v2, 2026-07-20. Fortschreibung nach jedem Sprint.
+> **Status:** v2.1, 2026-07-20. Fortschreibung nach jedem Sprint.
 > Fundament: `docs/product-scope.md` (Scope-Session 07.07.) + Baustand `docs/DECISIONS.md`.
 > **Das ist das Accountability-Dokument:** Gebaut wird, was hier steht. Jeder Sprint hat ein Ziel und eine prüfbare Abnahme.
 
@@ -26,7 +26,11 @@ Jedes Feature — bestehend oder neu — muss mindestens eine dieser Fragen mit 
 
 ## 3 · Alle Features einzeln — kompletter Bestand & Plan
 
-Status: ✅ fertig & im Einsatz · 🔶 teilweise · ⬜ geplant · 🔒 wartet auf Input/Zulassung
+Status-Regel (v2.1, Nutzer-Vorgabe 20.07.): **„Gebaut" ist nicht „funktioniert".** Grün gibt es erst, wenn das Feature im ECHTEN Einsatz von euch durchgespielt wurde — Buttons, die klickbar sind, zählen nicht.
+
+Status: ✅ im Praxistest bestätigt · 🧪 gebaut & automatisch getestet — Praxistest steht aus · 🔶 teilweise / in Reparatur · ⬜ geplant · 🔒 wartet auf Input/Zulassung
+
+Praxis-bestätigt sind bisher NUR: Login/Team, Marken- & Produkt-Verwaltung, Fehler-Popups, Cerebro-Import + Relevanz-Filter (echter Export verarbeitet), Listing-Import (Gesamtzahlen im Einsatz). In Reparatur nach Praxistest-Fehlschlag (Fix deployed, erneuter Test nötig): Text-Generierung (D106), Mehr-ASIN-Review-Scrape (D102), Findings-Dashboard (D103). Alles andere, was zuvor ✅ trug, ist ehrlich 🧪 — Sprint 1 spielt den Optimizer komplett durch und macht aus 🧪 dort ✅.
 
 ### Fundament (Plattform)
 
@@ -131,7 +135,7 @@ Status: ✅ fertig & im Einsatz · 🔶 teilweise · ⬜ geplant · 🔒 wartet 
 
 | Sprint | Outcome | Abnahme-Test |
 |---|---|---|
-| **S1 — Optimizer verlässlich** | Ein echtes Kundenprodukt komplett durchoptimiert, ohne dass etwas hakt (Review-Bezug bleibt Scraping — entschieden) | 3 echte ASINs von Import bis freigegebenem Content ohne Fehlercode |
+| **S1 — Optimizer verlässlich** | Ein echtes Kundenprodukt komplett durchoptimiert, ohne dass etwas hakt; jedes 🧪-Feature des Optimizers wird dabei im echten Einsatz durchgespielt und erst dann ✅ (Review-Bezug bleibt Scraping — entschieden) | 3 echte ASINs von Import bis freigegebenem Content ohne Fehlercode |
 | **S2 — Reporting-Monatsrhythmus** | Der Kundenmonat entsteht komplett im Tool: Retourenquote + SQP-Szenario-Rechner + geführter Upload | Ein Kundenmonat hochgeladen → Cockpit/Diagnose/Hebel stimmen mit Handrechnung überein |
 | **S3 — A+ Content** | A+ (Basic & Premium) wird generiert und geprüft wie Bullets — Regeln aus dem Agentur-Wissen | 1 Produkt bekommt regelkonforme A+-Modul-Entwürfe aus echten Daten |
 | **S4 — Amazon-API Stufe 1** 🔒 | Sobald SP-API/Ads-API-Zulassung da: Konten anbinden, Berichte automatisch ziehen (ersetzt manuelle Uploads; Parser bleiben) | Business- + Ads-Daten eines Kundenkontos kommen ohne manuellen Upload ins Cockpit, Zahlen identisch zum manuellen Bericht |
