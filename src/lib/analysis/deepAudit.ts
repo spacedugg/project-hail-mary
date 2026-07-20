@@ -176,7 +176,7 @@ export async function buildDeepAudit(input: DeepAuditInput): Promise<DeepAuditPa
     const res = await generateForRecipe("listing.deep-audit", {
       system: SYSTEM,
       messages: [{ role: "user", content: buildPrompt(input, dims) }],
-      maxTokens: 6000,
+      maxTokens: 16000, // Sonnet-5: Denkphase + Antwort teilen sich max_tokens (D106)
       temperature: 0.2,
     });
     raw = parseLlmJson(res.text);

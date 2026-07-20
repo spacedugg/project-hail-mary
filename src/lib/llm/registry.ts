@@ -56,8 +56,19 @@ class AnthropicProvider implements LlmProvider {
       body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
-    const data = (await res.json()) as { content: Array<{ type: string; text?: string }> };
+    const data = (await res.json()) as { content: Array<{ type: string; text?: string }>; stop_reason?: string };
     const text = data.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+    // Sonnet-5-Familie: adaptives Denken ist automatisch AN und teilt sich
+    // max_tokens mit der Antwort (D106). Frisst die Denkphase das Budget auf,
+    // kommt KEIN Text zurück — das war die Wurzel von „KI-Antwort enthielt
+    // kein JSON". Hier klar benennen statt kryptisch scheitern.
+    if (!text.trim()) {
+      throw new Error(
+        data.stop_reason === "max_tokens"
+          ? "Die Denkphase des Modells hat das gesamte Antwort-Budget (max_tokens) verbraucht — bitte erneut versuchen; wiederholt sich das, muss das Budget im Code erhöht werden."
+          : `Das Modell lieferte keinen Text (stop_reason: ${data.stop_reason ?? "unbekannt"}) — bitte erneut versuchen.`,
+      );
+    }
     return { text, model, provider: this.name };
   }
 }

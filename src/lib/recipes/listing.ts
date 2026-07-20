@@ -281,7 +281,11 @@ export async function generateSection(
     const res = await generateForRecipe(recipeKey, {
       system: SYSTEM,
       messages: [{ role: "user", content: sectionPrompt(section, inputs) }],
-      maxTokens: 3000, // Q&A/Beschreibung + Begründung sprengten 1200 → abgeschnittenes JSON (D81)
+      // 16000 statt 3000 (D106): Sonnet-5 denkt automatisch (adaptive thinking)
+      // und max_tokens deckelt Denken + Antwort GEMEINSAM. Mit 3000 fraß die
+      // Denkphase bei komplexen Prompts (Bullets seit D98) das ganze Budget —
+      // Antwort leer → „KI-Antwort enthielt kein JSON" (Nutzer-Screenshot).
+      maxTokens: 16000,
       temperature: 0.4,
     });
     raw = res.text;
