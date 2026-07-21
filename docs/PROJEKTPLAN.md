@@ -1,6 +1,6 @@
 # temoa OS — Bauplan (v3)
 
-> **Status:** v3.7, 2026-07-21 (neu: Insight-Schema der Analyse-Ausgaben nach Referenz-Tool-Sichtung II, D131–D136). Fortschreibung nach jedem abgeschlossenen Feature.
+> **Status:** v3.7, 2026-07-21 (neu: Insight-Schema der Analyse-Ausgaben nach Referenz-Tool-Sichtung II, D131–D140). Fortschreibung nach jedem abgeschlossenen Feature.
 > Fundament: `docs/product-scope.md` (Scope-Session 07.07.) + Baustand `docs/DECISIONS.md`.
 > **Das ist das Accountability-Dokument:** Gebaut wird, was hier steht.
 > **Neu in v3 (Nutzer-Entscheidung 21.07.):** Der Plan ist nicht mehr nach Sprints sortiert, sondern ist der **Bauplan des Tools** — gegliedert wie die linke Seitenleiste: Menüpunkt → Untermenü → Features. Ein Menüpunkt/Feature wird komplett gebaut und **in sich getestet**, dann kommt der nächste. So wächst das Tool entlang seiner eigenen Struktur statt querbeet.
@@ -106,7 +106,7 @@ Content-Sprache ist je Produkt/Auftrag wählbar — unabhängig vom Marktplatz. 
 | Findings-Dashboard: Pain Points, Kaufauslöser, Kundensprache, O-Töne | 🔶 | Crash behoben (D103) — erneuter Praxistest nötig |
 | Insight-Verdichtung: Roh-Themen → benannte Kaufgründe/Erkenntnisse in Klartext, nach Relevanz sortiert, mit Rückverweis auf Belege (D131) | ⬜ | Die Stufe zwischen Zählung und Content — Kaufgründe, die man Kunden und Grafikern vorlegen kann |
 | Zwei-Ebenen-Ausgabe: je Insight die zugeordneten Roh-Aspekte mit Zählwerten aufklappbar; gegensätzliche Aspekte → EIN ausgewogenes Insight; Dedup-Gate gegen Wiederholungen (D137) | ⬜ | Beleg-Kette sichtbar; Widersprüche werden Erwartungs-Management statt Schönfärberei |
-| Einheitliche Insight-Karte als Schema ALLER Erkenntnisse: Titel · Beschreibung · Relevanz (1–5) · Journey-Phase · Datenquellen · Bild-Ideen (D132) | ⬜ | Eine Struktur, eine Render-Komponente; Briefs & Generierung konsumieren jede Erkenntnis gleich |
+| Einheitliche Insight-Karte als Schema ALLER Erkenntnisse: Titel · Beschreibung · Relevanz/Häufigkeit · Datenquellen · Bild-Ideen · Beleg-Aspekte (D132, verschlankt per D140 — ohne Sentiment-Label & Journey-Phase) | ⬜ | Eine Struktur, eine Render-Komponente; Briefs & Generierung konsumieren jede Erkenntnis gleich |
 | Datenquellen-Ausweis je Erkenntnis — Quellen-Tags werden durch die Pipeline MITGEFÜHRT, Erkenntnis ohne Quelle fliegt raus (D133) | ⬜ | Jede Erkenntnis prüfbar (welche Reviews/Sektionen sagen das?); Wahrheits-Filter gegen KI-Erfindungen |
 | Mehrstufige Insight-Pipeline in Etappen: je Schritt ein Request, Zwischenstände gespeichert, Fortschritt sichtbar, Etappen einzeln nachholbar (D136) | ⬜ | Qualität vor Tempo — Gesamtlaufzeit von Minuten ist ok; 300 s gelten je Etappe, nie als Qualitäts-Budget der Analyse |
 | Analyse-Trichter am Kopf der Insight-Ausgabe: X Reviews → Y Roh-Aspekte → Z Insights (D139) | ⬜ | Macht das Verdichtungs-Prinzip selbsterklärend; Zahlen existieren schon, reine Darstellung |
