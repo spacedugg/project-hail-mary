@@ -149,7 +149,7 @@ AUFGABE: Schreibe genau ${RULES.bullets.count} Bullet Points.
 REGELN (knowledge/content/bullets.md + Blog 07/2026):
 - Jeder Bullet: HEADLINE IN VERSALIEN (3–5 Wörter) + Doppelpunkt + max. 3 Sätze.
 - BENEFIT ZUERST (erste 5–8 Wörter): die Headline IST eine kurze Benefit-Aussage, NIE ein Feature-Name („BLEIBT JAHRELANG SCHARF", nicht „GEHÄRTETER EDELSTAHL"). Kunden kaufen, was Features ihnen bringen.
-- Satzbau je Bullet: Benefit-Aussage → Feature als Beleg im selben Gedanken → Konkretes hinten dran (Material, Maß, Prüfnorm, Garantie oder Use Case).
+- DREI-POSITIONEN-ANATOMIE (Schaubild Blog 07/2026) — jeder Bullet in dieser Reihenfolge: POSITION 1 = Benefit zuerst (Headline + erste 5–8 Wörter). POSITION 2 = das Feature dahinter als Beleg, mit dem Secondary Keyword NATÜRLICH integriert. POSITION 3 = Use Case + konkrete Details: für wen/wann geeignet + Material, Maß, Prüfnorm oder Garantie. Beispiel: „Bleibt jahrelang scharf im täglichen Einsatz. Gehärteter Edelstahl mit dreifach geschliffener Klinge. Kein Nachschärfen nötig. 20 cm Klinge. 10 Jahre Garantie."
 - EIN BULLET = EIN THEMA: Jeder Satz eines Bullets belegt die Kernaussage seiner Headline. Ein Fakt, der nicht zum Thema gehört (z. B. Farbtemperatur im Stoßfestigkeits-Bullet), gehört in einen anderen Bullet oder fällt weg.
 - DREI JOBS je Bullet: einen wahrscheinlichen Einwand entkräften + einen konkreten Use Case bestätigen + ein Secondary Keyword NATÜRLICH unterbringen. Keyword-Stapeln auf Kosten der Lesbarkeit verliert alle drei — Kunden scannen in 2 Sekunden.
 - BUDGET AUSNUTZEN: Ziel ≥${RULES.bullets.utilizationMinBytes} Bytes pro Bullet, hartes Max ${RULES.bullets.hardMaxChars} Zeichen — so viel Substanz wie möglich, kein Füllwort-Padding.
