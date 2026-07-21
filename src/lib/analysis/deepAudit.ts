@@ -37,7 +37,7 @@ export const DIM_LABELS: Record<DeepAuditDimension["key"], string> = {
   backend: "Backend-Keywords",
   images: "Bilder",
   aplus: "A+ Content",
-  reviews: "Bewertungs-Sockel",
+  reviews: "Bewertungs-Basis (Sterne-Verteilung)",
   price: "Preisstrategie",
 };
 
@@ -84,7 +84,7 @@ ${input.bullets.map((b) => `• ${b}`).join("\n") || "(fehlen)"}
 BESCHREIBUNG: ${input.description.slice(0, 3000) || "(fehlt)"}
 ${input.backendKeywords ? `BACKEND-KEYWORDS: ${input.backendKeywords}` : ""}
 BILDER: ${input.imageCount !== null ? `${input.imageCount} von 7 Slots belegt (Bildinhalte liegen dir NICHT vor — bewerte nur die Anzahl/Slot-Nutzung)` : "unbekannt"}
-BEWERTUNGS-SOCKEL: ${input.basics ? `${input.basics.reviewsTotal ?? "?"} Bewertungen · Ø ${input.basics.ratingAvg ?? "?"} ★${input.basics.dist ? ` · Verteilung ${Object.entries(input.basics.dist).map(([s, p]) => `${s}★ ${p}%`).join(", ")}` : ""}` : "unbekannt"}
+BEWERTUNGS-BASIS: ${input.basics ? `${input.basics.reviewsTotal ?? "?"} Bewertungen · Ø ${input.basics.ratingAvg ?? "?"} ★${input.basics.dist ? ` · Verteilung ${Object.entries(input.basics.dist).map(([s, p]) => `${s}★ ${p}%`).join(", ")}` : ""}` : "unbekannt"}
 ${input.priceEur !== null ? `PREIS: ${input.priceEur} €` : ""}
 
 KUNDENSTIMMEN (aus der Bewertungs-Analyse — Primärquelle für USPs & Zielgruppe):
@@ -100,6 +100,7 @@ ${input.topGaps.length ? `TOP-UMSATZLÜCKEN (SOV): ${input.topGaps.slice(0, 5).m
 AUFGABE:
 1. LEITE aus Listing + Kundenstimmen her (nicht erfinden): 3–6 USPs (belegbar aus Daten), Zielgruppe (wer kauft wirklich, laut Reviews), Positionierung (1 Satz: wofür steht das Produkt im Markt).
 2. Bewerte NUR diese Dimensionen: ${dimList}. Je Dimension: score10 (0–10, ehrlich), aktuell (2–3 Sätze Ist-Stand), probleme (2–4 konkrete Punkte, mit Bezug auf Keywords/Pain Points wo passend), empfehlung (1–2 Sätze, umsetzbar).
+   Für die Bewertungs-Basis gilt: Benenne Sterne-Klassen IMMER explizit (negativ = 1–2 ★, neutral = 3 ★, positiv = 4–5 ★) und nutze ausschließlich die gelieferte Verteilung — keine Prozentwerte erfinden oder zusammenfassen, ohne zu sagen, welche Klassen gemeint sind.
 3. topActions: die 3–5 wichtigsten Maßnahmen über alle Dimensionen, priorisiert nach Hebel.
 
 JSON-Schema:

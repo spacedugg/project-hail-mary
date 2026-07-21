@@ -201,7 +201,9 @@ export function analyzeListing(input: {
       ...missing.map((p) => `Nicht adressiert: „${p.label}"${p.frequencyPct ? ` (${p.frequencyPct} % der kritischen Stimmen)` : ""}`),
       "Der Abgleich ist wortstamm-basiert (Thema muss in den Bullets vorkommen) — ob ein Einwand inhaltlich entkräftet ist, bewertet der Tiefen-Audit.",
     ];
-    dims.push({ key: "voc", label: "Kundenstimmen-Abgleich", score: pct, measured: true, evidence: "deterministic", findings, issues: [] });
+    // Umbenannt (Nutzer 21.07.): Es geht nicht nur um „Kundenstimmen", sondern
+    // darum, ob die Top-Pain-Points im Content adressiert sind → Quality Score.
+    dims.push({ key: "voc", label: "Quality Score (Pain-Point-Abdeckung)", score: pct, measured: true, evidence: "deterministic", findings, issues: [] });
     if (missing[0]) recs.push(`Häufigsten Kunden-Einwand („${missing[0].label}") prominent in Bullet 1–2 entkräften.`);
   }
 

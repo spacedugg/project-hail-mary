@@ -265,7 +265,7 @@ export default async function AnalysePage({
               Gemessen wird der <b>wirksame Stand</b>: freigegebene Texte, sonst das Original-Listing — Entwürfe zählen nicht
               (deren Prüfung steht im Optimizer). Basis: Titel {quelleText(quellen.title)} · Bullets {quelleText(quellen.bullets)} ·
               Beschreibung {quelleText(quellen.description)} · Backend {quelleText(quellen.backendKeywords)}.
-              Der Kundenstimmen-Abgleich misst gegen die genannten Bullets.
+              Der Quality Score (Pain-Point-Abdeckung) misst gegen die genannten Bullets.
             </p>
           );
         })()}
