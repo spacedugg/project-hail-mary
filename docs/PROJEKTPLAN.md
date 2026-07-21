@@ -111,7 +111,8 @@ Praxis-bestätigt sind bisher NUR: Login/Team, Marken- & Produkt-Verwaltung, Feh
 | Ziel-ACoS aus Portfolio-Namen + Überspend-Erkennung | 🧪 | Kampagnen über Ziel → Gebote senken |
 | Negativ-/Gebots-Empfehlungen als abarbeitbare Checkliste mit Export | ⬜ S5 | Vom Befund zur umgesetzten Änderung in der Ads-Konsole |
 | Kampagnen-Struktur-Vorschlag aus Keyword-Einteilung | ⬜ S5 | Neue Kampagnen konsistent und schnell aufsetzen |
-| Kampagnen-Anlage per Ads-API | 🔒 Stufe 2 | Struktur-Vorschlag direkt ins Konto schreiben |
+| **Kampagnen-Upload als Bulk-Sheet (Excel)** — Struktur-Vorschlag wird als upload-fertiges Bulk-Sheet für die Ads-Konsole exportiert (heutiger Arbeitsweg des Teams) | ⬜ S5 | Kampagnen ohne Abtippen in der Ads-Konsole anlegen — das Excel entsteht im Tool statt von Hand |
+| Kampagnen-Anlage per Ads-API (ersetzt den Bulk-Sheet-Umweg) | 🔒 Stufe 2 | Struktur-Vorschlag direkt ins Ads-Konto schreiben — ohne Excel-Zwischenschritt |
 
 ### Säule 6 — Reviews / Voice of Customer
 
@@ -139,7 +140,7 @@ Praxis-bestätigt sind bisher NUR: Login/Team, Marken- & Produkt-Verwaltung, Feh
 | **S2 — Reporting-Monatsrhythmus** | Der Kundenmonat entsteht komplett im Tool: Retourenquote + SQP-Szenario-Rechner + geführter Upload | Ein Kundenmonat hochgeladen → Cockpit/Diagnose/Hebel stimmen mit Handrechnung überein |
 | **S3 — A+ Content** | A+ (Basic & Premium) wird generiert und geprüft wie Bullets — nach dem eingearbeiteten Design-Guide (D112); inkl. Optimizer-Abfrage: Basic/Premium, Modul-Anzahl (1–7), Modultypen | 1 Produkt bekommt regelkonforme A+-Entwürfe (Briefing-Stil: Content-Stoff, Desktop-only) aus echten Daten |
 | **S4 — Amazon-API Stufe 1** 🔒 | Sobald SP-API/Ads-API-Zulassung da: Konten anbinden, Berichte automatisch ziehen (ersetzt manuelle Uploads; Parser bleiben) | Business- + Ads-Daten eines Kundenkontos kommen ohne manuellen Upload ins Cockpit, Zahlen identisch zum manuellen Bericht |
-| **S5 — Intelligenz + PPC-Handlung** | Advisor nennt die 3 Maßnahmen mit €-Hebel; Negativ-/Gebots-Checkliste exportierbar | Advisor-Maßnahmen tragen Quelle + Formel + €; Negativliste aus echtem Search-Term-Report exportiert |
+| **S5 — Intelligenz + PPC-Handlung** | Advisor nennt die 3 Maßnahmen mit €-Hebel; Negativ-/Gebots-Checkliste exportierbar; Kampagnen-Struktur als upload-fertiges Bulk-Sheet (Excel) für die Ads-Konsole | Advisor-Maßnahmen tragen Quelle + Formel + €; Negativliste + Bulk-Sheet aus echten Daten exportiert und in der Ads-Konsole hochladbar |
 | **S6 — Custom Dashboards v1** | Kachel-Baukasten: jeder stellt sich sein Dashboard zusammen (Vorstufe Kunden-Sicht) | Zwei unterschiedliche Dashboards aus denselben Daten gebaut, gespeichert, wieder geöffnet |
 | danach | Marktplätze (.fr/.it …), Bild-Audit, Content-Monitoring, Mandanten/Rollen, Abo | — |
 
