@@ -46,15 +46,27 @@ class AnthropicProvider implements LlmProvider {
     };
     if (!SAMPLING_UNSUPPORTED.test(model)) body.temperature = req.temperature ?? 0.4;
 
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify(body),
-    });
+    // Hartes Zeitlimit UNTER dem Vercel-Budget (D109): läuft die Anfrage zu
+    // lange, gibt es eine klare deutsche Meldung statt eines von Vercel
+    // gekillten Prozesses ohne Rückmeldung („unexpected response", ALG-00).
+    let res: Response;
+    try {
+      res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(50_000),
+      });
+    } catch (e) {
+      if (e instanceof Error && e.name === "TimeoutError") {
+        throw new Error("Die KI-Anfrage hat das Zeitlimit (50 s) überschritten — bitte erneut versuchen. Läuft bereits eine andere Generierung, erst deren Ende abwarten: Anfragen laufen nacheinander.");
+      }
+      throw e;
+    }
     if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
     const data = (await res.json()) as { content: Array<{ type: string; text?: string }>; stop_reason?: string };
     const text = data.content.filter((b) => b.type === "text").map((b) => b.text).join("");

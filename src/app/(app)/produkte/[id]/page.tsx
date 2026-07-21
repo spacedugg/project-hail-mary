@@ -8,6 +8,7 @@ import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
 import { AsinChips } from "@/components/asin-chips";
 import { FehlerPopup } from "@/components/fehler-popup";
+import { GenerierSperre, GenerierButton } from "@/components/generier-sperre";
 import { fehlerInfo } from "@/lib/fehlercodes";
 import { IconUpload, IconCheck, IconSearch, IconReviews, IconContent, IconEuro } from "@/components/icons";
 
@@ -463,7 +464,7 @@ export default async function ProductPage({
             icon={<IconContent />}
             chip="chip-teal"
             title="Content"
-            sub="Grundlage ist die Bewertungs-Analyse (Kundensprache, Pain Points). Jede Version läuft durchs Validation-Gate; Freigaben speisen Flat File & Analyse."
+            sub="Grundlage ist die Bewertungs-Analyse (Kundensprache, Pain Points). Sektionen werden NACHEINANDER generiert — läuft eine, warten die anderen. Jede Version läuft durchs Validation-Gate."
             right={!insights ? <span className="pill pill-warn">gesperrt — Analyse fehlt</span> : undefined}
           />
           {/* Content-Gate (D108): ohne Bewertungs-Analyse nur mit doppelter Bestätigung */}
@@ -496,6 +497,7 @@ export default async function ProductPage({
               <SubmitButton className="mt-2 btn-dark text-xs">Zusatz-Infos speichern</SubmitButton>
             </form>
           </details>
+          <GenerierSperre>
           <div className="mt-4 space-y-3">
             {SECTIONS.map(({ key, label }) => {
               const dbType = key === "backend" ? "backend_keywords" : key === "highlights" ? "item_highlights" : key;
@@ -523,9 +525,7 @@ export default async function ProductPage({
                         <form action={generateContent}>
                           <input type="hidden" name="productId" value={product.id} />
                           <input type="hidden" name="section" value={key} />
-                          <SubmitButton className="btn-primary px-3 py-1 text-xs" pendingLabel="Generiert…" progress>
-                            {v ? "Neu generieren" : "Generieren"}
-                          </SubmitButton>
+                          <GenerierButton>{v ? "Neu generieren" : "Generieren"}</GenerierButton>
                         </form>
                       ) : (
                         /* Doppelte Bestätigung (D108): aufklappen + ankreuzen, erst dann generieren */
@@ -541,9 +541,7 @@ export default async function ProductPage({
                               <input type="checkbox" name="ohneAnalyseBestaetigt" required className="mt-0.5" />
                               <span>Ja, ich will diese Sektion bewusst ohne Bewertungs-Analyse generieren.</span>
                             </label>
-                            <SubmitButton className="mt-2 btn-primary w-full px-3 py-1 text-xs" pendingLabel="Generiert…" progress>
-                              Trotzdem generieren
-                            </SubmitButton>
+                            <GenerierButton className="mt-2 btn-primary w-full px-3 py-1 text-xs">Trotzdem generieren</GenerierButton>
                           </form>
                         </details>
                       )}
@@ -612,6 +610,7 @@ export default async function ProductPage({
               );
             })}
           </div>
+          </GenerierSperre>
         </section>
 
         {/* Marge & Break-even */}
