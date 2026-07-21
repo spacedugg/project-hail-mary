@@ -94,6 +94,12 @@ function contextBlock(inputs: RecipeInputs): string {
       ? `ZUSATZ-INFOS VOM TEAM (Fakten & Vorbilder — verwenden, aber NICHTS darüber hinaus erfinden):\n${inputs.zusatzKontext.trim().slice(0, 4000)}`
       : "",
   ];
+  // FAKTEN-SPERRE (D115, Northpoint-Lehre): erfundene Specs sind der
+  // schlimmste Fehler — der Zahlen-Herkunfts-Check (D114) blockt sie hart,
+  // aber der Prompt soll sie gar nicht erst entstehen lassen.
+  lines.push(
+    "FAKTEN-SPERRE (WICHTIGSTE REGEL): Jede Zahl, jedes Material, jede Norm und jeder Messwert im Text MUSS wörtlich aus den Angaben dieses Prompts stammen (Produkt-Wahrheit, Listing-IST, Zusatz-Infos, Keywords). Fehlt eine Angabe (z. B. Material, Farbtemperatur, Schutzklasse): WEGLASSEN — niemals schätzen, ableiten oder erfinden. NIEMALS Tests, Prüfungen oder Belege behaupten, die nicht in den Angaben stehen (kein ‚interne Falltests belegen', kein ‚geprüft nach…'). Kundenstimmen liefern Sprache, Prioritäten und Einwände — NIEMALS technische Daten (sie können sich auf andere Produkte beziehen).",
+  );
   // Ohne Bewertungs-Analyse (D108, nur nach doppelter Bestätigung): ehrlich
   // benennen, worauf die Texte dann bauen — und Kundensprache NICHT erfinden.
   if (!ri) {
@@ -144,6 +150,7 @@ REGELN (knowledge/content/bullets.md + Blog 07/2026):
 - Jeder Bullet: HEADLINE IN VERSALIEN (3–5 Wörter) + Doppelpunkt + max. 3 Sätze.
 - BENEFIT ZUERST (erste 5–8 Wörter): die Headline IST eine kurze Benefit-Aussage, NIE ein Feature-Name („BLEIBT JAHRELANG SCHARF", nicht „GEHÄRTETER EDELSTAHL"). Kunden kaufen, was Features ihnen bringen.
 - Satzbau je Bullet: Benefit-Aussage → Feature als Beleg im selben Gedanken → Konkretes hinten dran (Material, Maß, Prüfnorm, Garantie oder Use Case).
+- EIN BULLET = EIN THEMA: Jeder Satz eines Bullets belegt die Kernaussage seiner Headline. Ein Fakt, der nicht zum Thema gehört (z. B. Farbtemperatur im Stoßfestigkeits-Bullet), gehört in einen anderen Bullet oder fällt weg.
 - DREI JOBS je Bullet: einen wahrscheinlichen Einwand entkräften + einen konkreten Use Case bestätigen + ein Secondary Keyword NATÜRLICH unterbringen. Keyword-Stapeln auf Kosten der Lesbarkeit verliert alle drei — Kunden scannen in 2 Sekunden.
 - BUDGET AUSNUTZEN: Ziel ≥${RULES.bullets.utilizationMinBytes} Bytes pro Bullet, hartes Max ${RULES.bullets.hardMaxChars} Zeichen — so viel Substanz wie möglich, kein Füllwort-Padding.
 - Slot-Logik: 1 HOOK (stärkster USP) · 2 PROBLEM→BENEFIT (häufigster Pain Point!) · 3 TRUST (Material/Norm mit Beleg) · 4 USAGE · 5 CLOSE (Lieferumfang/Erwartungsmanagement). Häufigster Pain Point darf nach vorn rücken.
