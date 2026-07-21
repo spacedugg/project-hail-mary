@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { assessableDims, enforceDeepAudit, type DeepAuditInput } from "./deepAudit";
-import type { ReviewInsightsPayload } from "@/db/schema";
+import { assessableDims, enforceDeepAudit, istDeutsch, pruefeAuditBehauptungen, type DeepAuditInput } from "./deepAudit";
+import type { DeepAuditPayload, ReviewInsightsPayload } from "@/db/schema";
 
 const ri: ReviewInsightsPayload = {
   sources: [],
@@ -79,6 +79,61 @@ describe("enforceDeepAudit — LLM generiert, Code erzwingt", () => {
     const bullets = out.dimensions.find((d) => d.key === "bullets")!;
     expect(bullets.score10).toBeNull();
     expect(bullets.aktuell).toBe("Vom Modell nicht bewertet.");
+  });
+
+  it("Wahrheits-Filter (D126) — der Werkstattlampen-Fall: falsche Fehlt- und Sprach-Behauptungen fliegen", () => {
+    const input: DeepAuditInput = {
+      ...base,
+      title: "Northpoint LED Arbeitslampe kabellos mit Magnet für Werkstatt und Camping",
+      bullets: ["HELLES LICHT: 300 Lumen für Werkstatt, Keller und unterwegs. Batteriebetrieb mit 4x AA."],
+      description: "Die kabellose LED-Arbeitslampe von Northpoint ist der zuverlässige Begleiter für Werkstatt, Garage und Camping. Dank der starken Magnete hält sie sicher an allen metallischen Flächen und leuchtet dunkle Ecken zuverlässig aus.",
+    };
+    const payload: DeepAuditPayload = {
+      derived: { usps: [], zielgruppe: "", positionierung: "" },
+      dimensions: [
+        {
+          key: "title", label: "Titel", score10: 7,
+          aktuell: "Titel vorhanden.",
+          probleme: [
+            'Fehlende Anwendungs-Keywords wie „Camping" oder „Werkstatt"', // FALSCH — beide stehen im Titel
+            'Keine Erwähnung von „Batteriebetrieb"', // steht in den Bullets — Cross-Sektion deckt ab
+            'Das Haupt-Keyword „Taschenlampe" fehlt', // WAHR — steht nirgends, muss bleiben
+          ],
+          empfehlung: "",
+        },
+        {
+          key: "description", label: "Beschreibung", score10: 5,
+          aktuell: "Beschreibung vorhanden.",
+          probleme: ["Text ist nicht auf Deutsch", "Zu wenige Absätze"], // erste Behauptung FALSCH
+          empfehlung: "",
+        },
+      ],
+      topActions: [],
+    };
+    const out = pruefeAuditBehauptungen(payload, input);
+    const titel = out.dimensions.find((d) => d.key === "title")!;
+    expect(titel.probleme).toEqual(['Das Haupt-Keyword „Taschenlampe" fehlt']);
+    expect(titel.aktuell).toContain("entfernt");
+    const beschr = out.dimensions.find((d) => d.key === "description")!;
+    expect(beschr.probleme).toEqual(["Zu wenige Absätze"]);
+  });
+
+  it("istDeutsch: erkennt deutschen Text, urteilt nicht bei zu kurzem Text", () => {
+    expect(istDeutsch("Die kabellose Arbeitslampe ist der zuverlässige Begleiter für die Werkstatt und den Keller.")).toBe(true);
+    expect(istDeutsch("This is a fully English product description for a work light with magnets.")).toBe(false);
+    expect(istDeutsch("kurz")).toBe(false);
+  });
+
+  it("Wahrheits-Filter lässt echte Befunde unangetastet", () => {
+    const payload: DeepAuditPayload = {
+      derived: { usps: [], zielgruppe: "", positionierung: "" },
+      dimensions: [{ key: "title", label: "Titel", score10: 6, aktuell: "Ok.", probleme: ['„Edelstahl" fehlt im Titel'], empfehlung: "" }],
+      topActions: [],
+    };
+    const out = pruefeAuditBehauptungen(payload, base); // base-Titel enthält Edelstahl!
+    expect(out.dimensions.find((d) => d.key === "title")!.probleme).toEqual([]);
+    const out2 = pruefeAuditBehauptungen(payload, { ...base, title: "Trinkflasche 1L Glas" });
+    expect(out2.dimensions.find((d) => d.key === "title")!.probleme).toHaveLength(1);
   });
 
   it("begrenzt Listen (USPs ≤ 6, topActions ≤ 5, Probleme ≤ 4)", () => {

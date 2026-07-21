@@ -1,5 +1,6 @@
 import { generateForRecipe, resolveRecipe } from "@/lib/llm/registry";
 import { parseLlmJson } from "@/lib/llm/json";
+import { normalizeToken } from "@/lib/text/bytes";
 import type { DeepAuditDimension, DeepAuditPayload, ReviewInsightsPayload } from "@/db/schema";
 
 /**
@@ -97,8 +98,14 @@ Kundensprache: ${ri.languageToBorrow.slice(0, 8).map((w) => `„${w}"`).join(", 
 ${input.primaryKeywords.length ? `PRIMÄR-KEYWORDS: ${input.primaryKeywords.slice(0, 15).join(", ")}` : ""}
 ${input.topGaps.length ? `TOP-UMSATZLÜCKEN (SOV): ${input.topGaps.slice(0, 5).map((g) => `„${g.keyword}" (SV ${g.sv}, ~${Math.round(g.fullRevGap)} €/Mo)`).join("; ")}` : ""}
 
+BEWERTUNGS-REGELN (Nutzer-Feedback 21.07. — Verstöße machen das Audit unglaubwürdig):
+- SYNONYME ZÄHLEN: Ein Kaufargument gilt als abgedeckt, wenn es sinngemäß im Text steht („kabellos" deckt „Batteriebetrieb" ab, „Werkstatt" deckt „Garage" ab). Kritisiere NIE das Fehlen eines Wortes, dessen Bedeutung bereits da ist.
+- VOR JEDER FEHLT-BEHAUPTUNG: Lies den gelieferten Text wörtlich nach. Behaupte nur „X fehlt", wenn X wirklich nirgends steht (auch nicht als Wortstamm, Kompositum oder Synonym) — und setze den fehlenden Begriff in „Anführungszeichen".
+- EIN SYSTEM: Titel, Bullets und Beschreibung arbeiten zusammen — bewusste NICHT-Duplizierung ist richtig. Ein Kaufargument, das prominent in einer anderen Sektion steht, senkt den Score dieser Sektion NICHT (Beispiel: „Batteriebetrieb" prägnant in den Bullets reicht; der Titel darf andere kaufrelevante Keywords tragen).
+- SPRACHE: Behaupte „Text ist nicht auf Deutsch" nur, wenn der Text tatsächlich überwiegend fremdsprachig ist.
+
 AUFGABE:
-1. LEITE aus Listing + Kundenstimmen her (nicht erfinden): 3–6 USPs (belegbar aus Daten), Zielgruppe (wer kauft wirklich, laut Reviews), Positionierung (1 Satz: wofür steht das Produkt im Markt).
+1. LEITE aus Listing + Kundenstimmen her (nicht erfinden): 3–6 USPs (belegbare Produkteigenschaften aus Listing/Daten — NICHT bloß umformulierte Kaufauslöser, die existieren separat als eigene Liste), Zielgruppe (wer kauft wirklich, laut Reviews), Positionierung (1 Satz: wofür steht das Produkt im Markt).
 2. Bewerte NUR diese Dimensionen: ${dimList}. Je Dimension: score10 (0–10, ehrlich), aktuell (2–3 Sätze Ist-Stand), probleme (2–4 konkrete Punkte, mit Bezug auf Keywords/Pain Points wo passend), empfehlung (1–2 Sätze, umsetzbar).
    Für die Bewertungs-Basis gilt: Benenne Sterne-Klassen IMMER explizit (negativ = 1–2 ★, neutral = 3 ★, positiv = 4–5 ★) und nutze ausschließlich die gelieferte Verteilung — keine Prozentwerte erfinden oder zusammenfassen, ohne zu sagen, welche Klassen gemeint sind.
 3. topActions: die 3–5 wichtigsten Maßnahmen über alle Dimensionen, priorisiert nach Hebel.
@@ -151,6 +158,80 @@ export function enforceDeepAudit(
   };
 }
 
+// ── Wahrheits-Filter (D126): falsche Audit-Behauptungen deterministisch entfernen ──
+// Nutzer-Befunde 21.07.: „fehlende Anwendungs-Keywords wie Camping" — obwohl
+// „Camping" wörtlich im Titel stand; „Text ist nicht auf Deutsch" — obwohl die
+// Beschreibung zu 100 % deutsch war. Prompt-Regeln allein reichen nicht:
+// nachprüfbare Behauptungen werden HIER gegen den echten Text geprüft.
+
+const stamm = (w: string) => normalizeToken(w);
+
+/** Kommt der Begriff (wortstamm- & komposita-bewusst) im Text vor? */
+function begriffImText(begriff: string, textStaemme: Set<string>): boolean {
+  const woerter = begriff.split(/[\s\-/]+/).map(stamm).filter((s) => s.length >= 3);
+  if (woerter.length === 0) return false;
+  return woerter.every((w) =>
+    [...textStaemme].some((t) => t === w || (w.length >= 4 && t.includes(w)) || (t.length >= 4 && w.includes(t))),
+  );
+}
+
+const FEHLT_MUSTER = /fehlt|fehlen|keine erwähnung|nicht erwähnt|nicht enthalten|nirgends|ohne bezug auf/i;
+const NICHT_DEUTSCH_MUSTER = /(nicht|kein[e]?)\s+(auf\s+)?deutsch|komplett\s+englisch|text\s+ist\s+englisch|auf\s+englisch\s+verfasst/i;
+const DEUTSCH_SIGNAL = new Set(["der", "die", "das", "und", "ist", "mit", "für", "ein", "eine", "einen", "dem", "den", "nicht", "auf", "im", "sich", "auch", "bei", "aus", "wird", "werden", "von", "zu", "zum", "zur", "über", "nach", "durch", "oder", "wie", "sowie", "dank", "ihre", "ihr", "bis"]);
+
+export function istDeutsch(text: string): boolean {
+  const woerter = text.toLowerCase().split(/[^a-zäöüß]+/).filter(Boolean);
+  if (woerter.length < 5) return false; // zu kurz für ein Urteil — Behauptung nicht filtern
+  const treffer = woerter.filter((w) => DEUTSCH_SIGNAL.has(w)).length;
+  return treffer >= 3 || treffer / woerter.length >= 0.08;
+}
+
+/**
+ * Entfernt nachweislich falsche Problem-Behauptungen:
+ * 1. „X fehlt" mit zitiertem Begriff, der im GESAMTEN Listing vorkommt
+ *    (auch Cross-Sektion — ein Argument in den Bullets senkt den Titel nicht).
+ * 2. „Text ist nicht auf Deutsch", obwohl die Sektion deutsch ist.
+ * Gefilterte Behauptungen werden ehrlich als Hinweis ausgewiesen, nie still.
+ */
+export function pruefeAuditBehauptungen(payload: DeepAuditPayload, input: DeepAuditInput): DeepAuditPayload {
+  const gesamtText = [input.title, ...input.bullets, input.description, input.backendKeywords].join(" ");
+  const textStaemme = new Set(gesamtText.split(/[\s\-–—/,.;:!?()•·]+/).map(stamm).filter((s) => s.length >= 3));
+  const sektionsText: Partial<Record<DeepAuditDimension["key"], string>> = {
+    title: input.title,
+    bullets: input.bullets.join(" "),
+    description: input.description,
+    backend: input.backendKeywords,
+  };
+
+  const dimensions = payload.dimensions.map((d) => {
+    const eigenerText = sektionsText[d.key];
+    const entfernt: string[] = [];
+    const probleme = d.probleme.filter((p) => {
+      // Fall 1: Fehlt-Behauptung mit zitierten Begriffen, die nachweislich da sind
+      if (FEHLT_MUSTER.test(p)) {
+        const zitate = [...p.matchAll(/[„"]([^"""]+)["""]/g)].map((m) => m[1]).filter((z) => z.length <= 60);
+        if (zitate.length > 0 && zitate.every((z) => begriffImText(z, textStaemme))) {
+          entfernt.push(p);
+          return false;
+        }
+      }
+      // Fall 2: „nicht auf Deutsch", obwohl die Sektion deutsch ist
+      if (eigenerText && NICHT_DEUTSCH_MUSTER.test(p) && istDeutsch(eigenerText)) {
+        entfernt.push(p);
+        return false;
+      }
+      return true;
+    });
+    if (entfernt.length === 0) return d;
+    return {
+      ...d,
+      probleme,
+      aktuell: `${d.aktuell}${d.aktuell ? " " : ""}(${entfernt.length} KI-Behauptung${entfernt.length > 1 ? "en" : ""} entfernt — der bemängelte Begriff steht nachweislich im Listing bzw. der Text ist deutsch.)`,
+    };
+  });
+  return { ...payload, dimensions };
+}
+
 export async function buildDeepAudit(input: DeepAuditInput): Promise<DeepAuditPayload> {
   const dims = assessableDims(input);
   const { provider } = resolveRecipe("listing.deep-audit");
@@ -182,5 +263,5 @@ export async function buildDeepAudit(input: DeepAuditInput): Promise<DeepAuditPa
     });
     raw = parseLlmJson(res.text);
   }
-  return enforceDeepAudit(raw, dims);
+  return pruefeAuditBehauptungen(enforceDeepAudit(raw, dims), input);
 }
