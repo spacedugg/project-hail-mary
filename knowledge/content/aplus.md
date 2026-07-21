@@ -10,8 +10,20 @@
   mit Haupt-Keyword).
 - **Design als Gesamtkomposition**: Module bilden zusammen ein Bild mit
   fließenden Übergängen; Inhalte dürfen über Modulgrenzen laufen.
-  Basic: weißer Trennbalken zwischen Modulen (nicht änderbar).
-  Premium: Module stoßen nahtlos aneinander.
+  - **Premium = seamless** (Nachtrag 21.07., Praxisbeleg Gillette Labs): keine
+    Trennlinie → das gesamte A+ wird als EIN durchgehendes Bild komponiert;
+    Text- und Bild-Elemente (Ziffern, Verläufe, Kanten, Motive) DÜRFEN
+    Modulgrenzen überlaufen — die Module sind nur die technische Zerlegung
+    (je 2196 × 900). Übergänge werden beim Entwurf bewusst geplant.
+  - **Basic: weißer Trennbalken ist fix** — zwei legitime Strategien:
+    (a) kaschieren: Hintergründe Richtung Modulrand weiß gestalten oder weiße
+    Elemente einstreuen, sodass die Linie optisch verschwindet; (b) bewusst
+    stehen lassen: eine sichtbare Zäsur ist kein Fehler.
+- **Marken-Look durchgängig** (Nachtrag 21.07.): Farben, Typografie und
+  Bildsprache der Marke vom ersten bis zum letzten Modul — keine generische
+  KI-Optik (gleiche Layouts/Stock-Optik wie alle anderen lässt Käufer
+  vorbeiscrollen). Jedes Modul trägt EINEN Verkaufsgedanken, in Kundensprache
+  aus echten Reviews.
 - **Text nur IM Bild** (Designauftrag) — keine Amazon-Textbausteine, keine
   Text-Module. Deshalb entfallen z. B. Vier-Quadranten-Module mit Textfeld.
 - **Kein Designauftrag** sind: Basic-Vergleichstabelle, Premium-Vergleichstabelle

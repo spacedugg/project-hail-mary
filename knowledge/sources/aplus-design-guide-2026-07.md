@@ -62,3 +62,63 @@
    Points, Darstellungsweise, ggf. Bullets/Badges); die Platzierung und
    Anordnung der Module liegt bei Designer/KI. Anzahl und Modultypen werden
    trotzdem benannt.
+
+---
+
+## Nachtrag 21.07.2026 — Seamless-Komposition & Daten-Prinzip (Nutzer-Input + externer Post)
+
+Vom Nutzer geliefert: ein LinkedIn-Post eines Tool-Anbieters („Scalable",
+Premium-A+-Generierung) + ein Praxis-Screenshot (Gillette Labs Premium A+).
+**Nutzer-Vorgabe: NUR das reine Wissen entnehmen** — keine Feature-Ideen oder
+Vermarktungs-Aussagen des Anbieters übernehmen.
+
+### Der Screenshot (Gillette Labs, Premium A+)
+
+Ein komplettes Premium-A+ als ein durchgehendes dunkles Design. Lila
+gestrichelte Linien markieren (nur zur Erklärung) die Grenzen der **sechs
+einzelnen Bild-Module** — ohne die Markierung wirkt alles wie EIN langes,
+zusammenhängendes Bild:
+
+- Elemente laufen ÜBER Modulgrenzen: eine weiße Wellen-Kante verbindet
+  Modul 1 und 2; die große „12"-Ziffer und ein grüner Lichtstreif liegen auf
+  der Grenze von Modul 3/4; Hintergrund-Verläufe laufen durch.
+- Durchgängiger Marken-Look: Schwarz/Neongrün (Gillette-Labs-Farben), gleiche
+  Typografie (weiße + grüne Versalien-Headlines), gleiche Bildsprache vom
+  ersten bis zum letzten Modul; Logo-Abbinder im letzten Modul.
+- Jedes Modul trägt EINEN Verkaufsgedanken (Kompatibilität, 5 Klingen,
+  12er-Pack/Ergiebigkeit, Original-Ersatzklingen) — Text kurz, im Bild.
+
+### Mündliche Erläuterung des Nutzers
+
+1. **Premium A+: keine weiße Trennlinie** → das gesamte A+ wird als EIN
+   durchgehendes Bild komponiert („seamless"); Texte und Bild-Elemente dürfen
+   modul-/bildübergreifend stattfinden.
+2. **Basic A+: weiße Trennlinie ist fix**, aber strategisch nutzbar: (a)
+   kaschieren — Hintergründe im Bild Richtung Modulübergang weiß gestalten
+   oder weiße Elemente einstreuen, sodass die Linie optisch verschwindet;
+   (b) die Linie bewusst stehen lassen — eine sichtbare Zäsur ist kein
+   Fehler, „manchmal ist diese Linie auch nicht schlimm".
+3. Gilt als Hintergrundwissen für Basic UND Premium.
+
+### Wörtlich übernommenes Wissen aus dem Post (Rest verworfen)
+
+- Generische Prompts erzeugen generische Module — gleiche Layouts, gleiche
+  Stock-Optik, gleiche Wörter wie alle anderen; Käufer scrollen vorbei.
+- Gutes A+ ist datenbasiert: Produktdaten (Listing, Bilder, Specs) +
+  Markt/Wettbewerb (Feature-Lücken) + Kundenrezensionen — „every module says
+  what makes people buy. in your customers' words, not a prompt's."
+- Marken-Look durchgängig: „your colors, your type, your vibe. seamless from
+  the first module to the last."
+
+### Kritischer Abgleich (Aufnahme-Entscheidung)
+
+- Deckt sich mit unserem Bau: Der Content-Stoff der A+-Briefs kommt bereits
+  aus Produkt-Wahrheit + Review-Insights (Pain Points, Kaufauslöser,
+  Kundensprache) + Wettbewerbsdaten — das Daten-Prinzip ist bestätigt, nicht neu.
+- **Neu übernommen:** (a) Seamless-Kompositionsregel für Premium (Elemente
+  DÜRFEN Modulgrenzen überlaufen — bisher stand nur „nahtlos aneinander");
+  (b) Basic-Trennlinien-Strategie (kaschieren oder bewusst stehen lassen);
+  (c) Marken-Look-Pflicht (Farben/Typo/Bildsprache durchgängig, keine
+  generische KI-Optik) explizit im Brief.
+- **Nicht übernommen:** Produkt-/Feature-Versprechen des Anbieters
+  („2-click", „500 Reviews", Sekunden-Generierung) — Vermarktung, kein Wissen.

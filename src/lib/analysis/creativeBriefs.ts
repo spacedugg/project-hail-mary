@@ -45,6 +45,9 @@ DESIGN-ANSATZ (Design-Guide)
     gestaltet — Inhalte dürfen über Modulgrenzen laufen.
   - Amazon-Produktseiten sind immer weiß: Float-Effekte über reinweiße
     Hintergründe oder weiße Rahmen.
+  - MARKEN-LOOK DURCHGÄNGIG: Farben, Typografie und Bildsprache der Marke vom
+    ersten bis zum letzten Modul — keine generische KI-Optik. Jedes Modul
+    trägt EINEN Verkaufsgedanken.
   - TEXT NUR IM BILD (Teil des Designs) — keine Amazon-Textbausteine.
   - Briefing gilt für DESKTOP; die Mobil-Variante wird 1:1 abgeleitet
     (nur Format-Umbau).`;
@@ -53,7 +56,10 @@ DESIGN-ANSATZ (Design-Guide)
 SPEZIFIKATIONEN (Basic A+, Design-Guide)
   - Alle Bild-Module: 1940 × 1200 px (Desktop = Mobil) · JPG · < 2 MB
     (Höhe darf laut Guide variieren — Standard gilt, außer dieses Briefing sagt anderes)
-  - Anordnung auf Amazon: untereinander mit weißem Trennbalken (fix)
+  - Anordnung auf Amazon: untereinander mit weißem Trennbalken (fix).
+    Trennbalken-Strategie wählen: (a) kaschieren — Hintergründe Richtung
+    Modulrand weiß gestalten / weiße Elemente einstreuen, sodass die Linie
+    optisch verschwindet; oder (b) bewusst als Zäsur stehen lassen (kein Fehler)
   - Umfang: 6 designte Module (Standard — 1 von 7 Plätzen bleibt frei für die
     Vergleichstabelle, die in Seller Central gepflegt wird; abweichende Anzahl
     ggf. unten unter ANPASSUNGEN)`;
@@ -62,6 +68,10 @@ SPEZIFIKATIONEN (Basic A+, Design-Guide)
 SPEZIFIKATIONEN (Premium A+, Design-Guide — Desktop ≠ Mobil, hier Desktop)
   - STANDARD-MODUL Full Image: 2196 × 900 px · JPG · < 2 MB (Mobil 1440 × 1080)
   - Anordnung auf Amazon: Module stoßen NAHTLOS aneinander (kein weißer Zwischenraum)
+    → SEAMLESS komponieren: das gesamte A+ als EIN durchgehendes Bild entwerfen;
+    Text- und Bild-Elemente (Ziffern, Verläufe, Kanten, Motive) dürfen
+    Modulgrenzen überlaufen — Übergänge bewusst planen (die Module sind nur
+    die technische Zerlegung des Gesamtbilds)
   - Verfügbare Module (nur bei Bedarf, sonst Full Images):
     · Hotspots: 2196 × 900, 2–6 Hotspots (Layout setzt Amazon); mobil als Slider (2–8 × 1440 × 1080)
     · Navigation Carousel: 2–5 Slides 2196 × 900 — Menü-Bar oben freihalten, keine Layover mobil
