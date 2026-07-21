@@ -84,7 +84,7 @@ BULLETS:
 ${input.bullets.map((b) => `• ${b}`).join("\n") || "(fehlen)"}
 BESCHREIBUNG: ${input.description.slice(0, 3000) || "(fehlt)"}
 ${input.backendKeywords ? `BACKEND-KEYWORDS: ${input.backendKeywords}` : ""}
-BILDER: ${input.imageCount !== null ? `${input.imageCount} von 7 Slots belegt (Bildinhalte liegen dir NICHT vor — bewerte nur die Anzahl/Slot-Nutzung)` : "unbekannt"}
+BILDER: ${input.imageCount !== null ? `${input.imageCount} Slots belegt (nur Kontext — die Bild-Dimension bewertet der Code, NICHT du)` : "unbekannt"}
 BEWERTUNGS-BASIS: ${input.basics ? `${input.basics.reviewsTotal ?? "?"} Bewertungen · Ø ${input.basics.ratingAvg ?? "?"} ★${input.basics.dist ? ` · Verteilung ${Object.entries(input.basics.dist).map(([s, p]) => `${s}★ ${p}%`).join(", ")}` : ""}` : "unbekannt"}
 ${input.priceEur !== null ? `PREIS: ${input.priceEur} €` : ""}
 
@@ -155,6 +155,26 @@ export function enforceDeepAudit(
     },
     dimensions,
     topActions: strs(raw.topActions, 5),
+  };
+}
+
+/**
+ * Bild-Dimension rechnet der CODE, nicht die KI (D126, Nutzer-Regel 21.07.):
+ * ≥ 7 Bilder = Minimum voll erfüllt (10/10) — MEHR Bilder sind tendenziell
+ * gut, dafür gibt es NIE Abzüge. Bildinhalte kann das Tool nicht sehen —
+ * dafür gibt es weder Bewertung noch Fehler (ehrliche Grenze statt
+ * KI-Spekulation über „unklare Bildinhalte").
+ */
+export function bildDimension(imageCount: number): DeepAuditDimension {
+  const voll = imageCount >= 7;
+  const score = voll ? 10 : Math.round((imageCount / 7) * 100) / 10;
+  return {
+    key: "images",
+    label: DIM_LABELS.images,
+    score10: score,
+    aktuell: `${imageCount} Bild-Slot${imageCount === 1 ? "" : "s"} belegt.${voll ? " Minimum von 7 erfüllt — zusätzliche Bilder sind tendenziell gut und geben nie Abzug." : ""} Bildinhalte kann das Tool (noch) nicht sehen — dafür gibt es weder Bewertung noch Abzug; das inhaltliche Bild-Audit folgt mit der Bild-Phase.`,
+    probleme: voll ? [] : [`Nur ${imageCount} von 7 Bild-Slots belegt — jeder leere Slot verschenkt Verkaufsfläche.`],
+    empfehlung: voll ? "" : "Leere Slots mit Nutzen-Bildern füllen: Anwendung, Maße/Größenvergleich, Lieferumfang, Detail-Aufnahmen.",
   };
 }
 
@@ -234,6 +254,8 @@ export function pruefeAuditBehauptungen(payload: DeepAuditPayload, input: DeepAu
 
 export async function buildDeepAudit(input: DeepAuditInput): Promise<DeepAuditPayload> {
   const dims = assessableDims(input);
+  // Bilder bewertet der Code (bildDimension) — die KI bekommt sie gar nicht erst als Aufgabe.
+  const llmDims = new Set([...dims].filter((k) => k !== "images"));
   const { provider } = resolveRecipe("listing.deep-audit");
 
   let raw: Partial<DeepAuditPayload>;
@@ -244,7 +266,7 @@ export async function buildDeepAudit(input: DeepAuditInput): Promise<DeepAuditPa
         zielgruppe: "Mock: Pendler & Outdoor-Nutzer, die Zuverlässigkeit über Design stellen.",
         positionierung: "Mock: das Alltags-Arbeitstier unter den Trinkflaschen.",
       },
-      dimensions: [...dims].map((key) => ({
+      dimensions: [...llmDims].map((key) => ({
         key,
         label: DIM_LABELS[key],
         score10: 6,
@@ -257,11 +279,16 @@ export async function buildDeepAudit(input: DeepAuditInput): Promise<DeepAuditPa
   } else {
     const res = await generateForRecipe("listing.deep-audit", {
       system: SYSTEM,
-      messages: [{ role: "user", content: buildPrompt(input, dims) }],
+      messages: [{ role: "user", content: buildPrompt(input, llmDims) }],
       maxTokens: 16000, // Sonnet-5: Denkphase + Antwort teilen sich max_tokens (D106)
       temperature: 0.2,
     });
     raw = parseLlmJson(res.text);
   }
-  return pruefeAuditBehauptungen(enforceDeepAudit(raw, dims), input);
+  const payload = pruefeAuditBehauptungen(enforceDeepAudit(raw, llmDims), input);
+  // Bild-Dimension deterministisch einsetzen (der Code rechnet, nicht die KI)
+  if (dims.has("images") && input.imageCount !== null) {
+    payload.dimensions = payload.dimensions.map((d) => (d.key === "images" ? bildDimension(input.imageCount!) : d));
+  }
+  return payload;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assessableDims, enforceDeepAudit, istDeutsch, pruefeAuditBehauptungen, type DeepAuditInput } from "./deepAudit";
+import { assessableDims, bildDimension, enforceDeepAudit, istDeutsch, pruefeAuditBehauptungen, type DeepAuditInput } from "./deepAudit";
 import type { DeepAuditPayload, ReviewInsightsPayload } from "@/db/schema";
 
 const ri: ReviewInsightsPayload = {
@@ -134,6 +134,20 @@ describe("enforceDeepAudit — LLM generiert, Code erzwingt", () => {
     expect(out.dimensions.find((d) => d.key === "title")!.probleme).toEqual([]);
     const out2 = pruefeAuditBehauptungen(payload, { ...base, title: "Trinkflasche 1L Glas" });
     expect(out2.dimensions.find((d) => d.key === "title")!.probleme).toHaveLength(1);
+  });
+
+  it("bildDimension (D126): ≥7 = voll erfüllt, mehr nie ein Abzug, Bildinhalte ohne Urteil", () => {
+    const sieben = bildDimension(7);
+    expect(sieben.score10).toBe(10);
+    expect(sieben.probleme).toEqual([]);
+    const neun = bildDimension(9); // MEHR als 7 → weiterhin 10, kein Abzug
+    expect(neun.score10).toBe(10);
+    expect(neun.probleme).toEqual([]);
+    const fuenf = bildDimension(5);
+    expect(fuenf.score10).toBeLessThan(10);
+    expect(fuenf.probleme[0]).toContain("5 von 7");
+    // Ehrliche Grenze: kein Urteil über Bildinhalte, kein Fehler daraus
+    expect(sieben.aktuell).toContain("weder Bewertung noch Abzug");
   });
 
   it("begrenzt Listen (USPs ≤ 6, topActions ≤ 5, Probleme ≤ 4)", () => {
