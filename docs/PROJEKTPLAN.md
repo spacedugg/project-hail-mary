@@ -132,6 +132,7 @@ Content-Sprache ist je Produkt/Auftrag wählbar — unabhängig vom Marktplatz. 
 | Tiefen-Audit (8 Dimensionen) | 🧪 | Vollbild des Listings → priorisierte Baustellen |
 | Regel-Messung des WIRKSAMEN Stands (freigegeben sonst Original, je Sektion ausgewiesen) | 🧪 | Gemessen wird, was auf Amazon live gehen kann (D110) |
 | Kundenstimmen-Abgleich (Themen-Abgleich, komposita-bewusst) | 🧪 | Adressieren die Bullets die Top-Pain-Points? (D117 repariert) |
+| Insight-Schema auch für Audit-Ausgaben: Stärken/Schwächen, Maßnahmen, Kauf-Verhinderer als Insight-Karten (D135) | ⬜ | Ein Erkenntnis-Format über alle Analyse-Dimensionen statt sieben Ausgabeformate |
 | Druck-Layout | 🧪 | Kundentaugliche Aufbereitung |
 | Bild-Audit (automatische visuelle Prüfung) | ⬜ | Hauptbild = größter CRO-Hebel |
 | Echter Listing-Score (Engine statt Handeingabe) | ⬜ | Vergleichbarkeit über Produkte und Zeit |
