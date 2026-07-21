@@ -82,7 +82,7 @@
 <body>
 <main>
   <header>
-    <div class="eyebrow">temoa OS · Bauplan v3.0 · 21.07.2026</div>
+    <div class="eyebrow">temoa OS · Bauplan v3.1 · 21.07.2026</div>
     <h1>Der Bauplan: das Tool, gegliedert wie seine Seitenleiste</h1>
     <p class="sub">Nicht mehr nach Sprints sortiert (Entscheidung 21.07.): Dieses Dokument ist die komplette Basis des Tools — Menüpunkt → Untermenü → Features. Ein Feature wird komplett gebaut und <b>in sich getestet</b>, dann kommt das nächste. So wächst das Tool entlang seiner eigenen Struktur statt querbeet.</p>
   </header>
@@ -215,7 +215,7 @@
 
   <section>
     <h2>Ebene 2 — Marken-Sicht (je Kunde/Marke)</h2>
-    <p class="h2sub">Die Marken-Seitenleiste: Cockpit · Katalog · Sichtbarkeit &amp; Markt · Advertising/PPC · Berichte &amp; Daten · Flat Files · Handlungen.</p>
+    <p class="h2sub">Die Marken-Seitenleiste: Cockpit · Katalog · Sichtbarkeit &amp; Markt · Advertising/PPC · Berichte &amp; Daten · <b>Content-Verwaltung (CMS)</b> · Handlungen. Neu in v3.1: Der Menüpunkt „Flat Files" geht im CMS auf — Flat File ist dort der heutige Publish-Weg, der API-Push der künftige (E6 zur Bestätigung).</p>
 
     <div class="menu">
       <header><h3>Cockpit</h3><span class="pfad">/marke/[id]</span></header>
@@ -273,9 +273,17 @@
     </div>
 
     <div class="menu">
-      <header><h3>Flat Files</h3><span class="pfad">/marke/[id]/flatfiles</span></header>
+      <header><h3>Content-Verwaltung (CMS)</h3><span class="pfad">neu · absorbiert „Flat Files" (E6)</span></header>
       <div class="body">
-        <div class="frow"><span class="chip c-part">Reparatur</span><span class="f">Flat-File-Erstellung</span><span class="n">Amazon-Vorlage einlesen → Upload-Datei; Content ohne Copy-Paste in Seller Central</span></div>
+        <div class="frow" style="grid-template-columns: 1fr; border-top: none;"><span class="n">Der Content-Lebenszyklus je Kunde: <b>erstellen → speichern → publishen → überwachen</b> — für Retainer- UND projektbasierte Kunden mit wiederkehrenden Scopes. Kern-Prinzip <b>Soll/Ist</b>: Soll = unser erarbeiteter, freigegebener Stand in der Datenbank · Ist = das regelmäßig gecrawlte Live-Listing (gern schon VOR der Zusammenarbeit). Ziel: Content-Accuracy ≥ 95–99 % — Content ständig überall live und 100 % gepflegt = <b>Retail-Readiness</b>, das Fundament fürs PPC-Cycling.</span></div>
+        <div class="frow"><span class="chip c-part">Reparatur</span><span class="f">Flat-File-Erstellung</span><span class="n">Der HEUTIGE Publish-Weg: Amazon-Vorlage einlesen → Upload-Datei, Content ohne Copy-Paste in Seller Central</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Content-Bibliothek je Kunde &amp; Produkt</span><span class="n">Alle im Tool erstellten Pieces (SEO-Texte, Bilder, Hauptbilder, A+) zentral verwaltet — Versionen &amp; Freigaben aus dem Optimizer laufen hier zusammen</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Bestands-Content-Import</span><span class="n">Auch historisch für den Kunden erstellter Content wird eingepflegt und ab dann mitverwaltet</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Soll/Ist-Abgleich je Content-Piece</span><span class="n">Jede Abweichung zwischen freigegebenem Stand und Live-Listing wird sichtbar. Ehrliche Grenze: kontinuierlich erst mit automatischem Bezug (Stufe 2), bis dahin per manuellem Re-Import</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Content-Accuracy-Dashboard</span><span class="n">Widgets: wie viel % unseres Solls ist live? Internes Ziel ≥ 95–99 % — messbar je Kunde/Produkt, als Kachel auch fürs Cockpit</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Content-Alerts</span><span class="n">Hauptbild rausgeflogen, Listing gesperrt/unterdrückt, Text überschrieben → das Tool meldet es, bevor der Kunde es merkt</span></div>
+        <div class="frow"><span class="chip c-blocked">wartet</span><span class="f">Publish zu Amazon per SP-API</span><span class="n">Content direkt aus dem Tool pushen &amp; publishen — ersetzt den Flat-File-Umweg (gleiche Logik wie Ads-API vs. Bulk-Sheet; Stufe 2)</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Kunden-Feedback am Content-Piece</span><span class="n">Kunde hinterlegt Feedback direkt am Piece — mittelfristig, sobald Kunden angebunden sind (Richtung Stufe 3)</span></div>
       </div>
     </div>
 
@@ -314,6 +322,7 @@
         <tr><td>E3</td><td>Keyword-Aufteilung: wichtigste 3 → Titel, 4–13 → Bullets, 14–18 → Beschreibung, Rest → Backend</td><td><span class="estatus e-open">Offen</span> — Platzzahlen bestätigen oder ändern.</td></tr>
         <tr><td>E4</td><td>Sprint-Reihenfolge</td><td><span class="estatus e-gone">Abgelöst (21.07.)</span> — Struktur &amp; Reihenfolge folgen dem Bauplan: Menüpunkt für Menüpunkt, Feature für Feature, in sich getestet.</td></tr>
         <tr><td>E5</td><td>A+-Modul-Set</td><td><span class="estatus e-done">Gelöst (20.07.)</span> — Design-Guide geliefert und eingearbeitet.</td></tr>
+        <tr><td>E6</td><td>CMS-Verortung: eigener Marken-Menüpunkt „Content-Verwaltung (CMS)", in dem „Flat Files" als Publish-Weg aufgeht</td><td><span class="estatus e-open">Offen</span> — Struktur bestätigen, oder CMS anders schneiden.</td></tr>
       </tbody>
     </table>
   </section>

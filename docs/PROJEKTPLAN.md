@@ -1,6 +1,6 @@
 # temoa OS — Bauplan (v3)
 
-> **Status:** v3.0, 2026-07-21. Fortschreibung nach jedem abgeschlossenen Feature.
+> **Status:** v3.1, 2026-07-21 (neu: Menüpunkt Content-Verwaltung/CMS). Fortschreibung nach jedem abgeschlossenen Feature.
 > Fundament: `docs/product-scope.md` (Scope-Session 07.07.) + Baustand `docs/DECISIONS.md`.
 > **Das ist das Accountability-Dokument:** Gebaut wird, was hier steht.
 > **Neu in v3 (Nutzer-Entscheidung 21.07.):** Der Plan ist nicht mehr nach Sprints sortiert, sondern ist der **Bauplan des Tools** — gegliedert wie die linke Seitenleiste: Menüpunkt → Untermenü → Features. Ein Menüpunkt/Feature wird komplett gebaut und **in sich getestet**, dann kommt der nächste. So wächst das Tool entlang seiner eigenen Struktur statt querbeet.
@@ -151,7 +151,7 @@ Das Content-Kraftwerk. Untermenüs = die Bereiche des Produkt-Arbeitsplatzes.
 
 ## 5 · Bauplan Ebene 2 — Marken-Sicht (je Kunde/Marke)
 
-Die Marken-Seitenleiste: Cockpit · Katalog · Sichtbarkeit & Markt · Advertising/PPC · Berichte & Daten · Flat Files · Handlungen.
+Die Marken-Seitenleiste: Cockpit · Katalog · Sichtbarkeit & Markt · Advertising/PPC · Berichte & Daten · **Content-Verwaltung (CMS)** · Handlungen. Neu in v3.1: Der Menüpunkt „Flat Files" geht im CMS auf — Flat File ist dort der heutige Publish-Weg, der API-Push der künftige (E6 zur Bestätigung).
 
 ### Menüpunkt: Cockpit (`/marke/[id]`)
 
@@ -203,11 +203,20 @@ Die Marken-Seitenleiste: Cockpit · Katalog · Sichtbarkeit & Markt · Advertisi
 | Automatischer Berichts-Bezug per SP-API/Ads-API | 🔒 | Daten kommen von selbst, lückenlos · Zulassung läuft (Stufe 2); Adapter wird vorbereitet, Parser bleiben |
 | Forecasts, Lagerbestand | ⬜ | Erst mit API-Datenbasis sinnvoll · später |
 
-### Menüpunkt: Flat Files (`/marke/[id]/flatfiles`)
+### Menüpunkt: Content-Verwaltung — CMS (neu · absorbiert „Flat Files")
+
+Der Content-Lebenszyklus je Kunde: **erstellen → speichern → publishen → überwachen.** Für Retainer- UND projektbasierte Kunden mit wiederkehrenden Content-/Advertising-/Management-Scopes. Kern-Prinzip: **Soll/Ist** — Soll ist der von uns erarbeitete, freigegebene Stand in der Datenbank; Ist ist das regelmäßig gecrawlte Live-Listing auf Amazon (gern auch schon VOR der Zusammenarbeit). Ziel: Content-Accuracy ≥ 95–99 % — unser Content ist ständig überall live und 100 % gepflegt. Das ist die **Retail-Readiness**, das Fundament fürs PPC-Cycling.
 
 | Feature | Status | Handlung/Nutzen |
 |---|---|---|
-| Flat-File-Erstellung (Amazon-Vorlage einlesen → Upload-Datei) | 🔶 | Content ohne Copy-Paste in Seller Central bringen |
+| Flat-File-Erstellung (Amazon-Vorlage einlesen → Upload-Datei) | 🔶 | Der HEUTIGE Publish-Weg: Content ohne Copy-Paste in Seller Central bringen |
+| Content-Bibliothek je Kunde & Produkt | ⬜ | Alle im Tool erstellten Pieces (SEO-Texte, Bilder, Hauptbilder, A+) zentral verwaltet — Versionen & Freigaben aus dem Optimizer laufen hier zusammen |
+| Bestands-Content-Import (historischer Content) | ⬜ | Auch Content, der VOR dem Tool bzw. früher für den Kunden erstellt wurde, wird eingepflegt und ab dann mitverwaltet |
+| Soll/Ist-Abgleich je Content-Piece | ⬜ | Soll = freigegebener Stand im Tool · Ist = gecrawltes Live-Listing; jede Abweichung wird sichtbar. Ehrliche Grenze: kontinuierlich erst mit automatischem Bezug (Stufe 2), bis dahin per manuellem Re-Import |
+| Content-Accuracy-Dashboard (Widgets) | ⬜ | Wie viel % unseres Solls ist live? Internes Ziel ≥ 95–99 % — messbar je Kunde/Produkt, als Kachel auch fürs Cockpit |
+| Content-Alerts | ⬜ | Hauptbild rausgeflogen, Listing gesperrt/unterdrückt, Text überschrieben → das Tool meldet es, bevor der Kunde es merkt (Abgleich-Basis wie Soll/Ist) |
+| Publish zu Amazon per SP-API | 🔒 Stufe 2 | Content direkt aus dem Tool pushen & publishen — ersetzt den Flat-File-Umweg (gleiche Logik wie Ads-API vs. Bulk-Sheet) |
+| Kunden-Feedback am Content-Piece | ⬜ | Kunde hinterlegt Feedback direkt am Piece — mittelfristig, sobald Kunden angebunden sind (Richtung Stufe 3) |
 
 ### Menüpunkt: Handlungen (`/marke/[id]/handlungen`)
 
@@ -238,3 +247,4 @@ Die Marken-Seitenleiste: Cockpit · Katalog · Sichtbarkeit & Markt · Advertisi
 | E3 | Keyword-Aufteilung: wichtigste 3 → Titel, 4–13 → Bullets, 14–18 → Beschreibung, Rest → Backend | **Offen:** Platzzahlen bestätigen oder ändern |
 | E4 | ~~Sprint-Reihenfolge~~ | **Abgelöst (21.07.):** Struktur & Reihenfolge folgen dem Bauplan (Menüpunkt für Menüpunkt, Feature für Feature, in sich getestet) — Sprint-Sortierung entfällt. |
 | E5 | A+-Modul-Set | **Gelöst (20.07.):** Design-Guide geliefert und eingearbeitet (D112/D113). |
+| E6 | CMS-Verortung: eigener Marken-Menüpunkt „Content-Verwaltung (CMS)", in dem „Flat Files" als Publish-Weg aufgeht | **Offen:** Struktur bestätigen — oder CMS anders schneiden (z. B. eigener Reiter neben Flat Files) |
