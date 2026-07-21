@@ -85,6 +85,47 @@ function containsPhrase(hay: string, phrase: string): boolean {
   return words.every((w) => h.has(w));
 }
 
+/**
+ * Themen-Abgleich für Pain-Points (D117): Ein Pain-Point-Label ist ein ganzer
+ * Beschwerde-Satz („Magnete zu schwach — halten Lampe nicht sicher …"). Gute
+ * Bullets kontern den Einwand mit POSITIVER Sprache statt ihn wörtlich zu
+ * wiederholen — containsPhrase (JEDES Wort muss vorkommen) lieferte deshalb
+ * praktisch immer 0/5. Stattdessen: Inhaltswörter (ohne Funktionswörter)
+ * wortstamm- UND komposita-bewusst matchen („Lampe" trifft „Arbeitslampe",
+ * „Batteriefach" trifft „Batterien"). Rückgabe: die getroffenen Themenwörter.
+ */
+const FUNKTIONSWOERTER = new Set([
+  "nicht", "kein", "ohn", "sehr", "aber", "dass", "sich", "sind", "ist", "wird",
+  "werd", "hat", "hab", "fur", "auf", "aus", "mit", "von", "und", "bei", "beim",
+  "wenn", "weil", "noch", "nur", "auch", "schon", "mehr", "als", "wie", "man",
+  "durch", "gegen", "uber", "unter", "nach", "vor", "sonst", "dann",
+]);
+
+function themenTreffer(hay: string, phrase: string): { treffer: string[]; themen: number } {
+  const bulletStems = [...tokenSet(hay)];
+  const woerter = phrase.split(/[\s\-–—/,()]+/).filter((w) => w.length >= 3);
+  const themen = woerter
+    .map((w) => ({ wort: w, stamm: normalizeToken(w) }))
+    .filter((t) => t.stamm.length >= 3 && !FUNKTIONSWOERTER.has(t.stamm));
+  const treffer = themen
+    .filter(({ stamm }) =>
+      bulletStems.some(
+        (b) =>
+          b === stamm ||
+          (stamm.length >= 4 && b.includes(stamm)) ||
+          (b.length >= 4 && stamm.includes(b)),
+      ),
+    )
+    .map((t) => t.wort);
+  return { treffer, themen: themen.length };
+}
+
+/** Adressiert = mindestens 2 Themenwörter getroffen (bei sehr kurzen Labels reicht 1). */
+function adressiert(hay: string, phrase: string): { ok: boolean; treffer: string[] } {
+  const { treffer, themen } = themenTreffer(hay, phrase);
+  return { ok: themen <= 2 ? treffer.length >= 1 : treffer.length >= 2, treffer };
+}
+
 function scoreFromIssues(issues: ValidationIssue[], base = 100): number {
   const s = base - issues.filter((i) => i.severity === "error").length * 30 - issues.filter((i) => i.severity === "warning").length * 8;
   return Math.max(0, Math.min(100, s));
@@ -150,12 +191,15 @@ export function analyzeListing(input: {
   if (reviewInsights && reviewInsights.painPoints.length > 0) {
     const top = reviewInsights.painPoints.slice(0, 5);
     const bulletsText = snapshot.bullets.join(" ");
-    const addressed = top.filter((p) => containsPhrase(bulletsText, p.label));
+    const geprueft = top.map((p) => ({ p, ...adressiert(bulletsText, p.label) }));
+    const addressed = geprueft.filter((g) => g.ok);
     const pct = Math.round((addressed.length / top.length) * 100);
-    const missing = top.filter((p) => !containsPhrase(bulletsText, p.label));
+    const missing = geprueft.filter((g) => !g.ok).map((g) => g.p);
     const findings = [
       `${addressed.length} von ${top.length} Top-Pain-Points werden in den Bullets adressiert.`,
+      ...addressed.map((g) => `Adressiert: „${g.p.label}" — Themen-Treffer in den Bullets: ${g.treffer.join(", ")}`),
       ...missing.map((p) => `Nicht adressiert: „${p.label}"${p.frequencyPct ? ` (${p.frequencyPct} % der kritischen Stimmen)` : ""}`),
+      "Der Abgleich ist wortstamm-basiert (Thema muss in den Bullets vorkommen) — ob ein Einwand inhaltlich entkräftet ist, bewertet der Tiefen-Audit.",
     ];
     dims.push({ key: "voc", label: "Kundenstimmen-Abgleich", score: pct, measured: true, evidence: "deterministic", findings, issues: [] });
     if (missing[0]) recs.push(`Häufigsten Kunden-Einwand („${missing[0].label}") prominent in Bullet 1–2 entkräften.`);
