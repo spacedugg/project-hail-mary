@@ -141,6 +141,7 @@ Content-Sprache ist je Produkt/Auftrag wählbar — unabhängig vom Marktplatz. 
 | Feature | Status | Handlung/Nutzen |
 |---|---|---|
 | Bild-Briefs (Vorgaben für Grafiker aus Daten) | 🧪 | Grafiker bekommt Fakten statt Bauchgefühl |
+| Bild-Ideen je Erkenntnis: Insight-Karten liefern 2–3 visuelle Umsetzungsideen, Briefs zitieren Erkenntnis + Idee (D134) | ⬜ | Direkter Weg Kaufgrund → Bild; Ideen unterliegen denselben Wahrheits-Regeln wie Text (keine erfundenen Testimonials/Siegel) |
 | A+-Briefs Basic & Premium (nach Design-Guide: Maße, Module, Text nur im Bild, Desktop-only) | 🧪 | Design-Auftrag nach den echten Agentur-Regeln (D113) |
 
 ### Menüpunkt: Tool-Einstellungen (`/einstellungen` + Daten & Formeln)
