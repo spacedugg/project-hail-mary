@@ -81,10 +81,16 @@ export default async function BriefsPage({ params }: { params: Promise<{ id: str
       text: buildImageBrief({ brand: brandName, productName: displayName, asin: product.asin, facts: product.facts, snapshot, analysis, reviewInsights: insights?.payload ?? null }),
     },
     {
-      key: "aplus",
-      titel: "A+ Content Brief",
-      hinweis: "Modul-Plan mit Amazon-Specs, Inhalt je Modul aus USPs/Pain Points/Kaufauslösern, Alt-Text-Keywords.",
-      text: buildAplusBrief(briefInputs),
+      key: "aplus-basic",
+      titel: "A+ Content Brief — Basic",
+      hinweis: "Design-Guide-Specs (1940×1200, 6 Module, weißer Trenner), Content-Stoff statt starrer Modul-Zuordnung.",
+      text: buildAplusBrief(briefInputs, "basic"),
+    },
+    {
+      key: "aplus-premium",
+      titel: "A+ Content Brief — Premium",
+      hinweis: "Design-Guide-Specs (Full Image 2196×900, nahtlos, Karussells/Hotspots/Video bei Bedarf) — nur bei Premium-Zugang des Kunden.",
+      text: buildAplusBrief(briefInputs, "premium"),
     },
     {
       key: "store",

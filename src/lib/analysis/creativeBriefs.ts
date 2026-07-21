@@ -22,52 +22,91 @@ const list = (xs: (string | undefined)[] | undefined, fallback: string) => {
   return clean.length ? clean.map((x) => `  - ${x}`).join("\n") : `  - ${fallback}`;
 };
 
-/** A+-Content-Brief: Modul-Plan mit Amazon-Spezifikationen + Inhalt je Modul. */
-export function buildAplusBrief(i: BriefInputs): string {
-  const usps = (i.facts.usps ?? []).slice(0, 4);
-  const pains = (i.reviewInsights?.painPoints ?? []).slice(0, 3).map((p) => p.label);
-  const triggers = (i.reviewInsights?.buyingTriggers ?? []).slice(0, 3).map((t) => t.label);
+/**
+ * A+-Content-Brief nach dem internen Design-Guide (D112, E5):
+ * allgemeiner Briefing-Stil — Content-Stoff statt starrer Modul-Zuordnung,
+ * die Platzierung liegt bei Designer/KI. Variante Basic/Premium mit den
+ * echten temoa-Specs; Vergleichstabelle/FAQ sind KEIN Designauftrag.
+ * Die kundenindividuelle Abfrage (Variante, Modul-Anzahl, Modultypen) im
+ * Optimizer folgt in S3 — bis dahin Defaults: Basic 6 Module / Premium Full Images.
+ */
+export function buildAplusBrief(i: BriefInputs, variante: "basic" | "premium" = "basic"): string {
+  const usps = (i.facts.usps ?? []).slice(0, 5);
+  const pains = (i.reviewInsights?.painPoints ?? []).slice(0, 4).map((p) => p.label);
+  const triggers = (i.reviewInsights?.buyingTriggers ?? []).slice(0, 4).map((t) => t.label);
+  const borrow = (i.reviewInsights?.languageToBorrow ?? []).slice(0, 5);
 
-  return `A+ CONTENT BRIEF — ${i.brand} · ${i.productName}${i.asin ? ` (${i.asin})` : ""}
+  const kopf = `A+ CONTENT BRIEF (${variante === "basic" ? "BASIC" : "PREMIUM"}) — ${i.brand} · ${i.productName}${i.asin ? ` (${i.asin})` : ""}
 ================================================================
 
-ZIEL
-  A+ ersetzt die Beschreibung visuell: Einwände abbauen, USPs beweisen,
-  Vergleich klären. Kein Keyword-Stuffing — SEO passiert im Listing-Text;
-  A+-Alt-Texte tragen die Keywords (siehe unten).
+DESIGN-ANSATZ (Design-Guide)
+  - DESIGN ALS GESAMTKOMPOSITION: Anders als Listing-Bilder (jedes steht für
+    sich) wird A+ als Komposition der Bild-Module mit fließenden Übergängen
+    gestaltet — Inhalte dürfen über Modulgrenzen laufen.
+  - Amazon-Produktseiten sind immer weiß: Float-Effekte über reinweiße
+    Hintergründe oder weiße Rahmen.
+  - TEXT NUR IM BILD (Teil des Designs) — keine Amazon-Textbausteine.
+  - Briefing gilt für DESKTOP; die Mobil-Variante wird 1:1 abgeleitet
+    (nur Format-Umbau).`;
 
-AMAZON-SPEZIFIKATIONEN (Standard-A+, Stand prüfen bei Upload)
-  - Logo: 600×180 px
-  - Bild-Header mit Text: 970×600 px
-  - Vier Bilder & Text (Quadrant): 220×220 px je Bild
-  - Vergleichstabelle: bis 6 Spalten, Produktbilder 150×300 px
-  - Text: kein Hersteller-Werbeversprechen ohne Beleg, keine Preise,
-    keine Garantie-Aussagen, keine Kontaktdaten
-  - Alt-Texte: je Modul 1 beschreibender Satz MIT Haupt-Keyword
-    (${i.primaryKeywords.slice(0, 3).join(", ") || "Keywords aus Sektion 2 pflegen"})
+  const specsBasic = `
+SPEZIFIKATIONEN (Basic A+, Design-Guide)
+  - Alle Bild-Module: 1940 × 1200 px (Desktop = Mobil) · JPG · < 2 MB
+    (Höhe darf laut Guide variieren — Standard gilt, außer dieses Briefing sagt anderes)
+  - Anordnung auf Amazon: untereinander mit weißem Trennbalken (fix)
+  - Umfang: 6 designte Module (Standard — 1 von 7 Plätzen bleibt frei für die
+    Vergleichstabelle, die in Seller Central gepflegt wird; abweichende Anzahl
+    ggf. unten unter ANPASSUNGEN)`;
 
-MODUL-PLAN (Reihenfolge = Argumentationskette)
-  1) BILD-HEADER (970×600): Held im Nutzungskontext (${i.facts.targetAudience || "Zielgruppe definieren"}).
-     Headline-Botschaft: ${usps[0] ?? "Top-USP aus der Produkt-Wahrheit"}
-  2) VIER-QUADRANTEN (4× 220×220): je Quadrant EIN USP mit Detail-Foto —
-${list(usps, "USPs in der Produkt-Wahrheit pflegen (Sektion 1)")}
-  3) EINWAND-MODUL (Bild + Text): die häufigsten Kauf-Einwände direkt beantworten —
-${list(pains, "Review-Insights ausführen für echte Pain Points (auch der Wettbewerber)")}
-  4) VERGLEICHSTABELLE: dieses Produkt vs. 2–3 eigene Varianten ODER generischer
-     Wettbewerbsvergleich über Eigenschaften (nie Wettbewerber-Marken nennen).
-     Zeilen aus den Specs: ${Object.keys(i.facts.specs ?? {}).join(", ") || i.facts.dimensions || "Maße/Material/Zertifikate"}
-  5) ABSCHLUSS-BANNER: Kaufauslöser bestätigen —
-${list(triggers, "Kaufauslöser aus den Review-Insights")}
+  const specsPremium = `
+SPEZIFIKATIONEN (Premium A+, Design-Guide — Desktop ≠ Mobil, hier Desktop)
+  - STANDARD-MODUL Full Image: 2196 × 900 px · JPG · < 2 MB (Mobil 1440 × 1080)
+  - Anordnung auf Amazon: Module stoßen NAHTLOS aneinander (kein weißer Zwischenraum)
+  - Verfügbare Module (nur bei Bedarf, sonst Full Images):
+    · Hotspots: 2196 × 900, 2–6 Hotspots (Layout setzt Amazon); mobil als Slider (2–8 × 1440 × 1080)
+    · Navigation Carousel: 2–5 Slides 2196 × 900 — Menü-Bar oben freihalten, keine Layover mobil
+    · Regimen Carousel: 2–5 Slides 2196 × 900 — Menü stapelt rechts, freihalten
+    · Simple Image Carousel: 2–8 Slides 2196 × 900 (Pfeile/Punkte setzt Amazon)
+    · Full Video: MP4, min. 960 × 540, < 200 MB, max. ~180 s; Preview 2196 × 900 (JPG)
+    · Comparison Table 3: NUR Produktbilder designen (732 × 1050) — Tabelle in Seller Central
+  - Umfang: bis 7 Module, Standard Full Images (gewünschte Modultypen/Anzahl unten unter ANPASSUNGEN)`;
+
+  const inhalt = `
+CONTENT-STOFF (abzubilden — Platzierung & Modul-Aufteilung liegt beim Design)
+  Ziel: Einwände abbauen, USPs beweisen, Kauf bestätigen. Kein Keyword-Stuffing —
+  SEO passiert im Listing-Text; Keywords tragen NUR die Alt-Texte (je Modul 1
+  beschreibender Satz mit Haupt-Keyword: ${i.primaryKeywords.slice(0, 3).join(", ") || "Keywords pflegen"}).
+
+  USPs (jede genau einmal prominent):
+${list(usps, "USPs in der Produkt-Wahrheit pflegen")}
+  Pain Points (aus echten Reviews — visuell entkräften):
+${list(pains, "Bewertungs-Analyse ausführen für echte Pain Points")}
+  Kaufauslöser (bestätigen, was überzeugt):
+${list(triggers, "Kaufauslöser aus der Bewertungs-Analyse")}
+  Kundensprache (nah dran formulieren):
+${list(borrow, "—")}
+  Zielgruppe/Nutzungskontext: ${i.facts.targetAudience ?? "(Zielgruppe erfassen)"}
 
 PRODUKT-WAHRHEIT (Referenz — NICHTS erfinden, Reference-Fidelity)
   - Produkttyp: ${i.facts.productType ?? "—"} · Maße/Menge: ${i.facts.dimensions ?? "—"}
   - Materialien: ${(i.facts.materials ?? []).join(", ") || "—"}
   - Zertifikate (nur echte zeigen): ${(i.facts.certifications ?? []).join(", ") || "keine hinterlegt"}
 
+KEIN DESIGNAUFTRAG (wird in Seller Central gepflegt — Inhalt liefern, nicht gestalten)
+  - ${variante === "basic" ? "Vergleichstabelle (der freigehaltene 7. Modulplatz)" : "Premium-Vergleichstabelle (Var. 1 & 2) und Premium FAQ"}:
+    Zeilen/Fragen aus Specs & Pain Points — ${Object.keys(i.facts.specs ?? {}).join(", ") || i.facts.dimensions || "Maße/Material/Zertifikate"}
+
 REGELN FÜR DEN DESIGNER
   - Nur gelieferte Referenzfotos als Produktdarstellung (kein generisches Stock-Produkt)
-  - Text im Bild: kurz, ≥ 24 px Äquivalent, Kontrast AA; Rechtschreibung deutsch
-  - Keine Preise, keine "Nr. 1"-Claims, keine fremden Markennamen/Logos`;
+  - Text im Bild: kurz, gut lesbar, Kontrast AA; Rechtschreibung deutsch
+  - Keine Preise, keine "Nr. 1"-Claims, keine fremden Markennamen/Logos, keine erfundenen Siegel
+
+ANPASSUNGEN (kundenindividuell — falls abweichend vom Standard hier eintragen)
+  - Modul-Anzahl: __ · gewünschte Modultypen: __`;
+
+  return `${kopf}
+${variante === "basic" ? specsBasic : specsPremium}
+${inhalt}`;
 }
 
 /** Brand-Store-Konzept: Seitenstruktur + Kachel-Plan + Guidelines. */
