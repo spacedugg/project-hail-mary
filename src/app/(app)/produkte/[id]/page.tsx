@@ -460,10 +460,11 @@ export default async function ProductPage({
                 </div>
               )}
               <p className="mt-2 text-[11px] text-muted">
-                Gescraped werden geschriebene Rezensionen (je ASIN und Sterne-Klasse die bis zu 100 aktuellsten).
-                Amazons Gesamtzahl zählt auch Sterne-Bewertungen OHNE Text mit — die Stichprobe ist deshalb oft deutlich
-                kleiner als die Gesamtzahl, ohne dass etwas fehlt. Sie bildet kein Gesamtverhältnis ab; alle Klassen
-                fließen in Pain Points und Kaufauslöser ein.
+                Gescraped werden geschriebene Rezensionen (je ASIN und Sterne-Klasse die bis zu 100 aktuellsten) —
+                mehr als ~100 je Klasse gibt Amazon von außen nicht her (Seiten-Limit), das ist der harte Deckel von
+                max. ~500 je ASIN. Amazons Gesamtzahl zählt auch Sterne-Bewertungen OHNE Text mit, und Kurz-Rezensionen
+                ohne verwertbaren Text fallen raus — die Stichprobe ist deshalb kleiner als die Gesamtzahl, ohne dass
+                etwas fehlt. Sie bildet kein Gesamtverhältnis ab; alle Klassen fließen in Pain Points und Kaufauslöser ein.
               </p>
               {(scrape.notes?.length ?? 0) > 0 && (
                 <div className="mt-2 space-y-0.5">

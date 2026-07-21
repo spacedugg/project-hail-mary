@@ -51,17 +51,19 @@ async function runStarClass(
     mediaType: "all_contents",
   }];
 
-  // Zeit-Budget (D102/D118): jeder Lauf bekommt 40 s (Abbruch 45 s) — nicht
-  // wegen Vercel (Seite hat seit D118 maxDuration=300), sondern weil ein
-  // Review-Scrape, der länger als 45 s hängt, praktisch nie mehr liefert und
-  // der Nutzer eine RÜCKMELDUNG mit Ausbeute-Notizen verdient statt Wartens.
+  // Zeit-Budget (D102/D118/D130): jeder Lauf bekommt 70 s (Abbruch 75 s).
+  // Die alten 40 s schnitten Läufe MITTEN im Crawl ab — der Actor braucht für
+  // 10 Seiten oft länger, und run-sync liefert beim Timeout nur die bis dahin
+  // gesammelten Seiten (Nutzer-Befund: 93/74/79 statt ~100 je Klasse).
+  // Worst Case mit 6 ASINs: 3 Batches × 75 s = 225 s + Auto-Analyse — passt
+  // ins 300-s-Budget der Seite (D118).
   const res = await fetch(
-    `https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?timeout=40`,
+    `https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?timeout=70`,
     {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({ input }),
-      signal: AbortSignal.timeout(45_000),
+      signal: AbortSignal.timeout(75_000),
     },
   );
   if (res.status === 408) throw new Error("Zeitlimit");
