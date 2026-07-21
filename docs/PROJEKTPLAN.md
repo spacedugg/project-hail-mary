@@ -1,6 +1,6 @@
 # temoa OS — Bauplan (v3)
 
-> **Status:** v3.2, 2026-07-21 (CMS konsolidiert: startet eigenständig, ersetzt mittelfristig den Katalog — E6 entschieden). Fortschreibung nach jedem abgeschlossenen Feature.
+> **Status:** v3.3, 2026-07-21 (CMS: Katalog als Grundlage markiert — teilweise vorhandene Features ehrlich als 🔶 statt ⬜). Fortschreibung nach jedem abgeschlossenen Feature.
 > Fundament: `docs/product-scope.md` (Scope-Session 07.07.) + Baustand `docs/DECISIONS.md`.
 > **Das ist das Accountability-Dokument:** Gebaut wird, was hier steht.
 > **Neu in v3 (Nutzer-Entscheidung 21.07.):** Der Plan ist nicht mehr nach Sprints sortiert, sondern ist der **Bauplan des Tools** — gegliedert wie die linke Seitenleiste: Menüpunkt → Untermenü → Features. Ein Menüpunkt/Feature wird komplett gebaut und **in sich getestet**, dann kommt der nächste. So wächst das Tool entlang seiner eigenen Struktur statt querbeet.
@@ -165,7 +165,7 @@ Die Marken-Seitenleiste: Cockpit · Katalog · Sichtbarkeit & Markt · Advertisi
 | Custom Dashboards (Kachel-Baukasten je Nutzer/Kunde/Ebene) | ⬜ | Jeder sieht genau seine Kennzahlen · Vorstufe der Kunden-Sicht (Stufe 3) |
 | Markt-Kontext (Prime Day, Saison in der Bewertung) | ⬜ | Ausreißer richtig einordnen · später |
 
-### Menüpunkt: Katalog (`/marke/[id]/katalog`) — geht mittelfristig im CMS auf
+### Menüpunkt: Katalog (`/marke/[id]/katalog`) — DIE GRUNDLAGE des CMS, geht mittelfristig darin auf
 
 Deckt heute die Erstellungs-Seite des Content-Lebenszyklus ab (über den Produkt-Arbeitsplatz): Ist-Zustand von Amazon ziehen (Listing-Import ✅) · Reviews analysieren (🔶 in Reparatur) · Content erstellen (🔶 in Reparatur) · Content-Score/Regel-Messung (🧪). Diese Features bleiben, wo sie sind — das CMS baut die Verwaltungs-Schicht darüber und übernimmt später auch diese Einstiegs-Navigation.
 
@@ -214,10 +214,10 @@ Der Content-Lebenszyklus je Kunde: **erstellen → speichern → publishen → �
 | Feature | Status | Handlung/Nutzen |
 |---|---|---|
 | Flat-File-Erstellung (Amazon-Vorlage einlesen → Upload-Datei) | 🔶 | Der HEUTIGE Publish-Weg: Content ohne Copy-Paste in Seller Central bringen |
-| Content-Bibliothek je Kunde & Produkt (verwalten, bearbeiten, neu anlegen, löschen) | ⬜ | Alle im Tool erstellten Pieces (SEO-Texte, Bilder, Hauptbilder, A+) zentral verwaltet — Versionen & Freigaben aus dem Optimizer laufen hier zusammen |
-| Bestands-Content-Import (historischer Content) | ⬜ | Auch Content, der VOR dem Tool bzw. früher für den Kunden erstellt wurde, wird eingepflegt und ab dann mitverwaltet |
-| Soll/Ist-Abgleich je Content-Piece | ⬜ | Soll = freigegebener Stand im Tool · Ist = gecrawltes Live-Listing; jede Abweichung wird sichtbar. Ehrliche Grenze: kontinuierlich erst mit automatischem Bezug (Stufe 2), bis dahin per manuellem Re-Import |
-| Content-Accuracy-Dashboard (Widgets) | ⬜ | Wie viel % unseres Solls ist live? Internes Ziel ≥ 95–99 % — messbar je Kunde/Produkt, als Kachel auch fürs Cockpit |
+| Content-Bibliothek je Kunde & Produkt (verwalten, bearbeiten, neu anlegen, löschen) | 🔶 teilweise | Grundlage vorhanden: Versionen & Freigaben je Produkt existieren im Arbeitsplatz. Neu ist nur die übergreifende Verwaltungs-Sicht je Kunde (alle Pieces an einem Ort, löschen/neu anlegen aus der Bibliothek heraus) |
+| Bestands-Content-Import (historischer Content) | 🔶 teilweise | Grundlage vorhanden: Der Listing-Import ✅ holt den LIVE-Content jedes Kunden ins Tool. Neu ist nur der Import von Content, der nicht (mehr) live ist — alte Bilder, frühere Texte, Archiv-Stände |
+| Soll/Ist-Abgleich je Content-Piece | 🔶 teilweise | Grundlage vorhanden: Beide Seiten existieren (Soll = Freigaben, Ist = Listing-Snapshot); die Analyse weist heute schon je Sektion aus, was freigegeben vs. Original ist. Neu ist der explizite Abweichungs-Vergleich freigegeben ↔ live. Kontinuierlich erst mit automatischem Bezug (Stufe 2), bis dahin manueller Re-Import |
+| Content-Accuracy-Dashboard (Widgets) | ⬜ | Wie viel % unseres Solls ist live? Ziel ≥ 95–99 % — baut direkt auf dem Soll/Ist-Abgleich auf. Ehrlich: Das heutige „Rating" (Content-Score) misst REGEL-Qualität der Texte, nicht Live-Genauigkeit — das sind zwei verschiedene Kennzahlen |
 | Content-Alerts | ⬜ | Hauptbild rausgeflogen, Listing gesperrt/unterdrückt, Text überschrieben → das Tool meldet es, bevor der Kunde es merkt (Abgleich-Basis wie Soll/Ist) |
 | Publish zu Amazon per SP-API | 🔒 Stufe 2 | Content direkt aus dem Tool pushen & publishen — ersetzt den Flat-File-Umweg (gleiche Logik wie Ads-API vs. Bulk-Sheet) |
 | Kunden-Feedback am Content-Piece | ⬜ | Kunde hinterlegt Feedback direkt am Piece — mittelfristig, sobald Kunden angebunden sind (Richtung Stufe 3) |

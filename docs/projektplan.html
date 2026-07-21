@@ -82,7 +82,7 @@
 <body>
 <main>
   <header>
-    <div class="eyebrow">temoa OS · Bauplan v3.2 · 21.07.2026</div>
+    <div class="eyebrow">temoa OS · Bauplan v3.3 · 21.07.2026</div>
     <h1>Der Bauplan: das Tool, gegliedert wie seine Seitenleiste</h1>
     <p class="sub">Nicht mehr nach Sprints sortiert (Entscheidung 21.07.): Dieses Dokument ist die komplette Basis des Tools — Menüpunkt → Untermenü → Features. Ein Feature wird komplett gebaut und <b>in sich getestet</b>, dann kommt das nächste. So wächst das Tool entlang seiner eigenen Struktur statt querbeet.</p>
   </header>
@@ -121,7 +121,7 @@
     <div class="legend">
       <span class="chip c-good">bestätigt — im Praxistest bestanden</span>
       <span class="chip c-built">gebaut — Praxistest steht aus</span>
-      <span class="chip c-part">in Reparatur — Fix deployed, erneuter Test nötig</span>
+      <span class="chip c-part">teilweise — Grundlage vorhanden / in Reparatur nach Praxistest</span>
       <span class="chip c-open">geplant</span>
       <span class="chip c-blocked">wartet — auf Input oder Zulassung</span>
     </div>
@@ -231,7 +231,7 @@
     </div>
 
     <div class="menu">
-      <header><h3>Katalog</h3><span class="pfad">/marke/[id]/katalog · geht mittelfristig im CMS auf</span></header>
+      <header><h3>Katalog</h3><span class="pfad">/marke/[id]/katalog · DIE GRUNDLAGE des CMS — geht mittelfristig darin auf</span></header>
       <div class="body">
         <div class="frow" style="grid-template-columns: 1fr; border-top: none;"><span class="n">Deckt heute die <b>Erstellungs-Seite</b> des Content-Lebenszyklus ab (über den Produkt-Arbeitsplatz): Ist-Zustand von Amazon ziehen (bestätigt) · Reviews analysieren (Reparatur) · Content erstellen (Reparatur) · Content-Score/Regel-Messung (gebaut). Diese Features bleiben, wo sie sind — das CMS baut die Verwaltungs-Schicht darüber und übernimmt später die Einstiegs-Navigation.</span></div>
         <div class="frow"><span class="chip c-good">bestätigt</span><span class="f">Produkt-Liste je Marke</span><span class="n">Der Absprung in den Produkt-Arbeitsplatz</span></div>
@@ -278,10 +278,10 @@
       <div class="body">
         <div class="frow" style="grid-template-columns: 1fr; border-top: none;"><span class="n">Der Content-Lebenszyklus je Kunde: <b>erstellen → speichern → publishen → überwachen</b> — verwalten, bearbeiten, neu anlegen, löschen, pushen. Für Retainer- UND projektbasierte Kunden mit wiederkehrenden Scopes. Kern-Prinzip <b>Soll/Ist</b>: Soll = unser erarbeiteter, freigegebener Stand in der Datenbank · Ist = das regelmäßig gecrawlte Live-Listing (gern schon VOR der Zusammenarbeit). Ziel: Content-Accuracy ≥ 95–99 % — Content ständig überall live und 100 % gepflegt = <b>Retail-Readiness</b>, das Fundament fürs PPC-Cycling.<br><br><b>Bereits vorhanden</b> (kommt aus Katalog/Arbeitsplatz — das CMS nutzt dieselbe Datenbasis, baut nichts doppelt): Ist-Zustand von Amazon ziehen (bestätigt) · Bewertungs-Analyse (Reparatur) · Content-Erstellung inkl. Versionen &amp; Freigaben (Reparatur/gebaut) · Content-Score/Regel-Messung (gebaut).</span></div>
         <div class="frow"><span class="chip c-part">Reparatur</span><span class="f">Flat-File-Erstellung</span><span class="n">Der HEUTIGE Publish-Weg: Amazon-Vorlage einlesen → Upload-Datei, Content ohne Copy-Paste in Seller Central</span></div>
-        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Content-Bibliothek je Kunde &amp; Produkt</span><span class="n">Verwalten, bearbeiten, neu anlegen, löschen — alle im Tool erstellten Pieces (SEO-Texte, Bilder, Hauptbilder, A+) zentral; Versionen &amp; Freigaben aus dem Optimizer laufen hier zusammen</span></div>
-        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Bestands-Content-Import</span><span class="n">Auch historisch für den Kunden erstellter Content wird eingepflegt und ab dann mitverwaltet</span></div>
-        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Soll/Ist-Abgleich je Content-Piece</span><span class="n">Jede Abweichung zwischen freigegebenem Stand und Live-Listing wird sichtbar. Ehrliche Grenze: kontinuierlich erst mit automatischem Bezug (Stufe 2), bis dahin per manuellem Re-Import</span></div>
-        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Content-Accuracy-Dashboard</span><span class="n">Widgets: wie viel % unseres Solls ist live? Internes Ziel ≥ 95–99 % — messbar je Kunde/Produkt, als Kachel auch fürs Cockpit</span></div>
+        <div class="frow"><span class="chip c-part">teilweise</span><span class="f">Content-Bibliothek je Kunde &amp; Produkt</span><span class="n">Grundlage vorhanden: Versionen &amp; Freigaben je Produkt existieren im Arbeitsplatz. Neu ist nur die übergreifende Verwaltungs-Sicht je Kunde — alle Pieces an einem Ort, löschen/neu anlegen aus der Bibliothek heraus</span></div>
+        <div class="frow"><span class="chip c-part">teilweise</span><span class="f">Bestands-Content-Import</span><span class="n">Grundlage vorhanden: Der Listing-Import (bestätigt) holt den LIVE-Content jedes Kunden ins Tool. Neu ist nur der Import von Content, der nicht (mehr) live ist — alte Bilder, frühere Texte, Archiv-Stände</span></div>
+        <div class="frow"><span class="chip c-part">teilweise</span><span class="f">Soll/Ist-Abgleich je Content-Piece</span><span class="n">Grundlage vorhanden: Beide Seiten existieren (Soll = Freigaben · Ist = Listing-Snapshot); die Analyse weist heute schon je Sektion aus, was freigegeben vs. Original ist. Neu ist der explizite Abweichungs-Vergleich freigegeben ↔ live; kontinuierlich erst mit automatischem Bezug (Stufe 2), bis dahin manueller Re-Import</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Content-Accuracy-Dashboard</span><span class="n">Widgets: wie viel % unseres Solls ist live? Ziel ≥ 95–99 % — baut direkt auf dem Soll/Ist-Abgleich auf. Ehrlich: Das heutige „Rating" (Content-Score) misst REGEL-Qualität der Texte, nicht Live-Genauigkeit — zwei verschiedene Kennzahlen</span></div>
         <div class="frow"><span class="chip c-open">geplant</span><span class="f">Content-Alerts</span><span class="n">Hauptbild rausgeflogen, Listing gesperrt/unterdrückt, Text überschrieben → das Tool meldet es, bevor der Kunde es merkt</span></div>
         <div class="frow"><span class="chip c-blocked">wartet</span><span class="f">Publish zu Amazon per SP-API</span><span class="n">Content direkt aus dem Tool pushen &amp; publishen — ersetzt den Flat-File-Umweg (gleiche Logik wie Ads-API vs. Bulk-Sheet; Stufe 2)</span></div>
         <div class="frow"><span class="chip c-open">geplant</span><span class="f">Kunden-Feedback am Content-Piece</span><span class="n">Kunde hinterlegt Feedback direkt am Piece — mittelfristig, sobald Kunden angebunden sind (Richtung Stufe 3)</span></div>
