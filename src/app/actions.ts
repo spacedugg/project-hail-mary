@@ -1239,12 +1239,26 @@ export async function saveContentManual(formData: FormData) {
     where: eq(schema.contentVersions.productId, productId),
     orderBy: desc(schema.contentVersions.createdAt),
   });
+  const manuSnapshot = await db.query.listingSnapshots.findFirst({
+    where: eq(schema.listingSnapshots.productId, productId),
+    orderBy: desc(schema.listingSnapshots.createdAt),
+  });
   const latest = (t: string) => versions.find((v) => v.type === t)?.payload as Record<string, unknown> | undefined;
   const ctx = {
     facts: product.facts,
     primaryKeywords: kws.filter((k) => k.tier === "primary").map((k) => k.keyword),
     // Auch Handarbeit läuft gegen die Fremdmarken-Blacklist (D97)
     competitorBrands: fremdmarkenAusKeywords(alleKws),
+    // … und gegen den Zahlen-Herkunfts-Check (D114) — gleiche Quellen wie die Generierung
+    zahlenQuellen: [
+      product.name,
+      JSON.stringify(product.facts),
+      manuSnapshot?.title ?? "",
+      ...(manuSnapshot?.bullets ?? []),
+      manuSnapshot?.description ?? "",
+      product.zusatzKontext ?? "",
+      ...kws.map((k) => k.keyword),
+    ].join("\n"),
   };
 
   const gate = await import("@/lib/validation/gate");

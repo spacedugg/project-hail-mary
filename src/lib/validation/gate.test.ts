@@ -135,6 +135,34 @@ describe("validateBackendKeywords", () => {
       "backend.visible-duplicate",
     );
   });
+  it("Zahlen-Herkunfts-Check (D114) — der Northpoint-Fall: falsche und erfundene Specs fliegen", () => {
+    const quellen = [
+      "Northpoint LED Workshop Lamp Work Lamp Bar Light 300 Lumen Wireless Magnet Hook",
+      "Battery work light with a very bright luminosity of approx. 300 lumens, powered by 4 x LR6 AA batteries (not included)",
+      "Practical magnetic holder (3 magnets) for mounting on metallic objects",
+      "Up to 5 hours of light duration. Dimensions: approx. 22 cm x 5.5 cm x 2.2 cm",
+    ].join("\n");
+
+    // Falsche Batterienzahl (Quelle: 4 x LR6 AA) → Widerspruch
+    const falsch = validateBullets(["HELLES LICHT: Drei AA-Batterien versorgen die Leuchte."], { zahlenQuellen: quellen });
+    expect(falsch.map((i) => i.rule)).toContain("bullets.zahl-widerspruch");
+
+    // Erfundene 6500 K → Zahl ohne Quelle
+    const erfunden = validateBullets(["ROBUST: Die Farbtemperatur von 6500 K sorgt für Farbwiedergabe."], { zahlenQuellen: quellen });
+    expect(erfunden.map((i) => i.rule)).toContain("bullets.zahl-ohne-quelle");
+
+    // Belegte Zahlen passieren: 300 Lumen, 3 Magnete, 5 Stunden, 22 x 5,5 x 2,2 cm
+    const korrekt = validateBullets(
+      ["HELL: 300 Lumen leuchten alles aus. Drei Magnete halten sicher. Bis zu 5 Stunden Laufzeit bei 22 x 5,5 x 2,2 cm."],
+      { zahlenQuellen: quellen },
+    );
+    expect(korrekt.filter((i) => i.rule.startsWith("bullets.zahl"))).toEqual([]);
+
+    // Ohne Quellen-Kontext: ehrlich passiv (keine Fake-Fehler)
+    const passiv = validateBullets(["TEST: 6500 K Farbtemperatur."], {});
+    expect(passiv.filter((i) => i.rule.startsWith("bullets.zahl"))).toEqual([]);
+  });
+
   it("Satzzeichen verschwenden Bytes — WARNUNG (Blog 07/2026: Amazon ignoriert sie)", () => {
     expect(validateBackendKeywords("salatschüssel; backschüssel.", "", ctx).map((i) => i.rule)).toContain("backend.punctuation");
     expect(validateBackendKeywords("salatschüssel backschüssel prep bowl", "", ctx).map((i) => i.rule)).not.toContain("backend.punctuation");

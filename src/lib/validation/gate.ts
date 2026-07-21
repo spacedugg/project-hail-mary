@@ -12,7 +12,91 @@ type Ctx = {
   facts?: ProductFacts;
   primaryKeywords?: string[]; // 3–4, aus Analyse
   competitorBrands?: string[]; // Blacklist
+  /**
+   * Zahlen-Herkunfts-Check (D114): Quelltext, aus dem JEDE Zahl im
+   * generierten Text belegbar sein muss (Produkt-Wahrheit + eigenes
+   * Listing-IST + Zusatz-Infos + Keywords — NIE Reviews, die können von
+   * fremden Produkten stammen). Fehlt der Kontext, prüft die Regel nicht.
+   */
+  zahlenQuellen?: string;
 };
+
+// ── Zahlen-Herkunfts-Check (D114) ────────────────────────────────────────────
+// Wurzel des Northpoint-Falls: „Drei AA-Batterien" (Quelle: 4 x LR6 AA),
+// erfundene „6500 K" und „interne Falltests". Keine Batterie-Sonderregel,
+// sondern generisch: Zahl + Kontextwort im Text müssen in den Quellen
+// vorkommen; steht das Kontextwort in der Quelle bei einer ANDEREN Zahl,
+// ist es ein Widerspruch (Fehler).
+
+const ZAHLWORT: Record<string, string> = {
+  zwei: "2", drei: "3", vier: "4", fuenf: "5", fünf: "5", sechs: "6",
+  sieben: "7", acht: "8", neun: "9", zehn: "10", elf: "11", zwoelf: "12", zwölf: "12",
+};
+const EINS_ARTIKEL = /^ein(e|em|er|en|es)?$/; // nur vor Einheiten werten (sonst Artikel-Rauschen)
+const EINHEITEN = /^(meter|metern|zentimeter|millimeter|kilometer|stunde|stunden|minute|minuten|sekunde|sekunden|tag|tagen|woche|wochen|monat|monaten|jahr|jahre|jahren|kg|kilogramm|gramm|liter|milliliter|watt|volt|lumen|prozent|grad|kelvin)$/;
+
+const normZahl = (s: string) => s.replace(",", ".").replace(/\.0+$/, "");
+
+/** Zahl-Claims (Zahl + bis zu 2 Folgewörter) aus einem Text ziehen. */
+function zahlClaims(text: string): Array<{ zahl: string; kontext: string[]; roh: string }> {
+  const tokens = text.split(/[\s/()„“"«»;:–—]+/).filter(Boolean);
+  const claims: Array<{ zahl: string; kontext: string[]; roh: string }> = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i].toLowerCase().replace(/[.!?,]+$/, "");
+    let zahl: string | null = null;
+    const mDigit = t.match(/^(\d+(?:[.,]\d+)?)/);
+    if (mDigit) zahl = normZahl(mDigit[1]);
+    else if (ZAHLWORT[t]) zahl = ZAHLWORT[t];
+    else if (EINS_ARTIKEL.test(t)) {
+      const next = (tokens[i + 1] ?? "").toLowerCase().replace(/[^a-zäöüß]/g, "");
+      if (EINHEITEN.test(next)) zahl = "1";
+      else continue;
+    } else continue;
+
+    const kontext = tokens
+      .slice(i + 1, i + 3)
+      .flatMap((w) => w.split("-"))
+      .map((w) => w.toLowerCase().replace(/[^a-zäöüß]/g, ""))
+      .filter((w) => w.length >= 2);
+    claims.push({ zahl, kontext, roh: tokens.slice(i, i + 3).join(" ") });
+  }
+  return claims;
+}
+
+export function pruefeZahlenTreue(text: string, quellen: string, rulePrefix: string): ValidationIssue[] {
+  if (!quellen.trim()) return []; // ohne Quellen ehrlich passiv
+  const issues: ValidationIssue[] = [];
+  const q = quellen.toLowerCase().replace(/,(?=\d)/g, ".");
+  const qZahlen = new Set((q.match(/\d+(?:\.\d+)?/g) ?? []).map(normZahl));
+
+  for (const c of zahlClaims(text)) {
+    const zahlBekannt = qZahlen.has(c.zahl);
+    // Kontextwort-Stämme in den Quellen suchen; Zahlen im Umfeld einsammeln
+    const stamm = c.kontext.map((k) => k.slice(0, 6)).find((k) => k.length >= 2 && q.includes(k));
+    if (stamm) {
+      let kontextTrifftZahl = false;
+      const umfeldZahlen = new Set<string>();
+      for (let idx = q.indexOf(stamm); idx !== -1; idx = q.indexOf(stamm, idx + 1)) {
+        const fenster = q.slice(Math.max(0, idx - 40), idx + stamm.length + 40);
+        for (const z of fenster.match(/\d+(?:\.\d+)?/g) ?? []) {
+          umfeldZahlen.add(normZahl(z));
+          if (normZahl(z) === c.zahl) kontextTrifftZahl = true;
+        }
+      }
+      if (!kontextTrifftZahl && umfeldZahlen.size > 0) {
+        issues.push(issue(`${rulePrefix}.zahl-widerspruch`, "error",
+          `Zahlen-Widerspruch: Text sagt „${c.roh}", die Quellen nennen dort ${[...umfeldZahlen].slice(0, 3).join("/")} — Spezifikationen NIE verändern.`));
+        continue;
+      }
+      if (kontextTrifftZahl) continue;
+    }
+    if (!zahlBekannt) {
+      issues.push(issue(`${rulePrefix}.zahl-ohne-quelle`, "error",
+        `Zahl ohne Quelle: „${c.roh}" kommt in keiner Daten-Quelle vor (Produkt-Wahrheit, Listing, Zusatz-Infos, Keywords) — nichts erfinden.`));
+    }
+  }
+  return issues;
+}
 
 function issue(
   rule: string,
@@ -56,6 +140,8 @@ export function validateTitle(title: string, ctx: Ctx = {}): ValidationIssue[] {
   const primary = ctx.primaryKeywords?.[0];
   if (primary && !t.toLowerCase().includes(primary.toLowerCase()))
     issues.push(issue("title.keyword-window", "error", `Hauptkeyword „${primary}" fehlt im Titel.`));
+
+  issues.push(...pruefeZahlenTreue(t, ctx.zahlenQuellen ?? "", "title"));
 
   // Keyword-Wiederholung: kein signifikantes Wort >1× (Stamm-Vergleich); Zahlen/Kurzwörter ok
   const tokens = t.split(/\s+/).map(normalizeToken).filter((w) => w.length >= 4);
@@ -119,6 +205,8 @@ export function validateBullets(bullets: string[], ctx: Ctx = {}): ValidationIss
     issues.push(...findBanned(t, RULES.bannedClaims, "bullets"));
     issues.push(...findCompetitorBrands(t, ctx, "bullets"));
   });
+
+  issues.push(...pruefeZahlenTreue(bullets.join("\n"), ctx.zahlenQuellen ?? "", "bullets"));
 
   // USP-Einmaligkeit über alle Bullets (Cross-Content-Regel — Kern des USP-Problems)
   const usps = ctx.facts?.usps ?? [];
@@ -185,6 +273,7 @@ export function validateDescription(description: string, bullets: string[] = [],
   const issues: ValidationIssue[] = [];
   const t = description.trim();
   if (!t) return [issue("description.empty", "error", "Beschreibung fehlt.")];
+  issues.push(...pruefeZahlenTreue(t, ctx.zahlenQuellen ?? "", "description"));
 
   const bytes = byteLength(t);
   if (bytes > RULES.description.maxBytes)
@@ -211,6 +300,7 @@ export function validateItemHighlights(text: string, ctx: Ctx = {}): ValidationI
   const issues: ValidationIssue[] = [];
   const t = text.trim();
   if (!t) return [issue("highlights.empty", "error", "Item Highlights fehlen.")];
+  issues.push(...pruefeZahlenTreue(t, ctx.zahlenQuellen ?? "", "highlights"));
   const chars = charLength(t);
   if (chars > RULES.itemHighlights.maxChars)
     issues.push(issue("highlights.max-length", "error", `${chars} Zeichen > ${RULES.itemHighlights.maxChars}.`));
@@ -243,6 +333,7 @@ export function validateQa(pairs: Array<{ q: string; a: string }>, ctx: Ctx = {}
     issues.push(...findBanned(`${p.q} ${p.a}`, RULES.bannedClaims, "qa"));
     issues.push(...findCompetitorBrands(`${p.q} ${p.a}`, ctx, "qa"));
   });
+  issues.push(...pruefeZahlenTreue(pairs.map((p) => `${p.q} ${p.a}`).join("\n"), ctx.zahlenQuellen ?? "", "qa"));
   return issues;
 }
 

@@ -309,11 +309,26 @@ export async function generateSection(
     parsed = parseJson(raw);
   }
 
+  // Zahlen-Herkunfts-Quellen (D114): NUR eigene Wahrheit — Produkt-Fakten,
+  // eigenes Listing-IST, Zusatz-Infos, Keywords, bereits freigegebene eigene
+  // Sektionen. Reviews bewusst NICHT (können von fremden Produkten stammen).
+  const zahlenQuellen = [
+    inputs.brand,
+    inputs.productName,
+    JSON.stringify(inputs.facts),
+    inputs.listingIst?.title ?? "",
+    ...(inputs.listingIst?.bullets ?? []),
+    inputs.zusatzKontext ?? "",
+    ...Object.values(inputs.keywords).flat(),
+    ...Object.values(inputs.approved ?? {}).flatMap((v) => (Array.isArray(v) ? v : [v ?? ""])),
+  ].join("\n");
+
   const ctx = {
     facts: inputs.facts,
     primaryKeywords: inputs.keywords.primary,
     // Erkannte Fremdmarken (Relevanz-Filter) — das Gate flaggt jedes Vorkommen (D97)
     competitorBrands: inputs.competitorBrands ?? [],
+    zahlenQuellen,
   };
 
   switch (section) {
