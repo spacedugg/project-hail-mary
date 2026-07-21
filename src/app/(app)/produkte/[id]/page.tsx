@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { saveKeywords, deriveKeywordsFromSov, generateContent, uploadCerebro, scrapeReviewsAction, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis } from "@/app/actions";
+import { saveKeywords, deriveKeywordsFromSov, generateContent, uploadCerebro, scrapeReviewsAction, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
@@ -463,8 +463,39 @@ export default async function ProductPage({
             icon={<IconContent />}
             chip="chip-teal"
             title="Content"
-            sub="Jede Version läuft durchs Validation-Gate; Freigaben speisen Flat File & Analyse."
+            sub="Grundlage ist die Bewertungs-Analyse (Kundensprache, Pain Points). Jede Version läuft durchs Validation-Gate; Freigaben speisen Flat File & Analyse."
+            right={!insights ? <span className="pill pill-warn">gesperrt — Analyse fehlt</span> : undefined}
           />
+          {/* Content-Gate (D108): ohne Bewertungs-Analyse nur mit doppelter Bestätigung */}
+          {!insights && (
+            <div className="mt-3 rounded-xl bg-[rgb(160_122_31/0.08)] p-3 text-xs">
+              <p className="font-medium text-warn">
+                △ Content ist gesperrt: Es liegt keine Bewertungs-Analyse vor.
+              </p>
+              <p className="mt-1 text-muted">
+                Die Analyse liefert die Text-Grundlage — echte Kundensprache, Pain Points, Kaufauslöser. Empfohlener Weg:
+                oben Reviews scrapen und analysieren. Wer bewusst ohne Analyse generiert, bestätigt das pro Sektion —
+                Grundlage sind dann das importierte Listing (IST) und die Zusatz-Infos unten.
+              </p>
+            </div>
+          )}
+          {/* Zusatz-Infos (D108): fließen in JEDE Generierung ein */}
+          <details className="mt-3" open={!insights && !product.zusatzKontext}>
+            <summary className="cursor-pointer text-xs text-muted hover:text-foreground">
+              Zusatz-Infos zum Produkt ({product.zusatzKontext?.trim() ? `${product.zusatzKontext.trim().length} Zeichen hinterlegt` : "leer"}) — fließen in jede Text-Generierung ein
+            </summary>
+            <form action={saveZusatzKontext} className="mt-2">
+              <input type="hidden" name="productId" value={product.id} />
+              <textarea
+                name="zusatzKontext"
+                rows={5}
+                defaultValue={product.zusatzKontext ?? ""}
+                placeholder={"Alles, was die Texte wissen sollen und nirgends steht:\n· Details/Fakten zum Produkt\n· eigene Bullets/Titel als Ausgangspunkt\n· gute Bullets, Titel, Beschreibungen ANDERER Produkte als Vorbild"}
+                className={`${input} w-full`}
+              />
+              <SubmitButton className="mt-2 btn-dark text-xs">Zusatz-Infos speichern</SubmitButton>
+            </form>
+          </details>
           <div className="mt-4 space-y-3">
             {SECTIONS.map(({ key, label }) => {
               const dbType = key === "backend" ? "backend_keywords" : key === "highlights" ? "item_highlights" : key;
@@ -488,13 +519,34 @@ export default async function ProductPage({
                           <SubmitButton className="btn-ghost px-3 py-1 text-xs !text-good">✓ Freigeben</SubmitButton>
                         </form>
                       )}
-                      <form action={generateContent}>
-                        <input type="hidden" name="productId" value={product.id} />
-                        <input type="hidden" name="section" value={key} />
-                        <SubmitButton className="btn-primary px-3 py-1 text-xs">
-                          {v ? "Neu generieren" : "Generieren"}
-                        </SubmitButton>
-                      </form>
+                      {insights ? (
+                        <form action={generateContent}>
+                          <input type="hidden" name="productId" value={product.id} />
+                          <input type="hidden" name="section" value={key} />
+                          <SubmitButton className="btn-primary px-3 py-1 text-xs" pendingLabel="Generiert…" progress>
+                            {v ? "Neu generieren" : "Generieren"}
+                          </SubmitButton>
+                        </form>
+                      ) : (
+                        /* Doppelte Bestätigung (D108): aufklappen + ankreuzen, erst dann generieren */
+                        <details className="relative">
+                          <summary className="btn-ghost cursor-pointer px-3 py-1 text-xs list-none">🔒 {v ? "Neu generieren" : "Generieren"} …</summary>
+                          <form action={generateContent} className="absolute right-0 z-10 mt-1 w-72 rounded-xl border border-hair bg-card p-3 shadow-lg">
+                            <input type="hidden" name="productId" value={product.id} />
+                            <input type="hidden" name="section" value={key} />
+                            <p className="text-[11px] text-muted">
+                              Ohne Bewertungs-Analyse fehlen Kundensprache und Pain Points. Grundlage sind dann Listing-IST + Zusatz-Infos.
+                            </p>
+                            <label className="mt-2 flex items-start gap-2 text-[11px]">
+                              <input type="checkbox" name="ohneAnalyseBestaetigt" required className="mt-0.5" />
+                              <span>Ja, ich will diese Sektion bewusst ohne Bewertungs-Analyse generieren.</span>
+                            </label>
+                            <SubmitButton className="mt-2 btn-primary w-full px-3 py-1 text-xs" pendingLabel="Generiert…" progress>
+                              Trotzdem generieren
+                            </SubmitButton>
+                          </form>
+                        </details>
+                      )}
                     </div>
                   </div>
                   {payload?.text && (

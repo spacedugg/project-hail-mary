@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { generateSection, SECTION_ORDER, type RecipeInputs } from "./listing";
+import { generateSection, sectionPrompt, SECTION_ORDER, type RecipeInputs } from "./listing";
 
 /**
  * Recipe-Pipeline im Mock-Modus (LLM_FORCE_MOCK): deterministischer Template-Pfad.
@@ -61,6 +61,26 @@ describe("listing recipes (mock)", () => {
   it("Validation-Report ist an jede Sektion angehängt (Gate ist Pflicht, kein Opt-in)", async () => {
     const res = await generateSection("bullets", inputs);
     expect(Array.isArray(res.issues)).toBe(true);
+  });
+
+  it("Listing-IST + Zusatz-Infos erreichen den Prompt; ohne Analyse steht der Erfindungs-Verbots-Hinweis (D108)", () => {
+    const prompt = sectionPrompt("bullets", {
+      ...inputs,
+      reviewInsights: null,
+      listingIst: { title: "Alter Titel", bullets: ["alter bullet eins"] },
+      zusatzKontext: "Vorbild: Konkurrenz-Bullet über Isolierung",
+    });
+    expect(prompt).toContain("AKTUELLES LISTING (IST-Zustand");
+    expect(prompt).toContain("Alter Titel");
+    expect(prompt).toContain("ZUSATZ-INFOS VOM TEAM");
+    expect(prompt).toContain("Vorbild: Konkurrenz-Bullet über Isolierung");
+    expect(prompt).toContain("KEINE Bewertungs-Analyse");
+    // Mit Analyse verschwindet der Hinweis
+    const mitAnalyse = sectionPrompt("bullets", {
+      ...inputs,
+      reviewInsights: { sources: [], stats: { reviewsTotal: 10, ratingAvg: 4.5 }, painPoints: [], buyingTriggers: [], languageToBorrow: [], languageToAvoid: [] },
+    });
+    expect(mitAnalyse).not.toContain("KEINE Bewertungs-Analyse");
   });
 
   it("erkannte Fremdmarken erreichen das Gate — Marke im Text wird als Fehler geflaggt (D97)", async () => {

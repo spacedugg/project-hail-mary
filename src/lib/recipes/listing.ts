@@ -44,6 +44,10 @@ export type RecipeInputs = {
    * (Warnung) UND ins Validation-Gate (Code erzwingt), D97.
    */
   competitorBrands?: string[];
+  /** IST-Zustand des Listings (letzter Import) — Arbeitsgrundlage, besonders ohne Bewertungs-Analyse (D108). */
+  listingIst?: { title?: string | null; bullets?: string[] | null } | null;
+  /** Zusätzliche Produkt-Infos vom Team (D108) — z. B. fremde Bullets/Titel als Vorbild. */
+  zusatzKontext?: string | null;
 };
 
 export type TitleRationale = Array<{ part: string; source: string; verified: boolean }>;
@@ -83,7 +87,20 @@ function contextBlock(inputs: RecipeInputs): string {
     inputs.competitorBrands?.length
       ? `FREMDMARKEN (Amazon-Verbot — dürfen NIRGENDS im Text auftauchen, auch nicht im Backend): ${[...new Set(inputs.competitorBrands)].slice(0, 12).join(", ")}`
       : "",
+    inputs.listingIst?.title || inputs.listingIst?.bullets?.length
+      ? `AKTUELLES LISTING (IST-Zustand — verbessern, nicht kopieren):${inputs.listingIst.title ? `\nTitel: ${inputs.listingIst.title}` : ""}${inputs.listingIst.bullets?.length ? `\nBullets: ${inputs.listingIst.bullets.join(" • ")}` : ""}`
+      : "",
+    inputs.zusatzKontext?.trim()
+      ? `ZUSATZ-INFOS VOM TEAM (Fakten & Vorbilder — verwenden, aber NICHTS darüber hinaus erfinden):\n${inputs.zusatzKontext.trim().slice(0, 4000)}`
+      : "",
   ];
+  // Ohne Bewertungs-Analyse (D108, nur nach doppelter Bestätigung): ehrlich
+  // benennen, worauf die Texte dann bauen — und Kundensprache NICHT erfinden.
+  if (!ri) {
+    lines.push(
+      "HINWEIS: Es liegt KEINE Bewertungs-Analyse vor. Grundlage sind ausschließlich Produkt-Wahrheit, Keywords, Listing-IST und Zusatz-Infos. Erfinde KEINE Kundenzitate, keine Pain Points, keine ‚Kunden sagen…'-Behauptungen.",
+    );
+  }
   if (ri) {
     const pp = ri.painPoints.slice(0, 5).map((p) => `${p.label}${p.frequencyPct ? ` (${p.frequencyPct}%)` : ""}`);
     const bt = ri.buyingTriggers.slice(0, 5).map((t) => t.label);
@@ -104,7 +121,7 @@ const SYSTEM =
   "Du bist Senior-SEO-Texter für Amazon-Listings (DE-Markt) bei temoa. " +
   "Du hältst dich exakt an die Regeln im Prompt. Antworte AUSSCHLIESSLICH mit dem geforderten JSON, ohne Markdown-Zäune, ohne Vorwort.";
 
-function sectionPrompt(section: ListingSection, inputs: RecipeInputs): string {
+export function sectionPrompt(section: ListingSection, inputs: RecipeInputs): string {
   const ctx = contextBlock(inputs);
   const kw = inputs.keywords;
   switch (section) {

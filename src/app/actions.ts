@@ -348,6 +348,18 @@ export async function toggleKeywordRelevanz(formData: FormData) {
   revalidatePath(`/produkte/${productId}`);
 }
 
+/** Zusatz-Infos zum Produkt speichern (D108) — fließen in jede Text-Generierung ein. */
+export async function saveZusatzKontext(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  if (!productId) return;
+  const db = await getDb();
+  await db
+    .update(schema.products)
+    .set({ zusatzKontext: String(formData.get("zusatzKontext") ?? "").trim() || null })
+    .where(eq(schema.products.id, productId));
+  revalidatePath(`/produkte/${productId}`);
+}
+
 /**
  * Fremdmarken, die der Keyword-Relevanz-Filter bereits erkannt hat (D87:
  * ausschlussGrund „Marke: XY") — als Blacklist für Prompt UND Validation-Gate
@@ -392,6 +404,26 @@ export async function generateContent(formData: FormData) {
     where: eq(schema.reviewInsights.productId, productId),
     orderBy: desc(schema.reviewInsights.createdAt),
   });
+  const snapshot = await db.query.listingSnapshots.findFirst({
+    where: eq(schema.listingSnapshots.productId, productId),
+    orderBy: desc(schema.listingSnapshots.createdAt),
+  });
+
+  // Content-Gate (D108, Nutzer-Vorgabe): Die Bewertungs-Analyse ist die
+  // Grundlage des Contents (Kundensprache, Pain Points, Kaufauslöser).
+  // OHNE Analyse ist die Generierung gesperrt — es sei denn, sie wurde
+  // ausdrücklich doppelt bestätigt UND es gibt eine Ersatz-Grundlage
+  // (Listing-IST oder Zusatz-Infos vom Team).
+  if (!insights) {
+    const bestaetigt = String(formData.get("ohneAnalyseBestaetigt") ?? "") === "on";
+    if (!bestaetigt) {
+      redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Content ist gesperrt: Es liegt keine Bewertungs-Analyse vor — sie liefert Kundensprache, Pain Points und Kaufauslöser als Text-Grundlage. Erst analysieren (Karte oben) oder bewusst ohne Analyse bestätigen.")}&code=GEN-02`);
+    }
+    const hatGrundlage = Boolean(snapshot?.title || snapshot?.bullets?.length || product.zusatzKontext?.trim());
+    if (!hatGrundlage) {
+      redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Ohne Bewertungs-Analyse braucht die Generierung eine Ersatz-Grundlage: Listing importieren (IST-Zustand) oder Zusatz-Infos zum Produkt eintragen — sonst gäbe es nur erfundenen Text.")}&code=GEN-03`);
+    }
+  }
 
   const byTier = (t: string) => kws.filter((k) => k.tier === t).map((k) => k.keyword);
 
@@ -420,6 +452,8 @@ export async function generateContent(formData: FormData) {
       bullets: latest("bullets")?.items as string[] | undefined,
     },
     competitorBrands: fremdmarkenAusKeywords(alleKws),
+    listingIst: snapshot ? { title: snapshot.title, bullets: snapshot.bullets } : null,
+    zusatzKontext: product.zusatzKontext,
   };
 
   // Fehler (API, Zeitbudget, kaputtes JSON) als Banner, nie als Fehlerseite (D81)

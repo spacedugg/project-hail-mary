@@ -107,6 +107,13 @@ export const products = sqliteTable(
       inputs: import("@/lib/margin/calc").MarginInputs;
       results: import("@/lib/margin/calc").MarginResults;
     }>(),
+    /**
+     * Zusätzliche Produkt-Infos vom Team (D108): fließen in JEDE
+     * Text-Generierung ein (z. B. fremde Bullets/Titel als Vorbild, Details,
+     * die nicht im Listing stehen). Ohne Bewertungs-Analyse sind sie —
+     * neben dem Listing-IST — die einzige Grundlage.
+     */
+    zusatzKontext: text("zusatz_kontext"),
     createdAt: ts("created_at").notNull(),
   },
   (t) => [uniqueIndex("products_brand_asin_mp").on(t.brandId, t.asin, t.marketplace)],

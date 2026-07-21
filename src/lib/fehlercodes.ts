@@ -43,6 +43,16 @@ export const FEHLER_CODES: Record<string, FehlerInfo> = {
     bedeutung: "Die Generierung der Sektion ist abgebrochen (API-Fehler, Zeitbudget oder unlesbare Antwort). Es wurde KEINE neue Version gespeichert.",
     loesung: "Erneut generieren. Schlägt es wiederholt fehl, Detail-Meldung prüfen — bestehende Versionen bleiben unberührt.",
   },
+  "GEN-02": {
+    titel: "Content gesperrt — Bewertungs-Analyse fehlt",
+    bedeutung: "Die Bewertungs-Analyse ist die Grundlage guter Texte: Sie liefert Kundensprache, Pain Points und Kaufauslöser. Ohne sie ist die Generierung bewusst gesperrt.",
+    loesung: "Erst Reviews scrapen und analysieren (Bewertungs-Analyse-Karte). Alternativ in der Content-Karte bewusst ‚ohne Analyse' bestätigen — dann bauen die Texte auf Listing-IST und deinen Zusatz-Infos.",
+  },
+  "GEN-03": {
+    titel: "Keine Text-Grundlage vorhanden",
+    bedeutung: "Ohne Bewertungs-Analyse braucht die Generierung eine Ersatz-Grundlage — sonst würde das Tool Fakten erfinden.",
+    loesung: "Listing importieren (IST-Zustand als Grundlage) oder in der Content-Karte Zusatz-Infos zum Produkt eintragen (z. B. eigene/fremde Bullets, Details) — dann erneut generieren.",
+  },
   "IMP-01": {
     titel: "Listing-Import fehlgeschlagen",
     bedeutung: "Weder der Web-Abruf noch der Produkt-Crawler konnten das Amazon-Listing laden (Detail-Meldung oben — z. B. Blockade, Zeitlimit, unbekannte ASIN).",

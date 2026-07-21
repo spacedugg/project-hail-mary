@@ -1,0 +1,1 @@
+ALTER TABLE `products` ADD `zusatz_kontext` text;
