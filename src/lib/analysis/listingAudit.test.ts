@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { analyzeListing } from "./listingAudit";
+import { analyzeListing, deckungsgrad } from "./listingAudit";
 import type { ReviewInsightsPayload } from "@/db/schema";
 
 /**
@@ -77,5 +77,23 @@ describe("Kundenstimmen-Abgleich (Themen-Abgleich D117)", () => {
     // Bullets — der Magnet-Pain-Point muss über Magnete/halten/sicher matchen.
     const voc = analyse().dimensions.find((d) => d.key === "voc")!;
     expect(voc.findings.join("\n")).not.toContain("Nicht adressiert: „Magnete zu schwach");
+  });
+});
+
+describe("deckungsgrad (D126) — ist unser Soll live?", () => {
+  const soll = "HELLES LICHT: 300 Lumen leuchten Werkstatt und Keller zuverlässig aus. Drei starke Magnete halten sicher.";
+  it("identischer Text = 100 %", () => {
+    expect(deckungsgrad(soll, soll)).toBe(100);
+  });
+  it("leicht abgeänderter Text bleibt über 85 % (Kunde formuliert beim Einstellen minimal um)", () => {
+    const live = "HELLES LICHT: 300 Lumen leuchten Werkstatt und Keller zuverlässig aus. Drei kräftige Magnete halten sicher fest.";
+    expect(deckungsgrad(soll, live)).toBeGreaterThanOrEqual(85);
+  });
+  it("fremder Text liegt deutlich darunter", () => {
+    const fremd = "Praktische Taschenlampe für unterwegs mit USB-Anschluss und Ladekabel im Lieferumfang.";
+    expect(deckungsgrad(soll, fremd)).toBeLessThan(50);
+  });
+  it("leeres Soll = 0 (ehrlich, kein Fake-Treffer)", () => {
+    expect(deckungsgrad("", "irgendwas")).toBe(0);
   });
 });

@@ -126,6 +126,23 @@ function adressiert(hay: string, phrase: string): { ok: boolean; treffer: string
   return { ok: themen <= 2 ? treffer.length >= 1 : treffer.length >= 2, treffer };
 }
 
+/**
+ * Live-Deckungsgrad (D126): Wie viel unseres freigegebenen SOLL-Texts steckt
+ * im LIVE-Stand (letzter Import)? Kunden ändern Texte beim Einstellen manchmal
+ * leicht ab — ab 85 % gilt „live" (grün), darunter „weicht ab" (orange).
+ * Wortstamm-basiert und komposita-bewusst, wie der Themen-Abgleich.
+ */
+export function deckungsgrad(soll: string, ist: string): number {
+  const sollStaemme = [...tokenSet(soll)];
+  if (sollStaemme.length === 0) return 0;
+  const istStaemme = tokenSet(ist);
+  const daPruefer = [...istStaemme];
+  const getroffen = sollStaemme.filter((s) =>
+    daPruefer.some((t) => t === s || (s.length >= 4 && t.includes(s)) || (t.length >= 4 && s.includes(t))),
+  ).length;
+  return Math.round((getroffen / sollStaemme.length) * 100);
+}
+
 function scoreFromIssues(issues: ValidationIssue[], base = 100): number {
   const s = base - issues.filter((i) => i.severity === "error").length * 30 - issues.filter((i) => i.severity === "warning").length * 8;
   return Math.max(0, Math.min(100, s));
