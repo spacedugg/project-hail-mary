@@ -1,6 +1,6 @@
 # temoa OS — Bauplan (v3)
 
-> **Status:** v3.1, 2026-07-21 (neu: Menüpunkt Content-Verwaltung/CMS). Fortschreibung nach jedem abgeschlossenen Feature.
+> **Status:** v3.2, 2026-07-21 (CMS konsolidiert: startet eigenständig, ersetzt mittelfristig den Katalog — E6 entschieden). Fortschreibung nach jedem abgeschlossenen Feature.
 > Fundament: `docs/product-scope.md` (Scope-Session 07.07.) + Baustand `docs/DECISIONS.md`.
 > **Das ist das Accountability-Dokument:** Gebaut wird, was hier steht.
 > **Neu in v3 (Nutzer-Entscheidung 21.07.):** Der Plan ist nicht mehr nach Sprints sortiert, sondern ist der **Bauplan des Tools** — gegliedert wie die linke Seitenleiste: Menüpunkt → Untermenü → Features. Ein Menüpunkt/Feature wird komplett gebaut und **in sich getestet**, dann kommt der nächste. So wächst das Tool entlang seiner eigenen Struktur statt querbeet.
@@ -151,7 +151,7 @@ Das Content-Kraftwerk. Untermenüs = die Bereiche des Produkt-Arbeitsplatzes.
 
 ## 5 · Bauplan Ebene 2 — Marken-Sicht (je Kunde/Marke)
 
-Die Marken-Seitenleiste: Cockpit · Katalog · Sichtbarkeit & Markt · Advertising/PPC · Berichte & Daten · **Content-Verwaltung (CMS)** · Handlungen. Neu in v3.1: Der Menüpunkt „Flat Files" geht im CMS auf — Flat File ist dort der heutige Publish-Weg, der API-Push der künftige (E6 zur Bestätigung).
+Die Marken-Seitenleiste: Cockpit · Katalog · Sichtbarkeit & Markt · Advertising/PPC · Berichte & Daten · **Content-Verwaltung (CMS)** · Handlungen. **Konsolidierung (v3.2, entschieden 21.07.):** Katalog und CMS sind EIN Baustein in zwei Ausbaustufen — der Katalog/Arbeitsplatz ist die Erstellungs-Sicht (kann heute schon: Ist-Zustand von Amazon ziehen, Reviews analysieren, Content erstellen, Content-Score messen), das CMS ergänzt die Verwaltungs-Sicht (Bestand, Soll/Ist, Accuracy, Publish). Das CMS startet als **eigenständiger Reiter** (in sich baubar und testbar) und **ersetzt mittelfristig den Katalog**. Technische Bedingung von Tag 1: beide Sichten zeigen auf DIESELBE Datenbasis (Versionen, Freigaben, Snapshots) — keine Kopien; „Flat Files" geht als Publish-Weg im CMS auf.
 
 ### Menüpunkt: Cockpit (`/marke/[id]`)
 
@@ -165,12 +165,14 @@ Die Marken-Seitenleiste: Cockpit · Katalog · Sichtbarkeit & Markt · Advertisi
 | Custom Dashboards (Kachel-Baukasten je Nutzer/Kunde/Ebene) | ⬜ | Jeder sieht genau seine Kennzahlen · Vorstufe der Kunden-Sicht (Stufe 3) |
 | Markt-Kontext (Prime Day, Saison in der Bewertung) | ⬜ | Ausreißer richtig einordnen · später |
 
-### Menüpunkt: Katalog (`/marke/[id]/katalog`)
+### Menüpunkt: Katalog (`/marke/[id]/katalog`) — geht mittelfristig im CMS auf
+
+Deckt heute die Erstellungs-Seite des Content-Lebenszyklus ab (über den Produkt-Arbeitsplatz): Ist-Zustand von Amazon ziehen (Listing-Import ✅) · Reviews analysieren (🔶 in Reparatur) · Content erstellen (🔶 in Reparatur) · Content-Score/Regel-Messung (🧪). Diese Features bleiben, wo sie sind — das CMS baut die Verwaltungs-Schicht darüber und übernimmt später auch diese Einstiegs-Navigation.
 
 | Feature | Status | Handlung/Nutzen |
 |---|---|---|
 | Produkt-Liste je Marke → Absprung in den Produkt-Arbeitsplatz | ✅ | Der Weg zu jedem Produkt |
-| Marketplace-Umschalter auf Markenebene (.de/.fr/.it getrennt) | ⬜ | Gleiche Marke je Land getrennt steuern |
+| Marketplace-Umschalter auf Markenebene (.de/.fr/.it getrennt) | ⬜ | Gleiche Marke je Land getrennt steuern · wandert mit ins CMS |
 
 ### Menüpunkt: Sichtbarkeit & Markt (`/marke/[id]/sichtbarkeit`)
 
@@ -203,14 +205,16 @@ Die Marken-Seitenleiste: Cockpit · Katalog · Sichtbarkeit & Markt · Advertisi
 | Automatischer Berichts-Bezug per SP-API/Ads-API | 🔒 | Daten kommen von selbst, lückenlos · Zulassung läuft (Stufe 2); Adapter wird vorbereitet, Parser bleiben |
 | Forecasts, Lagerbestand | ⬜ | Erst mit API-Datenbasis sinnvoll · später |
 
-### Menüpunkt: Content-Verwaltung — CMS (neu · absorbiert „Flat Files")
+### Menüpunkt: Content-Verwaltung — CMS (neu · startet eigenständig, ersetzt später den Katalog)
 
-Der Content-Lebenszyklus je Kunde: **erstellen → speichern → publishen → überwachen.** Für Retainer- UND projektbasierte Kunden mit wiederkehrenden Content-/Advertising-/Management-Scopes. Kern-Prinzip: **Soll/Ist** — Soll ist der von uns erarbeitete, freigegebene Stand in der Datenbank; Ist ist das regelmäßig gecrawlte Live-Listing auf Amazon (gern auch schon VOR der Zusammenarbeit). Ziel: Content-Accuracy ≥ 95–99 % — unser Content ist ständig überall live und 100 % gepflegt. Das ist die **Retail-Readiness**, das Fundament fürs PPC-Cycling.
+Der Content-Lebenszyklus je Kunde: **erstellen → speichern → publishen → überwachen** — verwalten, bearbeiten, neu anlegen, löschen, pushen. Für Retainer- UND projektbasierte Kunden mit wiederkehrenden Content-/Advertising-/Management-Scopes. Kern-Prinzip: **Soll/Ist** — Soll ist der von uns erarbeitete, freigegebene Stand in der Datenbank; Ist ist das regelmäßig gecrawlte Live-Listing auf Amazon (gern auch schon VOR der Zusammenarbeit). Ziel: Content-Accuracy ≥ 95–99 % — unser Content ist ständig überall live und 100 % gepflegt. Das ist die **Retail-Readiness**, das Fundament fürs PPC-Cycling.
+
+**Bereits vorhanden (kommt aus Katalog/Arbeitsplatz — das CMS nutzt dieselbe Datenbasis, baut nichts doppelt):** Ist-Zustand von Amazon ziehen (Listing-Import ✅) · Bewertungs-Analyse (🔶) · Content-Erstellung inkl. Versionen & Freigaben (🔶/🧪) · Content-Score/Regel-Messung (🧪).
 
 | Feature | Status | Handlung/Nutzen |
 |---|---|---|
 | Flat-File-Erstellung (Amazon-Vorlage einlesen → Upload-Datei) | 🔶 | Der HEUTIGE Publish-Weg: Content ohne Copy-Paste in Seller Central bringen |
-| Content-Bibliothek je Kunde & Produkt | ⬜ | Alle im Tool erstellten Pieces (SEO-Texte, Bilder, Hauptbilder, A+) zentral verwaltet — Versionen & Freigaben aus dem Optimizer laufen hier zusammen |
+| Content-Bibliothek je Kunde & Produkt (verwalten, bearbeiten, neu anlegen, löschen) | ⬜ | Alle im Tool erstellten Pieces (SEO-Texte, Bilder, Hauptbilder, A+) zentral verwaltet — Versionen & Freigaben aus dem Optimizer laufen hier zusammen |
 | Bestands-Content-Import (historischer Content) | ⬜ | Auch Content, der VOR dem Tool bzw. früher für den Kunden erstellt wurde, wird eingepflegt und ab dann mitverwaltet |
 | Soll/Ist-Abgleich je Content-Piece | ⬜ | Soll = freigegebener Stand im Tool · Ist = gecrawltes Live-Listing; jede Abweichung wird sichtbar. Ehrliche Grenze: kontinuierlich erst mit automatischem Bezug (Stufe 2), bis dahin per manuellem Re-Import |
 | Content-Accuracy-Dashboard (Widgets) | ⬜ | Wie viel % unseres Solls ist live? Internes Ziel ≥ 95–99 % — messbar je Kunde/Produkt, als Kachel auch fürs Cockpit |
@@ -247,4 +251,4 @@ Der Content-Lebenszyklus je Kunde: **erstellen → speichern → publishen → �
 | E3 | Keyword-Aufteilung: wichtigste 3 → Titel, 4–13 → Bullets, 14–18 → Beschreibung, Rest → Backend | **Offen:** Platzzahlen bestätigen oder ändern |
 | E4 | ~~Sprint-Reihenfolge~~ | **Abgelöst (21.07.):** Struktur & Reihenfolge folgen dem Bauplan (Menüpunkt für Menüpunkt, Feature für Feature, in sich getestet) — Sprint-Sortierung entfällt. |
 | E5 | A+-Modul-Set | **Gelöst (20.07.):** Design-Guide geliefert und eingearbeitet (D112/D113). |
-| E6 | CMS-Verortung: eigener Marken-Menüpunkt „Content-Verwaltung (CMS)", in dem „Flat Files" als Publish-Weg aufgeht | **Offen:** Struktur bestätigen — oder CMS anders schneiden (z. B. eigener Reiter neben Flat Files) |
+| E6 | CMS-Verortung | **Entschieden (21.07.):** Katalog und CMS sind EIN Baustein in zwei Ausbaustufen. Das CMS startet als eigenständiger Reiter (in sich testbar) und ersetzt mittelfristig den Katalog; „Flat Files" geht als Publish-Weg darin auf. Bedingung: beide Sichten zeigen auf dieselbe Datenbasis — keine Kopien. |
