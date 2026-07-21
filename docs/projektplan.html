@@ -82,7 +82,7 @@
 <body>
 <main>
   <header>
-    <div class="eyebrow">temoa OS · Bauplan v3.5 · 21.07.2026</div>
+    <div class="eyebrow">temoa OS · Bauplan v3.6 · 21.07.2026</div>
     <h1>Der Bauplan: das Tool, gegliedert wie seine Seitenleiste</h1>
     <p class="sub">Nicht mehr nach Sprints sortiert (Entscheidung 21.07.): Dieses Dokument ist die komplette Basis des Tools — Menüpunkt → Untermenü → Features. Ein Feature wird komplett gebaut und <b>in sich getestet</b>, dann kommt das nächste. So wächst das Tool entlang seiner eigenen Struktur statt querbeet.</p>
   </header>
@@ -158,6 +158,12 @@
         <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Exporte zusammenführen / Basis löschen</span><span class="n">Basis wächst über Uploads; Neustart ist bewusste Entscheidung</span></div>
         <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Manuelle Keywords</span><span class="n">Eigenes Marktwissen ergänzt die Tool-Daten</span></div>
         <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Einteilung auf Content-Plätze</span><span class="n">Titel/Bullets/Beschreibung/Backend — <b>E3 offen:</b> Platzzahlen 3/13/18 bestätigen</span></div>
+
+        <div class="sub-h">Untermenü · Mehrsprachigkeit &amp; Lokalisierung (neu 21.07.)</div>
+        <div class="frow" style="grid-template-columns: 1fr; border-top: none;"><span class="n">Content-Sprache je Produkt/Auftrag wählbar — unabhängig vom Marktplatz. Grundprinzip: <b>lokalisieren, nicht übersetzen</b> — Keyword-Analyse vom Ziel-Marktplatz, Kundenstimmen aus der Ziel-Sprache.</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Content-Sprache wählbar</span><span class="n">Texte + Keywords in der Zielsprache (de/en/fr/it/es …) — z. B. englischer Content, obwohl das Produkt heute auf .de gepflegt wird</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Sicherheits-Gate 1: Keyword-Sprache = Content-Sprache</span><span class="n">Deutsche Keyword-Liste blockt französische Generierung (Fehlercode statt stiller Übersetzung). Sprach-Heuristik über die GESAMTE Liste — einzelne Keywords sind mehrdeutig, die Gesamtliste nicht; Cerebro-Analyse muss auf dem Ziel-Marktplatz gefahren werden</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Sicherheits-Gate 2: Review-Quellen = Ziel-Marktplatz</span><span class="n">Bei nicht-deutschem Content laufen alle Scrapes (Haupt-ASIN + Chips) gegen den Marktplatz der Content-Sprache. Die ASIN selbst verrät ihren Marktplatz NICHT — das Gate erzwingt den Scrape-Zielmarkt; existiert die ASIN dort nicht → ehrlich 0 Ergebnisse + Fehlercode. Zweite Sicherung: Sprach-Heuristik über die gescrapten Review-Texte</span></div>
 
         <div class="sub-h">Untermenü · Bewertungs-Analyse</div>
         <div class="frow"><span class="chip c-part">Reparatur</span><span class="f">Review-Scrape je ASIN × Sterne-Klasse</span><span class="n">Eigenes Produkt + Wettbewerber (ASIN-Chips); Mehr-ASIN-Abbruch behoben — erneuter Praxistest nötig</span></div>
