@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>temoa OS — Projektplan v2</title>
+<title>temoa OS — Bauplan v3</title>
 <style>
   :root {
     --bg: #f7f8f7; --card: #ffffff; --ink: #20302c; --muted: #5c6b67; --hair: #e2e6e4;
@@ -20,10 +20,10 @@
   body { background: var(--bg); color: var(--ink); font: 15px/1.55 ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
     margin: 0; padding: 40px 20px 72px; }
   main { max-width: 1020px; margin: 0 auto; }
-  h1, h2, h3 { text-wrap: balance; margin: 0; }
+  h1, h2, h3, h4 { text-wrap: balance; margin: 0; }
   .eyebrow { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--teal); font-weight: 700; }
   h1 { font-size: 30px; line-height: 1.15; margin-top: 6px; }
-  .sub { color: var(--muted); max-width: 68ch; margin-top: 8px; }
+  .sub { color: var(--muted); max-width: 72ch; margin-top: 8px; }
   section { margin-top: 44px; }
   h2 { font-size: 19px; margin-bottom: 4px; }
   .h2sub { color: var(--muted); font-size: 13px; margin: 0 0 16px; max-width: 78ch; }
@@ -44,8 +44,8 @@
   .filter ol { margin: 0 0 8px; padding-left: 20px; font-size: 14px; }
   .filter .bsp { color: var(--muted); font-size: 13px; margin: 0; }
 
-  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
-  .chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 11px; font-size: 11.5px; font-weight: 600; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 11px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
   .chip::before { content: ""; width: 7px; height: 7px; border-radius: 999px; background: currentColor; }
   .c-good { color: var(--good); background: var(--good-soft); }
   .c-built { color: var(--violet); background: rgb(111 99 194 / 0.12); }
@@ -53,218 +53,270 @@
   .c-open { color: var(--open); background: var(--open-soft); }
   .c-blocked { color: var(--blocked); background: var(--blocked-soft); }
 
-  .saeule { background: var(--card); border: 1px solid var(--hair); border-radius: 14px; padding: 16px 18px; margin-top: 12px; }
-  .saeule h3 { font-size: 14.5px; margin-bottom: 10px; }
-  .frow { display: grid; grid-template-columns: 16px minmax(180px, 1.1fr) 1.6fr; gap: 4px 10px; padding: 6px 0;
+  /* Bauplan: Menüpunkt-Karte im Look der Seitenleiste */
+  .menu { background: var(--card); border: 1px solid var(--hair); border-radius: 14px; padding: 0; margin-top: 14px; overflow: hidden; }
+  .menu > header { display: flex; align-items: baseline; gap: 10px; padding: 14px 18px; background: var(--teal-soft); border-bottom: 1px solid var(--hair); }
+  .menu > header h3 { font-size: 15px; }
+  .menu > header .pfad { font-size: 11.5px; color: var(--muted); font-family: ui-monospace, monospace; }
+  .menu .body { padding: 6px 18px 14px; }
+  .sub-h { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--violet); margin: 14px 0 2px; }
+  .frow { display: grid; grid-template-columns: 96px minmax(180px, 1.1fr) 1.5fr; gap: 4px 12px; padding: 7px 0;
     border-top: 1px solid var(--hair); font-size: 13px; align-items: baseline; }
-  .frow:first-of-type { border-top: none; }
-  .frow .fname { font-weight: 600; }
-  .frow .fnutz { color: var(--muted); }
-  @media (max-width: 640px) { .frow { grid-template-columns: 16px 1fr; } .frow .fnutz { grid-column: 2; } }
-  .dot { width: 8px; height: 8px; border-radius: 999px; position: relative; top: -1px; justify-self: center; }
-  .d-good { background: var(--good); } .d-built { background: var(--violet); } .d-part { background: var(--part); }
-  .d-open { background: var(--open); opacity: 0.55; } .d-blocked { background: var(--blocked); }
+  .sub-h + .frow, .body > .frow:first-child { border-top: none; }
+  .frow .f { font-weight: 600; }
+  .frow .n { color: var(--muted); }
+  .frow .chip { justify-self: start; }
+  @media (max-width: 640px) { .frow { grid-template-columns: 1fr; gap: 2px; } }
 
-  .sprints { display: flex; flex-direction: column; margin-top: 4px; }
-  .sprint { display: grid; grid-template-columns: 56px 1fr; gap: 0 18px; position: relative; padding-bottom: 20px; }
-  .sprint::before { content: ""; position: absolute; left: 27px; top: 34px; bottom: -2px; width: 2px; background: var(--hair); }
-  .sprint:last-child::before { display: none; }
-  .snum { width: 54px; height: 30px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
-    font-weight: 700; font-size: 13px; background: var(--teal-soft); color: var(--teal); font-variant-numeric: tabular-nums; }
-  .sprint.wartet .snum { background: var(--blocked-soft); color: var(--blocked); }
-  .sbody { background: var(--card); border: 1px solid var(--hair); border-radius: 14px; padding: 14px 18px; }
-  .sbody h3 { font-size: 14.5px; }
-  .sbody .outcome { color: var(--muted); font-size: 13px; margin: 4px 0 8px; max-width: 74ch; }
-  .sbody .abnahme { font-size: 12.5px; border-top: 1px dashed var(--hair); padding-top: 8px; margin-top: 2px; color: var(--muted); }
-  .abnahme b { color: var(--good); }
-  .tag { display: inline-block; border-radius: 6px; padding: 1px 7px; font-size: 11px; font-weight: 700; vertical-align: 1px;
-    background: var(--blocked-soft); color: var(--blocked); }
+  .regeln { background: var(--card); border: 1px solid var(--hair); border-radius: 14px; padding: 16px 20px; }
+  .regeln ol { margin: 0; padding-left: 20px; font-size: 14px; }
+  .regeln li { margin: 5px 0; }
 
-  table { width: 100%; border-collapse: collapse; background: var(--card); font-size: 13.5px; }
-  .tablewrap { overflow-x: auto; border: 1px solid var(--hair); border-radius: 14px; }
-  th { text-align: left; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
-    padding: 10px 14px; border-bottom: 1px solid var(--hair); }
-  td { padding: 10px 14px; border-bottom: 1px solid var(--hair); vertical-align: top; }
-  tr:last-child td { border-bottom: none; }
-  td.eid { font-weight: 700; color: var(--violet); white-space: nowrap; }
-  footer { margin-top: 44px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--hair); padding-top: 14px; max-width: 82ch; }
+  .etab { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--hair); border-radius: 14px; overflow: hidden; font-size: 13px; }
+  .etab th, .etab td { text-align: left; padding: 10px 14px; border-top: 1px solid var(--hair); vertical-align: top; }
+  .etab thead th { border-top: none; background: var(--teal-soft); font-size: 12px; }
+  .estatus { font-weight: 700; white-space: nowrap; }
+  .e-done { color: var(--good); } .e-open { color: var(--part); } .e-gone { color: var(--muted); }
 </style>
 </head>
 <body>
 <main>
-  <div class="eyebrow">temoa OS · Projektplan v2.1 · Stand 20.07.2026</div>
-  <h1>Vision, alle Features, Sprint-Plan</h1>
-  <p class="sub">Verbindliche Quelle ist <code>docs/PROJEKTPLAN.md</code> im Repository — diese Seite ist die visuelle Zusammenfassung. Wird nach jedem Sprint fortgeschrieben.</p>
+  <header>
+    <div class="eyebrow">temoa OS · Bauplan v3.0 · 21.07.2026</div>
+    <h1>Der Bauplan: das Tool, gegliedert wie seine Seitenleiste</h1>
+    <p class="sub">Nicht mehr nach Sprints sortiert (Entscheidung 21.07.): Dieses Dokument ist die komplette Basis des Tools — Menüpunkt → Untermenü → Features. Ein Feature wird komplett gebaut und <b>in sich getestet</b>, dann kommt das nächste. So wächst das Tool entlang seiner eigenen Struktur statt querbeet.</p>
+  </header>
 
   <section>
     <h2>Vision in drei Ausbaustufen</h2>
-    <p class="h2sub">Alle verstreuten Amazon-Datenquellen fließen in ein Tool, das sie in datenbasierte Entscheidungen, konkrete Handlungen und fertigen Content übersetzt. Jede Zahl trägt Formel und Quelle. Keine Fassaden-Daten.</p>
     <div class="stufen">
-      <div class="stufe">
-        <div class="snr">Stufe 1</div><h3>Internes Agentur-Tool</h3>
-        <p>Das Team betreut damit die Kundenkonten. Daten kommen per manuellem Import: Amazon-Berichte, Helium-10-Exporte, Review- und Listing-Scrapes, Gebühren-PDFs.</p>
-        <span class="stand jetzt">Jetzt — in Betrieb, wird gehärtet</span>
-      </div>
-      <div class="stufe">
-        <div class="snr">Stufe 2</div><h3>Direkter Amazon-Draht (API)</h3>
-        <p>SP-API und Ads-API ziehen alle Berichte der betreuten Kundenkonten automatisch — das mühsame Ziehen einzelner Tages- und Wochenberichte entfällt komplett.</p>
-        <span class="stand mittel">Mittelfristig — Amazon-Zulassung läuft</span>
-      </div>
-      <div class="stufe">
-        <div class="snr">Stufe 3</div><h3>Kunden-Produkt (Abo)</h3>
-        <p>Kunden kaufen das Tool im Monats-Abo und nutzen es selbst, ohne Agentur: eigenes Amazon-Konto anbinden, eigene Dashboards, eigene Auswertungen.</p>
-        <span class="stand spaeter">Langfristig — prägt heutige Architektur</span>
-      </div>
+      <div class="stufe"><div class="snr">Stufe 1</div><h3>Internes Agentur-Tool</h3>
+        <p>Das Team betreut die Kundenkonten. Daten aus manuellen Importen: Amazon-Berichte (CSV), Helium-10-Exporte, Review-/Listing-Scrapes, Gebühren-PDFs.</p>
+        <span class="stand jetzt">Jetzt — in Betrieb, wird gehärtet</span></div>
+      <div class="stufe"><div class="snr">Stufe 2</div><h3>API-angebunden</h3>
+        <p>SP-API + Ads-API ziehen alle Berichte der betreuten Kundenkonten automatisch — kein manuelles Ziehen einzelner Berichte mehr.</p>
+        <span class="stand mittel">Mittelfristig — Zulassung läuft</span></div>
+      <div class="stufe"><div class="snr">Stufe 3</div><h3>Kunden-Produkt (SaaS)</h3>
+        <p>Kunden kaufen das Tool im Monats-Abo, binden ihr eigenes Amazon-Konto an und nutzen eigene Dashboards — ohne Agentur.</p>
+        <span class="stand spaeter">Langfristig — prägt heutige Architektur</span></div>
     </div>
   </section>
 
   <section>
     <h2>Der Feature-Filter — die Messlatte für alles</h2>
     <div class="filter">
-      <p>Jedes Feature muss mindestens eine Frage mit Ja beantworten <b>und</b> zu einer konkreten Handlung im Account führen:</p>
+      <p>Jedes Feature muss mindestens eine Frage mit Ja beantworten, <b>und</b> einen Handlungs-Pfad haben:</p>
       <ol>
         <li>Ermöglicht es eine <b>datenbasierte Entscheidung</b>, die vorher Bauchgefühl war?</li>
         <li>Bringt es dem Kunden <b>mehr Umsatz oder mehr Profit</b>?</li>
         <li>Macht es die <b>Bearbeitung messbar schneller</b>?</li>
       </ol>
-      <p class="bsp">„Interessant zu sehen" reicht nicht. Beispiel N-Gram-Analyse: Sie bleibt nur, weil ihre Wortwurzeln direkt zur Negativ-Keyword-Liste für die Ads-Konsole werden. Als reines Schaubild wäre sie gestrichen.</p>
+      <p class="bsp">„Interessant zu sehen" reicht nicht. Beispiel N-Gram-Analyse: Sie bleibt nur, weil ihre Wortwurzeln direkt zu Negativ-Keywords werden.</p>
     </div>
   </section>
 
   <section>
-    <h2>Alle Features einzeln</h2>
+    <h2>Status-Legende</h2>
+    <p class="h2sub">„Gebaut" ist nicht „funktioniert": Grün gibt es erst nach bestandenem Praxistest im echten Einsatz (Vorgabe 20.07.).</p>
     <div class="legend">
-      <span class="chip c-good">im Praxistest bestätigt — von euch im echten Einsatz durchgespielt</span>
-      <span class="chip c-built">gebaut &amp; automatisch getestet — Praxistest steht aus</span>
-      <span class="chip c-part">teilweise / in Reparatur</span>
+      <span class="chip c-good">bestätigt — im Praxistest bestanden</span>
+      <span class="chip c-built">gebaut — Praxistest steht aus</span>
+      <span class="chip c-part">in Reparatur — Fix deployed, erneuter Test nötig</span>
       <span class="chip c-open">geplant</span>
-      <span class="chip c-blocked">wartet auf Input oder Zulassung</span>
-    </div>
-
-    <div class="saeule"><h3>Fundament (Plattform)</h3>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Login, Team, Mein Konto</span><span class="fnutz">Jeder arbeitet unter eigenem Namen</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Marken- &amp; Produkt-Verwaltung</span><span class="fnutz">Struktur Marke → Produkt (ASIN) — alles hängt daran</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Fehler-Popups mit Code + Lösung</span><span class="fnutz">Kein stiller Abbruch — jeder Fehler ist behebbar erklärt</span></div>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">„Daten &amp; Formeln"-Register</span><span class="fnutz">Jede Zahl im Tool ist nachrechenbar (durchsuchbar)</span></div>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">Gebühren-Update per Amazon-PDF</span><span class="fnutz">PDF hochladen → Vorschau alt/neu → Margen-Rechner rechnet richtig</span></div>
-      <div class="frow"><i class="dot d-open"></i><span class="fname">Marketplace-Umschalter je Marke</span><span class="fnutz">Gleiche Marke auf .de/.fr/.it getrennt steuern</span></div>
-      <div class="frow"><i class="dot d-open"></i><span class="fname">Mandanten, Rollen, Abo</span><span class="fnutz">Stufe 3: Kunde sieht nur Seins und zahlt monatlich</span></div>
-    </div>
-
-    <div class="saeule"><h3>1 · Performance &amp; Wirtschaftlichkeit</h3>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">Business-Report-Import</span><span class="fnutz">Umsatz, Bestellungen, Sitzungen, Conversion, Buybox, Warenkorbwert</span></div>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">Ads-Report-Import</span><span class="fnutz">Werbekosten, ACoS, ROAS, Klickpreise je Periode</span></div>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">KPI-Cockpit + Trend-Linien</span><span class="fnutz">Zustand und Entwicklung auf einen Blick — wirkt die Maßnahme?</span></div>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">ACoS/TACoS-Ampel gegen Break-even</span><span class="fnutz">Sofort-Entscheidung: Werbung drosseln oder skalieren</span></div>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">Perioden-Diagnose</span><span class="fnutz">WARUM lief der Monat schlechter: Besucher, Conversion oder Warenkorb?</span></div>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">Margen-Rechner + Break-even-ACoS</span><span class="fnutz">Preis- und Gebots-Entscheidungen auf Profitbasis</span></div>
-      <div class="frow"><i class="dot d-part"></i><span class="fname">Handlungs-Hebel in €</span><span class="fnutz">Maßnahmen nach Geldwirkung sortiert</span></div>
-      <div class="frow"><i class="dot d-open"></i><span class="fname">Retourenquote</span><span class="fnutz">Sprint 2 — braucht den Retouren-/Payments-Bericht</span></div>
-      <div class="frow"><i class="dot d-open"></i><span class="fname">SQP-Szenario-Rechner</span><span class="fnutz">Sprint 2 — was bringt +1 % Conversion bei Suchanfrage X in €?</span></div>
-      <div class="frow"><i class="dot d-blocked"></i><span class="fname">Automatischer Berichts-Bezug (SP-API/Ads-API)</span><span class="fnutz">Sprint 4 — kein manuelles Berichte-Ziehen mehr; Amazon-Zulassung läuft</span></div>
-      <div class="frow"><i class="dot d-open"></i><span class="fname">Custom Dashboards (Kachel-Baukasten)</span><span class="fnutz">Sprint 6 — jeder stellt sich seine Sicht zusammen, vom Account bis zum Einzelbericht</span></div>
-    </div>
-
-    <div class="saeule"><h3>2 · Sichtbarkeit &amp; Wettbewerb</h3>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Cerebro-Import → Keyword-Basis</span><span class="fnutz">Ein Upload — die Keyword-Quelle je Produkt</span></div>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Relevanz-Filter</span><span class="fnutz">Fremdmarken (KI-erkannt), falsche Maße/Anzahl/Farbe/Form — markiert statt gelöscht</span></div>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">Keyword-Einteilung auf Content-Plätze</span><span class="fnutz">Wichtigste Keywords in den Titel, dann Bullets, Beschreibung, Backend</span></div>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">Uploads zusammenführen / Basis löschen</span><span class="fnutz">Basis wächst über mehrere Exporte; Neustart nur bewusst</span></div>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">SOV-Audit (Sichtbarkeits-Anteil)</span><span class="fnutz">Wo verlieren wir gegen Wettbewerber sichtbar Umsatz → Quick-Wins</span></div>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">SQP-Auswertung</span><span class="fnutz">Eigene Klick-/Kaufraten vs. Markt je Suchanfrage → verlorene Käufe</span></div>
-    </div>
-
-    <div class="saeule"><h3>3 · Content</h3>
-      <div class="frow"><i class="dot d-good"></i><span class="fname">Listing-Import von Amazon</span><span class="fnutz">Ist-Zustand (Titel, Bullets, Bilder, Bewertungszahlen) ohne Abtippen</span></div>
-      <div class="frow"><i class="dot d-part"></i><span class="fname">Text-Generierung (6 Sektionen)</span><span class="fnutz">Fehlschlag im Praxistest (GEN-01) behoben — Denk-Budget des KI-Modells war zu knapp; erneuter Praxistest nötig</span></div>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">Automatische Prüfung</span><span class="fnutz">Zeichen/Bytes, Keyword-Pflichten, Fremdmarken-Verbot — Prüfung ist Code, nicht Meinung</span></div>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">Begründung je Textbestandteil</span><span class="fnutz">Fürs Kundengespräch: WARUM steht jeder Baustein drin</span></div>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">Versionen + Freigabe</span><span class="fnutz">Stände vergleichbar, nichts geht verloren</span></div>
-      <div class="frow"><i class="dot d-part"></i><span class="fname">Flat-File-Erstellung</span><span class="fnutz">Content ohne Copy-Paste in Seller Central bringen</span></div>
-      <div class="frow"><i class="dot d-open"></i><span class="fname">A+-Content-Generierung</span><span class="fnutz">Sprint 3 — Basic/Premium-Regeln liegen im Agentur-Wissen vor</span></div>
-      <div class="frow"><i class="dot d-blocked"></i><span class="fname">Bild-Prompts (Hauptbild, Galerie)</span><span class="fnutz">Wartet auf euren Hauptbild-Prompt als Vorlage</span></div>
-      <div class="frow"><i class="dot d-open"></i><span class="fname">Content-Wirkungs-Messung</span><span class="fnutz">Nach Sprint 4 — hat die Titel-Änderung Conversion gebracht?</span></div>
-    </div>
-
-    <div class="saeule"><h3>4 · Listing-Diagnose</h3>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">Tiefen-Audit (8 Dimensionen)</span><span class="fnutz">Titel bis Preisstrategie — priorisierte Baustellen je Listing</span></div>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">Analyse-Seite (druckbar)</span><span class="fnutz">Kundentaugliche Aufbereitung</span></div>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">Bild-Briefs</span><span class="fnutz">Grafiker bekommt Daten-Vorgaben statt Bauchgefühl</span></div>
-      <div class="frow"><i class="dot d-open"></i><span class="fname">Bild-Audit + echter Listing-Score</span><span class="fnutz">Später — Hauptbild ist der größte Conversion-Hebel</span></div>
-    </div>
-
-    <div class="saeule"><h3>5 · Advertising / PPC</h3>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">Search-Term-Analyse</span><span class="fnutz">Geldvernichter finden: Wasted Spend, Negativ-Kandidaten (N-Grams nur als Zulieferer)</span></div>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">Ziel-ACoS + Überspend-Erkennung</span><span class="fnutz">Kampagnen über Ziel → Gebote senken</span></div>
-      <div class="frow"><i class="dot d-open"></i><span class="fname">Negativ-/Gebots-Checkliste mit Export</span><span class="fnutz">Sprint 5 — vom Befund zur umgesetzten Änderung</span></div>
-      <div class="frow"><i class="dot d-open"></i><span class="fname">Kampagnen-Struktur-Vorschlag</span><span class="fnutz">Sprint 5 — aus der Keyword-Einteilung</span></div>
-      <div class="frow"><i class="dot d-open"></i><span class="fname">Kampagnen-Upload als Bulk-Sheet (Excel)</span><span class="fnutz">Sprint 5 — upload-fertiges Excel für die Ads-Konsole (heutiger Arbeitsweg), statt Sheets von Hand zu bauen</span></div>
-      <div class="frow"><i class="dot d-blocked"></i><span class="fname">Kampagnen-Anlage per Ads-API</span><span class="fnutz">Stufe 2 — Struktur direkt ins Konto schreiben, ersetzt den Excel-Zwischenschritt</span></div>
-    </div>
-
-    <div class="saeule"><h3>6 · Reviews / Voice of Customer</h3>
-      <div class="frow"><i class="dot d-part"></i><span class="fname">Review-Scrape je ASIN × Sterne-Klasse</span><span class="fnutz">Einzel-ASIN lief im Praxistest; Mehr-ASIN-Abbruch behoben (Zeitbudget) — erneuter Praxistest nötig</span></div>
-      <div class="frow"><i class="dot d-part"></i><span class="fname">Findings-Dashboard</span><span class="fnutz">Crash im Praxistest behoben (KI-Antwort wird jetzt erzwungen geprüft) — erneuter Praxistest nötig</span></div>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">Automatischer Fluss in Content + Briefs</span><span class="fnutz">Einwände in Bullets/Q&amp;A, Kaufauslöser in Headlines — ohne Handarbeit</span></div>
-      <div class="frow"><i class="dot d-built"></i><span class="fname">Review-Bezug: bleibt Scraping (entschieden 20.07.)</span><span class="fnutz">Amazons offizielle APIs liefern keine Review-Texte — Scraping ist der einzige Weg</span></div>
-    </div>
-
-    <div class="saeule"><h3>Intelligenz-Schicht (über allen Säulen)</h3>
-      <div class="frow"><i class="dot d-open"></i><span class="fname">AI-Advisor</span><span class="fnutz">Sprint 5 — die 3 wichtigsten Maßnahmen je Marke, nach €-Hebel, mit Begründung</span></div>
-      <div class="frow"><i class="dot d-open"></i><span class="fname">Alerts</span><span class="fnutz">Sprint 5 — Ausreißer und Buybox-Einbruch melden sich, bevor der Kunde anruft</span></div>
-      <div class="frow"><i class="dot d-open"></i><span class="fname">Markt-Kontext</span><span class="fnutz">Später — Prime Day/Saison in der Bewertung berücksichtigen</span></div>
+      <span class="chip c-blocked">wartet — auf Input oder Zulassung</span>
     </div>
   </section>
 
   <section>
-    <h2>Sprint-Plan — 1 Woche, 1 Ergebnis, 1 prüfbare Abnahme</h2>
-    <p class="h2sub">Abnahme heißt: Der beschriebene Test gelingt klickend im Tool, ohne Fehlermeldung. Reihenfolge wird je Sprint-Wechsel gemeinsam bestätigt.</p>
-    <div class="sprints">
-      <div class="sprint"><div class="snum">S1</div><div class="sbody">
-        <h3>Optimizer verlässlich</h3>
-        <p class="outcome">Ein echtes Kundenprodukt wird komplett durchoptimiert, ohne dass etwas hakt. Jedes violette Feature des Optimizers wird dabei im echten Einsatz durchgespielt — erst dann wird es grün. Review-Bezug bleibt Scraping (entschieden).</p>
-        <p class="abnahme"><b>Abnahme:</b> 3 echte Produkte von Import bis freigegebenem Content ohne Fehlermeldung.</p>
-      </div></div>
-      <div class="sprint"><div class="snum">S2</div><div class="sbody">
-        <h3>Reporting-Monatsrhythmus</h3>
-        <p class="outcome">Der Kundenmonat entsteht komplett im Tool: Retourenquote, SQP-Szenario-Rechner, geführter Monats-Upload.</p>
-        <p class="abnahme"><b>Abnahme:</b> Ein Kundenmonat hochgeladen → Cockpit, Diagnose und Hebel-Liste stimmen mit der Handrechnung überein.</p>
-      </div></div>
-      <div class="sprint"><div class="snum">S3</div><div class="sbody">
-        <h3>A+ Content</h3>
-        <p class="outcome">A+ (Basic &amp; Premium) wird generiert und geprüft wie Bullets — die Modul-Regeln liegen im Agentur-Wissen vor.</p>
-        <p class="abnahme"><b>Abnahme:</b> 1 Produkt bekommt regelkonforme A+-Modul-Entwürfe aus echten Daten.</p>
-      </div></div>
-      <div class="sprint wartet"><div class="snum">S4</div><div class="sbody">
-        <h3>Amazon-API Stufe 1 <span class="tag">wartet auf Amazon-Zulassung</span></h3>
-        <p class="outcome">Kundenkonten anbinden, Berichte automatisch ziehen — ersetzt die manuellen Uploads, die Auswertung bleibt gleich. Wird bis zur Freigabe vorbereitet; rutscht die Zulassung, rücken S5/S6 vor.</p>
-        <p class="abnahme"><b>Abnahme:</b> Umsatz- und Werbedaten eines Kontos kommen ohne manuellen Upload ins Cockpit — Zahlen identisch zum manuellen Bericht.</p>
-      </div></div>
-      <div class="sprint"><div class="snum">S5</div><div class="sbody">
-        <h3>Intelligenz + PPC-Handlung</h3>
-        <p class="outcome">Der Advisor nennt je Marke die 3 wichtigsten Maßnahmen mit €-Hebel und Begründung; Negativ-/Gebots-Checkliste exportierbar; Kampagnen-Struktur als upload-fertiges Bulk-Sheet (Excel) für die Ads-Konsole.</p>
-        <p class="abnahme"><b>Abnahme:</b> Jede Advisor-Maßnahme trägt Quelle, Formel und €-Wert; Negativliste aus echtem Suchbegriffs-Bericht exportiert.</p>
-      </div></div>
-      <div class="sprint"><div class="snum">S6</div><div class="sbody">
-        <h3>Custom Dashboards v1</h3>
-        <p class="outcome">Kachel-Baukasten: Jeder stellt sich sein Dashboard selbst zusammen — die Vorstufe der späteren Kunden-Sicht.</p>
-        <p class="abnahme"><b>Abnahme:</b> Zwei unterschiedliche Dashboards aus denselben Daten gebaut, gespeichert, wieder geöffnet.</p>
-      </div></div>
+    <h2>Ebene 1 — Agentur-Sicht (temoa OS)</h2>
+    <p class="h2sub">Die schlanke OS-Seitenleiste: Portfolio · Listing Optimizer · Tool-Einstellungen · Mein Konto. Querschnitt darüber, wirkt in jedem Menüpunkt: Fehler-Popups mit Fehlercode + Lösung <b>(bestätigt)</b> · Login &amp; Team <b>(bestätigt)</b> · Ehrliche-Daten-Prinzip.</p>
+
+    <div class="menu">
+      <header><h3>Portfolio</h3><span class="pfad">/</span></header>
+      <div class="body">
+        <div class="frow"><span class="chip c-good">bestätigt</span><span class="f">Marken- &amp; Produkt-Verwaltung</span><span class="n">Die Grundstruktur Marke → Produkt (ASIN) — alles hängt daran</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Portfolio-Kennzahlen + Alerts-Übersicht</span><span class="n">Zustand aller Kundenkonten auf einen Blick — sinnvoll mit API-Datenbasis (Stufe 2)</span></div>
+      </div>
+    </div>
+
+    <div class="menu">
+      <header><h3>Listing Optimizer</h3><span class="pfad">/optimizer → Produkt-Arbeitsplatz</span></header>
+      <div class="body">
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Auftrags-Übersicht</span><span class="n">Jede Listing-Optimierung ist ein nachvollziehbarer Auftrag</span></div>
+
+        <div class="sub-h">Untermenü · Produkt-Wahrheit</div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Produkt-Fakten (Wahrheits-Anker)</span><span class="n">Auto-Wege füllen NUR leere Felder — Hand-Einträge gewinnen immer</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Persistente Zusatz-Infos</span><span class="n">Fließen in jede Generierung — Wissen geht nicht verloren</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Kategorie-dynamische Fakten-Felder</span><span class="n">Textil ≠ Elektronik — Felder passen sich der Kategorie an</span></div>
+
+        <div class="sub-h">Untermenü · Listing-Import</div>
+        <div class="frow"><span class="chip c-good">bestätigt</span><span class="f">Import von Amazon</span><span class="n">Titel, Bullets, Bilder, Bewertungszahlen — Ist-Zustand ohne Abtippen</span></div>
+
+        <div class="sub-h">Untermenü · Keyword-Basis</div>
+        <div class="frow"><span class="chip c-good">bestätigt</span><span class="f">Cerebro-Import</span><span class="n">DIE Keyword-Quelle je Produkt</span></div>
+        <div class="frow"><span class="chip c-good">bestätigt</span><span class="f">Relevanz-Filter</span><span class="n">Fremdmarken (KI-erkannt), abweichende Maße/Anzahl/Farbe/Form — markiert statt gelöscht</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Exporte zusammenführen / Basis löschen</span><span class="n">Basis wächst über Uploads; Neustart ist bewusste Entscheidung</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Manuelle Keywords</span><span class="n">Eigenes Marktwissen ergänzt die Tool-Daten</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Einteilung auf Content-Plätze</span><span class="n">Titel/Bullets/Beschreibung/Backend — <b>E3 offen:</b> Platzzahlen 3/13/18 bestätigen</span></div>
+
+        <div class="sub-h">Untermenü · Bewertungs-Analyse</div>
+        <div class="frow"><span class="chip c-part">Reparatur</span><span class="f">Review-Scrape je ASIN × Sterne-Klasse</span><span class="n">Eigenes Produkt + Wettbewerber (ASIN-Chips); Mehr-ASIN-Abbruch behoben — erneuter Praxistest nötig</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Ehrliche Datenbasis</span><span class="n">Amazon-Gesamtzahlen neben der Stichprobe, Ausbeute je Lauf</span></div>
+        <div class="frow"><span class="chip c-part">Reparatur</span><span class="f">Findings-Dashboard</span><span class="n">Pain Points, Kaufauslöser, Kundensprache, O-Töne; Crash behoben — erneuter Praxistest nötig</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Erkenntnisse fließen in Content + Briefs</span><span class="n">Automatisch — Bewertungen liefern Sprache und Prioritäten, NIE technische Daten</span></div>
+        <div class="frow"><span class="chip c-good">bestätigt</span><span class="f">Review-Bezug: bleibt Scraping</span><span class="n">Entschieden (E1): Amazons Schnittstellen liefern keine Bewertungs-Texte</span></div>
+
+        <div class="sub-h">Untermenü · Content-Werkstatt</div>
+        <div class="frow"><span class="chip c-part">Reparatur</span><span class="f">Text-Generierung (6 Sektionen)</span><span class="n">Titel, Bullets, Highlights, Backend, Beschreibung, Q&amp;A; Denk- und Zeit-Budget-Fixe deployed — erneuter Praxistest nötig</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Content-Gate</span><span class="n">Ohne Bewertungs-Analyse gesperrt; Ausnahme nur per Doppel-Bestätigung je Sektion</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Automatische Prüfung inkl. Zahlen-Herkunfts-Check</span><span class="n">Zeichen/Bytes, Keyword-Pflichten, Fremdmarken-Verbot, USP-Dopplung — und: jede Zahl braucht eine Quelle</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Prompt-Regeln aus Agentur-Wissen</span><span class="n">Drei-Positionen-Anatomie, EIN Bullet = EIN Thema, Fakten-Sperre</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Begründung je Textbestandteil</span><span class="n">Nachvollziehbar fürs Kunden-Gespräch</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Manuelle Bearbeitung mit derselben Prüfung</span><span class="n">Handarbeit spielt nach denselben Regeln</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Versionen + Freigabe-Workflow</span><span class="n">Stände vergleichbar, nichts geht verloren</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Serialisierte Generierung</span><span class="n">Buttons sperren sich gegenseitig — kein Fehler durch Parallel-Klicks</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">A+-Content-Generierung (Basic &amp; Premium)</span><span class="n">Nach dem eingearbeiteten Design-Guide; Abfrage: Variante, Modul-Anzahl 1–7, Modultypen — startklar</span></div>
+        <div class="frow"><span class="chip c-blocked">wartet</span><span class="f">Bild-Prompts (Hauptbild, Galerie)</span><span class="n">Wartet auf euren Hauptbild-Prompt (E2)</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Content-Performance-Monitoring</span><span class="n">Hat die Titel-Änderung die Kaufrate verbessert? — braucht API-Daten (Stufe 2)</span></div>
+
+        <div class="sub-h">Untermenü · Analyse</div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Tiefen-Audit (8 Dimensionen)</span><span class="n">Vollbild des Listings → priorisierte Baustellen</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Regel-Messung des wirksamen Stands</span><span class="n">Freigegeben, sonst Original — je Sektion ausgewiesen; gemessen wird, was live gehen kann</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Kundenstimmen-Abgleich</span><span class="n">Adressieren die Bullets die Top-Pain-Points? Themen-Abgleich, heute repariert</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Druck-Layout</span><span class="n">Kundentaugliche Aufbereitung</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Bild-Audit</span><span class="n">Automatische visuelle Prüfung — Hauptbild = größter Kaufraten-Hebel</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Echter Listing-Score</span><span class="n">Berechnet statt von Hand eingegeben — vergleichbar über Produkte und Zeit</span></div>
+
+        <div class="sub-h">Untermenü · Creative-Briefs</div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Bild-Briefs</span><span class="n">Grafiker bekommt Fakten statt Bauchgefühl</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">A+-Briefs Basic &amp; Premium</span><span class="n">Nach dem Design-Guide: Maße, Module, Text nur im Bild, Desktop-only</span></div>
+      </div>
+    </div>
+
+    <div class="menu">
+      <header><h3>Tool-Einstellungen</h3><span class="pfad">/einstellungen · Daten &amp; Formeln</span></header>
+      <div class="body">
+        <div class="frow"><span class="chip c-good">bestätigt</span><span class="f">Team-Verwaltung</span><span class="n">Wer darf rein, wer ist wer</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">„Daten &amp; Formeln"-Register</span><span class="n">Jede Zahl im Tool nachrechenbar — Vertrauen, Schulung neuer Teammitglieder</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Gebühren-Update per Amazon-PDF</span><span class="n">Vorschau der Änderungen → bestätigte Übernahme; Margen-Rechner rechnet sofort richtig</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Demo-Daten &amp; Zurücksetzen</span><span class="n">Gefahrloses Ausprobieren und Vorführen</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Mandanten &amp; Rollen</span><span class="n">Kunde sieht nur Seins — Voraussetzung fürs Kunden-Abo (Stufe 3)</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Abo/Abrechnung</span><span class="n">Monetarisierung (Stufe 3)</span></div>
+      </div>
+    </div>
+
+    <div class="menu">
+      <header><h3>Mein Konto</h3><span class="pfad">/konto</span></header>
+      <div class="body">
+        <div class="frow"><span class="chip c-good">bestätigt</span><span class="f">Persönliche Einstellungen</span><span class="n">Getrennt von den tool-weiten Einstellungen</span></div>
+      </div>
     </div>
   </section>
 
   <section>
-    <h2>Offene Entscheidungen</h2>
-    <div class="tablewrap"><table>
-      <tr><th>Nr</th><th>Thema</th><th>Stand</th></tr>
-      <tr><td class="eid">E1</td><td>Reviews per Amazon-API beziehen?</td><td><b>Entschieden:</b> Nicht möglich — die offiziellen Amazon-APIs liefern keine Review-Texte. Es bleibt beim Scraping.</td></tr>
-      <tr><td class="eid">E2</td><td>Quellen für Bilder &amp; A+</td><td><b>Teilweise gelöst:</b> A+-Regeln liegen im Agentur-Wissen → Sprint 3 startklar. Der Hauptbild-Prompt fehlt noch — blockiert nur die Bild-Prompts.</td></tr>
-      <tr><td class="eid">E3</td><td>Keyword-Aufteilung: Die Keyword-Liste wird nach Wichtigkeit sortiert (Suchvolumen × Relevanz). Die wichtigsten 3 kommen in den Titel, Platz 4–13 in die Bullets, 14–18 in die Beschreibung, der Rest ins unsichtbare Backend-Feld.</td><td><b>Offen:</b> Passt diese Aufteilung — oder andere Platzzahlen?</td></tr>
-      <tr><td class="eid">E4</td><td>Sprint-Reihenfolge S1–S6</td><td><b>Offen:</b> bestätigen oder umsortieren.</td></tr>
-    </table></div>
+    <h2>Ebene 2 — Marken-Sicht (je Kunde/Marke)</h2>
+    <p class="h2sub">Die Marken-Seitenleiste: Cockpit · Katalog · Sichtbarkeit &amp; Markt · Advertising/PPC · Berichte &amp; Daten · Flat Files · Handlungen.</p>
+
+    <div class="menu">
+      <header><h3>Cockpit</h3><span class="pfad">/marke/[id]</span></header>
+      <div class="body">
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Kennzahlen-Kacheln</span><span class="n">Umsatz, Bestellungen, Sitzungen, Kaufrate, Buybox, Warenkorbwert — Zustand auf einen Blick</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Trend-Linien über Perioden</span><span class="n">Umsatz, TACoS — wirkt die Maßnahme?</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">ACoS/TACoS-Ampel gegen Break-even</span><span class="n">Sofort-Entscheidung: Werbung drosseln oder skalieren</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Perioden-Diagnose</span><span class="n">Umsatz = Sitzungen × Kaufrate × Warenkorbwert zerlegt — WARUM lief der Monat schlechter</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Margen-Rechner + Break-even je Produkt</span><span class="n">Preis-/Gebots-Entscheidungen auf Profitbasis</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Custom Dashboards (Kachel-Baukasten)</span><span class="n">Jeder sieht genau seine Kennzahlen — je Nutzer/Kunde/Ebene; Vorstufe der Kunden-Sicht (Stufe 3)</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Markt-Kontext</span><span class="n">Prime Day, Saison in der Bewertung — Ausreißer richtig einordnen (später)</span></div>
+      </div>
+    </div>
+
+    <div class="menu">
+      <header><h3>Katalog</h3><span class="pfad">/marke/[id]/katalog</span></header>
+      <div class="body">
+        <div class="frow"><span class="chip c-good">bestätigt</span><span class="f">Produkt-Liste je Marke</span><span class="n">Der Absprung in den Produkt-Arbeitsplatz</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Marketplace-Umschalter</span><span class="n">Gleiche Marke auf .de/.fr/.it getrennt steuern</span></div>
+      </div>
+    </div>
+
+    <div class="menu">
+      <header><h3>Sichtbarkeit &amp; Markt</h3><span class="pfad">/marke/[id]/sichtbarkeit</span></header>
+      <div class="body">
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Sichtbarkeits-Audit (SOV)</span><span class="n">Sichtbarkeits-Anteil vs. Wettbewerber, schnelle Chancen, Umsatzlücken → rankende Keywords angreifen</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Suchanfragen-Auswertung (SQP)</span><span class="n">Eigene Klick-/Kaufraten vs. Markt, verlorene Käufe → Content-/Werbe-Handlung</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Suchanfragen-Szenario-Rechner</span><span class="n">Was bringt +1 % Kaufrate bei Suchanfrage X? — Investition dahin, wo sie am meisten bringt</span></div>
+      </div>
+    </div>
+
+    <div class="menu">
+      <header><h3>Advertising / PPC</h3><span class="pfad">/marke/[id]/advertising</span></header>
+      <div class="body">
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Suchbegriff-Analyse</span><span class="n">Verschwendete Ausgaben, Negativ-Kandidaten — Geldvernichter finden → Negativliste</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Wortwurzel-Analyse (N-Gram)</span><span class="n">Bleibt NUR als Zulieferer der Negativliste (Feature-Filter)</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Ziel-ACoS + Überspend-Erkennung</span><span class="n">Aus Portfolio-Namen; Kampagnen über Ziel → Gebote senken</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Negativ-/Gebots-Checkliste mit Export</span><span class="n">Vom Befund zur umgesetzten Änderung in der Ads-Konsole</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Kampagnen-Struktur-Vorschlag</span><span class="n">Aus der Keyword-Einteilung — neue Kampagnen konsistent aufsetzen</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Kampagnen-Upload als Bulk-Sheet (Excel)</span><span class="n">Upload-fertig für die Ads-Konsole — heutiger Arbeitsweg des Teams; Beispiel-Excel liefert das Team beim Start</span></div>
+        <div class="frow"><span class="chip c-blocked">wartet</span><span class="f">Kampagnen-Anlage per Ads-API</span><span class="n">Ersetzt den Bulk-Sheet-Umweg — Struktur direkt ins Werbe-Konto (Stufe 2)</span></div>
+      </div>
+    </div>
+
+    <div class="menu">
+      <header><h3>Berichte &amp; Daten</h3><span class="pfad">/marke/[id]/berichte</span></header>
+      <div class="body">
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Business-Report-Import</span><span class="n">Umsatz, Bestellungen, Sitzungen, Kaufrate, Buybox — Faktenbasis jeder Monats-Entscheidung</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Werbe-Report-Import</span><span class="n">Ausgaben, ACoS, ROAS, Klickpreise je Periode</span></div>
+        <div class="frow"><span class="chip c-built">gebaut</span><span class="f">Geführter Berichts-Upload</span><span class="n">Getaggt: Marke · Land · Periode — der Kundenmonat entsteht komplett im Tool</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Retourenquote</span><span class="n">Retourentreiber erkennen — braucht echten Retouren-/Zahlungs-Bericht als Beispieldatei</span></div>
+        <div class="frow"><span class="chip c-blocked">wartet</span><span class="f">Automatischer Berichts-Bezug (SP-API/Ads-API)</span><span class="n">Daten kommen von selbst, lückenlos — Zulassung läuft (Stufe 2); die Einlese-Logik bleibt</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Prognosen, Lagerbestand</span><span class="n">Erst mit API-Datenbasis sinnvoll (später)</span></div>
+      </div>
+    </div>
+
+    <div class="menu">
+      <header><h3>Flat Files</h3><span class="pfad">/marke/[id]/flatfiles</span></header>
+      <div class="body">
+        <div class="frow"><span class="chip c-part">Reparatur</span><span class="f">Flat-File-Erstellung</span><span class="n">Amazon-Vorlage einlesen → Upload-Datei; Content ohne Copy-Paste in Seller Central</span></div>
+      </div>
+    </div>
+
+    <div class="menu">
+      <header><h3>Handlungen</h3><span class="pfad">/marke/[id]/handlungen</span></header>
+      <div class="body">
+        <div class="frow"><span class="chip c-part">Reparatur</span><span class="f">Handlungs-Hebel in €</span><span class="n">Priorisierte Maßnahmen-Liste — was zuerst tun, nach Geldwirkung sortiert</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">AI-Advisor</span><span class="n">Die 3 wichtigsten Maßnahmen je Marke, nach €-Hebel, mit Begründung — das Differenzierungsmerkmal</span></div>
+        <div class="frow"><span class="chip c-open">geplant</span><span class="f">Alerts</span><span class="n">Ausreißer zwischen Perioden, Buybox-Einbruch, Regel-Änderungen — Probleme melden sich, bevor der Kunde anruft</span></div>
+      </div>
+    </div>
   </section>
 
-  <footer>Bewusst noch nicht gebaut (Zielbild, blockiert nichts): Market-Share- und Preis-Intelligence (keine Datenquelle), Forecasts, Lagerbestand, automatisches Zurückschreiben zu Amazon (bis API-Zugang), weitere Marktplätze jenseits .de.</footer>
+  <section>
+    <h2>Arbeitsregeln (unverändert gültig)</h2>
+    <div class="regeln">
+      <ol>
+        <li><b>Feature-Filter</b> — vor jedem neuen Feature.</li>
+        <li><b>Bauplan-Reihenfolge:</b> Ein Menüpunkt/Feature wird komplett gebaut und in sich getestet, dann der nächste — nicht querbeet.</li>
+        <li><b>Keine Annahmen ohne Herleitung:</b> Einlese-Logik &amp; Regeln nur mit echter Beispieldatei/Quelle.</li>
+        <li><b>KI generiert, Code erzwingt:</b> jede KI-Antwort läuft durch eine feste, deterministische Prüfung.</li>
+        <li><b>Ehrliche Daten:</b> keine Fassaden-Werte; Grenzen der Datenbasis werden ausgewiesen.</li>
+        <li><b>Jeder Fehler als Popup mit Code;</b> Buttons nur klickbar, wenn sie Neues erzeugen können.</li>
+        <li><b>Anti-Blackbox:</b> neue Formel ⇒ Eintrag in Daten &amp; Formeln im selben Schritt; ein Feature = ein Schritt mit Tests.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section>
+    <h2>Entscheidungen</h2>
+    <table class="etab">
+      <thead><tr><th>#</th><th>Entscheidung</th><th>Stand</th></tr></thead>
+      <tbody>
+        <tr><td>E1</td><td>Bewertungs-Bezug per Amazon-Schnittstelle?</td><td><span class="estatus e-done">Entschieden (20.07.)</span> — nicht möglich, die Schnittstellen liefern keine Bewertungs-Texte. Es bleibt beim Scraping.</td></tr>
+        <tr><td>E2</td><td>Quellen für Bilder &amp; A+</td><td><span class="estatus e-done">Teilweise gelöst</span> — A+-Regeln im Wissen, A+ startklar. <span class="estatus e-open">Offen:</span> Hauptbild-Prompt (blockiert nur die Bild-Prompts).</td></tr>
+        <tr><td>E3</td><td>Keyword-Aufteilung: wichtigste 3 → Titel, 4–13 → Bullets, 14–18 → Beschreibung, Rest → Backend</td><td><span class="estatus e-open">Offen</span> — Platzzahlen bestätigen oder ändern.</td></tr>
+        <tr><td>E4</td><td>Sprint-Reihenfolge</td><td><span class="estatus e-gone">Abgelöst (21.07.)</span> — Struktur &amp; Reihenfolge folgen dem Bauplan: Menüpunkt für Menüpunkt, Feature für Feature, in sich getestet.</td></tr>
+        <tr><td>E5</td><td>A+-Modul-Set</td><td><span class="estatus e-done">Gelöst (20.07.)</span> — Design-Guide geliefert und eingearbeitet.</td></tr>
+      </tbody>
+    </table>
+  </section>
 </main>
 </body>
 </html>
