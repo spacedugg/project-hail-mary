@@ -109,6 +109,7 @@ Content-Sprache ist je Produkt/Auftrag wählbar — unabhängig vom Marktplatz. 
 | Einheitliche Insight-Karte als Schema ALLER Erkenntnisse: Titel · Beschreibung · Relevanz (1–5) · Journey-Phase · Datenquellen · Bild-Ideen (D132) | ⬜ | Eine Struktur, eine Render-Komponente; Briefs & Generierung konsumieren jede Erkenntnis gleich |
 | Datenquellen-Ausweis je Erkenntnis — Quellen-Tags werden durch die Pipeline MITGEFÜHRT, Erkenntnis ohne Quelle fliegt raus (D133) | ⬜ | Jede Erkenntnis prüfbar (welche Reviews/Sektionen sagen das?); Wahrheits-Filter gegen KI-Erfindungen |
 | Mehrstufige Insight-Pipeline in Etappen: je Schritt ein Request, Zwischenstände gespeichert, Fortschritt sichtbar, Etappen einzeln nachholbar (D136) | ⬜ | Qualität vor Tempo — Gesamtlaufzeit von Minuten ist ok; 300 s gelten je Etappe, nie als Qualitäts-Budget der Analyse |
+| Analyse-Trichter am Kopf der Insight-Ausgabe: X Reviews → Y Roh-Aspekte → Z Insights (D139) | ⬜ | Macht das Verdichtungs-Prinzip selbsterklärend; Zahlen existieren schon, reine Darstellung |
 | Erkenntnisse fließen automatisch in Content + Briefs (NIE als Spec-Quelle) | 🧪 | Kein Übertragen von Hand; Reviews liefern Sprache, nie technische Daten |
 | Review-Bezug: bleibt Scraping | ✅ entschieden | Amazons APIs liefern keine Review-Texte (E1, 20.07.) |
 
