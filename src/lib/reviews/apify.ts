@@ -92,14 +92,24 @@ export async function scrapeReviews(
   if (valid.length === 0) throw new Error("Keine gültigen ASINs (Format B + 9 Zeichen).");
   const domain = opts.domain ?? "de";
 
-  // D96 (Nutzer-Vorgabe): je ASIN × Sterne-Klasse eine EIGENE Anfrage —
-  // 2 ASINs = 10 parallele Läufe, jeder bis zu 100 aktuellste Reviews.
+  // D96 (Nutzer-Vorgabe): je ASIN × Sterne-Klasse eine EIGENE Anfrage,
+  // jede bis zu 100 aktuellste Reviews.
   const laeufe = valid.flatMap((asin) =>
     STAR_FILTERS.map((filter, i) => ({ asin, filter, star: i + 1 })),
   );
-  const results = await Promise.allSettled(
-    laeufe.map((l) => runStarClass(apiKey, l.asin, l.filter, l.star, domain)),
-  );
+  // GESTAFFELT statt alles auf einmal (D129, Nutzer-Befund 21.07.): Bei
+  // 6 ASINs feuerten 30 Läufe parallel — ab dem 3. ASIN kamen nur noch leere
+  // Ergebnisse zurück (Scraper-Kontingent/Blockierung). Jetzt max. 10 Läufe
+  // (= 2 ASINs) gleichzeitig, Batches nacheinander; 6 ASINs = 3 Batches,
+  // Worst Case ~135 s — passt ins 300-s-Budget der Seite (D118).
+  const BATCH = 10;
+  const results: Array<PromiseSettledResult<RawReview[]>> = [];
+  for (let i = 0; i < laeufe.length; i += BATCH) {
+    const batch = laeufe.slice(i, i + BATCH);
+    results.push(
+      ...(await Promise.allSettled(batch.map((l) => runStarClass(apiKey, l.asin, l.filter, l.star, domain)))),
+    );
+  }
 
   const reviews: RawReview[] = [];
   const notes: string[] = [];
@@ -127,6 +137,11 @@ export async function scrapeReviews(
   for (const [asin, zaehler] of jeAsinKlasse) {
     const teile = zaehler.map((n, i) => `${i + 1}★ ${n}`).reverse().join(" · ");
     notes.push(`${asin}: ${teile} geschriebene Rezensionen geholt (je Klasse max. 100 der aktuellsten).`);
+    // Komplett leere ASIN ehrlich markieren (D129): 0 über ALLE Klassen ist
+    // fast nie „keine Reviews", sondern Blockierung oder falscher Marktplatz.
+    if (zaehler.every((n) => n === 0)) {
+      notes.push(`△ ${asin}: 0 Rezensionen über alle Klassen — ASIN auf amazon.${domain} prüfen (existiert sie dort?) oder später erneut scrapen.`);
+    }
   }
 
   if (reviews.length === 0) {

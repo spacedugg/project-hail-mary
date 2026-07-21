@@ -389,7 +389,7 @@ export default async function ProductPage({
             icon={<IconReviews />}
             chip="chip-violet"
             title="Bewertungs-Analyse"
-            sub="1 · Reviews scrapen: je ASIN und Sterne-Klasse (1★–5★) eine eigene Anfrage, jeweils die bis zu 100 aktuellsten — 2 · Analyse → Findings-Dashboard."
+            sub="Reviews scrapen (je ASIN und Sterne-Klasse eine eigene Anfrage, bis zu 100 aktuellste; Läufe gestaffelt) — die Analyse läuft danach AUTOMATISCH und mündet im Findings-Dashboard."
             right={insights ? <span className="pill pill-good">✓ analysiert · {insights.confidence}</span> : undefined}
           />
 
@@ -398,7 +398,7 @@ export default async function ProductPage({
             <input type="hidden" name="productId" value={product.id} />
             <AsinChips name="asins" mainAsin={product.asin} />
             <SubmitButton className="btn-dark flex-none" disabled={!product.asin} pendingLabel="Scrapt Reviews…" progress>
-              {scrape ? "Neu scrapen" : "1 · Reviews scrapen"}
+              {scrape ? "Neu scrapen + analysieren" : "Scrapen + analysieren"}
             </SubmitButton>
           </form>
           {!product.asin && <p className="mt-2 text-xs text-warn">△ Dafür braucht das Produkt eine ASIN.</p>}
@@ -406,7 +406,16 @@ export default async function ProductPage({
             <p className="mt-2 text-[11px] text-muted">Dieselben ASINs werden 24 h nicht doppelt gescraped — neu scrapen lohnt mit zusätzlichen Wettbewerber-ASINs.</p>
           )}
 
-          {scrape && (
+          {scrape && (() => {
+            // Zahlen-Basen NIE mischen (D129, Nutzer-Befund): Die Amazon-Gesamtzahl
+            // und die %-Verteilung gehören zum PRODUKT — daneben dürfen nur die
+            // Reviews des Produkts stehen, nicht die Summe inkl. Wettbewerber.
+            const eigene = product.asin ? scrape.reviews.filter((r) => r.asin === product.asin) : scrape.reviews;
+            const fremdAnzahl = scrape.reviews.length - eigene.length;
+            const fremdAsins = Object.keys(scrape.perAsin).filter((a) => a !== product.asin).length;
+            const eigeneJeKlasse: Record<string, number> = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
+            for (const r of eigene) eigeneJeKlasse[String(Math.min(5, Math.max(1, Math.round(r.rating))))] += 1;
+            return (
             <div className="mt-3 rounded-xl bg-background p-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <span className="text-xs font-semibold">
@@ -414,7 +423,8 @@ export default async function ProductPage({
                     <>
                       Auf Amazon: {fmt(scrape.amazonTotals.reviewsTotal)} Bewertungen
                       {scrape.amazonTotals.ratingAvg != null && <> · Ø {new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(scrape.amazonTotals.ratingAvg)} ★</>}
-                      {" — davon "}{scrape.reviews.length} gescraped
+                      {" — davon "}{eigene.length} vom Produkt gescraped
+                      {fremdAnzahl > 0 && <> (+ {fremdAnzahl} aus {fremdAsins} Wettbewerber-ASIN{fremdAsins === 1 ? "" : "s"})</>}
                     </>
                   ) : (
                     <>Stichprobe: {scrape.reviews.length} Reviews gescraped</>
@@ -425,11 +435,11 @@ export default async function ProductPage({
                 <span className="text-[11px] text-muted">{Object.entries(scrape.perAsin).map(([a, n]) => `${a}: ${n}`).join(" · ")}</span>
               </div>
               {scrape.amazonTotals?.dist ? (
-                /* Echte Amazon-Verteilung (%) als Balken; die Stichprobe steht als Zahl daneben */
+                /* Echte Amazon-Verteilung (%) des PRODUKTS; daneben NUR die Produkt-Stichprobe */
                 <div className="mt-2 space-y-1">
                   {(["5", "4", "3", "2", "1"] as const).map((star) => {
                     const pct = scrape.amazonTotals!.dist![star] ?? 0;
-                    const n = scrape.starCounts[star] ?? 0;
+                    const n = eigeneJeKlasse[star] ?? 0;
                     return (
                       <div key={star} className="flex items-center gap-2 text-xs tabular-nums">
                         <span className="w-8 flex-none text-muted">{star} ★</span>
@@ -476,15 +486,17 @@ export default async function ProductPage({
                 <form action={analyzeReviewsAction} className="mt-3 flex flex-wrap items-center gap-2">
                   <input type="hidden" name="productId" value={product.id} />
                   <SubmitButton className="btn-primary" pendingLabel="KI wertet Pain Points & Kaufauslöser aus…" progress>
-                    2 · Analyse starten
+                    Analyse nachholen
                   </SubmitButton>
+                  <span className="text-[11px] text-muted">Normalerweise läuft die Analyse automatisch nach dem Scrape — dieser Knopf holt sie nach, falls sie fehlgeschlagen ist.</span>
                   {insights && (
                     <span className="text-[11px] text-muted">Neuer Scrape seit der letzten Analyse — Analyse aktualisieren.</span>
                   )}
                 </form>
               )}
             </div>
-          )}
+            );
+          })()}
         </section>
 
         {/* Content */}

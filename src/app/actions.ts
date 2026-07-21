@@ -837,8 +837,30 @@ export async function scrapeReviewsAction(formData: FormData) {
     }
   }
 
-  await db.insert(schema.reviewScrapes).values({ id: id(), productId, source, asins, reviews, starCounts, perAsin, notes, amazonTotals });
+  const scrapeId = id();
+  await db.insert(schema.reviewScrapes).values({ id: scrapeId, productId, source, asins, reviews, starCounts, perAsin, notes, amazonTotals });
+
+  // Analyse läuft AUTOMATISCH nach dem Scrape (D129, Nutzer-Vorgabe: kein
+  // manueller Zwischenschritt — Scrape und Analyse gehen ineinander über).
+  // Schlägt sie fehl, bleibt der Scrape gespeichert und der Nachhol-Knopf
+  // auf der Seite übernimmt (Ausbeute-Notizen zeigen die Datenbasis).
+  const { extractInsights } = await import("@/lib/reviews/apify");
+  const dataBasis = source === "apify" ? "apify_scrape" : "none";
+  try {
+    const res = await extractInsights(
+      reviews,
+      asins.map((a) => `amazon.${amazonDomain(scrapeMarkt)}/dp/${a}`),
+      dataBasis,
+    );
+    await db.insert(schema.reviewInsights).values({
+      id: id(), productId, scrapeId, dataBasis, confidence: res.confidence, payload: res.payload,
+    });
+  } catch (e) {
+    revalidatePath(`/produkte/${productId}`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Scrape fertig (${reviews.length} Reviews, Ausbeute unten) — aber die automatische Analyse schlug fehl: ${e instanceof Error ? e.message : String(e)}. Mit „Analyse nachholen" erneut versuchen.`)}&code=ANA-01#reviews`);
+  }
   revalidatePath(`/produkte/${productId}`);
+  redirect(`/produkte/${productId}/reviews`);
 }
 
 export async function analyzeReviewsAction(formData: FormData) {
