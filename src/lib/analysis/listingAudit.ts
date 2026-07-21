@@ -17,6 +17,39 @@ export type ListingSnapshot = {
   backendKeywords: string;
 };
 
+/**
+ * Wirksamer Mess-Stand je Sektion (D110, Nutzer-Vorgabe): Die Analyse misst
+ * FREIGEGEBENE Texte — sonst das importierte Original-Listing (IST). Entwürfe
+ * zählen NICHT (deren Gate-Prüfung läuft im Optimizer); erst die Freigabe
+ * macht einen neuen Text zum Mess-Gegenstand. Jede Sektion weist ihre
+ * Quelle aus — keine stille Misch-Basis.
+ */
+export type SektionsQuelle = { basis: "freigegeben" | "original" | "fehlt"; version?: number };
+
+export function wirksamesListing(
+  versions: Array<{ type: string; status: string; version: number; payload: unknown }>,
+  original: { title?: string | null; bullets?: string[] | null; description?: string | null } | null,
+): { snapshot: ListingSnapshot; quellen: Record<keyof ListingSnapshot, SektionsQuelle> } {
+  const freigegeben = (t: string) => versions.find((v) => v.type === t && v.status === "approved");
+  const pick = <T,>(t: string, feld: string, orig: T | null | undefined, leer: T): { wert: T; quelle: SektionsQuelle } => {
+    const v = freigegeben(t);
+    const wert = (v?.payload as Record<string, unknown> | undefined)?.[feld] as T | undefined;
+    if (v && wert && (!Array.isArray(wert) || wert.length > 0)) return { wert, quelle: { basis: "freigegeben", version: v.version } };
+    if (orig && (!Array.isArray(orig) || orig.length > 0)) return { wert: orig, quelle: { basis: "original" } };
+    return { wert: leer, quelle: { basis: "fehlt" } };
+  };
+
+  const title = pick<string>("title", "text", original?.title, "");
+  const bullets = pick<string[]>("bullets", "items", original?.bullets, []);
+  const description = pick<string>("description", "text", original?.description, "");
+  const backend = pick<string>("backend_keywords", "text", null, ""); // Backend ist nie im Original sichtbar
+
+  return {
+    snapshot: { title: title.wert, bullets: bullets.wert, description: description.wert, backendKeywords: backend.wert },
+    quellen: { title: title.quelle, bullets: bullets.quelle, description: description.quelle, backendKeywords: backend.quelle },
+  };
+}
+
 export type AnalysisDimension = {
   key: string;
   label: string;

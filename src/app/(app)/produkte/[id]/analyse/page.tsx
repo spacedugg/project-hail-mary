@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { analyzeListing, type ListingSnapshot } from "@/lib/analysis/listingAudit";
+import { analyzeListing, wirksamesListing, type SektionsQuelle } from "@/lib/analysis/listingAudit";
 import { buildImageBrief } from "@/lib/analysis/imageBrief";
 import { runDeepAuditAction } from "@/app/actions";
 import { SubmitButton } from "@/components/submit-button";
@@ -42,19 +42,12 @@ export default async function AnalysePage({
     where: eq(schema.listingSnapshots.productId, id),
     orderBy: desc(schema.listingSnapshots.createdAt),
   });
-  // Kundenfertige Sicht: freigegebene Version bevorzugt, sonst neuester Entwurf,
-  // sonst das importierte ORIGINAL-Listing (Audit-Fall: Ist-Stand bewerten)
+  // Mess-Stand (D110): FREIGEGEBENE Texte, sonst Original-Listing — Entwürfe
+  // zählen nicht (deren Prüfung läuft im Optimizer). Quelle je Sektion sichtbar.
+  const { snapshot, quellen } = wirksamesListing(versions, original ?? null);
   const latest = (t: string) =>
     (versions.find((v) => v.type === t && v.status === "approved") ?? versions.find((v) => v.type === t))
       ?.payload as Record<string, unknown> | undefined;
-  const snapshot: ListingSnapshot = {
-    title: (latest("title")?.text as string) || original?.title || "",
-    bullets: ((latest("bullets")?.items as string[]) ?? []).length
-      ? ((latest("bullets")?.items as string[]) ?? [])
-      : (original?.bullets ?? []),
-    description: (latest("description")?.text as string) || original?.description || "",
-    backendKeywords: (latest("backend_keywords")?.text as string) ?? "",
-  };
   const deepAudit = await db.query.deepAudits.findFirst({
     where: eq(schema.deepAudits.productId, id),
     orderBy: desc(schema.deepAudits.createdAt),
@@ -276,6 +269,19 @@ export default async function AnalysePage({
 
       <section className="mt-6">
         <h2 className="sect-h">Regel-Messung (deterministisch)</h2>
+        {/* Mess-Basis transparent (D110): freigegeben vs. Original — nie stille Mischung */}
+        {(() => {
+          const quelleText = (q: SektionsQuelle) =>
+            q.basis === "freigegeben" ? `freigegebene v${q.version}` : q.basis === "original" ? `Original-Listing${original ? ` (${original.createdAt.toLocaleDateString("de-DE")})` : ""}` : "fehlt";
+          return (
+            <p className="mt-1 text-xs text-muted">
+              Gemessen wird der <b>wirksame Stand</b>: freigegebene Texte, sonst das Original-Listing — Entwürfe zählen nicht
+              (deren Prüfung steht im Optimizer). Basis: Titel {quelleText(quellen.title)} · Bullets {quelleText(quellen.bullets)} ·
+              Beschreibung {quelleText(quellen.description)} · Backend {quelleText(quellen.backendKeywords)}.
+              Der Kundenstimmen-Abgleich misst gegen die genannten Bullets.
+            </p>
+          );
+        })()}
         <div className="mt-2 space-y-3">
           {analysis.dimensions.map((d) => (
             <div key={d.key} className="card p-3">
