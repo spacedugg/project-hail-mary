@@ -51,10 +51,10 @@ async function runStarClass(
     mediaType: "all_contents",
   }];
 
-  // Zeit-Budget (D102): Vercel-Function max. 60 s — jeder Lauf bekommt 40 s
-  // (Abbruch 45 s), damit nach den parallelen Läufen sicher Zeit bleibt,
-  // Ergebnis + Notizen zu speichern und eine RÜCKMELDUNG zu geben (vorher
-  // 50/55 s: bei Verzögerung beendete Vercel die Funktion kommentarlos).
+  // Zeit-Budget (D102/D118): jeder Lauf bekommt 40 s (Abbruch 45 s) — nicht
+  // wegen Vercel (Seite hat seit D118 maxDuration=300), sondern weil ein
+  // Review-Scrape, der länger als 45 s hängt, praktisch nie mehr liefert und
+  // der Nutzer eine RÜCKMELDUNG mit Ausbeute-Notizen verdient statt Wartens.
   const res = await fetch(
     `https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?timeout=40`,
     {

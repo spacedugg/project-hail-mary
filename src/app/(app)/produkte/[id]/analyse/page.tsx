@@ -10,8 +10,9 @@ import { fehlerInfo } from "@/lib/fehlercodes";
 import type { SovAudit } from "@/lib/sov/audit";
 
 export const dynamic = "force-dynamic";
-// Tiefen-Audit (LLM) braucht mehr als das Vercel-Default-Zeitbudget
-export const maxDuration = 60;
+// Tiefen-Audit (LLM): sonnet-5 denkt adaptiv und braucht bei großen Prompts
+// teils Minuten (D118). 300 s Budget; der LLM-Abbruch liegt bei 270 s.
+export const maxDuration = 300;
 
 /**
  * Präsentationsfertige Listing-Analyse (kundentauglich, druckfreundlich):

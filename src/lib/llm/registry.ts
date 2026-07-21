@@ -31,6 +31,9 @@ export interface LlmProvider {
  */
 const SAMPLING_UNSUPPORTED = /^claude-(sonnet-5|opus-4-[7-9]|fable|mythos)/;
 
+/** LLM-Zeitbudget (D118): unter maxDuration=300 der aufrufenden Seiten. */
+const LLM_TIMEOUT_MS = 270_000;
+
 class AnthropicProvider implements LlmProvider {
   readonly name = "anthropic";
 
@@ -46,9 +49,12 @@ class AnthropicProvider implements LlmProvider {
     };
     if (!SAMPLING_UNSUPPORTED.test(model)) body.temperature = req.temperature ?? 0.4;
 
-    // Hartes Zeitlimit UNTER dem Vercel-Budget (D109): läuft die Anfrage zu
-    // lange, gibt es eine klare deutsche Meldung statt eines von Vercel
+    // Hartes Zeitlimit UNTER dem Vercel-Budget (D109/D118): läuft die Anfrage
+    // zu lange, gibt es eine klare deutsche Meldung statt eines von Vercel
     // gekillten Prozesses ohne Rückmeldung („unexpected response", ALG-00).
+    // Budget: Die LLM-Seiten setzen maxDuration=300 — sonnet-5 denkt adaptiv
+    // und braucht bei großen Prompts teils weit über 50 s (Nutzer-Befund
+    // GEN-01 Backend-Keywords, D118). 270 s lässt 30 s Rest fürs Speichern.
     let res: Response;
     try {
       res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -59,11 +65,11 @@ class AnthropicProvider implements LlmProvider {
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(50_000),
+        signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
       });
     } catch (e) {
       if (e instanceof Error && e.name === "TimeoutError") {
-        throw new Error("Die KI-Anfrage hat das Zeitlimit (50 s) überschritten — bitte erneut versuchen. Läuft bereits eine andere Generierung, erst deren Ende abwarten: Anfragen laufen nacheinander.");
+        throw new Error(`Die KI-Anfrage hat das Zeitlimit (${Math.round(LLM_TIMEOUT_MS / 1000)} s) überschritten — bitte erneut versuchen. Läuft bereits eine andere Generierung, erst deren Ende abwarten: Anfragen laufen nacheinander.`);
       }
       throw e;
     }

@@ -13,8 +13,10 @@ import { fehlerInfo } from "@/lib/fehlercodes";
 import { IconUpload, IconCheck, IconSearch, IconReviews, IconContent, IconEuro } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
-// Apify-Scrapes & LLM-Generierung brauchen mehr als das Vercel-Default-Zeitbudget
-export const maxDuration = 60;
+// Apify-Scrapes & LLM-Generierung: sonnet-5 denkt adaptiv und braucht bei
+// großen Prompts teils Minuten (D118, Nutzer-Befund GEN-01 Backend-Keywords).
+// 300 s ist das Maximum des Vercel-Plans; der LLM-Abbruch liegt bei 270 s.
+export const maxDuration = 300;
 
 const SECTIONS = [
   { key: "title", label: "Titel" },
