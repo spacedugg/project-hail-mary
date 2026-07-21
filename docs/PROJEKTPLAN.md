@@ -102,6 +102,7 @@ Content-Sprache ist je Produkt/Auftrag wählbar — unabhängig vom Marktplatz. 
 |---|---|---|
 | Review-Scrape je ASIN × Sterne-Klasse (eigenes Produkt + Wettbewerber, ASIN-Chips) | 🔶 | Mehr-ASIN-Abbruch behoben (D102) — erneuter Praxistest nötig |
 | Ehrliche Datenbasis (Amazon-Gesamtzahlen neben Stichprobe, Ausbeute je Lauf) | 🧪 | Keine Selbsttäuschung über die Datenlage |
+| Konfidenz-Einordnung in Worten an den Insight-Ausgaben („Basis: X von Y", Beleg-Stufe je Erkenntnis, deterministisch hergeleitet — keine Fassaden-Prozente) (D138) | ⬜ | Nachrechenbare Einordnung statt grüner Prozentzahlen; Herleitung steht in Daten & Formeln |
 | Findings-Dashboard: Pain Points, Kaufauslöser, Kundensprache, O-Töne | 🔶 | Crash behoben (D103) — erneuter Praxistest nötig |
 | Insight-Verdichtung: Roh-Themen → benannte Kaufgründe/Erkenntnisse in Klartext, nach Relevanz sortiert, mit Rückverweis auf Belege (D131) | ⬜ | Die Stufe zwischen Zählung und Content — Kaufgründe, die man Kunden und Grafikern vorlegen kann |
 | Zwei-Ebenen-Ausgabe: je Insight die zugeordneten Roh-Aspekte mit Zählwerten aufklappbar; gegensätzliche Aspekte → EIN ausgewogenes Insight; Dedup-Gate gegen Wiederholungen (D137) | ⬜ | Beleg-Kette sichtbar; Widersprüche werden Erwartungs-Management statt Schönfärberei |
