@@ -105,6 +105,7 @@ Content-Sprache ist je Produkt/Auftrag wählbar — unabhängig vom Marktplatz. 
 | Findings-Dashboard: Pain Points, Kaufauslöser, Kundensprache, O-Töne | 🔶 | Crash behoben (D103) — erneuter Praxistest nötig |
 | Insight-Verdichtung: Roh-Themen → benannte Kaufgründe/Erkenntnisse in Klartext, nach Relevanz sortiert, mit Rückverweis auf Belege (D131) | ⬜ | Die Stufe zwischen Zählung und Content — Kaufgründe, die man Kunden und Grafikern vorlegen kann |
 | Einheitliche Insight-Karte als Schema ALLER Erkenntnisse: Titel · Beschreibung · Relevanz (1–5) · Journey-Phase · Datenquellen · Bild-Ideen (D132) | ⬜ | Eine Struktur, eine Render-Komponente; Briefs & Generierung konsumieren jede Erkenntnis gleich |
+| Datenquellen-Ausweis je Erkenntnis — Quellen-Tags werden durch die Pipeline MITGEFÜHRT, Erkenntnis ohne Quelle fliegt raus (D133) | ⬜ | Jede Erkenntnis prüfbar (welche Reviews/Sektionen sagen das?); Wahrheits-Filter gegen KI-Erfindungen |
 | Erkenntnisse fließen automatisch in Content + Briefs (NIE als Spec-Quelle) | 🧪 | Kein Übertragen von Hand; Reviews liefern Sprache, nie technische Daten |
 | Review-Bezug: bleibt Scraping | ✅ entschieden | Amazons APIs liefern keine Review-Texte (E1, 20.07.) |
 
