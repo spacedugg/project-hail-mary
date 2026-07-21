@@ -1,6 +1,6 @@
 # temoa OS — Bauplan (v3)
 
-> **Status:** v3.3, 2026-07-21 (CMS: Katalog als Grundlage markiert — teilweise vorhandene Features ehrlich als 🔶 statt ⬜). Fortschreibung nach jedem abgeschlossenen Feature.
+> **Status:** v3.4, 2026-07-21 (CMS: Accuracy wird qualitativ — Live-Qualitäts-Score statt separatem Prozent-Dashboard). Fortschreibung nach jedem abgeschlossenen Feature.
 > Fundament: `docs/product-scope.md` (Scope-Session 07.07.) + Baustand `docs/DECISIONS.md`.
 > **Das ist das Accountability-Dokument:** Gebaut wird, was hier steht.
 > **Neu in v3 (Nutzer-Entscheidung 21.07.):** Der Plan ist nicht mehr nach Sprints sortiert, sondern ist der **Bauplan des Tools** — gegliedert wie die linke Seitenleiste: Menüpunkt → Untermenü → Features. Ein Menüpunkt/Feature wird komplett gebaut und **in sich getestet**, dann kommt der nächste. So wächst das Tool entlang seiner eigenen Struktur statt querbeet.
@@ -217,8 +217,8 @@ Der Content-Lebenszyklus je Kunde: **erstellen → speichern → publishen → �
 | Content-Bibliothek je Kunde & Produkt (verwalten, bearbeiten, neu anlegen, löschen) | 🔶 teilweise | Grundlage vorhanden: Versionen & Freigaben je Produkt existieren im Arbeitsplatz. Neu ist nur die übergreifende Verwaltungs-Sicht je Kunde (alle Pieces an einem Ort, löschen/neu anlegen aus der Bibliothek heraus) |
 | Bestands-Content-Import (historischer Content) | 🔶 teilweise | Grundlage vorhanden: Der Listing-Import ✅ holt den LIVE-Content jedes Kunden ins Tool. Neu ist nur der Import von Content, der nicht (mehr) live ist — alte Bilder, frühere Texte, Archiv-Stände |
 | Soll/Ist-Abgleich je Content-Piece | 🔶 teilweise | Grundlage vorhanden: Beide Seiten existieren (Soll = Freigaben, Ist = Listing-Snapshot); die Analyse weist heute schon je Sektion aus, was freigegeben vs. Original ist. Neu ist der explizite Abweichungs-Vergleich freigegeben ↔ live. Kontinuierlich erst mit automatischem Bezug (Stufe 2), bis dahin manueller Re-Import |
-| Content-Accuracy-Dashboard (Widgets) | ⬜ | Wie viel % unseres Solls ist live? Ziel ≥ 95–99 % — baut direkt auf dem Soll/Ist-Abgleich auf. Ehrlich: Das heutige „Rating" (Content-Score) misst REGEL-Qualität der Texte, nicht Live-Genauigkeit — das sind zwei verschiedene Kennzahlen |
-| Content-Alerts | ⬜ | Hauptbild rausgeflogen, Listing gesperrt/unterdrückt, Text überschrieben → das Tool meldet es, bevor der Kunde es merkt (Abgleich-Basis wie Soll/Ist) |
+| Live-Qualitäts-Score (qualitativ — ersetzt das separate Accuracy-Prozent-Dashboard) | 🔶 teilweise | Entschieden 21.07.: KEIN zweiter quantitativer „ist es da?"-Score. Der LIVE-Stand wird durch DIESELBE Qualitäts-Messung geschickt wie unsere Entwürfe — Regel-Messung + Kundenstimmen-Abgleich (Pain Points/Kaufauslöser aufgegriffen?) + Keyword-Abdeckung. Vollständigkeit (Titel/Bullets/A+ vorhanden?) steckt darin automatisch als Fehler-Abzug. **Retail-Readiness = Live-Score über Schwelle**; die Soll/Ist-Abweichungen erklären, WARUM der Live-Score unter dem Soll-Score liegt (z. B. Hauptbild raus = X Punkte). Grundlage vorhanden: Die Mess-Engine läuft heute schon gegen den wirksamen Stand — neu sind die Live-Messung als Dauerlauf, das Soll↔Live-Delta und die Cockpit-Kachel |
+| Content-Alerts | ⬜ | Auslöser: Soll/Ist-Abweichung oder Live-Score-Einbruch — Hauptbild rausgeflogen, Listing gesperrt/unterdrückt, Text überschrieben → das Tool meldet es, bevor der Kunde es merkt |
 | Publish zu Amazon per SP-API | 🔒 Stufe 2 | Content direkt aus dem Tool pushen & publishen — ersetzt den Flat-File-Umweg (gleiche Logik wie Ads-API vs. Bulk-Sheet) |
 | Kunden-Feedback am Content-Piece | ⬜ | Kunde hinterlegt Feedback direkt am Piece — mittelfristig, sobald Kunden angebunden sind (Richtung Stufe 3) |
 
