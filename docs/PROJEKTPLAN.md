@@ -92,9 +92,9 @@ Content-Sprache ist je Produkt/Auftrag wählbar — unabhängig vom Marktplatz. 
 
 | Feature | Status | Handlung/Nutzen |
 |---|---|---|
-| Content-Sprache wählbar (de/en/fr/it/es …) | ⬜ | Texte + Keywords in der Zielsprache erzeugen — z. B. englischer Content, obwohl das Produkt heute auf .de gepflegt wird |
-| Sicherheits-Gate 1: Keyword-Basis-Sprache = Content-Sprache | ⬜ | Deutsche Keyword-Liste blockt französische Generierung (Fehlercode statt stiller Übersetzung). Prüfung per Sprach-Heuristik über die GESAMTE Liste — einzelne Keywords sind sprachlich mehrdeutig, die Gesamtliste nicht. Cerebro-Analyse muss auf dem Ziel-Marktplatz gefahren werden |
-| Sicherheits-Gate 2: Review-Quellen = Ziel-Marktplatz | ⬜ | Bei nicht-deutschem Content laufen alle Scrapes (Haupt-ASIN + Wettbewerber-Chips) gegen den Marktplatz der Content-Sprache (amazon.co.uk/.fr/…). Wichtig: Die ASIN selbst verrät ihren Marktplatz NICHT (dieselbe ASIN kann auf mehreren existieren) — das Gate erzwingt stattdessen den Scrape-Zielmarkt; existiert die ASIN dort nicht, gibt es ehrlich 0 Ergebnisse + Fehlercode. Zusätzlich Sprach-Heuristik über die gescrapten Review-Texte als zweite Sicherung |
+| Content-Sprache wählbar (de/en/fr/it/es …) | 🧪 | Texte + Keywords in der Zielsprache erzeugen — z. B. englischer Content, obwohl das Produkt heute auf .de gepflegt wird |
+| Sicherheits-Gate 1: Keyword-Basis-Sprache = Content-Sprache | 🧪 | Deutsche Keyword-Liste blockt französische Generierung (Fehlercode statt stiller Übersetzung). Prüfung per Sprach-Heuristik über die GESAMTE Liste — einzelne Keywords sind sprachlich mehrdeutig, die Gesamtliste nicht. Cerebro-Analyse muss auf dem Ziel-Marktplatz gefahren werden |
+| Sicherheits-Gate 2: Review-Quellen = Ziel-Marktplatz | 🧪 | Bei nicht-deutschem Content laufen alle Scrapes (Haupt-ASIN + Wettbewerber-Chips) gegen den Marktplatz der Content-Sprache (amazon.co.uk/.fr/…). Wichtig: Die ASIN selbst verrät ihren Marktplatz NICHT (dieselbe ASIN kann auf mehreren existieren) — das Gate erzwingt stattdessen den Scrape-Zielmarkt; existiert die ASIN dort nicht, gibt es ehrlich 0 Ergebnisse + Fehlercode. Zusätzlich Sprach-Heuristik über die gescrapten Review-Texte als zweite Sicherung |
 
 **Untermenü: Bewertungs-Analyse (Voice of Customer)**
 

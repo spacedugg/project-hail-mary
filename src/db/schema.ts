@@ -74,6 +74,8 @@ export const brands = sqliteTable("brands", {
 
 /** v1: DE-only (D32) — Feld existiert, damit Multi-Marktplatz kein Schema-Bruch wird. */
 export type Marketplace = "de" | "uk" | "fr" | "it" | "es" | "nl" | "us";
+/** Content-Sprache je Produkt (D128) — unabhängig vom Marktplatz wählbar. */
+export type ContentSprache = "de" | "en" | "fr" | "it" | "es";
 
 export const productGroups = sqliteTable("product_groups", {
   id: text("id").primaryKey(),
@@ -114,6 +116,13 @@ export const products = sqliteTable(
      * neben dem Listing-IST — die einzige Grundlage.
      */
     zusatzKontext: text("zusatz_kontext"),
+    /**
+     * Content-Sprache (D128): In welcher Sprache werden Texte generiert —
+     * unabhängig vom Marktplatz. Zwei Gates sichern die Lokalisierung:
+     * Keyword-Basis-Sprache muss passen, Review-Scrapes laufen gegen den
+     * Marktplatz dieser Sprache.
+     */
+    contentSprache: text("content_sprache").$type<ContentSprache>().notNull().default("de"),
     createdAt: ts("created_at").notNull(),
   },
   (t) => [uniqueIndex("products_brand_asin_mp").on(t.brandId, t.asin, t.marketplace)],

@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { eq, desc, and } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { generateSection, type ListingSection, type RecipeInputs } from "@/lib/recipes/listing";
-import type { ProductFacts } from "@/db/schema";
+import type { ContentSprache, Marketplace, ProductFacts } from "@/db/schema";
+import { amazonDomain, erkenneSprache, marktplatzFuerSprache, marktplatzSprache, SPRACH_NAMEN } from "@/lib/text/sprache";
 
 const id = () => crypto.randomUUID();
 const slugify = (s: string) =>
@@ -59,10 +60,35 @@ export async function createProduct(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const asin = String(formData.get("asin") ?? "").trim() || null;
   if (!brandId || !name) return;
+  // Marktplatz beim Anlegen wählbar (D128): Import & Scrapes laufen dann
+  // automatisch gegen amazon.<Ziel-Domain> — die ASIN allein verrät ihn nicht.
+  const MARKETPLACES: Marketplace[] = ["de", "uk", "us", "fr", "it", "es", "nl"];
+  const mpRoh = String(formData.get("marketplace") ?? "de") as Marketplace;
+  const marketplace = MARKETPLACES.includes(mpRoh) ? mpRoh : "de";
   const db = await getDb();
   const productId = id();
-  await db.insert(schema.products).values({ id: productId, brandId, name, asin });
+  await db.insert(schema.products).values({
+    id: productId,
+    brandId,
+    name,
+    asin,
+    marketplace,
+    contentSprache: marktplatzSprache(marketplace) ?? "de",
+  });
   redirect(`/produkte/${productId}`);
+}
+
+/** Marktplatz & Content-Sprache je Produkt (D128) — Sprache unabhängig vom Marktplatz wählbar. */
+export async function saveMarktSprache(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const MARKETPLACES: Marketplace[] = ["de", "uk", "us", "fr", "it", "es", "nl"];
+  const SPRACHEN: ContentSprache[] = ["de", "en", "fr", "it", "es"];
+  const mp = String(formData.get("marketplace") ?? "") as Marketplace;
+  const sprache = String(formData.get("contentSprache") ?? "") as ContentSprache;
+  if (!productId || !MARKETPLACES.includes(mp) || !SPRACHEN.includes(sprache)) return;
+  const db = await getDb();
+  await db.update(schema.products).set({ marketplace: mp, contentSprache: sprache }).where(eq(schema.products.id, productId));
+  revalidatePath(`/produkte/${productId}`);
 }
 
 export async function saveFacts(formData: FormData) {
@@ -425,6 +451,16 @@ export async function generateContent(formData: FormData) {
     }
   }
 
+  // Sprach-Gate 1 (D128): Die Keyword-Basis muss zur Content-Sprache passen —
+  // lokalisieren statt übersetzen. Geblockt wird NUR bei sicherem Widerspruch
+  // (Heuristik über die GESAMTE Liste); bei Unsicherheit ehrlich passiv.
+  if (kws.length > 0) {
+    const erkannt = erkenneSprache(kws.map((k) => k.keyword)).sprache;
+    if (erkannt && erkannt !== product.contentSprache) {
+      redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Die Keyword-Basis ist erkennbar ${SPRACH_NAMEN[erkannt]}, die Content-Sprache dieses Produkts ist aber ${SPRACH_NAMEN[product.contentSprache]}. Lokalisierter Content braucht eine Keyword-Analyse vom Ziel-Marktplatz.`)}&code=GEN-04`);
+    }
+  }
+
   const byTier = (t: string) => kws.filter((k) => k.tier === t).map((k) => k.keyword);
 
   // Freigegebene/neueste Sektionen als Kontext (temoa-os-Ablauf)
@@ -454,6 +490,7 @@ export async function generateContent(formData: FormData) {
     competitorBrands: fremdmarkenAusKeywords(alleKws),
     listingIst: snapshot ? { title: snapshot.title, bullets: snapshot.bullets } : null,
     zusatzKontext: product.zusatzKontext,
+    sprache: product.contentSprache,
   };
 
   // Fehler (API, Zeitbudget, kaputtes JSON) als Banner, nie als Fehlerseite (D81)
@@ -741,8 +778,21 @@ export async function scrapeReviewsAction(formData: FormData) {
   let reviews: Array<{ asin: string; rating: number; title: string; body: string }> = [];
   let notes: string[] = [];
   let source: "apify" | "mock" = "apify";
+  // Sprach-Gate 2 (D128): Reviews kommen vom Marktplatz der CONTENT-Sprache —
+  // die ASIN allein verrät ihren Marktplatz nicht, also erzwingt das Gate die
+  // Scrape-Domain. Existiert eine ASIN dort nicht, gibt es ehrlich 0 Treffer.
+  const marktPasst = marktplatzSprache(product.marketplace) === product.contentSprache;
+  const scrapeMarkt = marktPasst ? product.marketplace : marktplatzFuerSprache(product.contentSprache);
   try {
-    ({ reviews, notes } = await scrapeReviews(asins, { domain: product.marketplace }));
+    ({ reviews, notes } = await scrapeReviews(asins, { domain: amazonDomain(scrapeMarkt) }));
+    if (!marktPasst) {
+      notes.unshift(`Sprach-Gate: Scrape lief gegen amazon.${amazonDomain(scrapeMarkt)} — der Marktplatz der Content-Sprache (${SPRACH_NAMEN[product.contentSprache]}), nicht amazon.${amazonDomain(product.marketplace)}.`);
+    }
+    // Zweite Sicherung: Sprache der gescrapten Texte gegen die Content-Sprache
+    const textSprache = erkenneSprache(reviews.map((r) => `${r.title} ${r.body}`)).sprache;
+    if (textSprache && textSprache !== product.contentSprache) {
+      notes.push(`△ Sprach-Heuristik: Die gescrapten Reviews wirken ${SPRACH_NAMEN[textSprache]}, die Content-Sprache ist ${SPRACH_NAMEN[product.contentSprache]} — Datenbasis prüfen, bevor daraus Content entsteht.`);
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("APIFY_API_KEY")) {

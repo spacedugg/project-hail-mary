@@ -18,10 +18,20 @@ export default async function BrandKatalog({ params }: { params: Promise<{ brand
       <h1 className="page-title">Katalog</h1>
       <p className="page-sub">Produkte dieser Marke. Die meisten ASINs existieren schon — anlegen, dann Daten anbinden.</p>
 
-      <form action={createProduct} className="mt-5 flex gap-2">
+      <form action={createProduct} className="mt-5 flex flex-wrap gap-2">
         <input type="hidden" name="brandId" value={brandId} />
-        <input name="name" placeholder="Produktname" required className={`${input} flex-1`} />
+        <input name="name" placeholder="Produktname" required className={`${input} min-w-48 flex-1`} />
         <input name="asin" placeholder="ASIN (B0…)" className={`${input} w-40 font-mono`} />
+        {/* Marktplatz beim Anlegen (D128): Import & Scrapes laufen gegen diese Domain — die ASIN allein verrät ihn nicht */}
+        <select name="marketplace" defaultValue="de" className={`${input} w-36`} title="Marktplatz — Listing-Import und Review-Scrapes laufen gegen diese Amazon-Domain">
+          <option value="de">amazon.de</option>
+          <option value="uk">amazon.co.uk</option>
+          <option value="us">amazon.com</option>
+          <option value="fr">amazon.fr</option>
+          <option value="it">amazon.it</option>
+          <option value="es">amazon.es</option>
+          <option value="nl">amazon.nl</option>
+        </select>
         <SubmitButton className="btn-primary">
           + Produkt
         </SubmitButton>

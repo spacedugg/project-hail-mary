@@ -10,7 +10,8 @@ import {
   validateItemHighlights,
   validateQa,
 } from "@/lib/validation/gate";
-import type { ProductFacts, ReviewInsightsPayload, ValidationIssue } from "@/db/schema";
+import type { ContentSprache, ProductFacts, ReviewInsightsPayload, ValidationIssue } from "@/db/schema";
+import { amazonDomain, marktplatzFuerSprache, SPRACH_NAMEN } from "@/lib/text/sprache";
 
 /**
  * Listing-Text-Recipes (Nachfolger von temoa-os buildPrompt, merge-kompatibel D39):
@@ -48,6 +49,8 @@ export type RecipeInputs = {
   listingIst?: { title?: string | null; bullets?: string[] | null } | null;
   /** Zusätzliche Produkt-Infos vom Team (D108) — z. B. fremde Bullets/Titel als Vorbild. */
   zusatzKontext?: string | null;
+  /** Content-Sprache (D128) — unabhängig vom Marktplatz; Default Deutsch. */
+  sprache?: ContentSprache | null;
 };
 
 export type TitleRationale = Array<{ part: string; source: string; verified: boolean }>;
@@ -74,6 +77,10 @@ function contextBlock(inputs: RecipeInputs): string {
     `MARKE: ${inputs.brand}`,
     `PRODUKT: ${inputs.productName}`,
     `MARKTPLATZ: amazon.${inputs.marketplace}`,
+    // Zielsprache (D128): lokalisieren, nicht übersetzen — bei Deutsch kein Extra-Block nötig.
+    inputs.sprache && inputs.sprache !== "de"
+      ? `ZIELSPRACHE: ${SPRACH_NAMEN[inputs.sprache]}. Schreibe ALLE Texte (inkl. Headlines, Backend-Begriffe, Q&A) auf ${SPRACH_NAMEN[inputs.sprache]} auf Muttersprachler-Niveau — lokalisiert für amazon.${amazonDomain(marktplatzFuerSprache(inputs.sprache))}, NICHT aus dem Deutschen übersetzt. Die Regeln unten gelten sinngemäß in der Zielsprache.`
+      : "",
     f.productType ? `PRODUKTTYP: ${f.productType}` : "",
     f.materials?.length
       ? `MATERIALIEN (Wahrheits-Anker — NIE idealisieren, Hybride beidseitig nennen): ${f.materials.join(", ")}`

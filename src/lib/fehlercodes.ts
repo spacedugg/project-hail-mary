@@ -53,6 +53,11 @@ export const FEHLER_CODES: Record<string, FehlerInfo> = {
     bedeutung: "Ohne Bewertungs-Analyse braucht die Generierung eine Ersatz-Grundlage — sonst würde das Tool Fakten erfinden.",
     loesung: "Listing importieren (IST-Zustand als Grundlage) oder in der Content-Karte Zusatz-Infos zum Produkt eintragen (z. B. eigene/fremde Bullets, Details) — dann erneut generieren.",
   },
+  "GEN-04": {
+    titel: "Keyword-Sprache passt nicht zur Content-Sprache",
+    bedeutung: "Die Keyword-Basis ist erkennbar in einer anderen Sprache als die eingestellte Content-Sprache dieses Produkts. Lokalisierter Content braucht Keywords vom Ziel-Marktplatz — Übersetzen reicht nicht, weil das Suchverhalten je Land anders ist.",
+    loesung: "Entweder die Content-Sprache des Produkts umstellen (Kopfzeile der Produktseite) — oder eine Keyword-Analyse (Cerebro) vom Ziel-Marktplatz hochladen und die alte Basis löschen.",
+  },
   "IMP-01": {
     titel: "Listing-Import fehlgeschlagen",
     bedeutung: "Weder der Web-Abruf noch der Produkt-Crawler konnten das Amazon-Listing laden (Detail-Meldung oben — z. B. Blockade, Zeitlimit, unbekannte ASIN).",

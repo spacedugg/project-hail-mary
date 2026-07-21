@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { saveKeywords, deriveKeywordsFromSov, generateContent, uploadCerebro, scrapeReviewsAction, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext } from "@/app/actions";
+import { saveKeywords, deriveKeywordsFromSov, generateContent, uploadCerebro, scrapeReviewsAction, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarktSprache } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
@@ -118,7 +118,34 @@ export default async function ProductPage({
       <div className="mt-1 flex items-center justify-between gap-4">
         <h1 className="page-title">
           {product.name}{" "}
-          {product.asin && <span className="font-mono text-sm text-neutral-500">{product.asin} · amazon.{product.marketplace}</span>}
+          {product.asin && <span className="font-mono text-sm text-neutral-500">{product.asin} · amazon.{product.marketplace}</span>}{" "}
+          {/* Marktplatz & Content-Sprache (D128): Sprache unabhängig vom Marktplatz — steuert Generierung, Keyword-Gate und Scrape-Domain */}
+          <details className="inline-block align-middle text-sm font-normal">
+            <summary className="cursor-pointer select-none text-xs text-primary-strong hover:underline">
+              Marktplatz &amp; Sprache: amazon.{product.marketplace} · Content {product.contentSprache.toUpperCase()}
+            </summary>
+            <form action={saveMarktSprache} className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-background p-2">
+              <input type="hidden" name="productId" value={product.id} />
+              <select name="marketplace" defaultValue={product.marketplace} className="input w-36 text-xs" title="Marktplatz — Listing-Import läuft gegen diese Domain">
+                <option value="de">amazon.de</option>
+                <option value="uk">amazon.co.uk</option>
+                <option value="us">amazon.com</option>
+                <option value="fr">amazon.fr</option>
+                <option value="it">amazon.it</option>
+                <option value="es">amazon.es</option>
+                <option value="nl">amazon.nl</option>
+              </select>
+              <select name="contentSprache" defaultValue={product.contentSprache} className="input w-36 text-xs" title="Content-Sprache — unabhängig vom Marktplatz; Keyword-Basis und Review-Quellen müssen dazu passen (Sprach-Gates)">
+                <option value="de">Deutsch</option>
+                <option value="en">Englisch</option>
+                <option value="fr">Französisch</option>
+                <option value="it">Italienisch</option>
+                <option value="es">Spanisch</option>
+              </select>
+              <SubmitButton className="btn-ghost text-xs">Speichern</SubmitButton>
+              <span className="text-[10px] text-muted">Sprach-Gates: Keyword-Basis muss zur Content-Sprache passen; Review-Scrapes laufen gegen den Marktplatz der Content-Sprache.</span>
+            </form>
+          </details>
         </h1>
         <div className="flex flex-none gap-2">
           {snapshot || versions.length > 0 ? (
