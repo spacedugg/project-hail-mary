@@ -78,7 +78,7 @@ export function AsinChips({
         />
       </div>
       <p className="mt-1 text-[11px] text-muted">
-        {warnung ? <span className="text-warn">△ {warnung}</span> : "Leertaste, Komma oder Enter trennt — jede erkannte ASIN wird zum farbigen Chip. Chips lassen sich mit × entfernen."}
+        {warnung && <span className="text-warn">△ {warnung}</span>}
       </p>
     </div>
   );

@@ -467,7 +467,7 @@ export default async function AnalysePage({
           wie die Review-Erkenntnisse, deterministisch aus dem Audit gemappt */}
       {deepAudit && befundKarten(deepAudit.payload, deepAudit.dataBasis).length > 0 && (
         <section className="mt-6">
-          <h2 className="sect-h">Stärken & Schwächen (aus dem Tiefen-Audit)</h2>
+          <h2 className="sect-h">Stärken & Schwächen</h2>
           <div className="mt-2 space-y-2">
             {befundKarten(deepAudit.payload, deepAudit.dataBasis).map((k, i) => (
               <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={0} belegHinweis="aus Tiefen-Audit" />
@@ -480,7 +480,7 @@ export default async function AnalysePage({
           Quellen-Tags nur nach verifiziertem Verbatim-Beleg, Relevanz rechnet der Code */}
       <section className="mt-6 print:hidden">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="sect-h">Feature-Relevanz-Ranking — welche Listing-Features Kunden honorieren</h2>
+          <h2 className="sect-h">Feature-Ranking</h2>
           <form action={rankeFeaturesAction}>
             <input type="hidden" name="productId" value={id} />
             <SubmitButton className="btn-ghost text-xs" pendingLabel="Rankt… (kann Minuten dauern)" progress>
@@ -500,7 +500,7 @@ export default async function AnalysePage({
                 <p key={i} className="text-[11px] text-muted">ℹ {h}</p>
               ))}
               {featureRanking.payload.verworfen > 0 && (
-                <p className="text-[11px] text-warn">△ {featureRanking.payload.verworfen} Feature(s) ohne verifizierten Listing-Beleg verworfen (ausgewiesen, nie still).</p>
+                <p className="text-[11px] text-warn">△ {featureRanking.payload.verworfen} Feature(s) ohne Listing-Beleg verworfen.</p>
               )}
               {featureRanking.payload.entfernteBildIdeen.map((e, i) => (
                 <p key={`b-${i}`} className="text-[11px] text-warn">✕ Bild-Idee entfernt: „{e.idee}" — {e.grund}</p>
@@ -514,7 +514,7 @@ export default async function AnalysePage({
       </section>
 
       <section className="mt-6">
-        <h2 className="sect-h">Maßnahmen (priorisiert)</h2>
+        <h2 className="sect-h">Maßnahmen</h2>
         {(() => {
           const karten = massnahmenKarten(
             deepAudit?.payload.topActions ?? [],

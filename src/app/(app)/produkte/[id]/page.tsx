@@ -484,7 +484,6 @@ export default async function ProductPage({
                   {" · "}{scrape.createdAt.toLocaleDateString("de-DE")}
                   {scrape.source !== "apify" && <span className="ml-1 pill pill-warn">Demo-Daten (kein Scrape-Key)</span>}
                 </span>
-                <span className="text-[11px] text-muted">{Object.entries(scrape.perAsin).map(([a, n]) => `${a}: ${n}`).join(" · ")}</span>
               </div>
               {scrape.amazonTotals?.dist ? (
                 /* Echte Amazon-Verteilung (%) des PRODUKTS; daneben NUR die Produkt-Stichprobe */
@@ -525,7 +524,6 @@ export default async function ProductPage({
 
               {scrapeAnalyzed ? (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <span className="text-[11px] text-muted">Dieser Scrape ist analysiert — für eine neue Analyse erst neu scrapen (z. B. mit weiteren ASINs).</span>
                 </div>
               ) : (
                 <form action={analyzeReviewsAction} className="mt-3 flex flex-wrap items-center gap-2">
