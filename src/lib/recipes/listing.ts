@@ -164,7 +164,7 @@ export function sectionPrompt(section: ListingSection, inputs: RecipeInputs): st
 AUFGABE: Schreibe den Amazon-Produkttitel.
 REGELN (knowledge/content/title.md, Amazon-Neuerung 07/2026):
 - HART: ${RULES.title.targetMinChars}–${RULES.title.maxChars} Zeichen — das 75er-Budget bestmöglich ausnutzen, NIE überschreiten. Zähle sorgfältig.
-- Struktur (gekürzt fürs Budget): Marke → Produkttyp (=Hauptkeyword) → 1–2 stärkste kaufentscheidende Attribute (Maß/Menge/Material) → ggf. Kernnutzen-Kürzel.
+- REIHENFOLGE (Best Practice, Nutzer-Vorgabe 22.07.): Marke → Hauptkeyword → Produkttyp → wichtigste Key Features → Größe/Menge → Material → Kundennutzen — gekürzt auf das, was ins 75er-Budget passt; Lesbarkeit schlägt Keyword-Dichte, KEIN Keyword-Stuffing.
 - Hauptkeyword „${kw.primary[0] ?? ""}" MUSS vorkommen. PRIMARY-Keywords (je max. 1×): ${kw.primary.join(", ")}
 - Zahlen als Ziffern. Keine Werbephrasen, keine Emojis, keine Versalien-Wörter außer Marke/Norm.
 - BEGRÜNDUNG: Erkläre jeden Titelbestandteil — woraus er sich ableitet (Keyword-Analyse, USP, Produkt-Wahrheit, Marke) und warum er das Budget verdient.
@@ -201,7 +201,7 @@ AUFGABE: Backend-Suchbegriffe (generische Keywords).
 REGELN (knowledge/content/backend-keywords.md + Blog 07/2026):
 - Einzelwörter, Leerzeichen-getrennt, KEINE Kommas, KEINE Satzzeichen (Amazon ignoriert sie — verschwendete Bytes). Max ${RULES.backendKeywords.maxBytes} Bytes UTF-8 — bei Überschreitung ignoriert Amazon das GESAMTE Feld.
 - KEIN Wort, das schon in Titel/Bullets sichtbar ist (Main Keywords hier = verschwendeter Platz). Keine Markennamen (Policy + Account Health). Singular ODER Plural, nie beides.
-- Priorität: (1) Invisible-Keywords, (2) Rest-Long-Tails, (3) Synonyme/Abkürzungen/andere Schreibweisen (Titel „Edelstahl Rührschüssel" → Backend „salatschüssel backschüssel teigschüssel"), (4) ENGLISCHE Suchbegriffe auf amazon.de („mixing bowl" statt „rührschüssel"), (5) Kundensprache/Regionalbegriffe. KEINE Tippfehler (Amazon fängt sie ab).
+- Priorität (Nutzer-Vorgabe 22.07.): (1) Synonyme/Abkürzungen/andere Formulierungen ZUERST (Titel „Edelstahl Rührschüssel" → Backend „salatschüssel backschüssel teigschüssel prep bowl"), (2) andere Schreibweisen inkl. gängiger Vertipper, (3) ENGLISCHE Suchbegriffe auf amazon.de („mixing bowl" statt „rührschüssel" — die fängt kaum jemand ab), (4) Rest-Long-Tails, (5) Kundensprache/Regionalbegriffe.
 - BUDGET AUSNUTZEN: möglichst nah an ${RULES.backendKeywords.maxBytes} Bytes (nie darüber).
 - POOL: ${kw.backendPool.join(", ")}
 JSON: {"backend": "wort1 wort2 wort3 ...", "rationale": [{"part": "<Wortgruppe>", "source": "<Herleitung: invisible/Long-Tail/Kundensprache>"}]}`;
