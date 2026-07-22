@@ -101,6 +101,7 @@ Content-Sprache ist je Produkt/Auftrag wählbar — unabhängig vom Marktplatz. 
 | Feature | Status | Handlung/Nutzen |
 |---|---|---|
 | Review-Scrape je ASIN × Sterne-Klasse (eigenes Produkt + Wettbewerber, ASIN-Chips) | 🔶 | Mehr-ASIN-Abbruch behoben (D102) — erneuter Praxistest nötig |
+| Wettbewerbs-Kontext als eigener Analyse-Baustein: Wettbewerber zeigen Produkt-Einordnung, Zielgruppe, gelöste Pain Points, unbeleuchtete eigene Features (D141) | ⬜ | Optimieren nur mit eigenen Daten = luftleerer Raum; Hand-Eingabe der ASINs bleibt und gewinnt immer |
 | Ehrliche Datenbasis (Amazon-Gesamtzahlen neben Stichprobe, Ausbeute je Lauf) | 🧪 | Keine Selbsttäuschung über die Datenlage |
 | Konfidenz-Einordnung in Worten an den Insight-Ausgaben („Basis: X von Y", Beleg-Stufe je Erkenntnis, deterministisch hergeleitet — keine Fassaden-Prozente) (D138) | ⬜ | Nachrechenbare Einordnung statt grüner Prozentzahlen; Herleitung steht in Daten & Formeln |
 | Findings-Dashboard: Pain Points, Kaufauslöser, Kundensprache, O-Töne | 🔶 | Crash behoben (D103) — erneuter Praxistest nötig |
