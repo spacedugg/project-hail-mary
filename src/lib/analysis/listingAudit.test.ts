@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { analyzeListing, deckungsgrad } from "./listingAudit";
+import { adressiert, analyzeListing, deckungsgrad } from "./listingAudit";
 import type { ReviewInsightsPayload } from "@/db/schema";
 
 /**
@@ -50,33 +50,22 @@ const analyse = () =>
     reviewInsights: insights,
   });
 
-describe("Kundenstimmen-Abgleich (Themen-Abgleich D117)", () => {
-  it("Northpoint-Regression: adressierte Pain-Points werden erkannt (nicht mehr 0/5)", () => {
-    const voc = analyse().dimensions.find((d) => d.key === "voc");
-    expect(voc).toBeDefined();
-    // Magnete (Bullet 2), Batteriefach/Lampe (Bullet 4), Helligkeit/Ausleuchtung (Bullet 1+5)
-    expect(voc!.score).toBeGreaterThanOrEqual(60);
-    const text = voc!.findings.join("\n");
-    expect(text).toContain("Adressiert: „Magnete zu schwach");
-    expect(text).toContain("Adressiert: „Zu schwache Helligkeit");
+describe("Pain-Point-Abgleich (D117/D176) — Heuristik speist nur noch Massnahmen, kein Score", () => {
+  it("es gibt KEINE Score-Dimension mehr fuer Pain-Point-Abdeckung (D176)", () => {
+    expect(analyse().dimensions.find((d) => d.key === "voc")).toBeUndefined();
   });
 
-  it("weist Themen-Treffer aus und bleibt bei fehlenden Themen ehrlich", () => {
-    const voc = analyse().dimensions.find((d) => d.key === "voc")!;
-    const text = voc.findings.join("\n");
-    // Adressierte zeigen, WELCHE Wörter getroffen wurden
-    expect(text).toMatch(/Themen-Treffer in den Bullets: .*Magnete/);
-    // Stoßfestigkeit kommt in den Live-Bullets thematisch nicht vor → ehrlich „nicht adressiert"
-    expect(text).toContain("Nicht adressiert: „Gehäuse nicht stoßfest");
-    // Transparenz-Hinweis auf die Grenzen der Wortstamm-Heuristik
-    expect(text).toContain("wortstamm-basiert");
+  it("Northpoint-Regression: positiv formulierte Konter zaehlen als adressiert", () => {
+    const bulletsText = northpointBullets.join(" ");
+    expect(adressiert(bulletsText, "Magnete zu schwach – halten Lampe nicht sicher an vertikalen/mobilen Flaechen").ok).toBe(true);
+    expect(adressiert(bulletsText, "Zu schwache Helligkeit – reicht nicht fuer Arbeiten/Ausleuchtung").ok).toBe(true);
+    expect(adressiert(bulletsText, "Gehaeuse nicht stossfest – bricht/reisst bei Sturz").ok).toBe(false);
   });
 
-  it("ein Bullet, der den Einwand nur wörtlich NICHT wiederholt, zählt trotzdem (positive Konter-Sprache)", () => {
-    // Genau der alte Fehler: „schwach", „vertikalen", „Flächen" stehen nie in den
-    // Bullets — der Magnet-Pain-Point muss über Magnete/halten/sicher matchen.
-    const voc = analyse().dimensions.find((d) => d.key === "voc")!;
-    expect(voc.findings.join("\n")).not.toContain("Nicht adressiert: „Magnete zu schwach");
+  it("der haeufigste NICHT adressierte Einwand wird zur Massnahme", () => {
+    const rec = analyse().recommendations.find((r) => r.includes("Kunden-Einwand"));
+    expect(rec).toBeDefined();
+    expect(rec).toContain("Gehäuse nicht stoßfest");
   });
 });
 

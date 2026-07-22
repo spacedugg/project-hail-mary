@@ -78,10 +78,11 @@ export function ListingKontrolle({
       </div>
 
       {/* Quality Score + Keyword-Abdeckung */}
-      {(detByKey.voc || detByKey["seo-coverage"]) && (
+      {/* Pain-Point-Abdeckungs-Score abgeschafft (D176) — Keyword-Abdeckung ist die Mess-Basis */}
+      {detByKey["seo-coverage"] && (
         <div className="grid gap-3 lg:grid-cols-2">
-          {[detByKey.voc, detByKey["seo-coverage"]].filter(Boolean).map((d) => (
-            <div key={d!.key} className={`rounded-xl border border-hair p-4 ${d!.key === "voc" ? "border-l-4 border-l-[var(--primary)]" : ""}`}>
+          {[detByKey["seo-coverage"]].filter(Boolean).map((d) => (
+            <div key={d!.key} className="rounded-xl border border-l-4 border-hair border-l-[var(--primary)] p-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold">{d!.label}</h3>
                 <div className="flex items-center gap-2">

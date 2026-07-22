@@ -121,7 +121,7 @@ function themenTreffer(hay: string, phrase: string): { treffer: string[]; themen
 }
 
 /** Adressiert = mindestens 2 Themenwörter getroffen (bei sehr kurzen Labels reicht 1). */
-function adressiert(hay: string, phrase: string): { ok: boolean; treffer: string[] } {
+export function adressiert(hay: string, phrase: string): { ok: boolean; treffer: string[] } {
   const { treffer, themen } = themenTreffer(hay, phrase);
   return { ok: themen <= 2 ? treffer.length >= 1 : treffer.length >= 2, treffer };
 }
@@ -204,23 +204,15 @@ export function analyzeListing(input: {
     if (missing.length) recs.push(`Die ${missing.length} wichtigsten Umsatzlücken-Keywords in Titel/Bullets einarbeiten (größter Hebel: „${missing[0].keyword}").`);
   }
 
-  // 6 · Voice-of-Customer-Abgleich: adressieren die Bullets die Top-Pain-Points? (deterministisch, heuristisch)
+  // 6 · Pain-Point-Abgleich — KEIN Score mehr (D176, Nutzer-Korrektur 22.07.):
+  // Nicht jeder Pain Point MUSS in Bullets/Bildern beantwortet sein (vieles
+  // gehört ins Q&A oder in die Beschreibung, manches nirgendwohin) — ein
+  // Abdeckungs-Score wäre eine falsche Messlatte. Der Abgleich speist nur
+  // noch die MASSNAHMEN (unadressierter Top-Einwand).
   if (reviewInsights && reviewInsights.painPoints.length > 0) {
     const top = reviewInsights.painPoints.slice(0, 5);
     const bulletsText = snapshot.bullets.join(" ");
-    const geprueft = top.map((p) => ({ p, ...adressiert(bulletsText, p.label) }));
-    const addressed = geprueft.filter((g) => g.ok);
-    const pct = Math.round((addressed.length / top.length) * 100);
-    const missing = geprueft.filter((g) => !g.ok).map((g) => g.p);
-    const findings = [
-      `${addressed.length} von ${top.length} Top-Pain-Points werden in den Bullets adressiert.`,
-      ...addressed.map((g) => `Adressiert: „${g.p.label}" — Themen-Treffer in den Bullets: ${g.treffer.join(", ")}`),
-      ...missing.map((p) => `Nicht adressiert: „${p.label}"${p.frequencyPct ? ` (${p.frequencyPct} % der kritischen Stimmen)` : ""}`),
-      "Der Abgleich ist wortstamm-basiert (Thema muss in den Bullets vorkommen) — ob ein Einwand inhaltlich entkräftet ist, bewertet der Tiefen-Audit.",
-    ];
-    // Umbenannt (Nutzer 21.07.): Es geht nicht nur um „Kundenstimmen", sondern
-    // darum, ob die Top-Pain-Points im Content adressiert sind → Quality Score.
-    dims.push({ key: "voc", label: "Quality Score (Pain-Point-Abdeckung)", score: pct, measured: true, evidence: "deterministic", findings, issues: [] });
+    const missing = top.filter((p) => !adressiert(bulletsText, p.label).ok);
     if (missing[0]) recs.push(`Häufigsten Kunden-Einwand („${missing[0].label}") prominent in Bullet 1–2 entkräften.`);
   }
 
