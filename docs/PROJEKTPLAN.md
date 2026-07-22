@@ -155,6 +155,7 @@ Content-Sprache ist je Produkt/Auftrag wählbar — unabhängig vom Marktplatz. 
 | Bild-Briefs (Vorgaben für Grafiker aus Daten) | 🧪 | Grafiker bekommt Fakten statt Bauchgefühl |
 | Bild-Ideen je Erkenntnis: Insight-Karten liefern 2–3 visuelle Umsetzungsideen, Briefs zitieren Erkenntnis + Idee (D134) | 🧪 | Direkter Weg Kaufgrund → Bild; Ideen unterliegen denselben Wahrheits-Regeln wie Text (keine erfundenen Testimonials/Siegel) |
 | A+-Briefs Basic & Premium (nach Design-Guide: Maße, Module, Text nur im Bild, Desktop-only) | 🧪 | Design-Auftrag nach den echten Agentur-Regeln (D113) |
+| **Briefings-Überarbeitung — NÄCHSTER GROSSER BAUSTEIN (D168, vorgemerkt)**: Briefings für Listing-Bilder + A+ aus ALLEN Findings (Pain Points, Kaufauslöser, Kundensprache, Insight-Karten, Feature-Ranking, Conversion-Blocker) inkl. konkreter Bild-Umsetzungen je Erkenntnis (Referenz: „Visual Implementation Ideas") | ⬜ | Die Brücke Findings → Grafiker-Auftrag — einmal richtig bauen, wenn die Analyse-Basis steht |
 
 ### Menüpunkt: Tool-Einstellungen (`/einstellungen` + Daten & Formeln)
 
