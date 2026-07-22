@@ -13,6 +13,7 @@ import { LoeschButton } from "@/components/loesch-button";
 import { GenerierSperre, GenerierButton } from "@/components/generier-sperre";
 import { BewertungsDashboard } from "@/components/bewertungs-dashboard";
 import { fehlerInfo } from "@/lib/fehlercodes";
+import { normalisierePayload } from "@/lib/reviews/insights";
 import { IconUpload, IconCheck, IconSearch, IconReviews, IconContent, IconEuro } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
@@ -124,43 +125,71 @@ export default async function ProductPage({
   return (
     <main className="w-full p-8">
       <Link href={backHref} className="text-xs text-neutral-500 hover:underline">← {parentBrand?.kind === "workbench" ? "Listing Optimizer" : "Katalog"}</Link>
-      <div className="mt-1 flex items-center justify-between gap-4">
-        <h1 className="page-title">
-          {product.name}{" "}
-          {product.asin && <span className="font-mono text-sm text-neutral-500">{product.asin} · amazon.{product.marketplace}</span>}{" "}
-        </h1>
-      </div>
-      {/* Marktplatz & Content-Sprache (D128) — IMMER sichtbar (Nutzer-Vorgabe 22.07.): elementare Steuergrößen */}
-      <form action={saveMarktSprache} className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-        <input type="hidden" name="productId" value={product.id} />
-        <label className="text-muted">Marke</label>
-        <input name="marke" defaultValue={product.marke ?? ""} placeholder="Pflicht für Content" required className="input w-36 text-xs" />
-        <label className="text-muted">Marktplatz</label>
-        <select name="marketplace" defaultValue={product.marketplace} className="input w-32 text-xs">
-          <option value="de">amazon.de</option>
-          <option value="uk">amazon.co.uk</option>
-          <option value="us">amazon.com</option>
-          <option value="fr">amazon.fr</option>
-          <option value="it">amazon.it</option>
-          <option value="es">amazon.es</option>
-          <option value="nl">amazon.nl</option>
-        </select>
-        <label className="text-muted">Content-Sprache</label>
-        <select name="contentSprache" defaultValue={product.contentSprache} className="input w-32 text-xs">
-          <option value="de">Deutsch</option>
-          <option value="en">Englisch</option>
-          <option value="fr">Französisch</option>
-          <option value="it">Italienisch</option>
-          <option value="es">Spanisch</option>
-        </select>
-        <SubmitButton className="btn-ghost text-xs">Speichern</SubmitButton>
-        <LoeschButton
-          action={deleteProductAction}
-          felder={{ productId: product.id }}
-          frage={`„${product.name}" mit allen Daten (Keywords, Scrapes, Analysen, Content) endgültig löschen?`}
-          title="Produkt löschen"
-        />
-      </form>
+      {/* Produkt-Kopfkarte (D166): EINE immer sichtbare Übersicht über alle Reiter —
+          Bild, Listing-Titel, ASIN, Stand, editierbare Steuergrößen, Reviews analysiert. */}
+      {(() => {
+        const bild = snapshot?.imageUrls?.[0];
+        const stand = [snapshot?.createdAt, insights?.createdAt, versions[0]?.createdAt]
+          .filter((d): d is Date => Boolean(d))
+          .sort((a, b) => b.getTime() - a.getTime())[0];
+        const reviewsAnalysiert = insights ? normalisierePayload(insights.payload).stats.reviewsTotal : null;
+        return (
+          <section className="card mt-2 p-4">
+            <div className="flex flex-wrap items-start gap-4">
+              {bild && (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={bild} alt={product.name} className="h-20 w-20 flex-none rounded-xl border border-hair bg-white object-contain p-1" />
+              )}
+              <div className="min-w-0 flex-1">
+                <h1 className="page-title">{product.name}</h1>
+                {snapshot?.title && snapshot.title !== product.name && (
+                  <p className="mt-0.5 line-clamp-2 text-xs text-muted">{snapshot.title}</p>
+                )}
+                <p className="mt-1 text-xs text-muted">
+                  {product.asin && <span className="font-mono">{product.asin}</span>}
+                  {stand && <>{product.asin ? " · " : ""}Stand {stand.toLocaleDateString("de-DE")}</>}
+                </p>
+                <form action={saveMarktSprache} className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                  <input type="hidden" name="productId" value={product.id} />
+                  <label className="text-muted">Marke</label>
+                  <input name="marke" defaultValue={product.marke ?? ""} placeholder="Pflicht für Content" required className="input w-36 text-xs" />
+                  <label className="text-muted">Marktplatz</label>
+                  <select name="marketplace" defaultValue={product.marketplace} className="input w-32 text-xs">
+                    <option value="de">amazon.de</option>
+                    <option value="uk">amazon.co.uk</option>
+                    <option value="us">amazon.com</option>
+                    <option value="fr">amazon.fr</option>
+                    <option value="it">amazon.it</option>
+                    <option value="es">amazon.es</option>
+                    <option value="nl">amazon.nl</option>
+                  </select>
+                  <label className="text-muted">Content-Sprache</label>
+                  <select name="contentSprache" defaultValue={product.contentSprache} className="input w-32 text-xs">
+                    <option value="de">Deutsch</option>
+                    <option value="en">Englisch</option>
+                    <option value="fr">Französisch</option>
+                    <option value="it">Italienisch</option>
+                    <option value="es">Spanisch</option>
+                  </select>
+                  <SubmitButton className="btn-ghost text-xs">Speichern</SubmitButton>
+                  <LoeschButton
+                    action={deleteProductAction}
+                    felder={{ productId: product.id }}
+                    frage={`„${product.name}" mit allen Daten (Keywords, Scrapes, Analysen, Content) endgültig löschen?`}
+                    title="Produkt löschen"
+                  />
+                </form>
+              </div>
+              {reviewsAnalysiert !== null && reviewsAnalysiert > 0 && (
+                <div className="flex-none rounded-xl bg-background px-4 py-2 text-center">
+                  <div className="text-xl font-semibold tabular-nums">{fmt(reviewsAnalysiert)}</div>
+                  <div className="text-[10px] text-muted">Reviews analysiert</div>
+                </div>
+              )}
+            </div>
+          </section>
+        );
+      })()}
 
       {fehler && <FehlerPopup message={fehler} {...fehlerInfo(code)} />}
       {hinweis && <p className="mt-4 rounded-xl bg-[var(--primary-soft)] px-3 py-2 text-sm text-primary-strong">ℹ {hinweis}</p>}
@@ -303,7 +332,6 @@ export default async function ProductPage({
               <input type="hidden" name="productId" value={product.id} />
               <input type="file" name="file" accept=".csv" required className="text-sm" />
               <input name="price" type="text" inputMode="decimal" defaultValue={product.price !== null ? (product.price / 100).toFixed(2) : ""} placeholder="Ø-Verkaufspreis € *" required className="input w-40 text-xs" title="Basis der €-Werte im SOV-Audit" />
-              <input name="price" type="number" step="0.01" placeholder="Ø-Preis € (45)" className={`${input} w-36`} />
               <SubmitButton className="btn-primary" pendingLabel="Liest Export, filtert Relevanz…" progress>
                 {kws.some((k) => k.source === "cerebro") ? "Weiteren Export dazuladen" : "Keyword-Export hochladen"}
               </SubmitButton>
