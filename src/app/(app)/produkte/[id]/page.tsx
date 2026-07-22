@@ -93,42 +93,23 @@ export default async function ProductPage({
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, id) });
   if (!product) notFound();
 
-  const kws = await db.query.keywords.findMany({ where: eq(schema.keywords.productId, id) });
-  const insights = await db.query.reviewInsights.findFirst({
-    where: eq(schema.reviewInsights.productId, id),
-    orderBy: desc(schema.reviewInsights.createdAt),
-  });
-  const scrape = await db.query.reviewScrapes.findFirst({
-    where: eq(schema.reviewScrapes.productId, id),
-    orderBy: desc(schema.reviewScrapes.createdAt),
-  });
-  const uploads = await db.query.reportUploads.findMany({
-    where: eq(schema.reportUploads.brandId, product.brandId),
-    orderBy: desc(schema.reportUploads.createdAt),
-  });
+  // Unabhängige Queries parallel (Review-Fix): jeder Reiter-Wechsel zahlte
+  // vorher 8+ serielle Roundtrips.
+  const [kws, insights, scrape, uploads, versions, snapshot, blockerLauf, deepAudit, featureRanking, parentBrand] = await Promise.all([
+    db.query.keywords.findMany({ where: eq(schema.keywords.productId, id) }),
+    db.query.reviewInsights.findFirst({ where: eq(schema.reviewInsights.productId, id), orderBy: desc(schema.reviewInsights.createdAt) }),
+    db.query.reviewScrapes.findFirst({ where: eq(schema.reviewScrapes.productId, id), orderBy: desc(schema.reviewScrapes.createdAt) }),
+    db.query.reportUploads.findMany({ where: eq(schema.reportUploads.brandId, product.brandId), orderBy: desc(schema.reportUploads.createdAt) }),
+    db.query.contentVersions.findMany({ where: eq(schema.contentVersions.productId, id), orderBy: desc(schema.contentVersions.createdAt) }),
+    db.query.listingSnapshots.findFirst({ where: eq(schema.listingSnapshots.productId, id), orderBy: desc(schema.listingSnapshots.createdAt) }),
+    db.query.conversionBlockers.findFirst({ where: eq(schema.conversionBlockers.productId, id), orderBy: desc(schema.conversionBlockers.createdAt) }),
+    db.query.deepAudits.findFirst({ where: eq(schema.deepAudits.productId, id), orderBy: desc(schema.deepAudits.createdAt) }),
+    db.query.featureRankings.findFirst({ where: eq(schema.featureRankings.productId, id), orderBy: desc(schema.featureRankings.createdAt) }),
+    db.query.brands.findFirst({ where: eq(schema.brands.id, product.brandId) }),
+  ]);
   const sovUpload = uploads.find(
     (u) => u.reportType === "cerebro" && u.parseStatus === "ok" && (u.parsed as { productId?: string })?.productId === id,
   );
-  const versions = await db.query.contentVersions.findMany({
-    where: eq(schema.contentVersions.productId, id),
-    orderBy: desc(schema.contentVersions.createdAt),
-  });
-  const snapshot = await db.query.listingSnapshots.findFirst({
-    where: eq(schema.listingSnapshots.productId, id),
-    orderBy: desc(schema.listingSnapshots.createdAt),
-  });
-  const blockerLauf = await db.query.conversionBlockers.findFirst({
-    where: eq(schema.conversionBlockers.productId, id),
-    orderBy: desc(schema.conversionBlockers.createdAt),
-  });
-  const deepAudit = await db.query.deepAudits.findFirst({
-    where: eq(schema.deepAudits.productId, id),
-    orderBy: desc(schema.deepAudits.createdAt),
-  });
-  const featureRanking = await db.query.featureRankings.findFirst({
-    where: eq(schema.featureRankings.productId, id),
-    orderBy: desc(schema.featureRankings.createdAt),
-  });
   const latestOf = (t: string) => versions.find((v) => v.type === t);
   const input = "input-base";
   const mc = product.marginCalc ?? null;
@@ -137,7 +118,6 @@ export default async function ProductPage({
   const fmtEur = (n: number) => `${new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)} €`;
   const fmtPct = (n: number) => `${new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(n)} %`;
 
-  const parentBrand = await db.query.brands.findFirst({ where: eq(schema.brands.id, product.brandId) });
   const backHref = parentBrand?.kind === "workbench" ? "/optimizer" : `/marke/${product.brandId}/katalog`;
   // Der aktuelle Scrape ist analysiert (D79) → kein Analyse-Button mehr, nur Dashboard.
   // Altbestand ohne scrapeId: Analyse nach dem Scrape gilt als dessen Analyse.
@@ -145,16 +125,24 @@ export default async function ProductPage({
     insights && scrape && (insights.scrapeId === scrape.id || (!insights.scrapeId && insights.createdAt > scrape.createdAt)),
   );
 
+  // Ergebnis-Phase (Review-Fix): Reiter erscheinen mit Analyse ODER Content —
+  // Produkte ohne Reviews (bewusst ohne Analyse getextet, GEN-03) sonst nie.
+  const bereit = Boolean(insights) || versions.length > 0;
+
   // Kontrollvariablen (D172): Regel-Messung + KI-Befunde direkt im Listing-Reiter
   const { snapshot: wirksam, quellen: sektionsQuellen } = wirksamesListing(versions, snapshot ?? null);
   const sovAudit = (sovUpload?.parsed as { audit?: SovAudit })?.audit ?? null;
-  const analysis = analyzeListing({
-    snapshot: wirksam,
-    facts: product.facts,
-    primaryKeywords: kws.filter((k) => k.tier === "primary" && !k.ausgeschlossen).map((k) => k.keyword),
-    sovAudit,
-    reviewInsights: insights?.payload ?? null,
-  });
+  // Nur rechnen, wenn ein Reiter sie zeigt (Review-Fix): Marge/Content zahlten
+  // sonst die volle Wortstamm-Analyse bei jedem Wechsel mit.
+  const analysis = bereit && (tab === "listing" || tab === "analyse")
+    ? analyzeListing({
+        snapshot: wirksam,
+        facts: product.facts,
+        primaryKeywords: kws.filter((k) => k.tier === "primary" && !k.ausgeschlossen).map((k) => k.keyword),
+        sovAudit,
+        reviewInsights: insights?.payload ?? null,
+      })
+    : null;
   const auditNeuestesInput = Math.max(
     snapshot?.createdAt.getTime() ?? 0,
     insights?.createdAt.getTime() ?? 0,
@@ -220,7 +208,7 @@ export default async function ProductPage({
 
       {/* Reiter-Leiste (D172): erst nach dem Analyse-Lauf — davor führt die Start-Maske.
           Mit Sofort-Feedback beim Wechsel (D173). */}
-      {insights && (
+      {bereit && (
         <TabLeiste
           basisHref={`/produkte/${product.id}`}
           tabs={[...TABS]}
@@ -230,7 +218,7 @@ export default async function ProductPage({
       )}
 
       <div className="stagger mt-6 space-y-3">
-        {insights && tab === "listing" && (
+        {bereit && tab === "listing" && (
         <section className="card p-5">
           <CardHead
             icon={<IconUpload />}
@@ -313,16 +301,16 @@ export default async function ProductPage({
             </form>
           </details>
           {/* Kontrollvariablen direkt hier (D172): Scores nicht in einem Zweit-Level-Bericht */}
-          <ListingKontrolle analysis={analysis} deepAudit={deepAudit ?? null} quellen={sektionsQuellen} original={snapshot ?? null} sektionSoll={sektionSoll} />
+          {analysis && <ListingKontrolle analysis={analysis} deepAudit={deepAudit ?? null} quellen={sektionsQuellen} original={snapshot ?? null} sektionSoll={sektionSoll} />}
         </section>
         )}
         {/* Maßnahmen gehighlightet unten im Übersichtsreiter (D172) */}
-        {insights && tab === "listing" && <MassnahmenBlock analysis={analysis} deepAudit={deepAudit ?? null} />}
+        {bereit && tab === "listing" && analysis && <MassnahmenBlock analysis={analysis} deepAudit={deepAudit ?? null} />}
 
 
         {/* Keywords: in der Start-Phase der Prüf-Schritt vor dem Lauf (D172),
             danach Teil des gebündelten Analyse-Reiters */}
-        {(!insights || tab === "analyse") && (
+        {(!bereit || tab === "analyse") && (
         <section className="card p-5">
             <CardHead
               icon={<IconSearch />}
@@ -432,7 +420,7 @@ export default async function ProductPage({
         )}
 
         {/* Start-Phase (D172): Zusatz-Infos + EIN Klick für den ganzen Lauf */}
-        {!insights && (
+        {!bereit && (
         <section className="card p-5">
           <CardHead icon={<IconSparkle />} chip="chip-violet" title="Analyse & Content" />
           <details className="mt-3" open={Boolean(product.zusatzKontext?.trim())}>
@@ -455,7 +443,7 @@ export default async function ProductPage({
         </section>
         )}
 
-        {insights && tab === "analyse" && (<>
+        {bereit && tab === "analyse" && (<>
         <section id="reviews" className="card p-5">
           <CardHead
             icon={<IconReviews />}
@@ -574,7 +562,7 @@ export default async function ProductPage({
           );
         })()}
 
-        {insights && tab === "analyse" && (
+        {bereit && tab === "analyse" && (
         <section className="card p-5">
           <CardHead
             icon={<IconSichtbarkeit />}
@@ -609,7 +597,7 @@ export default async function ProductPage({
         )}
 
         {/* Restliches Hintergrundwissen (D172): Zielgruppe/USPs, Sterne-Gruppen, SOV, Feature-Ranking, Stärken & Schwächen */}
-        {insights && tab === "analyse" && (
+        {bereit && tab === "analyse" && analysis && (
           <AnalyseHintergrund
             analysis={analysis}
             deepAudit={deepAudit ?? null}
@@ -618,7 +606,7 @@ export default async function ProductPage({
           />
         )}
 
-        {insights && tab === "content" && (
+        {bereit && tab === "content" && (
         <section className="card p-5">
           <CardHead
             icon={<IconContent />}
@@ -749,7 +737,7 @@ export default async function ProductPage({
         </section>
         )}
 
-        {insights && tab === "marge" && (
+        {bereit && tab === "marge" && (
         <section className="card p-5">
           <CardHead
             icon={<IconEuro />}

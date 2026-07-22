@@ -28,6 +28,8 @@ type Etappe = {
   label: string;
   status: "offen" | "laeuft" | "fertig" | "fehler";
   detail?: string;
+  /** Content ohne Analyse nur mit ausdrücklicher Bestätigung (GEN-02). */
+  bestaetigt?: boolean;
   /** Harte Abhängigkeit: scheitert sie, stoppt der Lauf (spätere Etappen brauchen sie). */
   hart: boolean;
 };
@@ -63,7 +65,11 @@ export function AnalyseStart({
         res = await runPipelineStufe(
           productId,
           e.stufe,
-          e.stufe === "scrape" ? { asins: asinListe } : e.section ? { section: e.section } : undefined,
+          e.stufe === "scrape"
+            ? { asins: asinListe, force: nurAnalyse }
+            : e.section
+              ? { section: e.section, ohneAnalyseBestaetigt: e.bestaetigt === true }
+              : undefined,
         );
       } catch (err) {
         res = { ok: false, fehler: err instanceof Error ? err.message : String(err), code: "ALG-00" };
@@ -92,10 +98,13 @@ export function AnalyseStart({
   const starte = async (fd: FormData) => {
     const liste = [...new Set(String(fd.get("asins") ?? "").split(/[\s,;]+/).map((a) => a.trim().toUpperCase()).filter(Boolean))];
     const sections = fd.getAll("sections").map(String);
+    // Bewusste Bestätigung (GEN-02/Review-Fix): Produkte ohne Reviews kommen
+    // nur so zu Content — die Review-Etappen werden dann weiche Etappen.
+    const ohneAnalyse = fd.get("ohneAnalyse") === "on";
     const plan: Etappe[] = [
       { stufe: "listing", label: "Amazon Listing laden (Texte, Bilder, Bildanalyse)", status: "offen", hart: true },
-      { stufe: "scrape", label: `Reviews scrapen (${liste.length} ASIN${liste.length === 1 ? "" : "s"})`, status: "offen", hart: true },
-      { stufe: "auswertung", label: "Reviews auswerten (Pain Points, Kaufauslöser)", status: "offen", hart: true },
+      { stufe: "scrape", label: `Reviews scrapen (${liste.length} ASIN${liste.length === 1 ? "" : "s"})`, status: "offen", hart: !ohneAnalyse },
+      { stufe: "auswertung", label: "Reviews auswerten (Pain Points, Kaufauslöser)", status: "offen", hart: !ohneAnalyse },
       { stufe: "verdichtung", label: "Erkenntnisse verdichten", status: "offen", hart: false },
       { stufe: "blocker", label: "Conversion-Blocker finden", status: "offen", hart: false },
       { stufe: "features", label: "Produkt-Features ranken", status: "offen", hart: false },
@@ -106,6 +115,7 @@ export function AnalyseStart({
         label: `${SEKTIONEN.find((x) => x.key === s)?.label ?? s} texten`,
         status: "offen" as const,
         hart: false,
+        bestaetigt: ohneAnalyse,
       })),
     ];
     setEtappen(plan);
@@ -136,7 +146,7 @@ export function AnalyseStart({
             </li>
           ))}
         </ul>
-        {!laeuft && !fertig && fehlerIndex >= 0 && (
+        {!laeuft && fehlerIndex >= 0 && (
           <button type="button" onClick={() => fahre(etappen, fehlerIndex, asins)} className="btn-primary mt-3 text-xs">
             Ab der fehlgeschlagenen Etappe fortsetzen
           </button>
@@ -181,6 +191,10 @@ export function AnalyseStart({
               </label>
             ))}
           </div>
+          <label className="mt-2 flex items-center gap-1.5 text-xs">
+            <input type="checkbox" name="ohneAnalyse" />
+            Auch ohne Bewertungs-Analyse texten (Produkt ohne Reviews)
+          </label>
         </div>
       )}
       <button type="submit" disabled={!mainAsin} className="btn-primary disabled:opacity-40">

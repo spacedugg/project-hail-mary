@@ -478,60 +478,6 @@ const SEKTIONS_LABEL: Record<string, string> = {
   backend: "Backend-Keywords", description: "Beschreibung", qa: "Q&A",
 };
 
-/**
- * Batch-Generierung (D156, Nutzer-Vorgabe): Sektionen anhaken → EIN Klick →
- * alles läuft NACHEINANDER durch (D109-Serialisierung bleibt gewahrt, weil
- * ein einziger Request der Reihe nach arbeitet). Zeit-Budget: Vor jeder
- * Sektion wird geprüft, ob noch genug Rest im 300-s-Fenster ist — was fertig
- * ist, ist gespeichert; der Rest wird benannt und läuft beim nächsten Klick
- * weiter (Etappen-Muster D136, kein stiller Abbruch).
- */
-export async function generateContentBatch(formData: FormData) {
-  const productId = String(formData.get("productId") ?? "");
-  const gewaehlt = formData.getAll("sections").map(String);
-  const sections = SEKTIONS_REIHENFOLGE.filter((s) => gewaehlt.includes(s));
-  if (sections.length === 0) {
-    redirect(`/produkte/${productId}?hinweis=${encodeURIComponent("Keine Sektion angehakt.")}&tab=content#content`);
-  }
-  const bestaetigt = String(formData.get("ohneAnalyseBestaetigt") ?? "") === "on";
-  const db = await getDb();
-
-  const start = Date.now();
-  const BUDGET_MS = 200_000; // Rest des 300-s-Fensters bleibt für die laufende Sektion + Speichern
-  const fertig: string[] = [];
-  const fehlgeschlagen: string[] = [];
-  const offen: string[] = [];
-
-  for (const section of sections) {
-    if (Date.now() - start > BUDGET_MS) {
-      offen.push(SEKTIONS_LABEL[section]);
-      continue;
-    }
-    try {
-      await generiereSektionKern(db, productId, section, bestaetigt);
-      fertig.push(SEKTIONS_LABEL[section]);
-      revalidatePath(`/produkte/${productId}`);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      // Gate-Fehler (Analyse fehlt / Sprache passt nicht) gelten für ALLE Sektionen — sofort raus
-      if (e instanceof GenFehler && e.code !== "GEN-01") {
-        redirect(`/produkte/${productId}?fehler=${encodeURIComponent(msg)}&code=${e.code}&tab=content#content`);
-      }
-      fehlgeschlagen.push(`${SEKTIONS_LABEL[section]} (${msg.slice(0, 120)})`);
-    }
-  }
-
-  revalidatePath(`/produkte/${productId}`);
-  const teile = [
-    fertig.length ? `Generiert: ${fertig.join(", ")}.` : "",
-    fehlgeschlagen.length ? `Fehlgeschlagen: ${fehlgeschlagen.join(" · ")} — einzeln erneut versuchen.` : "",
-    offen.length ? `Zeit-Budget erreicht — noch offen: ${offen.join(", ")}. Erneut auf Generieren klicken, es geht dort weiter.` : "",
-  ].filter(Boolean).join(" ");
-  if (fehlgeschlagen.length && !fertig.length) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(teile)}&code=GEN-01&tab=content#content`);
-  }
-  redirect(`/produkte/${productId}?hinweis=${encodeURIComponent(teile)}&tab=content#content`);
-}
 
 async function generiereSektionKern(
   db: Awaited<ReturnType<typeof getDb>>,
@@ -1112,22 +1058,6 @@ async function blockerKern(
   return null;
 }
 
-export async function findeBlockerAction(formData: FormData) {
-  const productId = String(formData.get("productId") ?? "");
-  const db = await getDb();
-  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
-  if (!product) return;
-
-  let hinweis: string | null = null;
-  try {
-    hinweis = await blockerKern(db, product);
-  } catch (e) {
-    const code = e instanceof GenFehler ? e.code : "BLK-01";
-    redirect(`/produkte/${productId}?tab=analyse&fehler=${encodeURIComponent(e instanceof Error ? e.message : String(e))}&code=${code}`);
-  }
-  revalidatePath(`/produkte/${productId}`);
-  redirect(`/produkte/${productId}?tab=analyse${hinweis ? `&hinweis=${encodeURIComponent(hinweis)}` : ""}`);
-}
 
 /**
  * Ein-Klick-Pipeline (D172): EINE Etappe je Aufruf — der Client-Runner reiht
@@ -1140,7 +1070,7 @@ export type PipelineErgebnis = { ok: boolean; hinweis?: string; fehler?: string;
 export async function runPipelineStufe(
   productId: string,
   stufe: "listing" | "scrape" | "auswertung" | "verdichtung" | "blocker" | "features" | "audit" | "content",
-  extra?: { asins?: string[]; section?: string },
+  extra?: { asins?: string[]; section?: string; force?: boolean; ohneAnalyseBestaetigt?: boolean },
 ): Promise<PipelineErgebnis> {
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
@@ -1152,7 +1082,7 @@ export async function runPipelineStufe(
         return { ok: true, hinweis: (await importListingKern(db, product)) ?? undefined };
       case "scrape": {
         const asins = [...new Set((extra?.asins ?? []).map((a) => a.trim().toUpperCase()).filter(Boolean))];
-        return { ok: true, hinweis: (await scrapeKern(db, product, asins)) ?? undefined };
+        return { ok: true, hinweis: (await scrapeKern(db, product, asins, extra?.force === true)) ?? undefined };
       }
       case "auswertung":
         return { ok: true, hinweis: (await auswertungKern(db, product)) ?? undefined };
@@ -1178,7 +1108,9 @@ export async function runPipelineStufe(
         const section = String(extra?.section ?? "");
         const gueltig = ["title", "bullets", "description", "backend", "highlights", "qa"];
         if (!gueltig.includes(section)) return { ok: false, fehler: `Unbekannte Sektion: ${section}`, code: "GEN-01" };
-        await generiereSektionKern(db, productId, section as ListingSection, true);
+        // GEN-02-Gate gilt auch hier (Review-Fix): ohne Analyse nur mit
+        // ausdrücklicher Bestätigung aus der Start-Maske, nie automatisch.
+        await generiereSektionKern(db, productId, section as ListingSection, extra?.ohneAnalyseBestaetigt === true);
         return { ok: true };
       }
     }
@@ -1186,9 +1118,10 @@ export async function runPipelineStufe(
     if (e instanceof GenFehler) return { ok: false, fehler: e.message, code: e.code };
     const fallback = stufe === "verdichtung" ? "VER-01" : stufe === "content" ? "GEN-01" : "ALG-00";
     return { ok: false, fehler: e instanceof Error ? e.message : String(e), code: fallback };
-  } finally {
-    revalidatePath(`/produkte/${productId}`);
   }
+  // BEWUSST kein revalidatePath je Etappe (Review-Fix): der neue RSC-Baum
+  // würde die laufende Start-Maske abbauen, sobald die erste Analyse existiert.
+  // Der Client ruft am Ende router.refresh(); die Seite ist force-dynamic.
 }
 
 /**
@@ -1200,6 +1133,8 @@ async function scrapeKern(
   db: Awaited<ReturnType<typeof getDb>>,
   product: NonNullable<Awaited<ReturnType<Awaited<ReturnType<typeof getDb>>["query"]["products"]["findFirst"]>>>,
   asins: string[],
+  /** true („Neu scrapen"-Absicht, Review-Fix): 24-h-Guard bewusst übergehen. */
+  force = false,
 ): Promise<string | null> {
   const productId = product.id;
   if (asins.length === 0) {
@@ -1214,6 +1149,7 @@ async function scrapeKern(
   });
   const norm = (a: string[]) => [...new Set(a.map((x) => x.trim().toUpperCase()))].sort().join(",");
   if (
+    !force &&
     lastScrape &&
     lastScrape.source === "apify" &&
     norm(lastScrape.asins) === norm(asins) &&
@@ -1317,9 +1253,12 @@ async function auswertungKern(
   const { extractInsights } = await import("@/lib/reviews/apify");
   const dataBasis = scrape.source === "apify" ? "apify_scrape" : "none";
   try {
+    // Quell-URLs wie beim Scrape (Review-Fix): echte Domain des Scrape-Marktplatzes
+    const marktPasst = marktplatzSprache(product.marketplace) === product.contentSprache;
+    const scrapeMarkt = marktPasst ? product.marketplace : marktplatzFuerSprache(product.contentSprache);
     const res = await extractInsights(
       scrape.reviews,
-      scrape.asins.map((a) => `amazon.${product.marketplace}/dp/${a}`),
+      scrape.asins.map((a) => `amazon.${amazonDomain(scrapeMarkt)}/dp/${a}`),
       dataBasis,
     );
     await db.insert(schema.reviewInsights).values({
@@ -1331,51 +1270,6 @@ async function auswertungKern(
   return null;
 }
 
-export async function scrapeReviewsAction(formData: FormData) {
-  const productId = String(formData.get("productId") ?? "");
-  const db = await getDb();
-  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
-  if (!product) return;
-
-  // Chip-Eingabe (D95): `asins` ist die KOMPLETTE Liste — die Haupt-ASIN ist
-  // als Chip vorbelegt (Default mit dabei), kann aber bewusst entfernt werden.
-  // Fallback `competitorAsins` (altes Feld): dort kam die Haupt-ASIN dazu.
-  const chipListe = String(formData.get("asins") ?? "").split(/[\s,;]+/).filter(Boolean);
-  const asins = chipListe.length
-    ? chipListe
-    : ([product.asin, ...String(formData.get("competitorAsins") ?? "").split(/[\s,;]+/).filter(Boolean)].filter(Boolean) as string[]);
-
-  let hinweis: string | null = null;
-  try {
-    hinweis = await scrapeKern(db, product, asins);
-  } catch (e) {
-    const code = e instanceof GenFehler ? e.code : "REV-03";
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(e instanceof Error ? e.message : String(e))}&code=${code}&tab=analyse#reviews`);
-  }
-  if (hinweis) {
-    redirect(`/produkte/${productId}?hinweis=${encodeURIComponent(`${hinweis} Für mehr Daten Wettbewerber-ASINs dazugeben; neue Reviews gibt es ab morgen.`)}&tab=analyse#reviews`);
-  }
-
-  // Analyse läuft AUTOMATISCH nach dem Scrape (D129) — schlägt sie fehl,
-  // bleibt der Scrape gespeichert und der Nachhol-Knopf übernimmt.
-  try {
-    await auswertungKern(db, product);
-  } catch (e) {
-    revalidatePath(`/produkte/${productId}`);
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Scrape fertig (Ausbeute unten) — aber die automatische Analyse schlug fehl: ${e instanceof Error ? e.message : String(e)}. Mit „Analyse nachholen" erneut versuchen.`)}&code=ANA-01&tab=analyse#reviews`);
-  }
-
-  // Etappe 3 (D131/D136): Verdichtung als eigener, nachholbarer Schritt —
-  // scheitert sie, bleiben Scrape + Roh-Analyse unversehrt gespeichert.
-  try {
-    await fuehreVerdichtungAus(db, productId);
-  } catch (e) {
-    revalidatePath(`/produkte/${productId}`);
-    redirect(`/produkte/${productId}?tab=analyse&fehler=${encodeURIComponent(`Scrape und Roh-Analyse sind gespeichert — aber die Verdichtung schlug fehl: ${e instanceof Error ? e.message : String(e)}`)}&code=VER-01`);
-  }
-  revalidatePath(`/produkte/${productId}`);
-  redirect(`/produkte/${productId}?tab=analyse`);
-}
 
 export async function analyzeReviewsAction(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
@@ -1383,11 +1277,24 @@ export async function analyzeReviewsAction(formData: FormData) {
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return;
 
+  let hinweis: string | null = null;
   try {
-    await auswertungKern(db, product);
+    hinweis = await auswertungKern(db, product);
   } catch (e) {
     const code = e instanceof GenFehler ? e.code : "ANA-01";
     redirect(`/produkte/${productId}?fehler=${encodeURIComponent(e instanceof Error ? e.message : String(e))}&code=${code}&tab=analyse#reviews`);
+  }
+  // Bereits ausgewertet UND verdichtet → nichts erneut laufen lassen (Review-Fix:
+  // sonst überschrieb ein Doppel-Klick die Karten und stapelte Qualitäts-Notizen)
+  if (hinweis) {
+    const insight = await db.query.reviewInsights.findFirst({
+      where: eq(schema.reviewInsights.productId, productId),
+      orderBy: desc(schema.reviewInsights.createdAt),
+    });
+    const { normalisierePayload } = await import("@/lib/reviews/insights");
+    if (insight && (normalisierePayload(insight.payload).insightCards?.length ?? 0) > 0) {
+      redirect(`/produkte/${productId}?tab=analyse&hinweis=${encodeURIComponent(hinweis)}`);
+    }
   }
 
   // Etappe 3 (D131/D136): Verdichtung — eigener, nachholbarer Schritt

@@ -171,8 +171,14 @@ describe("filtereEinzelnennungen — Signifikanz-Gate (D170)", () => {
 
   it("ab 500 Reviews braucht ein Aspekt 3 Fundstellen", () => {
     const zwei = { ...selten, mentionCount: 2 };
-    expect(filtereEinzelnennungen({ painPoints: [zwei], buyingTriggers: [] }, 600).aspekte.painPoints).toEqual([]);
+    expect(filtereEinzelnennungen({ painPoints: [zwei, haeufig], buyingTriggers: [] }, 600).aspekte.painPoints.map((a) => a.label)).toEqual([haeufig.label]);
     expect(filtereEinzelnennungen({ painPoints: [zwei], buyingTriggers: [] }, 200).aspekte.painPoints).toHaveLength(1);
+  });
+
+  it("Sicherung: würde das Gate ALLES streichen, bleibt die Roh-Liste stehen (Zählwerte sind Mindestwerte)", () => {
+    const { aspekte, hinweise } = filtereEinzelnennungen({ painPoints: [selten], buyingTriggers: [] }, 1000);
+    expect(aspekte.painPoints).toHaveLength(1);
+    expect(hinweise[0]).toContain("ausgesetzt");
   });
 
   it("kleine Stichprobe und Altbestand ohne Zählwert bleiben unangetastet", () => {

@@ -54,6 +54,17 @@ export function filtereEinzelnennungen(
       return false;
     });
   const gefiltert = { painPoints: filter(aspekte.painPoints), buyingTriggers: filter(aspekte.buyingTriggers) };
+  // Sicherung (Review-Fix): Würde das Gate ALLES streichen, bleibt die
+  // Roh-Liste stehen — ein leeres Ergebnis wäre ein Fehlurteil, weil die
+  // Zählwerte nur Mindestwerte sind (max. 15 Zitate je Aspekt, D170).
+  if (gefiltert.painPoints.length + gefiltert.buyingTriggers.length === 0) {
+    return {
+      aspekte,
+      hinweise: [
+        `Signifikanz-Gate ausgesetzt: Kein Aspekt erreicht ${mindest} verifizierte Fundstellen bei ${reviewsGesamt} analysierten Reviews — die Zählwerte sind Mindestwerte, alle Aspekte bleiben gewertet.`,
+      ],
+    };
+  }
   const hinweise = uebergangen.length
     ? [
         `Signifikanz-Gate: ${uebergangen.length} Aspekt(e) mit weniger als ${mindest} verifizierten Fundstellen bei ${reviewsGesamt} analysierten Reviews nicht als Erkenntnis gewertet: ${uebergangen.map((l) => `„${l}"`).join(", ")}.`,
