@@ -299,7 +299,7 @@ export default async function ProductPage({
             </div>
           )}
           {snapshot?.bilderText && snapshot.bilderText.length > 0 && (
-            <p className="mt-2 text-[11px] text-muted">Bildanalyse: {snapshot.bilderText.length} Bilder erfasst · fließt in Analyse & Content ein</p>
+            <p className="mt-2 text-[11px] text-muted">Bildanalyse: {snapshot.bilderText.length} Bilder erfasst</p>
           )}
           {snapshot && !snapshot.bilderText && (snapshot.imageUrls?.length ?? 0) > 0 && (
             <p className="mt-2 text-[11px] text-muted">Bildanalyse folgt automatisch beim nächsten Listing-Import.</p>
@@ -345,13 +345,6 @@ export default async function ProductPage({
                 {kws.some((k) => k.source === "cerebro") ? "Weiteren Export dazuladen" : "Keyword-Export hochladen"}
               </SubmitButton>
             </form>
-            <p className="mt-2 text-[11px] text-muted">
-              Keyword-Basis inkl. Relevanz-Filter entsteht automatisch.
-              Enthält der Export Wettbewerber-ASIN-Spalten, entsteht daraus zusätzlich das SOV-Audit — nichts wird doppelt hochgeladen.
-              {kws.some((k) => k.source === "cerebro") && (
-                <> Ein weiterer Upload ersetzt nichts: neue Datei und bestehende Basis werden zusammengeführt, identische Keywords erscheinen nur einmal.</>
-              )}
-            </p>
             {sovUpload && kws.filter((k) => k.source === "cerebro").length === 0 && (
               <form action={deriveKeywordsFromSov} className="mt-3">
                 <input type="hidden" name="productId" value={product.id} />
@@ -444,7 +437,7 @@ export default async function ProductPage({
           <CardHead icon={<IconSparkle />} chip="chip-violet" title="Analyse & Content" />
           <details className="mt-3" open={Boolean(product.zusatzKontext?.trim())}>
             <summary className="cursor-pointer text-xs text-muted hover:text-foreground">
-              Zusatz-Infos zum Produkt ({product.zusatzKontext?.trim() ? `${product.zusatzKontext.trim().length} Zeichen hinterlegt` : "leer"}) — fließen in jede Text-Generierung ein
+              Zusatz-Infos zum Produkt ({product.zusatzKontext?.trim() ? `${product.zusatzKontext.trim().length} Zeichen hinterlegt` : "leer"})
             </summary>
             <form action={saveZusatzKontext} className="mt-2">
               <input type="hidden" name="productId" value={product.id} />
@@ -536,8 +529,6 @@ export default async function ProductPage({
                   ))}
                 </div>
               )}
-              <p className="mt-2 text-[11px] text-muted">
-                Je ASIN und Sterne-Klasse bis zu 100 aktuellste geschriebene Rezensionen. </p>
               {(scrape.notes?.length ?? 0) > 0 && (
                 <div className="mt-2 space-y-0.5">
                   {scrape.notes!.map((n, i) =>
@@ -557,10 +548,6 @@ export default async function ProductPage({
                   <SubmitButton className="btn-primary" pendingLabel="KI wertet Pain Points & Kaufauslöser aus…" progress>
                     Analyse nachholen
                   </SubmitButton>
-                  <span className="text-[11px] text-muted">Normalerweise läuft die Analyse automatisch nach dem Scrape — dieser Knopf holt sie nach, falls sie fehlgeschlagen ist.</span>
-                  {insights && (
-                    <span className="text-[11px] text-muted">Neuer Scrape seit der letzten Analyse — Analyse aktualisieren.</span>
-                  )}
                 </form>
               )}
             </div>
@@ -594,7 +581,6 @@ export default async function ProductPage({
             chip="chip-amber"
             title="Conversion-Blocker"
           />
-          <p className="mt-2 text-xs text-muted">Kunden-Themen mit echtem Gewicht, die Listing und Bilder nicht beantworten. Jeder Blocker zeigt die belegenden Kunden-Themen.</p>
           {(!snapshot || !insights) && (
             <p className="mt-3 text-xs text-warn">△ Dafür braucht es das importierte Listing und die Bewertungs-Analyse.</p>
           )}
@@ -642,7 +628,7 @@ export default async function ProductPage({
           {/* Zusatz-Infos (D108): fließen in JEDE Generierung ein */}
           <details className="mt-3">
             <summary className="cursor-pointer text-xs text-muted hover:text-foreground">
-              Zusatz-Infos zum Produkt ({product.zusatzKontext?.trim() ? `${product.zusatzKontext.trim().length} Zeichen hinterlegt` : "leer"}) — fließen in jede Text-Generierung ein
+              Zusatz-Infos zum Produkt ({product.zusatzKontext?.trim() ? `${product.zusatzKontext.trim().length} Zeichen hinterlegt` : "leer"})
             </summary>
             <form action={saveZusatzKontext} className="mt-2">
               <input type="hidden" name="productId" value={product.id} />

@@ -166,7 +166,6 @@ export function AnalyseStart({
     >
       <div>
         <h3 className="text-sm font-semibold">Reviews</h3>
-        <p className="mt-1 text-xs text-muted">Die Produkt-ASIN ist gesetzt. Weitere ASINs liefern zusätzliche Kundenstimmen.</p>
         <div className="mt-2">
           <AsinChips name="asins" mainAsin={mainAsin} placeholder="Weitere ASIN eingeben …" />
         </div>

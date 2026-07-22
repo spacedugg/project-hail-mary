@@ -56,7 +56,7 @@ export function AnalyseHintergrund({
             </div>
           </div>
         ) : (
-          <p className="mt-2 text-xs text-muted">KI-Bewertung aus Listing + Kundenstimmen. Speist auch die Scores und Maßnahmen im Reiter Amazon Listing.</p>
+          <p className="mt-2 text-sm text-muted">Steht nach dem nächsten Analyse-Lauf hier.</p>
         )}
       </section>
 
@@ -133,7 +133,7 @@ export function AnalyseHintergrund({
             </div>
           </>
         ) : (
-          <p className="mt-2 text-sm text-muted">Noch kein Ranking. Ordnet Listing-Features nach Kunden-Echo.</p>
+          <p className="mt-2 text-sm text-muted">Steht nach dem nächsten Analyse-Lauf hier.</p>
         )}
       </section>
 
