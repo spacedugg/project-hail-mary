@@ -20,6 +20,7 @@ import { normalisierePayload } from "@/lib/reviews/insights";
 import { IconUpload, IconCheck, IconSearch, IconReviews, IconContent, IconEuro, IconSichtbarkeit, IconSparkle } from "@/components/icons";
 import { AnalyseStart } from "@/components/analyse-start";
 import { TabLeiste } from "@/components/tab-leiste";
+import { KopierFeld } from "@/components/kopier-feld";
 import { ListingKontrolle, MassnahmenBlock } from "@/components/listing-kontrolle";
 import { AnalyseHintergrund } from "@/components/analyse-hintergrund";
 import { analyzeListing, wirksamesListing } from "@/lib/analysis/listingAudit";
@@ -686,19 +687,24 @@ export default async function ProductPage({
                       </form>
                     </div>
                   </div>
+                  {/* Kopierbare Einzel-Felder (D175): Klick kopiert; Zeichen-Hinweis
+                      neutral, rot NUR über dem harten Amazon-Maximum */}
                   {payload?.text && (
-                    <p className="mt-2 whitespace-pre-wrap rounded-xl bg-background p-2 text-sm">
-                      {payload.text}
-                      {key === "title" && <span className="ml-2 font-mono text-[10px] text-neutral-400">{payload.text.length}/75</span>}
-                      {key === "highlights" && <span className="ml-2 font-mono text-[10px] text-neutral-400">{payload.text.length}/125</span>}
-                    </p>
+                    <div className="mt-2">
+                      <KopierFeld
+                        text={payload.text}
+                        max={key === "title" ? 75 : key === "highlights" ? 125 : key === "backend" ? 250 : undefined}
+                        bytes={key === "backend"}
+                        mono={key === "backend"}
+                      />
+                    </div>
                   )}
                   {payload?.pairs && (
-                    <ul className="mt-2 space-y-1.5 rounded-xl bg-background p-2 text-sm">
+                    <div className="mt-2 space-y-1.5">
                       {payload.pairs.map((p, i) => (
-                        <li key={i}><b>F: {p.q}</b><br />A: {p.a}</li>
+                        <KopierFeld key={i} label={`Frage ${i + 1}`} text={`${p.q}\n${p.a}`} />
                       ))}
-                    </ul>
+                    </div>
                   )}
                   {payload?.rationale && payload.rationale.length > 0 && (
                     <details className="mt-1">
@@ -713,9 +719,11 @@ export default async function ProductPage({
                     </details>
                   )}
                   {payload?.items && (
-                    <ul className="mt-2 space-y-1 rounded-xl bg-background p-2 text-sm">
-                      {payload.items.map((b, i) => <li key={i}>• {b}</li>)}
-                    </ul>
+                    <div className="mt-2 space-y-1.5">
+                      {payload.items.map((b, i) => (
+                        <KopierFeld key={i} label={`Bullet ${i + 1}`} text={b} />
+                      ))}
+                    </div>
                   )}
                   {v?.validation && <IssueList issues={v.validation.issues} />}
                   <details className="mt-2">
