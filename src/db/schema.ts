@@ -317,6 +317,8 @@ export type ReviewInsightsPayload = {
   kernThese?: string | null;
   /** Von der Normalisierung verworfene Karten (ohne gültigen Beleg) — ausgewiesen statt still (D133). */
   verworfeneKarten?: number;
+  /** Vom Bild-Ideen-Wahrheitsfilter (D134) Aussortiertes — ausgewiesen, nie still. */
+  entfernteBildIdeen?: Array<{ idee: string; grund: string }>;
 };
 
 /** Beleg-Aspekt einer Insight-Karte (D137): Rückverweis auf ein Roh-Thema MIT Zählwert — vom Code gesetzt, nie vom LLM behauptet. */

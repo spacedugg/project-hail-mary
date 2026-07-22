@@ -23,6 +23,8 @@ export type VerdichtungsErgebnis = {
   cards: InsightCard[];
   kernThese: string | null;
   verworfen: number;
+  /** Vom Wahrheits-Filter (D134) aussortierte Bild-Ideen — ausgewiesen, nie still. */
+  entfernteBildIdeen: Array<{ idee: string; grund: string }>;
 };
 
 const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, "").replace(/\s+/g, " ").trim();
@@ -142,7 +144,12 @@ JSON-Schema:
 
 export async function verdichteInsights(
   payload: ReviewInsightsPayload,
-  opts: { quellen: string[]; sprache?: string },
+  opts: {
+    quellen: string[];
+    sprache?: string;
+    /** Produkt-Wahrheit als Text (Fakten + Listing) — Basis des Bild-Ideen-Wahrheitsfilters (D134). */
+    belegText?: string;
+  },
 ): Promise<VerdichtungsErgebnis> {
   const aspekte: RoheAspekte = { painPoints: payload.painPoints, buyingTriggers: payload.buyingTriggers };
   if (aspekte.painPoints.length === 0 && aspekte.buyingTriggers.length === 0) {
@@ -167,6 +174,7 @@ export async function verdichteInsights(
       })),
       kernThese: "Mock-Kern-These — in Produktion fasst EIN Satz die Analyse zusammen.",
       verworfen: 0,
+      entfernteBildIdeen: [],
     };
   }
 
@@ -181,6 +189,19 @@ export async function verdichteInsights(
   if (cards.length === 0) {
     throw new Error("Die Verdichtung lieferte keine belegbare Erkenntnis (alle Karten ohne gültigen Roh-Themen-Beleg) — bitte erneut starten.");
   }
+
+  // Wahrheits-Filter für Bild-Ideen (D134): erfundene Autoritäts-Belege/Siegel
+  // fliegen deterministisch raus, wenn die Produkt-Wahrheit sie nicht deckt.
+  const entfernteBildIdeen: VerdichtungsErgebnis["entfernteBildIdeen"] = [];
+  if (opts.belegText) {
+    const { pruefeBildIdeen } = await import("@/lib/analysis/bildideen");
+    for (const card of cards) {
+      const geprueft = pruefeBildIdeen(card.bildIdeen, opts.belegText);
+      card.bildIdeen = geprueft.zulaessig;
+      entfernteBildIdeen.push(...geprueft.entfernt);
+    }
+  }
+
   const kernThese = String((raw as { kernThese?: unknown }).kernThese ?? "").trim() || null;
-  return { cards, kernThese, verworfen };
+  return { cards, kernThese, verworfen, entfernteBildIdeen };
 }

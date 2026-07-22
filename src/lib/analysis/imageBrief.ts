@@ -54,6 +54,18 @@ export function buildImageBrief(input: {
   const pains = (reviewInsights?.painPoints ?? []).slice(0, 3);
   const borrow = (reviewInsights?.languageToBorrow ?? []).slice(0, 4);
   const avoid = (reviewInsights?.languageToAvoid ?? []).slice(0, 4);
+  // D134: Der Brief zitiert die verdichteten Erkenntnisse SAMT ihrer Bild-Ideen —
+  // der Grafiker sieht: DIESER Kaufgrund → DIESE Bildidee (Ideen sind bereits
+  // durch den Wahrheits-Filter gelaufen).
+  const cards = (reviewInsights?.insightCards ?? []).slice(0, 6);
+  const cardsBlock = cards.length
+    ? cards
+        .map(
+          (c) =>
+            `- **${c.titel}** (Relevanz ${c.relevanz}/5, Beleg: ${c.belegAspekte.map((b) => `„${b.label}"${b.mentionCount ? ` ${b.mentionCount}×` : ""}`).join(" + ")})\n${c.bildIdeen.map((idee) => `    · Bild-Idee: ${idee}`).join("\n") || "    · (keine zulässige Bild-Idee — Ideen ggf. vom Wahrheits-Filter entfernt)"}`,
+        )
+        .join("\n")
+    : "⚠️ Noch keine verdichteten Erkenntnisse — Verdichtungs-Etappe der Bewertungs-Analyse ausführen.";
 
   return `# Creative Brief — ${asin ?? "NEU"} (${brand} ${productName})
 
@@ -89,6 +101,14 @@ ${headlines.map((h) => (h.changed ? `- „${h.original}" → Bild-tauglich: **�
 ## 4. Pain Points → Szenen-Ideen (Lifestyle)
 
 ${pains.length ? pains.map((p) => `- **${p.label}**${p.frequencyPct ? ` (${p.frequencyPct} %)` : ""} — Szene: Situation zeigen, in der das Problem sichtbar gelöst ist. O-Ton: ${p.quotes[0] ? `„${p.quotes[0]}"` : "—"}`).join("\n") : "⚠️ Keine Review-Insights vorhanden — Szenen ohne Kundendaten-Basis."}
+
+---
+
+## 4b. Verdichtete Erkenntnisse → Bild-Ideen (aus der Bewertungs-Analyse)
+
+Jede Erkenntnis nennt ihre Belege aus echten Reviews; die Bild-Ideen sind durch den Wahrheits-Filter gelaufen (keine erfundenen Experten-Zitate, Testimonials oder Siegel).
+
+${cardsBlock}
 
 ---
 

@@ -98,5 +98,14 @@ export function normalisierePayload(raw: unknown): ReviewInsightsPayload {
     insightCards: karten(o.insightCards),
     kernThese: kernThese || null,
     verworfeneKarten: num(o.verworfeneKarten) ?? undefined,
+    entfernteBildIdeen: Array.isArray(o.entfernteBildIdeen)
+      ? o.entfernteBildIdeen
+          .map((x) => {
+            const e = (x ?? {}) as Record<string, unknown>;
+            const idee = String(e.idee ?? "").trim();
+            return idee ? { idee, grund: String(e.grund ?? "").trim() } : null;
+          })
+          .filter((e): e is NonNullable<typeof e> => e !== null)
+      : undefined,
   };
 }
