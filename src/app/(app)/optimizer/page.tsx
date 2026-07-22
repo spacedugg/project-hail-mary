@@ -38,12 +38,27 @@ export default async function OptimizerPage() {
         <section className="mt-6 card p-4">
           <h2 className="sect-h">Neuen Auftrag anlegen</h2>
           <form action={createOptimizerOrder} className="mt-3 flex flex-wrap gap-2">
-            <input name="brandName" placeholder="Marke/Hersteller (optional)" className={`${input} w-56`} />
+            <input name="brandName" placeholder="Marke *" required className={`${input} w-48`} />
             <input name="name" placeholder="Produkt/Auftrag *" required className={`${input} min-w-64 flex-1`} />
-            <input name="asin" placeholder="ASIN (B0…, optional)" className={`${input} w-44 font-mono`} />
+            <input name="asin" placeholder="ASIN (B0…) *" required pattern="[Bb][A-Za-z0-9]{9}" className={`${input} w-44 font-mono`} />
+            <select name="marketplace" defaultValue="de" className={`${input} w-36`}>
+              <option value="de">amazon.de</option>
+              <option value="uk">amazon.co.uk</option>
+              <option value="us">amazon.com</option>
+              <option value="fr">amazon.fr</option>
+              <option value="it">amazon.it</option>
+              <option value="es">amazon.es</option>
+              <option value="nl">amazon.nl</option>
+            </select>
+            <select name="contentSprache" defaultValue="de" className={`${input} w-36`}>
+              <option value="de">Content: Deutsch</option>
+              <option value="en">Content: Englisch</option>
+              <option value="fr">Content: Französisch</option>
+              <option value="it">Content: Italienisch</option>
+              <option value="es">Content: Spanisch</option>
+            </select>
             <SubmitButton className="btn-primary">Auftrag anlegen</SubmitButton>
           </form>
-          <p className="mt-2 text-xs text-muted">Bestehende ASIN? Nach dem Anlegen direkt „Von Amazon importieren" — Neuprodukt: Produkt-Wahrheit von Hand füllen.</p>
         </section>
 
         <section className="mt-6">

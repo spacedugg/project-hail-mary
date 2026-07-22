@@ -32,9 +32,16 @@ export async function createClient(formData: FormData) {
  */
 export async function createOptimizerOrder(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
-  const asin = String(formData.get("asin") ?? "").trim() || null;
-  const brandName = String(formData.get("brandName") ?? "").trim();
-  if (!name) return;
+  const asin = String(formData.get("asin") ?? "").trim().toUpperCase();
+  const marke = String(formData.get("brandName") ?? "").trim();
+  // Pflichtfelder (D159): ASIN und Marke sind erforderlich
+  if (!name || !asin || !marke) return;
+  const MARKETPLACES: Marketplace[] = ["de", "uk", "us", "fr", "it", "es", "nl"];
+  const SPRACHEN: ContentSprache[] = ["de", "en", "fr", "it", "es"];
+  const mpRoh = String(formData.get("marketplace") ?? "de") as Marketplace;
+  const marketplace = MARKETPLACES.includes(mpRoh) ? mpRoh : "de";
+  const sprRoh = String(formData.get("contentSprache") ?? "") as ContentSprache;
+  const contentSprache = SPRACHEN.includes(sprRoh) ? sprRoh : (marktplatzSprache(marketplace) ?? "de");
   const db = await getDb();
 
   let workbench = await db.query.brands.findFirst({ where: eq(schema.brands.kind, "workbench") });
@@ -49,9 +56,11 @@ export async function createOptimizerOrder(formData: FormData) {
   await db.insert(schema.products).values({
     id: productId,
     brandId: workbench!.id,
-    // Marken-/Herstellername des Auftrags wandert in die Produkt-Wahrheit
-    name: brandName ? `${brandName} — ${name}` : name,
+    name,
+    marke,
     asin,
+    marketplace,
+    contentSprache,
   });
   redirect(`/produkte/${productId}`);
 }
@@ -59,8 +68,10 @@ export async function createOptimizerOrder(formData: FormData) {
 export async function createProduct(formData: FormData) {
   const brandId = String(formData.get("brandId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
-  const asin = String(formData.get("asin") ?? "").trim() || null;
-  if (!brandId || !name) return;
+  const asin = String(formData.get("asin") ?? "").trim().toUpperCase();
+  const marke = String(formData.get("marke") ?? "").trim();
+  // Pflichtfelder (D159): ASIN und Marke sind erforderlich
+  if (!brandId || !name || !asin || !marke) return;
   // Marktplatz beim Anlegen wählbar (D128): Import & Scrapes laufen dann
   // automatisch gegen amazon.<Ziel-Domain> — die ASIN allein verrät ihn nicht.
   const MARKETPLACES: Marketplace[] = ["de", "uk", "us", "fr", "it", "es", "nl"];
@@ -68,15 +79,36 @@ export async function createProduct(formData: FormData) {
   const marketplace = MARKETPLACES.includes(mpRoh) ? mpRoh : "de";
   const db = await getDb();
   const productId = id();
+  const sprRoh = String(formData.get("contentSprache") ?? "") as ContentSprache;
+  const SPRACHEN: ContentSprache[] = ["de", "en", "fr", "it", "es"];
   await db.insert(schema.products).values({
     id: productId,
     brandId,
     name,
+    marke,
     asin,
     marketplace,
-    contentSprache: marktplatzSprache(marketplace) ?? "de",
+    contentSprache: SPRACHEN.includes(sprRoh) ? sprRoh : (marktplatzSprache(marketplace) ?? "de"),
   });
   redirect(`/produkte/${productId}`);
+}
+
+/**
+ * Produkt löschen (D159): FK-Kaskaden räumen alle Kind-Daten ab (Keywords,
+ * Scrapes, Insights, Versionen, Audits, Rankings, Snapshots). Bestätigung
+ * passiert zweistufig in der UI (Aufklappen + Checkbox) — hier wird nur
+ * noch ausgeführt.
+ */
+export async function deleteProductAction(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  if (String(formData.get("bestaetigt") ?? "") !== "on") return;
+  const db = await getDb();
+  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  if (!product) return;
+  const brand = await db.query.brands.findFirst({ where: eq(schema.brands.id, product.brandId) });
+  await db.delete(schema.products).where(eq(schema.products.id, productId));
+  revalidatePath("/optimizer");
+  redirect(brand?.kind === "workbench" ? "/optimizer" : `/marke/${product.brandId}/katalog`);
 }
 
 /** Marktplatz & Content-Sprache je Produkt (D128) — Sprache unabhängig vom Marktplatz wählbar. */
@@ -87,8 +119,9 @@ export async function saveMarktSprache(formData: FormData) {
   const mp = String(formData.get("marketplace") ?? "") as Marketplace;
   const sprache = String(formData.get("contentSprache") ?? "") as ContentSprache;
   if (!productId || !MARKETPLACES.includes(mp) || !SPRACHEN.includes(sprache)) return;
+  const marke = String(formData.get("marke") ?? "").trim();
   const db = await getDb();
-  await db.update(schema.products).set({ marketplace: mp, contentSprache: sprache }).where(eq(schema.products.id, productId));
+  await db.update(schema.products).set({ marketplace: mp, contentSprache: sprache, ...(marke ? { marke } : {}) }).where(eq(schema.products.id, productId));
   revalidatePath(`/produkte/${productId}`);
 }
 
@@ -555,8 +588,9 @@ async function generiereSektionKern(
   });
   const latest = (t: string) => versions.find((v) => v.type === t)?.payload as Record<string, unknown> | undefined;
 
-  // Marken-Kontext (D149): Werkbank-Name nie als Marke, Eigenmarke nie auf der Blacklist
-  const mk = contentMarkenKontext(brand ?? undefined, snapshot?.title, fremdmarkenAusKeywords(alleKws));
+  // Marken-Kontext (D149/D159): Produkt-Marke (Pflichtfeld) schlägt alles;
+  // Werkbank-Name nie als Marke, Eigenmarke nie auf der Blacklist
+  const mk = contentMarkenKontext(brand ?? undefined, snapshot?.title, fremdmarkenAusKeywords(alleKws), product.marke);
 
   const inputs: RecipeInputs = {
     brand: mk.marke,
@@ -911,16 +945,15 @@ export async function verdichteInsightsAction(formData: FormData) {
   }
   const { normalisierePayload } = await import("@/lib/reviews/insights");
   if ((normalisierePayload(insight!.payload).insightCards?.length ?? 0) > 0) {
-    redirect(`/produkte/${productId}/reviews?hinweis=${encodeURIComponent("Diese Analyse ist bereits verdichtet — neue Karten entstehen erst mit einer neuen Analyse (Redundanz-Guard).")}`);
+    redirect(`/produkte/${productId}?tab=bewertungen&hinweis=${encodeURIComponent("Diese Analyse ist bereits verdichtet — neue Karten entstehen erst mit einer neuen Analyse (Redundanz-Guard).")}`);
   }
   try {
     await fuehreVerdichtungAus(db, productId);
   } catch (e) {
-    redirect(`/produkte/${productId}/reviews?fehler=${encodeURIComponent(`Insight-Verdichtung: ${e instanceof Error ? e.message : String(e)}`)}&code=VER-01`);
+    redirect(`/produkte/${productId}?tab=bewertungen&fehler=${encodeURIComponent(`Insight-Verdichtung: ${e instanceof Error ? e.message : String(e)}`)}&code=VER-01`);
   }
-  revalidatePath(`/produkte/${productId}/reviews`);
   revalidatePath(`/produkte/${productId}`);
-  redirect(`/produkte/${productId}/reviews`);
+  redirect(`/produkte/${productId}?tab=bewertungen`);
 }
 
 /**
@@ -1133,10 +1166,10 @@ export async function scrapeReviewsAction(formData: FormData) {
     await fuehreVerdichtungAus(db, productId);
   } catch (e) {
     revalidatePath(`/produkte/${productId}`);
-    redirect(`/produkte/${productId}/reviews?fehler=${encodeURIComponent(`Scrape und Roh-Analyse sind gespeichert — aber die Verdichtung schlug fehl: ${e instanceof Error ? e.message : String(e)}`)}&code=VER-01`);
+    redirect(`/produkte/${productId}?tab=bewertungen&fehler=${encodeURIComponent(`Scrape und Roh-Analyse sind gespeichert — aber die Verdichtung schlug fehl: ${e instanceof Error ? e.message : String(e)}`)}&code=VER-01`);
   }
   revalidatePath(`/produkte/${productId}`);
-  redirect(`/produkte/${productId}/reviews`);
+  redirect(`/produkte/${productId}?tab=bewertungen`);
 }
 
 export async function analyzeReviewsAction(formData: FormData) {
@@ -1159,7 +1192,7 @@ export async function analyzeReviewsAction(formData: FormData) {
     orderBy: desc(schema.reviewInsights.createdAt),
   });
   if (existing && (existing.scrapeId === scrape!.id || (!existing.scrapeId && existing.createdAt > scrape!.createdAt))) {
-    redirect(`/produkte/${productId}/reviews`);
+    redirect(`/produkte/${productId}?tab=bewertungen`);
   }
 
   const { extractInsights } = await import("@/lib/reviews/apify");
@@ -1182,10 +1215,10 @@ export async function analyzeReviewsAction(formData: FormData) {
     await fuehreVerdichtungAus(db, productId);
   } catch (e) {
     revalidatePath(`/produkte/${productId}`);
-    redirect(`/produkte/${productId}/reviews?fehler=${encodeURIComponent(`Roh-Analyse gespeichert — aber die Verdichtung schlug fehl: ${e instanceof Error ? e.message : String(e)}`)}&code=VER-01`);
+    redirect(`/produkte/${productId}?tab=bewertungen&fehler=${encodeURIComponent(`Roh-Analyse gespeichert — aber die Verdichtung schlug fehl: ${e instanceof Error ? e.message : String(e)}`)}&code=VER-01`);
   }
   revalidatePath(`/produkte/${productId}`);
-  redirect(`/produkte/${productId}/reviews`);
+  redirect(`/produkte/${productId}?tab=bewertungen`);
 }
 
 /**
@@ -1623,7 +1656,7 @@ export async function saveContentManual(formData: FormData) {
     facts: product.facts,
     primaryKeywords: kws.filter((k) => k.tier === "primary").map((k) => k.keyword),
     // Auch Handarbeit läuft gegen die Fremdmarken-Blacklist (D97) — Marken-Kontext D149
-    competitorBrands: contentMarkenKontext(manuBrand ?? undefined, manuSnapshot?.title, fremdmarkenAusKeywords(alleKws)).fremdmarken,
+    competitorBrands: contentMarkenKontext(manuBrand ?? undefined, manuSnapshot?.title, fremdmarkenAusKeywords(alleKws), product.marke).fremdmarken,
     // … und gegen den Zahlen-Herkunfts-Check (D114) — gleiche Quellen wie die Generierung
     zahlenQuellen: [
       product.name,

@@ -2,13 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { saveKeywords, deriveKeywordsFromSov, generateContent, generateContentBatch, uploadCerebro, scrapeReviewsAction, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarktSprache } from "@/app/actions";
+import { saveKeywords, deriveKeywordsFromSov, generateContent, generateContentBatch, deleteProductAction, uploadCerebro, scrapeReviewsAction, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarktSprache } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
 import { AsinChips } from "@/components/asin-chips";
 import { FehlerPopup } from "@/components/fehler-popup";
 import { GenerierSperre, GenerierButton } from "@/components/generier-sperre";
+import { BewertungsDashboard } from "@/components/bewertungs-dashboard";
 import { fehlerInfo } from "@/lib/fehlercodes";
 import { IconUpload, IconCheck, IconSearch, IconReviews, IconContent, IconEuro } from "@/components/icons";
 
@@ -67,14 +68,13 @@ export default async function ProductPage({
   const { id } = await params;
   const { fehler, code, hinweis, tab: tabParam } = await searchParams;
   const TABS = [
-    { key: "uebersicht", label: "Übersicht" },
     { key: "listing", label: "Amazon Listing" },
     { key: "keywords", label: "Keywords" },
     { key: "bewertungen", label: "Bewertungen" },
     { key: "content", label: "Content" },
     { key: "marge", label: "Marge" },
   ] as const;
-  const tab = TABS.some((t) => t.key === tabParam) ? (tabParam as (typeof TABS)[number]["key"]) : "uebersicht";
+  const tab = TABS.some((t) => t.key === tabParam) ? (tabParam as (typeof TABS)[number]["key"]) : "listing";
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, id) });
   if (!product) notFound();
@@ -131,6 +131,8 @@ export default async function ProductPage({
       {/* Marktplatz & Content-Sprache (D128) — IMMER sichtbar (Nutzer-Vorgabe 22.07.): elementare Steuergrößen */}
       <form action={saveMarktSprache} className="mt-2 flex flex-wrap items-center gap-2 text-xs">
         <input type="hidden" name="productId" value={product.id} />
+        <label className="text-muted">Marke</label>
+        <input name="marke" defaultValue={product.marke ?? ""} placeholder="Pflicht für Content" required className="input w-36 text-xs" />
         <label className="text-muted">Marktplatz</label>
         <select name="marketplace" defaultValue={product.marketplace} className="input w-32 text-xs">
           <option value="de">amazon.de</option>
@@ -151,12 +153,51 @@ export default async function ProductPage({
         </select>
         <SubmitButton className="btn-ghost text-xs">Speichern</SubmitButton>
       </form>
+      <details className="mt-1 text-xs">
+        <summary className="text-bad">Produkt löschen …</summary>
+        <form action={deleteProductAction} className="mt-1 flex flex-wrap items-center gap-2 rounded-xl border border-hair p-2">
+          <input type="hidden" name="productId" value={product.id} />
+          <label className="flex items-center gap-1.5">
+            <input type="checkbox" name="bestaetigt" required />
+            Ja, „{product.name}" mit ALLEN Daten (Keywords, Scrapes, Analysen, Content) endgültig löschen.
+          </label>
+          <SubmitButton className="btn-ghost text-xs !text-bad">Endgültig löschen</SubmitButton>
+        </form>
+      </details>
 
       {fehler && <FehlerPopup message={fehler} {...fehlerInfo(code)} />}
       {hinweis && <p className="mt-4 rounded-xl bg-[var(--primary-soft)] px-3 py-2 text-sm text-primary-strong">ℹ {hinweis}</p>}
 
-      {/* Reiter-Navigation (D157): Übersicht als Default, tiefer je Reiter */}
-      <nav className="mt-5 flex flex-wrap gap-1 border-b border-hair">
+      {/* Step-Guide (D160): IMMER sichtbar über den Reitern — die Führung durch die Optimierung */}
+      {(() => {
+        const steps = [
+          { nr: 1, href: `/produkte/${product.id}?tab=listing`, label: "Amazon Listing", done: Boolean(snapshot) },
+          { nr: 2, href: `/produkte/${product.id}?tab=keywords`, label: "Keywords", done: kws.length > 0 },
+          { nr: 3, href: `/produkte/${product.id}?tab=bewertungen`, label: "Bewertungen", done: Boolean(insights) },
+          { nr: 4, href: `/produkte/${product.id}?tab=content`, label: "Content", done: versions.some((v) => v.status === "approved") },
+          { nr: 5, href: `/produkte/${product.id}/analyse`, label: "Prüfen & Übergeben", done: false, extra: true },
+        ];
+        const naechster = steps.find((st) => !st.done && !st.extra)?.nr ?? 5;
+        return (
+          <div className="mt-4 flex flex-wrap items-center gap-x-1 gap-y-2 rounded-xl border border-hair bg-card px-3 py-2">
+            {steps.map((st, i) => (
+              <span key={st.nr} className="flex items-center gap-1">
+                {i > 0 && <span className="mx-1 text-neutral-300">→</span>}
+                <span className={`flex h-5 w-5 flex-none items-center justify-center rounded-full text-[11px] font-semibold ${st.done ? "bg-[rgb(47_158_143/0.15)] text-good" : st.nr === naechster ? "bg-[var(--primary-soft)] text-primary-strong" : "bg-hair text-muted"}`}>
+                  {st.done ? "✓" : st.nr}
+                </span>
+                <Link href={st.href} className={`text-xs hover:underline ${st.nr === naechster ? "font-semibold text-primary-strong" : st.done ? "text-foreground" : "text-muted"}`}>
+                  {st.label}
+                </Link>
+                {st.nr === 5 && <Link href={`/produkte/${product.id}/briefs`} className="text-xs text-muted hover:underline">· Briefs</Link>}
+              </span>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* Reiter-Navigation (D157/D160): Amazon Listing als Default */}
+      <nav className="mt-3 flex flex-wrap gap-1 border-b border-hair">
         {TABS.map((t) => (
           <Link
             key={t.key}
@@ -169,51 +210,6 @@ export default async function ProductPage({
       </nav>
 
       <div className="stagger mt-6 space-y-3">
-        {tab === "uebersicht" && (
-          <section className="card p-5">
-            <h2 className="text-sm font-semibold">Der Weg zum optimierten Listing</h2>
-            <ol className="mt-3 space-y-2">
-              {[
-                {
-                  nr: 1, tabKey: "listing", label: "Amazon Listing laden",
-                  done: Boolean(snapshot),
-                  status: snapshot ? `geladen am ${snapshot.createdAt.toLocaleDateString("de-DE")} (${snapshot.imageUrls?.length ?? 0} Bilder)` : "noch nicht geladen",
-                },
-                {
-                  nr: 2, tabKey: "keywords", label: "Keywords importieren",
-                  done: kws.length > 0,
-                  status: kws.length > 0 ? `${kws.filter((k) => !k.ausgeschlossen).length} aktive Keywords` : "kein Cerebro-Export",
-                },
-                {
-                  nr: 3, tabKey: "bewertungen", label: "Bewertungen scrapen & analysieren",
-                  done: Boolean(insights),
-                  status: insights ? `analysiert${scrapeAnalyzed ? "" : " (älterer Scrape)"}` : scrape ? "gescraped — Analyse fehlt" : "noch nicht gescraped",
-                },
-                {
-                  nr: 4, tabKey: "content", label: "Content generieren & freigeben",
-                  done: versions.some((v) => v.status === "approved"),
-                  status: versions.length ? `${new Set(versions.map((v) => v.type)).size} von 6 Sektionen · ${versions.filter((v) => v.status === "approved").length} freigegeben` : "noch kein Content",
-                },
-                {
-                  nr: 5, tabKey: "marge", label: "Marge & Break-even (optional)",
-                  done: Boolean(mc),
-                  status: mc ? "berechnet" : "nicht berechnet",
-                },
-              ].map((st) => (
-                <li key={st.nr} className="flex flex-wrap items-baseline gap-2 rounded-xl border border-hair p-3">
-                  <span className={`flex h-5 w-5 flex-none items-center justify-center rounded-full text-[11px] font-semibold ${st.done ? "bg-[rgb(47_158_143/0.15)] text-good" : "bg-hair text-muted"}`}>{st.done ? "✓" : st.nr}</span>
-                  <Link href={`/produkte/${product.id}?tab=${st.tabKey}`} className="text-sm font-medium text-primary-strong hover:underline">{st.label}</Link>
-                  <span className="text-xs text-muted">{st.status}</span>
-                </li>
-              ))}
-            </ol>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {insights && <Link href={`/produkte/${product.id}/reviews`} className="btn-ghost text-xs">Bewertungs-Dashboard</Link>}
-              <Link href={`/produkte/${product.id}/analyse`} className="btn-ghost text-xs">Analyse</Link>
-              <Link href={`/produkte/${product.id}/briefs`} className="btn-ghost text-xs">Creative-Briefs</Link>
-            </div>
-          </section>
-        )}
         {tab === "listing" && (
         <section className="card p-5">
           <CardHead
@@ -353,6 +349,23 @@ export default async function ProductPage({
                 </SubmitButton>
               </form>
             )}
+            {(() => {
+              const audit = (sovUpload?.parsed as { audit?: import("@/lib/sov/audit").SovAudit })?.audit;
+              if (!audit) return null;
+              return (
+                <div className="mt-3 rounded-xl border border-hair p-3">
+                  <h3 className="text-xs font-semibold">SOV-Audit — {audit.quickWins.length} Quick Wins · {audit.topDemandGaps.length} Top-Umsatzlücken</h3>
+                  <ul className="mt-2 space-y-0.5">
+                    {audit.topDemandGaps.slice(0, 5).map((g) => (
+                      <li key={g.keyword} className="flex items-baseline justify-between gap-2 text-xs">
+                        <span>{g.keyword}</span>
+                        <span className="flex-none tabular-nums text-muted">{g.sv ? `${fmt(g.sv)} SV` : ""}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })()}
             {(["primary", "secondary", "tertiary", "backend"] as const).map((tier) => {
               const inTier = kws.filter((k) => k.tier === tier && k.source !== "manual" && !k.ausgeschlossen);
               if (inTier.length === 0) return null;
@@ -433,7 +446,7 @@ export default async function ProductPage({
         </section>
         )}
 
-        {tab === "bewertungen" && (
+        {tab === "bewertungen" && (<>
         <section id="reviews" className="card p-5">
           <CardHead
             icon={<IconReviews />}
@@ -518,9 +531,6 @@ export default async function ProductPage({
 
               {scrapeAnalyzed ? (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <Link href={`/produkte/${product.id}/reviews`} className="btn-primary text-xs">
-                    Findings-Dashboard öffnen →
-                  </Link>
                   <span className="text-[11px] text-muted">Dieser Scrape ist analysiert — für eine neue Analyse erst neu scrapen (z. B. mit weiteren ASINs).</span>
                 </div>
               ) : (
@@ -539,7 +549,8 @@ export default async function ProductPage({
             );
           })()}
         </section>
-        )}
+        {insights && <BewertungsDashboard insight={insights} scrape={scrape ?? null} productId={product.id} productAsin={product.asin} />}
+        </>)}
 
         {tab === "content" && (
         <section className="card p-5">

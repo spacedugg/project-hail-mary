@@ -141,6 +141,13 @@
       "when": 1784713455532,
       "tag": "0019_bild-auslese",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1784715139361,
+      "tag": "0020_produkt-marke",
+      "breakpoints": true
     }
   ]
 }

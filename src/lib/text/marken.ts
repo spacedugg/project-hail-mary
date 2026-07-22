@@ -14,9 +14,11 @@ export function contentMarkenKontext(
   brand: { name: string; kind: "brand" | "workbench" } | undefined,
   originalTitel: string | null | undefined,
   fremdmarkenRoh: string[],
+  /** Produkt-Marke (D159, Pflichtfeld beim Anlegen) — schlägt jede Ableitung. */
+  produktMarke?: string | null,
 ): { marke: string; eigenmarkeAusListing: string; fremdmarken: string[] } {
   const gleich = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
-  const marke = brand && brand.kind === "brand" ? brand.name : "";
+  const marke = produktMarke?.trim() || (brand && brand.kind === "brand" ? brand.name : "");
   const eigenmarkeAusListing = (originalTitel ?? "").trim().split(/\s+/)[0] ?? "";
   const fremdmarken = fremdmarkenRoh.filter(
     (m) => !(marke && gleich(m, marke)) && !(eigenmarkeAusListing.length > 1 && gleich(m, eigenmarkeAusListing)),

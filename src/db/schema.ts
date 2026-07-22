@@ -95,7 +95,14 @@ export const products = sqliteTable(
     productGroupId: text("product_group_id").references(() => productGroups.id, {
       onDelete: "set null",
     }),
-    asin: text("asin"), // null bei Neuprodukt ohne Listing
+    asin: text("asin"), // Pflicht beim Anlegen (D159) — Alt-Daten können null sein
+    /**
+     * Produktmarke (D159, Pflicht beim Anlegen): DIE Marke für Content —
+     * unabhängig vom Brand-Container (Werkbank-Aufträge haben keinen echten
+     * Marken-Container, D149). Wandert in den MARKE-Slot der Generierung
+     * und wird von der Fremdmarken-Blacklist ferngehalten.
+     */
+    marke: text("marke"),
     marketplace: text("marketplace").$type<Marketplace>().notNull().default("de"),
     name: text("name").notNull(),
     /**

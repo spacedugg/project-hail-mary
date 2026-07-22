@@ -20,8 +20,9 @@ export default async function BrandKatalog({ params }: { params: Promise<{ brand
 
       <form action={createProduct} className="mt-5 flex flex-wrap gap-2">
         <input type="hidden" name="brandId" value={brandId} />
-        <input name="name" placeholder="Produktname" required className={`${input} min-w-48 flex-1`} />
-        <input name="asin" placeholder="ASIN (B0…)" className={`${input} w-40 font-mono`} />
+        <input name="name" placeholder="Produktname *" required className={`${input} min-w-48 flex-1`} />
+        <input name="marke" placeholder="Marke *" required className={`${input} w-40`} />
+        <input name="asin" placeholder="ASIN (B0…) *" required pattern="[Bb][A-Za-z0-9]{9}" className={`${input} w-40 font-mono`} />
         {/* Marktplatz beim Anlegen (D128): Import & Scrapes laufen gegen diese Domain — die ASIN allein verrät ihn nicht */}
         <select name="marketplace" defaultValue="de" className={`${input} w-36`} title="Marktplatz — Listing-Import und Review-Scrapes laufen gegen diese Amazon-Domain">
           <option value="de">amazon.de</option>
@@ -31,6 +32,13 @@ export default async function BrandKatalog({ params }: { params: Promise<{ brand
           <option value="it">amazon.it</option>
           <option value="es">amazon.es</option>
           <option value="nl">amazon.nl</option>
+        </select>
+        <select name="contentSprache" defaultValue="de" className={`${input} w-40`}>
+          <option value="de">Content: Deutsch</option>
+          <option value="en">Content: Englisch</option>
+          <option value="fr">Content: Französisch</option>
+          <option value="it">Content: Italienisch</option>
+          <option value="es">Content: Spanisch</option>
         </select>
         <SubmitButton className="btn-primary">
           + Produkt
