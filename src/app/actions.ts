@@ -833,6 +833,88 @@ export async function verdichteInsightsAction(formData: FormData) {
   redirect(`/produkte/${productId}/reviews`);
 }
 
+/**
+ * Feature-Relevanz-Ranking (D141/D146): Listing-Features nach Kunden-Relevanz.
+ * Pflicht-Datenbasis: Listing-Snapshot + Bewertungs-Analyse. Läuft als eigene
+ * Etappe mit Redundanz-Guard (D81-Muster) — dieselbe Datenbasis wird nicht
+ * doppelt gerankt.
+ */
+export async function rankeFeaturesAction(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const db = await getDb();
+  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  if (!product) return;
+  const back = (msg: string, code: string) =>
+    redirect(`/produkte/${productId}/analyse?fehler=${encodeURIComponent(msg)}&code=${code}`);
+
+  const snapshot = await db.query.listingSnapshots.findFirst({
+    where: eq(schema.listingSnapshots.productId, productId),
+    orderBy: desc(schema.listingSnapshots.createdAt),
+  });
+  if (!snapshot) back("Feature-Ranking braucht den Listing-Import (Titel/Bullets/Attribute als Quelltexte).", "FEA-01");
+
+  const insight = await db.query.reviewInsights.findFirst({
+    where: eq(schema.reviewInsights.productId, productId),
+    orderBy: desc(schema.reviewInsights.createdAt),
+  });
+  if (!insight) back("Feature-Ranking braucht die Bewertungs-Analyse — sie liefert das Kunden-Echo je Feature.", "FEA-01");
+
+  // Redundanz-Guard: dieselbe Datenbasis wird nicht doppelt gerankt
+  const last = await db.query.featureRankings.findFirst({
+    where: eq(schema.featureRankings.productId, productId),
+    orderBy: desc(schema.featureRankings.createdAt),
+  });
+  if (last && Math.max(snapshot!.createdAt.getTime(), insight!.createdAt.getTime()) <= last.createdAt.getTime()) {
+    redirect(`/produkte/${productId}/analyse?hinweis=${encodeURIComponent("Die Datenbasis ist seit dem letzten Feature-Ranking unverändert — das Ergebnis unten ist aktuell. Neu ranken wird nach neuem Import oder neuer Analyse wieder frei.")}`);
+  }
+
+  const { normalisierePayload } = await import("@/lib/reviews/insights");
+  const p = normalisierePayload(insight!.payload);
+  const scrape = await db.query.reviewScrapes.findFirst({
+    where: eq(schema.reviewScrapes.productId, productId),
+    orderBy: desc(schema.reviewScrapes.createdAt),
+  });
+  const normAsin = (a: string) => a.trim().toUpperCase();
+  const wettbewerberAsins = (scrape?.asins ?? []).map(normAsin).filter((a) => !product.asin || a !== normAsin(product.asin)).length;
+
+  const f = product.facts;
+  const belegText = [
+    f.productType, f.dimensions, ...(f.materials ?? []), ...(f.usps ?? []), f.targetAudience,
+    ...(f.certifications ?? []), product.zusatzKontext,
+    snapshot!.title, ...(snapshot!.bullets ?? []), snapshot!.description,
+    ...(snapshot!.attributes ? Object.entries(snapshot!.attributes).map(([k, v]) => `${k}: ${v}`) : []),
+    snapshot!.importantInfo, snapshot!.aplusContent,
+  ].filter(Boolean).join("\n");
+
+  try {
+    const { rankeFeatures } = await import("@/lib/analysis/featureRanking");
+    const payload = await rankeFeatures({
+      quellen: {
+        title: snapshot!.title,
+        bullets: snapshot!.bullets ?? [],
+        description: snapshot!.description,
+        attributes: snapshot!.attributes,
+        importantInfo: snapshot!.importantInfo,
+        aplusContent: snapshot!.aplusContent,
+      },
+      aspekte: { painPoints: p.painPoints, buyingTriggers: p.buyingTriggers },
+      reviewsGesamt: p.stats.reviewsTotal,
+      sprache: product.contentSprache,
+      belegText,
+      wettbewerberAsins,
+    });
+    const dataBasis = [
+      `Listing-Import (${snapshot!.source}, ${snapshot!.createdAt.toLocaleDateString("de-DE")})`,
+      `Review-Insights (${insight!.dataBasis}, ${p.stats.reviewsTotal} Reviews)`,
+    ];
+    await db.insert(schema.featureRankings).values({ id: id(), productId, payload, dataBasis });
+  } catch (e) {
+    back(`Feature-Ranking: ${e instanceof Error ? e.message : String(e)}`, "FEA-01");
+  }
+  revalidatePath(`/produkte/${productId}/analyse`);
+  redirect(`/produkte/${productId}/analyse`);
+}
+
 export async function scrapeReviewsAction(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
   const db = await getDb();

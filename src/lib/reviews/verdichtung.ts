@@ -17,7 +17,7 @@ import type { BelegAspekt, InsightCard, ReviewInsightsPayload } from "@/db/schem
  *   zusammengelegt (Referenz-Tool zeigte dasselbe Insight dreifach).
  */
 
-type RoheAspekte = Pick<ReviewInsightsPayload, "painPoints" | "buyingTriggers">;
+export type RoheAspekte = Pick<ReviewInsightsPayload, "painPoints" | "buyingTriggers">;
 
 export type VerdichtungsErgebnis = {
   cards: InsightCard[];
@@ -30,7 +30,7 @@ export type VerdichtungsErgebnis = {
 const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, "").replace(/\s+/g, " ").trim();
 
 /** Aspekt-Referenz des LLM gegen die ECHTEN Roh-Themen auflösen (wortgleich oder enthalten). */
-function findeAspekt(ref: string, aspekte: RoheAspekte): BelegAspekt | null {
+export function findeAspekt(ref: string, aspekte: RoheAspekte): BelegAspekt | null {
   const n = norm(ref);
   if (!n) return null;
   const suche = (

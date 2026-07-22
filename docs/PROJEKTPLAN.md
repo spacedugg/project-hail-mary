@@ -102,7 +102,7 @@ Content-Sprache ist je Produkt/Auftrag wählbar — unabhängig vom Marktplatz. 
 | Feature | Status | Handlung/Nutzen |
 |---|---|---|
 | Review-Scrape je ASIN × Sterne-Klasse (eigenes Produkt + Wettbewerber, ASIN-Chips) | 🔶 | Mehr-ASIN-Abbruch behoben (D102) — erneuter Praxistest nötig |
-| Wettbewerbs-Kontext als eigener Analyse-Baustein: Wettbewerber zeigen Produkt-Einordnung, Zielgruppe, gelöste Pain Points, unbeleuchtete eigene Features (D141) | ⬜ | Optimieren nur mit eigenen Daten = luftleerer Raum; Hand-Eingabe der ASINs bleibt und gewinnt immer |
+| Wettbewerbs-Kontext als eigener Analyse-Baustein: Wettbewerber zeigen Produkt-Einordnung, Zielgruppe, gelöste Pain Points, unbeleuchtete eigene Features (D141) | 🧪 | Optimieren nur mit eigenen Daten = luftleerer Raum; Hand-Eingabe der ASINs bleibt und gewinnt immer |
 | Wettbewerber-Vorschlag in 4 Stufen: Kandidaten über Top-Keywords (+ optional Unterkategorie-Bestseller) → Eignungs-Filter (Rating/Rezensionen/BSR als Proxys) → KI-Ähnlichkeits-Gate gegen Produkt-Wahrheit → begründete Vorschlags-Liste zum Bestätigen (D142) | 🔒 auf Hold (D144) | Keyword-Match statt Kategorie-Nachbarschaft; Datenweg ungeklärt — manueller Weg (Hand-ASINs + Helium 10) IST der Stand; erst wieder aufgreifen, wenn der Nutzer es aufruft |
 | Ehrliche Datenbasis (Amazon-Gesamtzahlen neben Stichprobe, Ausbeute je Lauf) | 🧪 | Keine Selbsttäuschung über die Datenlage |
 | Konfidenz-Einordnung in Worten an den Insight-Ausgaben („Basis: X von Y", Beleg-Stufe je Erkenntnis, deterministisch hergeleitet — keine Fassaden-Prozente) (D138) | 🧪 | Nachrechenbare Einordnung statt grüner Prozentzahlen; Herleitung steht in Daten & Formeln |
@@ -141,7 +141,7 @@ Content-Sprache ist je Produkt/Auftrag wählbar — unabhängig vom Marktplatz. 
 | Regel-Messung des WIRKSAMEN Stands (freigegeben sonst Original, je Sektion ausgewiesen) | 🧪 | Gemessen wird, was auf Amazon live gehen kann (D110) |
 | Kundenstimmen-Abgleich (Themen-Abgleich, komposita-bewusst) | 🧪 | Adressieren die Bullets die Top-Pain-Points? (D117 repariert) |
 | Insight-Schema auch für Audit-Ausgaben: Stärken/Schwächen, Maßnahmen, Kauf-Verhinderer als Insight-Karten (D135) | 🧪 | Ein Erkenntnis-Format über alle Analyse-Dimensionen statt sieben Ausgabeformate |
-| Feature-Relevanz-Ranking: Listing-Features (Titel/Bullets/Attribute/Wichtige Infos/A+) nach Kunden-Relevanz sortiert; hoch relevant + bei Wettbewerbern unbeleuchtet = echter USP (D146, braucht D145) | ⬜ | Beantwortet datenbasiert, welches Feature in Bildern/A+ zuerst gezeigt wird — Umkehrung des Kundenstimmen-Abgleichs |
+| Feature-Relevanz-Ranking: Listing-Features (Titel/Bullets/Attribute/Wichtige Infos/A+) nach Kunden-Relevanz sortiert; hoch relevant + bei Wettbewerbern unbeleuchtet = echter USP (D146, braucht D145) | 🧪 | Beantwortet datenbasiert, welches Feature in Bildern/A+ zuerst gezeigt wird — Umkehrung des Kundenstimmen-Abgleichs |
 | Druck-Layout | 🧪 | Kundentaugliche Aufbereitung |
 | Bild-Audit (automatische visuelle Prüfung) | ⬜ | Hauptbild = größter CRO-Hebel |
 | Echter Listing-Score (Engine statt Handeingabe) | ⬜ | Vergleichbarkeit über Produkte und Zeit |

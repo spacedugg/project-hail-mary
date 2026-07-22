@@ -38,6 +38,11 @@ export const FEHLER_CODES: Record<string, FehlerInfo> = {
     bedeutung: "Die KI-Auswertung des gespeicherten Scrapes ist abgebrochen (Detail-Meldung oben). Der Scrape selbst ist unversehrt gespeichert.",
     loesung: "Analyse erneut starten — der Scrape muss NICHT wiederholt werden. Bei wiederholtem Abbruch die Detail-Meldung ernst nehmen.",
   },
+  "FEA-01": {
+    titel: "Feature-Ranking nicht möglich",
+    bedeutung: "Das Feature-Relevanz-Ranking braucht Listing-Inhalt (Import) UND eine Bewertungs-Analyse als Kunden-Echo — oder der Lauf selbst ist abgebrochen (Detail-Meldung oben).",
+    loesung: "Erst Listing importieren und Reviews analysieren, dann erneut ranken. Bestehende Daten bleiben unberührt.",
+  },
   "VER-01": {
     titel: "Insight-Verdichtung fehlgeschlagen",
     bedeutung: "Die Verdichtungs-Etappe (Roh-Themen → benannte Erkenntnisse) ist abgebrochen. Scrape und Roh-Analyse sind unversehrt gespeichert — nur die Karten fehlen.",

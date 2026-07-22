@@ -277,6 +277,33 @@ export type DeepAuditPayload = {
   topActions: string[];
 };
 
+/**
+ * Feature-Relevanz-Ranking (D146): Listing-Features nach Kunden-Relevanz —
+ * die Umkehrung des Kundenstimmen-Abgleichs (Listing → Reviews). Karten im
+ * einheitlichen Insight-Schema (D132/D135); Relevanz DETERMINISTISCH aus den
+ * Erwähnungen der zugeordneten Review-Aspekte, Quellen-Tags nur nach
+ * verifiziertem Verbatim-Beleg im Listing-Text (D133).
+ */
+export const featureRankings = sqliteTable("feature_rankings", {
+  id: text("id").primaryKey(),
+  productId: text("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  payload: text("payload", { mode: "json" }).$type<FeatureRankingPayload>().notNull(),
+  dataBasis: text("data_basis", { mode: "json" }).$type<string[]>().notNull(),
+  createdAt: ts("created_at").notNull(),
+});
+
+export type FeatureRankingPayload = {
+  cards: InsightCard[];
+  /** Features ohne verifizierten Listing-Beleg — gezählt ausgewiesen (D133). */
+  verworfen: number;
+  entfernteBildIdeen: Array<{ idee: string; grund: string }>;
+  /** Ehrliche Grenzen, z. B. „USP-Vergleich nicht bewertbar — Wettbewerber-Listings liegen nicht vor (D144)". */
+  hinweise: string[];
+  stats: { reviewsGesamt: number };
+};
+
 export const reviewInsights = sqliteTable("review_insights", {
   id: text("id").primaryKey(),
   productId: text("product_id")
