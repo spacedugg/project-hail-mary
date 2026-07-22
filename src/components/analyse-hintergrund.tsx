@@ -3,8 +3,6 @@ import type { DeepAuditPayload, FeatureRankingPayload } from "@/db/schema";
 import type { listingSnapshots } from "@/db/schema";
 import { befundKarten } from "@/lib/analysis/auditKarten";
 import { InsightKarte } from "@/components/insight-karte";
-import { SubmitButton } from "@/components/submit-button";
-import { runDeepAuditAction, rankeFeaturesAction } from "@/app/actions";
 
 /**
  * Analyse-Hintergrundwissen (D172): die restlichen Bausteine des gebündelten
@@ -51,14 +49,12 @@ export function SterneGruppen({ dist, avg, total }: { dist: Record<string, numbe
 }
 
 export function AnalyseHintergrund({
-  productId,
   analysis,
   deepAudit,
   auditStale,
   featureRanking,
   original,
 }: {
-  productId: string;
   analysis: Analysis;
   deepAudit: DeepAuditRow;
   auditStale: boolean;
@@ -69,18 +65,10 @@ export function AnalyseHintergrund({
     <>
       {/* Zielgruppe · Positionierung · USPs (D126) */}
       <section className="card p-5">
+        {/* Kein manueller CTA (D177): die KI-Bewertung läuft als Etappe des Analyse-Laufs */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold">Zielgruppe · Positionierung · USPs {deepAudit && <span className="ml-1 pill pill-good">✓ {deepAudit.createdAt.toLocaleDateString("de-DE")}</span>}</h2>
-          {auditStale ? (
-            <form action={runDeepAuditAction}>
-              <input type="hidden" name="productId" value={productId} />
-              <SubmitButton className="btn-primary text-xs" pendingLabel="KI bewertet das Listing…" progress>
-                {deepAudit ? "KI-Bewertung aktualisieren" : "KI-Bewertung starten"}
-              </SubmitButton>
-            </form>
-          ) : (
-            <span className="pill pill-neutral">aktuell</span>
-          )}
+          {deepAudit && (auditStale ? <span className="pill pill-warn">wird beim nächsten Lauf aktualisiert</span> : <span className="pill pill-neutral">aktuell</span>)}
         </div>
         {deepAudit ? (
           <div className="stagger mt-3 grid gap-3 lg:grid-cols-3">
@@ -164,15 +152,8 @@ export function AnalyseHintergrund({
 
       {/* Feature-Ranking (D141/D146) */}
       <section className="card p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold">Feature-Ranking</h2>
-          <form action={rankeFeaturesAction}>
-            <input type="hidden" name="productId" value={productId} />
-            <SubmitButton className="btn-ghost text-xs" pendingLabel="Rankt… (kann Minuten dauern)" progress>
-              {featureRanking ? "Neu ranken" : "Features ranken"}
-            </SubmitButton>
-          </form>
-        </div>
+        {/* Kein manueller CTA (D177): das Ranking läuft als Etappe des Analyse-Laufs */}
+        <h2 className="text-sm font-semibold">Produkt-Features</h2>
         {featureRanking ? (
           <>
             <div className="mt-2 space-y-2">

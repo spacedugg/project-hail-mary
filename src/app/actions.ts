@@ -971,13 +971,14 @@ export async function verdichteInsightsAction(formData: FormData) {
  * Etappe mit Redundanz-Guard (D81-Muster) — dieselbe Datenbasis wird nicht
  * doppelt gerankt.
  */
-export async function rankeFeaturesAction(formData: FormData) {
-  const productId = String(formData.get("productId") ?? "");
-  const db = await getDb();
-  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
-  if (!product) return;
-  const back = (msg: string, code: string) =>
-    redirect(`/produkte/${productId}?tab=analyse&fehler=${encodeURIComponent(msg)}&code=${code}`);
+async function featuresKern(
+  db: Awaited<ReturnType<typeof getDb>>,
+  product: NonNullable<Awaited<ReturnType<Awaited<ReturnType<typeof getDb>>["query"]["products"]["findFirst"]>>>,
+): Promise<string | null> {
+  const productId = product.id;
+  const back = (msg: string, code: string): never => {
+    throw new GenFehler(msg, code);
+  };
 
   const snapshot = await db.query.listingSnapshots.findFirst({
     where: eq(schema.listingSnapshots.productId, productId),
@@ -997,7 +998,7 @@ export async function rankeFeaturesAction(formData: FormData) {
     orderBy: desc(schema.featureRankings.createdAt),
   });
   if (last && Math.max(snapshot!.createdAt.getTime(), insight!.createdAt.getTime()) <= last.createdAt.getTime()) {
-    redirect(`/produkte/${productId}?tab=analyse&hinweis=${encodeURIComponent("Die Datenbasis ist seit dem letzten Feature-Ranking unverändert — das Ergebnis unten ist aktuell. Neu ranken wird nach neuem Import oder neuer Analyse wieder frei.")}`);
+    return "Die Datenbasis ist seit dem letzten Feature-Ranking unverändert.";
   }
 
   const { normalisierePayload } = await import("@/lib/reviews/insights");
@@ -1043,10 +1044,10 @@ export async function rankeFeaturesAction(formData: FormData) {
     ];
     await db.insert(schema.featureRankings).values({ id: id(), productId, payload, dataBasis });
   } catch (e) {
+    if (e instanceof GenFehler) throw e;
     back(`Feature-Ranking: ${e instanceof Error ? e.message : String(e)}`, "FEA-01");
   }
-  revalidatePath(`/produkte/${productId}`);
-  redirect(`/produkte/${productId}?tab=analyse`);
+  return null;
 }
 
 /**
@@ -1138,7 +1139,7 @@ export type PipelineErgebnis = { ok: boolean; hinweis?: string; fehler?: string;
 
 export async function runPipelineStufe(
   productId: string,
-  stufe: "listing" | "scrape" | "auswertung" | "verdichtung" | "blocker" | "content",
+  stufe: "listing" | "scrape" | "auswertung" | "verdichtung" | "blocker" | "features" | "audit" | "content",
   extra?: { asins?: string[]; section?: string },
 ): Promise<PipelineErgebnis> {
   const db = await getDb();
@@ -1169,6 +1170,10 @@ export async function runPipelineStufe(
       }
       case "blocker":
         return { ok: true, hinweis: (await blockerKern(db, product)) ?? undefined };
+      case "features":
+        return { ok: true, hinweis: (await featuresKern(db, product)) ?? undefined };
+      case "audit":
+        return { ok: true, hinweis: (await auditKern(db, product)) ?? undefined };
       case "content": {
         const section = String(extra?.section ?? "");
         const gueltig = ["title", "bullets", "description", "backend", "highlights", "qa"];
@@ -1402,12 +1407,14 @@ export async function analyzeReviewsAction(formData: FormData) {
  * Bewertungs-Analyse dieses Produkts (optional inkl. Wettbewerber-ASINs) —
  * USPs & Zielgruppe werden aus echten Daten HERGELEITET, nie getippt.
  */
-export async function runDeepAuditAction(formData: FormData) {
-  const productId = String(formData.get("productId") ?? "");
-  const db = await getDb();
-  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
-  if (!product) return;
-  const back = (msg: string) => redirect(`/produkte/${productId}?tab=analyse&fehler=${encodeURIComponent(msg)}&code=AUD-01`);
+async function auditKern(
+  db: Awaited<ReturnType<typeof getDb>>,
+  product: NonNullable<Awaited<ReturnType<Awaited<ReturnType<typeof getDb>>["query"]["products"]["findFirst"]>>>,
+): Promise<string | null> {
+  const productId = product.id;
+  const back = (msg: string): never => {
+    throw new GenFehler(msg, "AUD-01");
+  };
 
   const snapshot = await db.query.listingSnapshots.findFirst({
     where: eq(schema.listingSnapshots.productId, productId),
@@ -1466,7 +1473,7 @@ export async function runDeepAuditAction(formData: FormData) {
       sovUpload?.createdAt.getTime() ?? 0,
     );
     if (newestInput <= lastAudit.createdAt.getTime()) {
-      redirect(`/produkte/${productId}?tab=analyse&hinweis=${encodeURIComponent("Die Datenbasis ist seit dem letzten Tiefen-Audit unverändert — das Ergebnis unten ist aktuell. Neu bewerten wird nach neuem Import, Scrape, Analyse oder Content wieder frei.")}`);
+      return "Die Datenbasis ist seit der letzten KI-Bewertung unverändert.";
     }
   }
 
@@ -1510,10 +1517,10 @@ export async function runDeepAuditAction(formData: FormData) {
     if (!f.targetAudience && payload.derived.zielgruppe) { f.targetAudience = payload.derived.zielgruppe; changed = true; }
     if (changed) await db.update(schema.products).set({ facts: f }).where(eq(schema.products.id, productId));
   } catch (e) {
+    if (e instanceof GenFehler) throw e;
     back(`Tiefen-Audit: ${e instanceof Error ? e.message : String(e)}`);
   }
-  revalidatePath(`/produkte/${productId}`);
-  revalidatePath(`/produkte/${productId}`);
+  return null;
 }
 
 // ── Handlungen (D45): aus Analysen ableiten + Status pflegen ─────────────────

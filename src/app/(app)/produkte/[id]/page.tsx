@@ -2,11 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { saveKeywords, deriveKeywordsFromSov, generateContent, deleteProductAction, uploadCerebro, scrapeReviewsAction, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarke, findeBlockerAction } from "@/app/actions";
+import { saveKeywords, deriveKeywordsFromSov, generateContent, deleteProductAction, uploadCerebro, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarke } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
-import { AsinChips } from "@/components/asin-chips";
 import { AussortierteKeywords } from "@/components/aussortierte-keywords";
 import { FehlerPopup } from "@/components/fehler-popup";
 import { LoeschButton } from "@/components/loesch-button";
@@ -471,14 +470,9 @@ export default async function ProductPage({
             right={insights ? <span className="pill pill-good">✓ analysiert · {insights.confidence}</span> : undefined}
           />
 
-          {/* Chip-Eingabe (D95): Haupt-ASIN vorbelegt (entfernbar), Wettbewerber per Leertaste/Komma als Chips */}
-          <form action={scrapeReviewsAction} className="mt-4 flex flex-wrap items-start gap-2">
-            <input type="hidden" name="productId" value={product.id} />
-            <AsinChips name="asins" mainAsin={product.asin} />
-            <SubmitButton className="btn-dark flex-none" disabled={!product.asin} pendingLabel="Scrapt Reviews…" progress>
-              {scrape ? "Neu scrapen + analysieren" : "Scrapen + analysieren"}
-            </SubmitButton>
-          </form>
+          {/* EIN Weg zum Aktualisieren (D177): derselbe Etappen-Lauf wie beim Start,
+              nur ohne Content — hält auch Blocker, Features und KI-Bewertung frisch */}
+          <AnalyseStart productId={product.id} mainAsin={product.asin} nurAnalyse />
           {!product.asin && <p className="mt-2 text-xs text-warn">△ Dafür braucht das Produkt eine ASIN.</p>}
           {scrape && (() => {
             // Zahlen-Basen NIE mischen (D129, Nutzer-Befund): Die Amazon-Gesamtzahl
@@ -581,14 +575,6 @@ export default async function ProductPage({
             icon={<IconSichtbarkeit />}
             chip="chip-amber"
             title="Conversion-Blocker"
-            right={
-              <form action={findeBlockerAction}>
-                <input type="hidden" name="productId" value={product.id} />
-                <SubmitButton className="btn-primary" disabled={!snapshot || !insights} pendingLabel="Prüft Listing gegen Kunden-Themen…" progress>
-                  {blockerLauf ? "Neu prüfen" : "Blocker finden"}
-                </SubmitButton>
-              </form>
-            }
           />
           <p className="mt-2 text-xs text-muted">Kunden-Themen mit echtem Gewicht, die Listing und Bilder nicht beantworten. Jeder Blocker zeigt die belegenden Kunden-Themen.</p>
           {(!snapshot || !insights) && (
@@ -621,7 +607,6 @@ export default async function ProductPage({
         {/* Restliches Hintergrundwissen (D172): Zielgruppe/USPs, Sterne-Gruppen, SOV, Feature-Ranking, Stärken & Schwächen */}
         {insights && tab === "analyse" && (
           <AnalyseHintergrund
-            productId={product.id}
             analysis={analysis}
             deepAudit={deepAudit ?? null}
             auditStale={auditStale}

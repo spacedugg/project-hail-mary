@@ -23,7 +23,7 @@ const SEKTIONEN = [
 ] as const;
 
 type Etappe = {
-  stufe: "listing" | "scrape" | "auswertung" | "verdichtung" | "blocker" | "content";
+  stufe: "listing" | "scrape" | "auswertung" | "verdichtung" | "blocker" | "features" | "audit" | "content";
   section?: string;
   label: string;
   status: "offen" | "laeuft" | "fertig" | "fehler";
@@ -32,7 +32,16 @@ type Etappe = {
   hart: boolean;
 };
 
-export function AnalyseStart({ productId, mainAsin }: { productId: string; mainAsin: string | null }) {
+export function AnalyseStart({
+  productId,
+  mainAsin,
+  nurAnalyse = false,
+}: {
+  productId: string;
+  mainAsin: string | null;
+  /** true (Analyse-Reiter): Lauf ohne Content-Generierung — „Neu scrapen & analysieren". */
+  nurAnalyse?: boolean;
+}) {
   const router = useRouter();
   const [etappen, setEtappen] = useState<Etappe[]>([]);
   const [asins, setAsins] = useState<string[]>([]);
@@ -89,6 +98,8 @@ export function AnalyseStart({ productId, mainAsin }: { productId: string; mainA
       { stufe: "auswertung", label: "Reviews auswerten (Pain Points, Kaufauslöser)", status: "offen", hart: true },
       { stufe: "verdichtung", label: "Erkenntnisse verdichten", status: "offen", hart: false },
       { stufe: "blocker", label: "Conversion-Blocker finden", status: "offen", hart: false },
+      { stufe: "features", label: "Produkt-Features ranken", status: "offen", hart: false },
+      { stufe: "audit", label: "KI-Bewertung des Listings", status: "offen", hart: false },
       ...sections.map((s) => ({
         stufe: "content" as const,
         section: s,
@@ -160,24 +171,23 @@ export function AnalyseStart({ productId, mainAsin }: { productId: string; mainA
           <AsinChips name="asins" mainAsin={mainAsin} placeholder="Weitere ASIN eingeben …" />
         </div>
       </div>
-      <div>
-        <h3 className="text-sm font-semibold">Content</h3>
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
-          {SEKTIONEN.map(({ key, label }) => (
-            <label key={key} className="flex cursor-pointer items-center gap-1.5 text-xs">
-              <input type="checkbox" name="sections" value={key} defaultChecked />
-              {label}
-            </label>
-          ))}
+      {!nurAnalyse && (
+        <div>
+          <h3 className="text-sm font-semibold">Content</h3>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
+            {SEKTIONEN.map(({ key, label }) => (
+              <label key={key} className="flex cursor-pointer items-center gap-1.5 text-xs">
+                <input type="checkbox" name="sections" value={key} defaultChecked />
+                {label}
+              </label>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
       <button type="submit" disabled={!mainAsin} className="btn-primary disabled:opacity-40">
-        Analysieren &amp; Texte erstellen
+        {nurAnalyse ? "Neu scrapen & analysieren" : "Analysieren & Texte erstellen"}
       </button>
       {!mainAsin && <p className="text-xs text-warn">△ Dafür braucht das Produkt eine ASIN.</p>}
-      <p className="text-[11px] text-muted">
-        Ein Klick: Listing laden · Bilder analysieren · Reviews scrapen &amp; auswerten · Erkenntnisse verdichten · Blocker finden · gewählten Content texten.
-      </p>
     </form>
   );
 }
