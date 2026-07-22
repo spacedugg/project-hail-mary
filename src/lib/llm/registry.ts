@@ -122,27 +122,22 @@ export function registerProvider(p: LlmProvider): void {
  * gilt erst nach Eval-Lauf (D33).
  */
 export const RECIPE_MODELS: Record<string, { provider: string; model: string }> = {
-  // Content-Erstellung auf Opus 4.8 (Nutzer-Vorgabe 22.07., D148)
+  // ALLE Recipes auf Opus 4.8 (Nutzer-Vorgabe 22.07., D148/D153) — Wechsel nur per Env-Override oder neuer Nutzer-Entscheidung
   "listing.title": { provider: "anthropic", model: "claude-opus-4-8" },
   "listing.bullets": { provider: "anthropic", model: "claude-opus-4-8" },
   "listing.description": { provider: "anthropic", model: "claude-opus-4-8" },
   "listing.backend": { provider: "anthropic", model: "claude-opus-4-8" },
   "listing.highlights": { provider: "anthropic", model: "claude-opus-4-8" },
   "listing.qa": { provider: "anthropic", model: "claude-opus-4-8" },
-  // Roh-Analyse auf Sonnet (D152): Haiku produzierte Fehl-Abstraktionen (Label ohne Zitat-Deckung)
-  "reviews.pain-points": { provider: "anthropic", model: "claude-sonnet-5" },
-  // Unabhängiger Label↔Zitat-Gegencheck (D152)
-  "reviews.beleg-check": { provider: "anthropic", model: "claude-sonnet-5" },
-  // Verdichtung (D131): Abstraktion + ausgewogene Bündelung ist die schwerste
-  // Stufe der Review-Strecke — Sonnet statt Haiku (Qualität vor Tempo, D136).
-  "reviews.verdichtung": { provider: "anthropic", model: "claude-sonnet-5" },
-  // Feature-Ranking (D146): Extraktion + Verbatim-Belege + Aspekt-Zuordnung
-  "listing.feature-ranking": { provider: "anthropic", model: "claude-sonnet-5" },
-  "listing.deep-audit": { provider: "anthropic", model: "claude-sonnet-5" },
-  "listing.scrape": { provider: "anthropic", model: "claude-sonnet-5" },
-  "keywords.filter": { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
-  "keywords.brands": { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
-  "facts.extract": { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
+  "reviews.pain-points": { provider: "anthropic", model: "claude-opus-4-8" },
+  "reviews.beleg-check": { provider: "anthropic", model: "claude-opus-4-8" },
+  "reviews.verdichtung": { provider: "anthropic", model: "claude-opus-4-8" },
+  "listing.feature-ranking": { provider: "anthropic", model: "claude-opus-4-8" },
+  "listing.deep-audit": { provider: "anthropic", model: "claude-opus-4-8" },
+  "listing.scrape": { provider: "anthropic", model: "claude-opus-4-8" },
+  "keywords.filter": { provider: "anthropic", model: "claude-opus-4-8" },
+  "keywords.brands": { provider: "anthropic", model: "claude-opus-4-8" },
+  "facts.extract": { provider: "anthropic", model: "claude-opus-4-8" },
 };
 
 export function resolveRecipe(recipeKey: string): { provider: LlmProvider; model: string } {
