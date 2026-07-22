@@ -8,8 +8,9 @@ import { parseLlmJson } from "@/lib/llm/json";
  * 1. AUSLESE (objektiv): Text-im-Bild wortwörtlich, Bildinhalt in einem Satz,
  *    gezeigte Claims — schließt die größte Datenlücke (Infografiken/A+ sind
  *    für Text-Scrapes unsichtbar) und wird Quelle „Bilder" (D133).
- * 2. BEFUNDE (nur faktische Regel-Verstöße): z. B. Text/Badge auf dem
- *    Hauptbild, nicht-weißer Hauptbild-Hintergrund — keine Geschmacksurteile.
+ * 2. KEINE Regel-Urteile (D165, Nutzer-Korrektur): Was auf Amazon erlaubt/
+ *    üblich ist, ist kategorie- und praxisabhängig — Urteile gibt es erst
+ *    wieder mit einem kuratierten Regelwerk aus dem Agentur-Wissen.
  * Ohne API-Key: null (ehrlich „nicht ausgelesen"), nie ein Mock — erfundene
  * Bild-Inhalte wären Gift für die Wahrheits-Kette.
  */
@@ -61,9 +62,9 @@ export async function leseBilderAus(imageUrls: string[], sprache = "de"): Promis
     type: "text",
     text: `AUFGABE: Lies die ${urls.length} Listing-Bilder oben aus (Antwort-Sprache "${sprache}").
 Je Bild: textImBild = ALLER lesbare Text wortwörtlich (Headlines, Labels, Zahlen — leer, wenn textfrei) · inhalt = EIN objektiver Satz, was gezeigt wird · claims = im Bild behauptete Produkt-Aussagen (nur was da steht/gezeigt wird).
-befunde = NUR faktische Amazon-Regel-Verstöße: Bild 1 ist das Hauptbild (dort sind Text, Logos, Badges, Grafik-Overlays und nicht-weißer Hintergrund Verstöße); je Verstoß EIN Satz mit Bild-Nummer. KEINE Stil- oder Qualitätsurteile.
+KEINE Urteile, KEINE Regel- oder Verstoß-Bewertungen, KEINE Stil-Kommentare — nur beschreiben und abtippen.
 JSON-Schema:
-{"bilder":[{"slot":1,"textImBild":["..."],"inhalt":"...","claims":["..."]}],"befunde":["..."]}`,
+{"bilder":[{"slot":1,"textImBild":["..."],"inhalt":"...","claims":["..."]}]}`,
   });
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -72,7 +73,7 @@ JSON-Schema:
     body: JSON.stringify({ model, max_tokens: 8000, system: SYSTEM, messages: [{ role: "user", content }] }),
     signal: AbortSignal.timeout(120_000),
   });
-  if (!res.ok) throw new Error(`Bild-Auslese: Anthropic ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  if (!res.ok) throw new Error(`Bildanalyse: Anthropic ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const data = (await res.json()) as { content: Array<{ type: string; text?: string }> };
   const text = data.content.filter((b) => b.type === "text").map((b) => b.text ?? "").join("");
   return normalisiereBildAuslese(parseLlmJson(text), urls.length);

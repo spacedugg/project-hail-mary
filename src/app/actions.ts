@@ -729,12 +729,19 @@ function svTiering(list: Array<{ keyword: string; sv: number }>): KeywordKandida
 export async function uploadCerebro(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
   const file = formData.get("file") as File | null;
-  const price = parseFloat(String(formData.get("price") ?? "")) || undefined;
+  const formPreis = parseFloat(String(formData.get("price") ?? "").replace(",", ".")) || undefined;
   if (!productId || !file) return;
 
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return;
+  // Preis fürs SOV-Audit (D165): Eingabe beim Upload gewinnt und wird am
+  // Produkt gespeichert; sonst der gepflegte Produkt-Preis. OHNE Preis rechnet
+  // das Audit KEINE €-Werte (kein Default).
+  const price = formPreis ?? (product.price !== null ? product.price / 100 : undefined);
+  if (formPreis) {
+    await db.update(schema.products).set({ price: Math.round(formPreis * 100) }).where(eq(schema.products.id, productId));
+  }
 
   const { parseCerebroCsv, computeSovAudit } = await import("@/lib/sov/audit");
   let parseStatus = "ok", parseError: string | null = null, audit = null;

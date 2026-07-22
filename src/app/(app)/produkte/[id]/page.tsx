@@ -7,6 +7,7 @@ import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
 import { AsinChips } from "@/components/asin-chips";
+import { AussortierteKeywords } from "@/components/aussortierte-keywords";
 import { FehlerPopup } from "@/components/fehler-popup";
 import { LoeschButton } from "@/components/loesch-button";
 import { GenerierSperre, GenerierButton } from "@/components/generier-sperre";
@@ -266,25 +267,10 @@ export default async function ProductPage({
             </div>
           )}
           {snapshot?.bilderText && snapshot.bilderText.length > 0 && (
-            <details className="mt-3">
-              <summary className="text-xs">Bild-Auslese ({snapshot.bilderText.length} Bilder gelesen{(snapshot.bildBefunde?.length ?? 0) > 0 ? ` · ${snapshot.bildBefunde!.length} Befund${snapshot.bildBefunde!.length === 1 ? "" : "e"}` : ""})</summary>
-              {(snapshot.bildBefunde?.length ?? 0) > 0 && (
-                <ul className="mt-2 space-y-0.5">
-                  {snapshot.bildBefunde!.map((b, i) => <li key={i} className="text-xs text-warn">△ {b}</li>)}
-                </ul>
-              )}
-              <ul className="mt-2 space-y-1.5">
-                {snapshot.bilderText.map((b) => (
-                  <li key={b.slot} className="rounded-xl bg-background p-2 text-xs">
-                    <b>Bild {b.slot}:</b> {b.inhalt}
-                    {b.textImBild.length > 0 && <span className="text-muted"> · Text im Bild: {b.textImBild.join(" | ")}</span>}
-                  </li>
-                ))}
-              </ul>
-            </details>
+            <p className="mt-2 text-[11px] text-muted">Bildanalyse: {snapshot.bilderText.length} Bilder erfasst · fließt in Analyse & Content ein</p>
           )}
           {snapshot && !snapshot.bilderText && (snapshot.imageUrls?.length ?? 0) > 0 && (
-            <p className="mt-2 text-[11px] text-muted">Bilder noch nicht ausgelesen — passiert automatisch beim nächsten Listing-Import.</p>
+            <p className="mt-2 text-[11px] text-muted">Bildanalyse folgt automatisch beim nächsten Listing-Import.</p>
           )}
           <details className="mt-3">
             <summary className="cursor-pointer text-xs text-muted hover:text-foreground">Alternativ: Helium-10-Export (CSV) importieren</summary>
@@ -316,6 +302,7 @@ export default async function ProductPage({
             <form action={uploadCerebro} className="mt-4 flex flex-wrap items-center gap-2">
               <input type="hidden" name="productId" value={product.id} />
               <input type="file" name="file" accept=".csv" required className="text-sm" />
+              <input name="price" type="text" inputMode="decimal" defaultValue={product.price !== null ? (product.price / 100).toFixed(2) : ""} placeholder="Ø-Verkaufspreis € *" required className="input w-40 text-xs" title="Basis der €-Werte im SOV-Audit" />
               <input name="price" type="number" step="0.01" placeholder="Ø-Preis € (45)" className={`${input} w-36`} />
               <SubmitButton className="btn-primary" pendingLabel="Liest Export, filtert Relevanz…" progress>
                 {kws.some((k) => k.source === "cerebro") ? "Weiteren Export dazuladen" : "Keyword-Export hochladen"}
@@ -365,7 +352,7 @@ export default async function ProductPage({
                         <input type="hidden" name="keywordId" value={k.id} />
                         <input type="hidden" name="productId" value={product.id} />
                         <input type="hidden" name="aktion" value="ausschliessen" />
-                        <span className="tag group/kw inline-flex items-center gap-1">
+                        <span className="group/kw inline-flex items-center gap-1 rounded-full bg-[rgb(47_158_143/0.12)] px-2.5 py-1 text-xs text-good">
                           {k.keyword}{k.searchVolume ? ` · ${fmt(k.searchVolume)}` : ""}
                           <button title="Als irrelevant ausschließen" className="text-neutral-400 transition hover:text-bad">×</button>
                         </span>
@@ -376,39 +363,22 @@ export default async function ProductPage({
                 </div>
               );
             })}
-            {/* Aussortierte Keywords (D87): gekennzeichnet statt gelöscht — prüfbar & wieder aufnehmbar */}
-            {kws.some((k) => k.ausgeschlossen) && (
-              <details className="mt-3">
-                <summary className="cursor-pointer text-xs text-warn">
-                  △ Aussortiert ({kws.filter((k) => k.ausgeschlossen).length}) — Marken, abweichende Maße/Anzahlen · prüfen & ggf. wieder aufnehmen
-                </summary>
-                <ul className="mt-2 space-y-1">
-                  {kws.filter((k) => k.ausgeschlossen).map((k) => (
-                    <li key={k.id} className="flex items-center justify-between gap-2 rounded-lg bg-background px-2 py-1 text-xs">
-                      <span className="min-w-0">
-                        <b>{k.keyword}</b>{k.searchVolume ? <span className="text-muted"> · SV {fmt(k.searchVolume)}</span> : ""}
-                        <span className="block text-[11px] text-muted">{k.ausschlussGrund}</span>
-                      </span>
-                      <form action={toggleKeywordRelevanz} className="flex-none">
-                        <input type="hidden" name="keywordId" value={k.id} />
-                        <input type="hidden" name="productId" value={product.id} />
-                        <input type="hidden" name="aktion" value="aufnehmen" />
-                        <SubmitButton className="btn-ghost px-2 py-0.5 text-[11px]">↩ aufnehmen</SubmitButton>
-                      </form>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
+            {/* Aussortierte Keywords (D87/D165): sichtbar + durchsuchbar, EIN Klick zur Wiederaufnahme */}
+            <AussortierteKeywords
+              eintraege={kws.filter((k) => k.ausgeschlossen).map((k) => ({ id: k.id, keyword: k.keyword, searchVolume: k.searchVolume, grund: k.ausschlussGrund }))}
+              productId={product.id}
+              action={toggleKeywordRelevanz}
+            />
             {/* Basis löschen (D94/D162): Icon + Rückfrage statt Aufklapp-Text */}
             {kws.some((k) => k.source === "cerebro") && (
-              <div className="mt-3 flex items-center gap-1 text-xs text-muted">
+              <div className="mt-3 flex items-center gap-1 text-xs font-medium text-bad">
                 Keyword-Basis löschen
                 <LoeschButton
                   action={deleteKeywordBasis}
                   felder={{ productId: product.id }}
                   frage={`Alle ${kws.filter((k) => k.source === "cerebro").length} Upload-Keywords samt SOV-Audit endgültig löschen? Manuelle Keywords und Relevanz-Entscheidungen bleiben erhalten.`}
                   title="Keyword-Basis löschen"
+                  className="rounded-lg p-1.5 text-bad transition hover:bg-[rgb(220_38_38/0.08)]"
                 />
               </div>
             )}

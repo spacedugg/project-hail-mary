@@ -12,13 +12,12 @@ describe("normalisiereBildAuslese", () => {
           { slot: 99, inhalt: "gibt es nicht", textImBild: [], claims: [] },
           { slot: "kaputt", inhalt: "x" },
         ],
-        befunde: ["Bild 1: Text-Overlay auf dem Hauptbild.", ""],
       },
       7,
     );
     expect(res.bilder).toHaveLength(1);
     expect(res.bilder[0]).toEqual({ slot: 1, textImBild: ["STOPPT GRASFRESSEN"], inhalt: "Produktdose auf Weiß", claims: ["hilft bei Sodbrennen"] });
-    expect(res.befunde).toEqual(["Bild 1: Text-Overlay auf dem Hauptbild."]);
+    expect(res.befunde).toEqual([]); // Regel-Urteile abgeschafft (D165)
   });
 
   it("kaputte Antwort → leer, nichts geraten", () => {

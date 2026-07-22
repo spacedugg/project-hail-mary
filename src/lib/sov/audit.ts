@@ -32,7 +32,7 @@ export type SovKeyword = CerebroRow & {
 
 export type SovAudit = {
   mainAsin: string | null;
-  price: number;
+  price: number | null;
   keywordCount: number;
   brandSOV: number; // %
   topCompetitor: { asin: string; sov: number } | null;
@@ -223,7 +223,9 @@ export function computeSovAudit(
   rows: CerebroRow[],
   opts: { price?: number; mainAsin?: string | null } = {},
 ): SovAudit {
-  const price = opts.price && opts.price > 0 ? opts.price : 45;
+  // Ehrliche Daten (D165): OHNE echten Preis KEINE €-Werte — der frühere
+  // 45-€-Default war ein Fassaden-Wert. price=null ⇒ alle €-Felder bleiben 0.
+  const price = opts.price && opts.price > 0 ? opts.price : null;
   const cprBase = rows.map((r) => r.cpr).filter((c) => c > 0 && c < 999).sort((a, b) => a - b);
 
   let sumOwnVis = 0, sumAllVis = 0;
@@ -248,7 +250,7 @@ export function computeSovAudit(
     const kwSOV = denom > 0 ? Math.round((weightedVis / denom) * 1000) / 10 : 0;
 
     const ksMonthly = r.ks * WEEKLY_TO_MONTHLY;
-    const kwRevPool = ksMonthly * price;
+    const kwRevPool = price ? ksMonthly * price : 0;
     const fullRevGap = Math.max(0, kwRevPool * rankShare(bestCompRank) - kwRevPool * rankShare(r.mainRank));
 
     const opportunityType = classifyOpportunity(r.mainRank, bestCompRank, r.ks);
