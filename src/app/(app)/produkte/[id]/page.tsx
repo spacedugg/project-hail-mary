@@ -19,6 +19,7 @@ import { fehlerInfo } from "@/lib/fehlercodes";
 import { normalisierePayload } from "@/lib/reviews/insights";
 import { IconUpload, IconCheck, IconSearch, IconReviews, IconContent, IconEuro, IconSichtbarkeit, IconSparkle } from "@/components/icons";
 import { AnalyseStart } from "@/components/analyse-start";
+import { TabLeiste } from "@/components/tab-leiste";
 import { ListingKontrolle, MassnahmenBlock } from "@/components/listing-kontrolle";
 import { AnalyseHintergrund } from "@/components/analyse-hintergrund";
 import { analyzeListing, wirksamesListing } from "@/lib/analysis/listingAudit";
@@ -216,20 +217,15 @@ export default async function ProductPage({
       {fehler && <FehlerPopup message={fehler} {...fehlerInfo(code)} />}
       {hinweis && <p className="mt-4 rounded-xl bg-[var(--primary-soft)] px-3 py-2 text-sm text-primary-strong">ℹ {hinweis}</p>}
 
-      {/* Reiter-Leiste (D172): erst nach dem Analyse-Lauf — davor führt die Start-Maske */}
+      {/* Reiter-Leiste (D172): erst nach dem Analyse-Lauf — davor führt die Start-Maske.
+          Mit Sofort-Feedback beim Wechsel (D173). */}
       {insights && (
-        <nav className="mt-4 flex flex-wrap gap-1 border-b border-hair">
-          {TABS.map((t) => (
-            <Link
-              key={t.key}
-              href={`/produkte/${product.id}?tab=${t.key}`}
-              className={`rounded-t-lg px-3 py-2 text-sm ${tab === t.key ? "border-b-2 border-[var(--primary)] font-semibold text-primary-strong" : "text-muted hover:text-foreground"}`}
-            >
-              {t.label}
-            </Link>
-          ))}
-          <Link href={`/produkte/${product.id}/briefs`} className="rounded-t-lg px-3 py-2 text-sm text-muted hover:text-foreground">Briefings</Link>
-        </nav>
+        <TabLeiste
+          basisHref={`/produkte/${product.id}`}
+          tabs={[...TABS]}
+          aktiv={tab}
+          extra={[{ href: `/produkte/${product.id}/briefs`, label: "Briefings" }]}
+        />
       )}
 
       <div className="stagger mt-6 space-y-3">

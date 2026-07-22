@@ -44,6 +44,7 @@ export function AnalyseStart({ productId, mainAsin }: { productId: string; mainA
 
   const fahre = async (plan: Etappe[], ab: number, asinListe: string[]) => {
     setLaeuft(true);
+    let fehlerFrei = true;
     for (let i = ab; i < plan.length; i++) {
       const e = plan[i];
       if (e.status === "fertig") continue;
@@ -59,6 +60,7 @@ export function AnalyseStart({ productId, mainAsin }: { productId: string; mainA
         res = { ok: false, fehler: err instanceof Error ? err.message : String(err), code: "ALG-00" };
       }
       if (!res.ok) {
+        fehlerFrei = false;
         setzeStatus(i, "fehler", `${res.fehler}${res.code ? ` (${res.code})` : ""}`);
         if (e.hart) {
           setLaeuft(false);
@@ -67,11 +69,15 @@ export function AnalyseStart({ productId, mainAsin }: { productId: string; mainA
         continue;
       }
       setzeStatus(i, "fertig", res.hinweis);
-      router.refresh();
+      // KEIN router.refresh() je Etappe: sobald die Analyse existiert, würde
+      // die Server-Seite diese Start-Maske abbauen und der Fortschritt
+      // verschwände mitten im Lauf.
     }
     setLaeuft(false);
     setFertig(true);
-    router.refresh();
+    // Fehlerfrei → direkt zu den Ergebnis-Reitern; mit Fehlern bleibt die
+    // Übersicht stehen (Knopf „Ergebnisse anzeigen").
+    if (fehlerFrei) router.refresh();
   };
 
   const starte = async (fd: FormData) => {
@@ -125,9 +131,10 @@ export function AnalyseStart({ productId, mainAsin }: { productId: string; mainA
           </button>
         )}
         {fertig && (
-          <p className="mt-3 text-sm">
-            Ergebnis steht in den Reitern oben: Content zuerst, Analyse als Hintergrundwissen.
-          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button type="button" onClick={() => router.refresh()} className="btn-primary text-xs">Ergebnisse anzeigen</button>
+            <p className="text-sm text-muted">Content und Analyse stehen danach in den Reitern oben.</p>
+          </div>
         )}
         <p className="mt-2 text-[11px] text-muted">Der Lauf braucht mehrere Minuten. Seite offen lassen.</p>
       </div>
@@ -135,8 +142,15 @@ export function AnalyseStart({ productId, mainAsin }: { productId: string; mainA
   }
 
   return (
+    // BEWUSST onSubmit statt <form action>: Eine Form-Action läuft als EINE
+    // React-Transition — deren Zwischen-Status (Etappen-Fortschritt) würde
+    // erst NACH dem kompletten Lauf gerendert. Der Klick wirkte dann tot,
+    // obwohl die Pipeline lief (Nutzer-Befund 22.07.).
     <form
-      action={starte}
+      onSubmit={(e) => {
+        e.preventDefault();
+        void starte(new FormData(e.currentTarget));
+      }}
       className="mt-4 space-y-4"
     >
       <div>

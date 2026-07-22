@@ -337,10 +337,38 @@ body {
   .page-sub { margin-top: 0.25rem; font-size: 0.875rem; color: var(--muted); max-width: 44rem; }
 }
 
+/* Klick-Feedback tool-weit (D173, Nutzer-Vorgabe 22.07.): jeder Druck ist
+   spürbar (kurzes Einfedern), jedes Laden sichtbar (Fortschritts-Linie). */
+button:not(:disabled) { cursor: pointer; }
+.btn-primary, .btn-dark, .btn-ghost, .side-item, .pill, .tag {
+  transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.btn-primary:active:not(:disabled), .btn-dark:active:not(:disabled), .btn-ghost:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.btn-primary:not(:disabled):hover { box-shadow: 0 6px 18px rgb(124 92 252 / 0.35); }
+.nav-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, var(--primary), var(--primary), transparent);
+  background-size: 35% 100%;
+  background-repeat: no-repeat;
+  animation: nav-slide 0.9s linear infinite;
+}
+@keyframes nav-slide {
+  from { background-position: -35% 0; }
+  to { background-position: 135% 0; }
+}
+
 /* Bewegung abschaltbar (Barrierefreiheit) */
 @media (prefers-reduced-motion: reduce) {
-  .anim-in, .stagger > *, .bar-fill, .donut-seg, .card-hero::after { animation: none !important; }
+  .anim-in, .stagger > *, .bar-fill, .donut-seg, .card-hero::after, .nav-progress { animation: none !important; }
   .card, .side-item, a.card:hover, .card-lift:hover { transition: none !important; transform: none !important; }
+  .btn-primary:active, .btn-dark:active, .btn-ghost:active { transform: none !important; }
 }
 
 /* Aufklappbares fällt als klickbar auf (Nutzer-Vorgabe 22.07., D157) */
