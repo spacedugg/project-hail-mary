@@ -19,6 +19,10 @@ import { fehlerInfo } from "@/lib/fehlercodes";
 import { normalisierePayload } from "@/lib/reviews/insights";
 import { IconUpload, IconCheck, IconSearch, IconReviews, IconContent, IconEuro, IconSichtbarkeit, IconSparkle } from "@/components/icons";
 import { AnalyseStart } from "@/components/analyse-start";
+import { ListingKontrolle, MassnahmenBlock } from "@/components/listing-kontrolle";
+import { AnalyseHintergrund } from "@/components/analyse-hintergrund";
+import { analyzeListing, wirksamesListing } from "@/lib/analysis/listingAudit";
+import type { SovAudit } from "@/lib/sov/audit";
 
 export const dynamic = "force-dynamic";
 // Apify-Scrapes & LLM-Generierung: sonnet-5 denkt adaptiv und braucht bei
@@ -115,6 +119,14 @@ export default async function ProductPage({
     where: eq(schema.conversionBlockers.productId, id),
     orderBy: desc(schema.conversionBlockers.createdAt),
   });
+  const deepAudit = await db.query.deepAudits.findFirst({
+    where: eq(schema.deepAudits.productId, id),
+    orderBy: desc(schema.deepAudits.createdAt),
+  });
+  const featureRanking = await db.query.featureRankings.findFirst({
+    where: eq(schema.featureRankings.productId, id),
+    orderBy: desc(schema.featureRankings.createdAt),
+  });
   const latestOf = (t: string) => versions.find((v) => v.type === t);
   const input = "input-base";
   const mc = product.marginCalc ?? null;
@@ -130,6 +142,26 @@ export default async function ProductPage({
   const scrapeAnalyzed = Boolean(
     insights && scrape && (insights.scrapeId === scrape.id || (!insights.scrapeId && insights.createdAt > scrape.createdAt)),
   );
+
+  // Kontrollvariablen (D172): Regel-Messung + KI-Befunde direkt im Listing-Reiter
+  const { snapshot: wirksam, quellen: sektionsQuellen } = wirksamesListing(versions, snapshot ?? null);
+  const sovAudit = (sovUpload?.parsed as { audit?: SovAudit })?.audit ?? null;
+  const analysis = analyzeListing({
+    snapshot: wirksam,
+    facts: product.facts,
+    primaryKeywords: kws.filter((k) => k.tier === "primary" && !k.ausgeschlossen).map((k) => k.keyword),
+    sovAudit,
+    reviewInsights: insights?.payload ?? null,
+  });
+  const auditNeuestesInput = Math.max(
+    snapshot?.createdAt.getTime() ?? 0,
+    insights?.createdAt.getTime() ?? 0,
+    versions[0]?.createdAt.getTime() ?? 0,
+    scrape?.createdAt.getTime() ?? 0,
+    sovUpload?.createdAt.getTime() ?? 0,
+  );
+  const auditStale = !deepAudit || auditNeuestesInput > deepAudit.createdAt.getTime();
+  const sektionSoll = { title: wirksam.title, bullets: wirksam.bullets.join(" "), description: wirksam.description };
 
   return (
     <main className="w-full p-8">
@@ -283,8 +315,12 @@ export default async function ProductPage({
               <SubmitButton className="btn-ghost text-xs">Importieren</SubmitButton>
             </form>
           </details>
+          {/* Kontrollvariablen direkt hier (D172): Scores nicht in einem Zweit-Level-Bericht */}
+          <ListingKontrolle analysis={analysis} deepAudit={deepAudit ?? null} quellen={sektionsQuellen} original={snapshot ?? null} sektionSoll={sektionSoll} />
         </section>
         )}
+        {/* Maßnahmen gehighlightet unten im Übersichtsreiter (D172) */}
+        {insights && tab === "listing" && <MassnahmenBlock analysis={analysis} deepAudit={deepAudit ?? null} />}
 
 
         {/* Keywords: in der Start-Phase der Prüf-Schritt vor dem Lauf (D172),
@@ -474,17 +510,22 @@ export default async function ProductPage({
                   {scrape.source !== "apify" && <span className="ml-1 pill pill-warn">Demo-Daten (kein Scrape-Key)</span>}
                 </span>
               </div>
+              {/* Sterne-Gruppierung (D172): schlecht = 1–3★ · neutral = 4★ · positiv = 5★ */}
               {scrape.amazonTotals?.dist ? (
                 /* Echte Amazon-Verteilung (%) des PRODUKTS; daneben NUR die Produkt-Stichprobe */
                 <div className="mt-2 space-y-1">
-                  {(["5", "4", "3", "2", "1"] as const).map((star) => {
-                    const pct = scrape.amazonTotals!.dist![star] ?? 0;
-                    const n = eigeneJeKlasse[star] ?? 0;
+                  {([
+                    ["Positiv", "5 ★", ["5"], "var(--cat-2)"],
+                    ["Neutral", "4 ★", ["4"], "var(--warn)"],
+                    ["Schlecht", "1–3 ★", ["1", "2", "3"], "var(--bad)"],
+                  ] as const).map(([label, sterne, keys, farbe]) => {
+                    const pct = keys.reduce((s, k) => s + (scrape.amazonTotals!.dist![k] ?? 0), 0);
+                    const n = keys.reduce((s, k) => s + (eigeneJeKlasse[k] ?? 0), 0);
                     return (
-                      <div key={star} className="flex items-center gap-2 text-xs tabular-nums">
-                        <span className="w-8 flex-none text-muted">{star} ★</span>
+                      <div key={label} className="flex items-center gap-2 text-xs tabular-nums">
+                        <span className="w-28 flex-none text-muted">{label} · {sterne}</span>
                         <div className="h-2 flex-1 overflow-hidden rounded-full bg-hair">
-                          <div className="bar-fill h-full rounded-full" style={{ width: `${pct}%`, background: Number(star) >= 4 ? "var(--cat-2)" : Number(star) === 3 ? "var(--warn)" : "var(--bad)" }} />
+                          <div className="bar-fill h-full rounded-full" style={{ width: `${Math.min(100, pct)}%`, background: farbe }} />
                         </div>
                         <span className="w-32 flex-none text-right font-medium">{pct} % · {n} gescraped</span>
                       </div>
@@ -494,8 +535,12 @@ export default async function ProductPage({
               ) : (
                 /* Ohne echte Verteilung KEINE Verhältnis-Balken — die Stichprobe ist je Klasse gedeckelt */
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  {(["5", "4", "3", "2", "1"] as const).map((star) => (
-                    <span key={star} className="rounded-full bg-hair px-2.5 py-1 text-xs tabular-nums">{star} ★ · {scrape.starCounts[star] ?? 0} gescraped</span>
+                  {([
+                    ["Positiv · 5 ★", ["5"]],
+                    ["Neutral · 4 ★", ["4"]],
+                    ["Schlecht · 1–3 ★", ["1", "2", "3"]],
+                  ] as const).map(([label, keys]) => (
+                    <span key={label} className="rounded-full bg-hair px-2.5 py-1 text-xs tabular-nums">{label} · {keys.reduce((s, k) => s + (scrape.starCounts[k] ?? 0), 0)} gescraped</span>
                   ))}
                 </div>
               )}
@@ -574,6 +619,18 @@ export default async function ProductPage({
             </>
           )}
         </section>
+        )}
+
+        {/* Restliches Hintergrundwissen (D172): Zielgruppe/USPs, Sterne-Gruppen, SOV, Feature-Ranking, Stärken & Schwächen */}
+        {insights && tab === "analyse" && (
+          <AnalyseHintergrund
+            productId={product.id}
+            analysis={analysis}
+            deepAudit={deepAudit ?? null}
+            auditStale={auditStale}
+            featureRanking={featureRanking ?? null}
+            original={snapshot ?? null}
+          />
         )}
 
         {insights && tab === "content" && (

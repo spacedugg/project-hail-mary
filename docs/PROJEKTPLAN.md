@@ -143,6 +143,7 @@ Content-Sprache ist je Produkt/Auftrag wählbar — unabhängig vom Marktplatz. 
 | Insight-Schema auch für Audit-Ausgaben: Stärken/Schwächen, Maßnahmen, Kauf-Verhinderer als Insight-Karten (D135) | 🧪 | Ein Erkenntnis-Format über alle Analyse-Dimensionen statt sieben Ausgabeformate |
 | Feature-Relevanz-Ranking: Listing-Features (Titel/Bullets/Attribute/Wichtige Infos/A+) nach Kunden-Relevanz sortiert; hoch relevant + bei Wettbewerbern unbeleuchtet = echter USP (D146, braucht D145) | 🧪 | Beantwortet datenbasiert, welches Feature in Bildern/A+ zuerst gezeigt wird — Umkehrung des Kundenstimmen-Abgleichs |
 | Conversion-Blocker-Reiter: Kunden-Themen mit Gewicht OHNE Listing-Antwort, Aspekt-Match per Code erzwungen (D167) | 🧪 | Zeigt, wo das Listing auf nachweislich Kaufentscheidendes schweigt — jeder Blocker mit echten Beleg-Aspekten |
+| Start-Maske + Ein-Klick-Pipeline: alles vorab abgefragt (Keywords mit Prüf-Schritt, Wettbewerber-ASINs, Content-Auswahl), EIN Klick fährt alle Etappen automatisch; danach Reiter Amazon Listing (Kontrollvariablen + Maßnahmen) · Content · Analyse (alles gebündelt) · Marge · Briefings (D172) | 🧪 | Ein geführter Lauf statt sechs Einzel-Klicks über Schritt-Reiter |
 | Produkt-Kopfkarte über allen Reitern: Bild, Listing-Titel, ASIN, Stand, Steuergrößen, Reviews analysiert (D166) | 🧪 | Ein Blick zeigt jederzeit, welches Produkt in welchem Zustand bearbeitet wird |
 | Druck-Layout | 🧪 | Kundentaugliche Aufbereitung |
 | Bild-Audit (automatische visuelle Prüfung) | ⬜ | Hauptbild = größter CRO-Hebel |

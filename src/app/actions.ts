@@ -977,7 +977,7 @@ export async function rankeFeaturesAction(formData: FormData) {
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return;
   const back = (msg: string, code: string) =>
-    redirect(`/produkte/${productId}/analyse?fehler=${encodeURIComponent(msg)}&code=${code}`);
+    redirect(`/produkte/${productId}?tab=analyse&fehler=${encodeURIComponent(msg)}&code=${code}`);
 
   const snapshot = await db.query.listingSnapshots.findFirst({
     where: eq(schema.listingSnapshots.productId, productId),
@@ -997,7 +997,7 @@ export async function rankeFeaturesAction(formData: FormData) {
     orderBy: desc(schema.featureRankings.createdAt),
   });
   if (last && Math.max(snapshot!.createdAt.getTime(), insight!.createdAt.getTime()) <= last.createdAt.getTime()) {
-    redirect(`/produkte/${productId}/analyse?hinweis=${encodeURIComponent("Die Datenbasis ist seit dem letzten Feature-Ranking unverändert — das Ergebnis unten ist aktuell. Neu ranken wird nach neuem Import oder neuer Analyse wieder frei.")}`);
+    redirect(`/produkte/${productId}?tab=analyse&hinweis=${encodeURIComponent("Die Datenbasis ist seit dem letzten Feature-Ranking unverändert — das Ergebnis unten ist aktuell. Neu ranken wird nach neuem Import oder neuer Analyse wieder frei.")}`);
   }
 
   const { normalisierePayload } = await import("@/lib/reviews/insights");
@@ -1045,8 +1045,8 @@ export async function rankeFeaturesAction(formData: FormData) {
   } catch (e) {
     back(`Feature-Ranking: ${e instanceof Error ? e.message : String(e)}`, "FEA-01");
   }
-  revalidatePath(`/produkte/${productId}/analyse`);
-  redirect(`/produkte/${productId}/analyse`);
+  revalidatePath(`/produkte/${productId}`);
+  redirect(`/produkte/${productId}?tab=analyse`);
 }
 
 /**
@@ -1407,7 +1407,7 @@ export async function runDeepAuditAction(formData: FormData) {
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return;
-  const back = (msg: string) => redirect(`/produkte/${productId}/analyse?fehler=${encodeURIComponent(msg)}&code=AUD-01`);
+  const back = (msg: string) => redirect(`/produkte/${productId}?tab=analyse&fehler=${encodeURIComponent(msg)}&code=AUD-01`);
 
   const snapshot = await db.query.listingSnapshots.findFirst({
     where: eq(schema.listingSnapshots.productId, productId),
@@ -1466,7 +1466,7 @@ export async function runDeepAuditAction(formData: FormData) {
       sovUpload?.createdAt.getTime() ?? 0,
     );
     if (newestInput <= lastAudit.createdAt.getTime()) {
-      redirect(`/produkte/${productId}/analyse?hinweis=${encodeURIComponent("Die Datenbasis ist seit dem letzten Tiefen-Audit unverändert — das Ergebnis unten ist aktuell. Neu bewerten wird nach neuem Import, Scrape, Analyse oder Content wieder frei.")}`);
+      redirect(`/produkte/${productId}?tab=analyse&hinweis=${encodeURIComponent("Die Datenbasis ist seit dem letzten Tiefen-Audit unverändert — das Ergebnis unten ist aktuell. Neu bewerten wird nach neuem Import, Scrape, Analyse oder Content wieder frei.")}`);
     }
   }
 
@@ -1512,7 +1512,7 @@ export async function runDeepAuditAction(formData: FormData) {
   } catch (e) {
     back(`Tiefen-Audit: ${e instanceof Error ? e.message : String(e)}`);
   }
-  revalidatePath(`/produkte/${productId}/analyse`);
+  revalidatePath(`/produkte/${productId}`);
   revalidatePath(`/produkte/${productId}`);
 }
 
