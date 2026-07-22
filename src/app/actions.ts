@@ -935,6 +935,8 @@ async function fuehreVerdichtungAus(db: Awaited<ReturnType<typeof getDb>>, produ
         kernThese: res.kernThese,
         verworfeneKarten: res.verworfen,
         entfernteBildIdeen: res.entfernteBildIdeen,
+        // Signifikanz-Gate (D170): Übergangenes ausweisen, nie still
+        qualitaetsNotizen: [...(payload.qualitaetsNotizen ?? []), ...res.hinweise],
       },
     })
     .where(eq(schema.reviewInsights.id, insight.id));

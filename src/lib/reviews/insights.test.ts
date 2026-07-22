@@ -32,17 +32,18 @@ describe("normalisiereInsights", () => {
     expect(p.languageToAvoid).toEqual(["Premium"]);
   });
 
-  it("kaputte Einträge fliegen raus, Zahlen-Strings werden koerziert, Quotes auf 3 gekappt", () => {
+  it("kaputte Einträge fliegen raus, Zahlen-Strings werden koerziert, Quotes auf 15 gekappt (D170)", () => {
     const p = normalisiereInsights({
       painPoints: [
         { label: "", frequencyPct: 10 }, // ohne Label → raus
         null,
-        { label: "zu klein", frequencyPct: "25,5", quotes: ["a", "b", "c", "d", 5] },
+        { label: "zu klein", frequencyPct: "25,5", quotes: [...Array.from({ length: 16 }, (_, i) => `zitat ${i + 1}`), 5] },
       ],
     });
     expect(p.painPoints).toHaveLength(1);
     expect(p.painPoints[0]).toMatchObject({ label: "zu klein", frequencyPct: 25.5 });
-    expect(p.painPoints[0].quotes).toEqual(["a", "b", "c"]);
+    expect(p.painPoints[0].quotes).toHaveLength(15); // Basis des echten Zählwerts (D170)
+    expect(p.painPoints[0].quotes[0]).toBe("zitat 1");
   });
 });
 

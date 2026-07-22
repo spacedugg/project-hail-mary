@@ -42,6 +42,23 @@ describe("verifiziereZitate", () => {
     expect(notizen.some((n) => n.includes("1.0★") && n.includes("prüfen"))).toBe(true);
   });
 
+  it("mentionCount = VERSCHIEDENE Reviews mit verifizierter Fundstelle — der Code zählt, nie das LLM (D170)", () => {
+    const { aspekte } = verifiziereZitate(
+      [
+        aspekt("Verdauung und Fell", [
+          "Jetzt ist die Verdauung super und das Fell glänzt wieder.", // Review 3
+          "die Verdauung super und das Fell glänzt", // ebenfalls Review 3 → zählt nicht doppelt
+          "Kein eines von diesen Dingern hat mein Hund gegessen", // Review 2
+          "Der Tierarzt hat es empfohlen", // erfunden → zählt nicht
+        ]),
+      ],
+      reviews,
+      "buyingTrigger",
+    );
+    expect(aspekte[0].mentionCount).toBe(2); // LLM-Wert 10 überschrieben
+    expect(aspekte[0].frequencyPct).toBeNull();
+  });
+
   it("Groß-/Kleinschreibung und Anführungszeichen stören den Abgleich nicht", () => {
     const { aspekte } = verifiziereZitate(
       [aspekt("Ärztlich abgeklärt", ["nachdem medizinische gründe ÄRZTLICH ausgeschlossen werden konnten"])],

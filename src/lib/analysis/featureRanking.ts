@@ -1,6 +1,6 @@
 import { generateForRecipe, resolveRecipe } from "@/lib/llm/registry";
 import { parseLlmJson } from "@/lib/llm/json";
-import { findeAspekt, type RoheAspekte } from "@/lib/reviews/verdichtung";
+import { filtereEinzelnennungen, findeAspekt, type RoheAspekte } from "@/lib/reviews/verdichtung";
 import { pruefeBildIdeen } from "@/lib/analysis/bildideen";
 import type { FeatureRankingPayload, InsightCard } from "@/db/schema";
 
@@ -180,7 +180,12 @@ export async function rankeFeatures(input: {
     throw new Error("Feature-Ranking braucht Listing-Inhalt — erst das Listing importieren (D145-Felder inklusive).");
   }
 
+  // Signifikanz-Gate (D170): Einzelnennungen bei großer Stichprobe zählen nicht als Kunden-Echo
+  const gate = filtereEinzelnennungen(input.aspekte, input.reviewsGesamt);
+  input = { ...input, aspekte: gate.aspekte };
+
   const hinweise: string[] = [
+    ...gate.hinweise,
     "USP-Vergleich (‚bei Wettbewerbern unbeleuchtet') ist nicht bewertbar — Wettbewerber-LISTINGS liegen nicht vor (Wettbewerber-Auswahl auf Hold, D144). " +
       (input.wettbewerberAsins > 0
         ? `Die ${input.wettbewerberAsins} Wettbewerber-ASINs im Review-Scrape liefern Kundenstimmen, aber keine Listing-Inhalte.`

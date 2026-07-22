@@ -97,7 +97,11 @@ export function BewertungsDashboard({
           <div className="mt-3 space-y-3">
             {p.painPoints.map((x, i) => (
               <div key={i} className="rounded-xl border border-hair p-3">
-                <span className="text-sm font-medium">{x.label}</span>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-sm font-medium">{x.label}</span>
+                  {/* Echter Zählwert (D170): verschiedene Reviews mit verifizierter Fundstelle */}
+                  {x.mentionCount !== null && <span className="flex-none rounded-full bg-hair px-2 py-0.5 text-[11px] tabular-nums text-muted" title="Reviews mit verifizierter Fundstelle">{x.mentionCount}×</span>}
+                </div>
                 {x.quotes?.length > 0 && (
                   <blockquote className="mt-2 border-l-2 border-hair pl-2 text-xs italic text-muted">„{x.quotes[0]}"</blockquote>
                 )}
@@ -111,7 +115,10 @@ export function BewertungsDashboard({
           <div className="mt-3 space-y-3">
             {p.buyingTriggers.map((x, i) => (
               <div key={i} className="rounded-xl border border-hair p-3">
-                <span className="text-sm font-medium">{x.label}</span>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-sm font-medium">{x.label}</span>
+                  {x.mentionCount !== null && <span className="flex-none rounded-full bg-hair px-2 py-0.5 text-[11px] tabular-nums text-muted" title="Reviews mit verifizierter Fundstelle">{x.mentionCount}×</span>}
+                </div>
                 {x.quotes?.length > 0 && (
                   <blockquote className="mt-2 border-l-2 border-hair pl-2 text-xs italic text-muted">„{x.quotes[0]}"</blockquote>
                 )}

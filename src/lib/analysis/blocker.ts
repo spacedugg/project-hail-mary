@@ -1,6 +1,6 @@
 import { generateForRecipe, resolveRecipe } from "@/lib/llm/registry";
 import { parseLlmJson } from "@/lib/llm/json";
-import { findeAspekt, type RoheAspekte } from "@/lib/reviews/verdichtung";
+import { filtereEinzelnennungen, findeAspekt, type RoheAspekte } from "@/lib/reviews/verdichtung";
 import { featureRelevanz, quellTexte, type FeatureQuellen } from "@/lib/analysis/featureRanking";
 import type { ConversionBlockerPayload, InsightCard } from "@/db/schema";
 
@@ -109,13 +109,16 @@ export async function findeBlocker(input: {
   if (!Object.values(texte).some((t) => t.trim())) {
     throw new Error("Der Blocker-Lauf braucht Listing-Inhalt — erst das Listing importieren.");
   }
+  // Signifikanz-Gate (D170): Einzelnennungen bei großer Stichprobe werden kein Blocker
+  const gate = filtereEinzelnennungen(input.aspekte, input.reviewsGesamt);
+  input = { ...input, aspekte: gate.aspekte };
   if (input.aspekte.painPoints.length + input.aspekte.buyingTriggers.length === 0) {
     throw new Error("Der Blocker-Lauf braucht die Kunden-Themen der Bewertungs-Analyse — der Match ist der Blocker.");
   }
 
   // Quellen-Tags stempelt der CODE (D133): die tatsächlich geprüfte Datenbasis
   const quellenTags = ["Reviews", "Listing", ...(texte.bilder.trim() ? ["Bilder"] : [])];
-  const hinweise: string[] = [];
+  const hinweise: string[] = [...gate.hinweise];
   const QUELL_LABEL: Record<string, string> = {
     title: "Titel", bullets: "Bullets", description: "Beschreibung", attributes: "Attribute",
     important_info: "Wichtige Informationen", aplus: "A+-Inhalt", bilder: "Bilder",

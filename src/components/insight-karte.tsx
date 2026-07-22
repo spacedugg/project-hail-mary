@@ -54,6 +54,8 @@ export function InsightKarte({
                       </span>{" "}
                       {b.label}
                     </span>
+                    {/* Echter Zählwert (D170): Reviews mit verifizierter Fundstelle */}
+                    {b.mentionCount !== null && <span className="flex-none tabular-nums text-muted" title="Reviews mit verifizierter Fundstelle">{b.mentionCount}×</span>}
                   </li>
                 ))}
               </ul>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalisiereInsightCards, verdichteInsights } from "./verdichtung";
+import { filtereEinzelnennungen, normalisiereInsightCards, verdichteInsights } from "./verdichtung";
 import type { ReviewInsightsPayload } from "@/db/schema";
 
 /** Roh-Themen wie aus der Analyse-Etappe (D131-Basis). */
@@ -119,5 +119,29 @@ describe("verdichteInsights (Mock-Provider ohne Key)", () => {
     await expect(
       verdichteInsights({ ...payload, painPoints: [], buyingTriggers: [] }, { quellen: QUELLEN }),
     ).rejects.toThrow(/Roh-Themen/);
+  });
+});
+
+describe("filtereEinzelnennungen — Signifikanz-Gate (D170)", () => {
+  const selten = { label: "Insektenprotein überrascht", frequencyPct: null, mentionCount: 1, quotes: ["hätte ich das gewusst"] };
+  const haeufig = { label: "Hund frisst die Drops nicht", frequencyPct: null, mentionCount: 19, quotes: [] };
+  const ohneZahl = { label: "Altbestand ohne Zählwert", frequencyPct: null, mentionCount: null, quotes: [] };
+
+  it("bei großer Stichprobe fliegen Einzelnennungen GEZÄHLT und BENANNT raus", () => {
+    const { aspekte, hinweise } = filtereEinzelnennungen({ painPoints: [selten, haeufig], buyingTriggers: [] }, 1000);
+    expect(aspekte.painPoints.map((a) => a.label)).toEqual(["Hund frisst die Drops nicht"]);
+    expect(hinweise[0]).toContain("Insektenprotein überrascht");
+    expect(hinweise[0]).toContain("1000 analysierten Reviews");
+  });
+
+  it("ab 500 Reviews braucht ein Aspekt 3 Fundstellen", () => {
+    const zwei = { ...selten, mentionCount: 2 };
+    expect(filtereEinzelnennungen({ painPoints: [zwei], buyingTriggers: [] }, 600).aspekte.painPoints).toEqual([]);
+    expect(filtereEinzelnennungen({ painPoints: [zwei], buyingTriggers: [] }, 200).aspekte.painPoints).toHaveLength(1);
+  });
+
+  it("kleine Stichprobe und Altbestand ohne Zählwert bleiben unangetastet", () => {
+    expect(filtereEinzelnennungen({ painPoints: [selten], buyingTriggers: [] }, 60).aspekte.painPoints).toHaveLength(1);
+    expect(filtereEinzelnennungen({ painPoints: [ohneZahl], buyingTriggers: [] }, 1000).aspekte.painPoints).toHaveLength(1);
   });
 });

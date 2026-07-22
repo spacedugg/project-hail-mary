@@ -13,6 +13,10 @@ import type { RawReview } from "./apify";
  * 3. SENTIMENT-PLAUSIBILITÄT: Die Sterne der Beleg-Reviews sind ein Signal —
  *    ein „Kaufauslöser", dessen Belege im Schnitt aus 1–2★-Reviews stammen,
  *    bekommt einen sichtbaren Warnhinweis (kein stilles Umsortieren).
+ * 4. ECHTER ZÄHLWERT (D170): mentionCount = Anzahl VERSCHIEDENER Reviews mit
+ *    verifizierter Fundstelle — vom Code gezählt, nie vom LLM geschätzt
+ *    (D154). Ein ehrlicher Mindestwert: mindestens so oft kommt der Aspekt
+ *    nachweislich vor.
  */
 
 type Aspekt = ReviewInsightsPayload["painPoints"][number];
@@ -32,12 +36,14 @@ export function verifiziereZitate(
   for (const a of aspekte) {
     const belegt: string[] = [];
     const sterne: number[] = [];
+    const fundReviews = new Set<number>();
     for (const q of a.quotes) {
       const nq = norm(q);
-      const treffer = nq.length >= 8 ? texte.find((t) => t.text.includes(nq)) : undefined;
-      if (treffer) {
+      const trefferIndex = nq.length >= 8 ? texte.findIndex((t) => t.text.includes(nq)) : -1;
+      if (trefferIndex >= 0) {
         belegt.push(q);
-        sterne.push(treffer.rating);
+        sterne.push(texte[trefferIndex].rating);
+        fundReviews.add(trefferIndex);
       } else {
         entfernteZitate++;
       }
@@ -50,7 +56,8 @@ export function verifiziereZitate(
     if (typ === "buyingTrigger" && avg <= 2.5) {
       notizen.push(`△ Kaufauslöser „${a.label}": Beleg-Zitate stammen im Schnitt aus ${avg.toFixed(1)}★-Reviews — Einordnung als Kaufauslöser prüfen.`);
     }
-    behalten.push({ ...a, quotes: belegt });
+    // Echter Zählwert (D170): verschiedene Reviews mit verifizierter Fundstelle
+    behalten.push({ ...a, quotes: belegt, mentionCount: fundReviews.size, frequencyPct: null });
   }
   if (entfernteZitate > 0) {
     notizen.push(`${entfernteZitate} Zitat(e) ohne wörtliche Fundstelle in den Reviews entfernt (Verbatim-Gate).`);

@@ -175,7 +175,7 @@ ${fmt(crit) || "(keine)"}
 REVIEWS 4–5★:
 ${fmt(pos) || "(keine)"}
 
-AUFGABE: Extrahiere 8–12 Pain Points und 6–10 Kaufauslöser, WICHTIGSTER ZUERST (Reihenfolge = Gewicht), je mit 1–3 verbatim-Zitaten. KEINE Zählwerte oder Prozentangaben — die wären Schätzungen. Dazu Kundensprache zum Übernehmen (wörtliche Formulierungen) und Sprache zum Vermeiden.
+AUFGABE: Extrahiere 8–12 Pain Points und 6–10 Kaufauslöser, WICHTIGSTER ZUERST (Reihenfolge = Gewicht). Je Aspekt ALLE wörtlichen Fundstellen aus VERSCHIEDENEN Reviews (max. 15 Zitate je Aspekt) — die Fundstellen werden programmatisch verifiziert und GEZÄHLT, jedes ausgelassene Vorkommen fehlt später im echten Zählwert. KEINE eigenen Zählwerte oder Prozentangaben — gezählt wird im Code. Dazu Kundensprache zum Übernehmen (wörtliche Formulierungen) und Sprache zum Vermeiden.
 WICHTIG: Werte ALLE Reviews auf BEIDES aus. Pain Points finden sich auch in 4–5★-Reviews (Einschränkungen, „gut, aber…", Wünsche) — das sind oft die wertvollsten, weil sie von überzeugten Käufern kommen. Kaufauslöser finden sich auch in 1–3★-Reviews (was trotz Enttäuschung überzeugt hat, warum gekauft wurde). Die Sterne-Zahl ist Kontext für die Gewichtung, kein Filter.
 BELEG-REGELN (WICHTIGSTE REGELN — Verstöße werden programmatisch aussortiert):
 1. Das Label darf NUR behaupten, was seine Zitate WÖRTLICH stützen. Beispiel-Fehler: Zitat „Nachdem medizinische Gründe ärztlich ausgeschlossen wurden, probierten wir es" belegt KEINE „Empfehlung durch Tierarzt" — der Arzt hat Ursachen ausgeschlossen, nicht das Produkt empfohlen.
@@ -216,7 +216,8 @@ export async function extractInsights(
     const res = await generateForRecipe("reviews.pain-points", {
       system: INSIGHTS_SYSTEM,
       messages: [{ role: "user", content: insightsPrompt(reviews) }],
-      maxTokens: 8000,
+      // Bis zu 15 Fundstellen je Aspekt (D170) brauchen Antwort-Budget
+      maxTokens: 16000,
       temperature: 0,
     });
     // Struktur ERZWINGEN statt blind speichern (D103): kaputte/abweichende
@@ -252,6 +253,12 @@ export async function extractInsights(
     if (core.painPoints.length === 0 && core.buyingTriggers.length === 0) {
       throw new Error("Die Analyse lieferte kein belegbares Ergebnis (alle Aspekte ohne wörtliche Zitat-Belege) — bitte erneut starten.");
     }
+
+    // Reihenfolge = Gewicht (D154), jetzt mit ECHTEN Zählwerten (D170):
+    // deterministisch nach verifizierten Fundstellen sortieren.
+    const nachGewicht = (liste: typeof core.painPoints) =>
+      [...liste].sort((a, b) => (b.mentionCount ?? 0) - (a.mentionCount ?? 0));
+    core = { ...core, painPoints: nachGewicht(core.painPoints), buyingTriggers: nachGewicht(core.buyingTriggers) };
   }
 
   const confidence = reviews.length >= 60 ? "high" : reviews.length >= 20 ? "medium" : "low";

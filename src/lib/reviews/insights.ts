@@ -37,7 +37,8 @@ function findings(v: unknown): Kern["painPoints"] {
         label,
         frequencyPct: num(f.frequencyPct ?? f.frequency_pct),
         mentionCount: num(f.mentionCount ?? f.mention_count),
-        quotes: strings(f.quotes).slice(0, 3),
+        // bis zu 15 Fundstellen je Aspekt (D170) — Basis des echten Zählwerts
+        quotes: strings(f.quotes).slice(0, 15),
       };
     })
     .filter((f): f is NonNullable<typeof f> => f !== null);

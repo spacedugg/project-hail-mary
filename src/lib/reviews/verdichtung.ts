@@ -25,9 +25,42 @@ export type VerdichtungsErgebnis = {
   verworfen: number;
   /** Vom Wahrheits-Filter (D134) aussortierte Bild-Ideen — ausgewiesen, nie still. */
   entfernteBildIdeen: Array<{ idee: string; grund: string }>;
+  /** Signifikanz-Gate (D170): übergangene Einzelnennungen u. Ä. — ausgewiesen, nie still. */
+  hinweise: string[];
 };
 
 const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, "").replace(/\s+/g, " ").trim();
+
+/**
+ * Signifikanz-Gate (D170, Nutzer-Vorgabe 22.07.): Was bei großer Stichprobe
+ * nur vereinzelt vorkommt (z. B. 1–2 von 1.000 Reviews), wird KEINE
+ * Erkenntnis und KEIN Finding für Briefings — es bleibt in der Roh-Liste
+ * sichtbar, wird aber ausgewiesen übergangen. Schwelle deterministisch:
+ * unter 100 analysierten Reviews kein Gate (dünne Basis wird schon per
+ * Worturteil eingeordnet, D138); ab 100 braucht ein Aspekt ≥2, ab 500 ≥3
+ * verifizierte Fundstellen. Aspekte ohne Zählwert (Altbestand) bleiben.
+ */
+export function filtereEinzelnennungen(
+  aspekte: RoheAspekte,
+  reviewsGesamt: number,
+): { aspekte: RoheAspekte; hinweise: string[] } {
+  if (reviewsGesamt < 100) return { aspekte, hinweise: [] };
+  const mindest = reviewsGesamt >= 500 ? 3 : 2;
+  const uebergangen: string[] = [];
+  const filter = (liste: RoheAspekte["painPoints"]) =>
+    liste.filter((a) => {
+      if (a.mentionCount === null || a.mentionCount >= mindest) return true;
+      uebergangen.push(a.label);
+      return false;
+    });
+  const gefiltert = { painPoints: filter(aspekte.painPoints), buyingTriggers: filter(aspekte.buyingTriggers) };
+  const hinweise = uebergangen.length
+    ? [
+        `Signifikanz-Gate: ${uebergangen.length} Aspekt(e) mit weniger als ${mindest} verifizierten Fundstellen bei ${reviewsGesamt} analysierten Reviews nicht als Erkenntnis gewertet: ${uebergangen.map((l) => `„${l}"`).join(", ")}.`,
+      ]
+    : [];
+  return { aspekte: gefiltert, hinweise };
+}
 
 /** Aspekt-Referenz des LLM gegen die ECHTEN Roh-Themen auflösen (wortgleich oder enthalten). */
 export function findeAspekt(ref: string, aspekte: RoheAspekte): BelegAspekt | null {
@@ -151,7 +184,13 @@ export async function verdichteInsights(
     belegText?: string;
   },
 ): Promise<VerdichtungsErgebnis> {
-  const aspekte: RoheAspekte = { painPoints: payload.painPoints, buyingTriggers: payload.buyingTriggers };
+  // Signifikanz-Gate (D170): Einzelnennungen bei großer Stichprobe werden
+  // keine Erkenntnis — ausgewiesen, nie still.
+  const gate = filtereEinzelnennungen(
+    { painPoints: payload.painPoints, buyingTriggers: payload.buyingTriggers },
+    payload.stats.reviewsTotal,
+  );
+  const aspekte = gate.aspekte;
   if (aspekte.painPoints.length === 0 && aspekte.buyingTriggers.length === 0) {
     throw new Error("Verdichtung braucht Roh-Themen — die Review-Analyse (Etappe davor) hat keine geliefert.");
   }
@@ -175,6 +214,7 @@ export async function verdichteInsights(
       kernThese: "Mock-Kern-These — in Produktion fasst EIN Satz die Analyse zusammen.",
       verworfen: 0,
       entfernteBildIdeen: [],
+      hinweise: gate.hinweise,
     };
   }
 
@@ -203,5 +243,5 @@ export async function verdichteInsights(
   }
 
   const kernThese = String((raw as { kernThese?: unknown }).kernThese ?? "").trim() || null;
-  return { cards, kernThese, verworfen, entfernteBildIdeen };
+  return { cards, kernThese, verworfen, entfernteBildIdeen, hinweise: gate.hinweise };
 }
