@@ -75,7 +75,7 @@ Das Content-Kraftwerk. Untermenüs = die Bereiche des Produkt-Arbeitsplatzes.
 | Feature | Status | Handlung/Nutzen |
 |---|---|---|
 | Listing-Import von Amazon (Titel, Bullets, Bilder, Bewertungszahlen) | ✅ | Ist-Zustand als Arbeitsgrundlage, ohne Abtippen |
-| Import-Erweiterung: Attribute (Produktinformation-Tabelle), „Wichtige Informationen", A+-Inhalt (D145) | ⬜ | Die verlässlichsten Produktdaten (strukturierte Attribute, Inhaltsstoffe wörtlich) für Fakten-Autofill (D70) und Quellen-Ausweis (D133); nicht Lieferbares ehrlich „nicht erfasst" |
+| Import-Erweiterung: Attribute (Produktinformation-Tabelle), „Wichtige Informationen", A+-Inhalt (D145) | 🧪 | Die verlässlichsten Produktdaten (strukturierte Attribute, Inhaltsstoffe wörtlich) für Fakten-Autofill (D70) und Quellen-Ausweis (D133); nicht Lieferbares ehrlich „nicht erfasst" |
 
 **Untermenü: Keyword-Basis**
 

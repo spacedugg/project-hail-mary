@@ -12,11 +12,27 @@ import { generateForRecipe } from "@/lib/llm/registry";
 import { parseLlmJson } from "@/lib/llm/json";
 
 export async function extractFactsFromListing(
-  listing: { title: string | null; bullets: string[] | null; description: string | null },
+  listing: {
+    title: string | null;
+    bullets: string[] | null;
+    description: string | null;
+    /** Erweiterte Quellen (D145) — strukturierte Attribute schlagen Fließtext als Fakten-Quelle. */
+    attributes?: Record<string, string> | null;
+    importantInfo?: string | null;
+  },
   existing: ProductFacts,
 ): Promise<ProductFacts | null> {
   if (!process.env.ANTHROPIC_API_KEY) return null;
-  const text = [listing.title ?? "", ...(listing.bullets ?? []), (listing.description ?? "").slice(0, 2000)]
+  const attrText = listing.attributes
+    ? Object.entries(listing.attributes).map(([k, v]) => `${k}: ${v}`).join("\n")
+    : "";
+  const text = [
+    listing.title ?? "",
+    ...(listing.bullets ?? []),
+    attrText ? `PRODUKTINFORMATION (strukturiert):\n${attrText}` : "",
+    listing.importantInfo ? `WICHTIGE INFORMATIONEN:\n${listing.importantInfo.slice(0, 2000)}` : "",
+    (listing.description ?? "").slice(0, 2000),
+  ]
     .filter(Boolean)
     .join("\n");
   if (text.trim().length < 40) return null;

@@ -1,4 +1,4 @@
-import type { ProductSnapshot } from "./apifyProduct";
+import { parseAttributes, parseImportantInfo, type ProductSnapshot } from "./apifyProduct";
 
 /**
  * Apify-Produkt-Crawler (junglee/amazon-crawler, D84 — Nutzer lieferte das
@@ -48,6 +48,9 @@ export function mapCrawlerItem(it: CrawlerItem, url: string): ProductSnapshot {
     reviewsTotal: reviewsCount !== null && reviewsCount >= 0 ? Math.round(reviewsCount) : null,
     ratingAvg: stars !== null && stars > 0 && stars <= 5 ? Math.round(stars * 10) / 10 : null,
     ratingDist,
+    attributes: parseAttributes(it),
+    importantInfo: parseImportantInfo(it),
+    aplusContent: null, // Crawler-Route liefert keinen A+-Inhalt — ehrlich „nicht erfasst" (D145)
     raw: { provider: "crawler", url, asin: it.asin },
   };
 }

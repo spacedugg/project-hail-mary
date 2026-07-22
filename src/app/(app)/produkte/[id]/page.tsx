@@ -198,6 +198,20 @@ export default async function ProductPage({
                 {snapshot.ratingAvg !== null && <> · Ø {new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(snapshot.ratingAvg)} ★</>}
                 {snapshot.ratingDist && <> · {(["5", "4", "3", "2", "1"] as const).filter((s) => snapshot.ratingDist![s] !== undefined).map((s) => `${s}★ ${snapshot.ratingDist![s]} %`).join(" · ")}</>}
               </p>
+              {/* Erweiterte Quellen (D145): null = vom Import-Weg nicht erfasst — ehrlich sagen, nie als „leer" deuten */}
+              <p className="mt-1 text-muted">
+                {snapshot.attributes ? `${Object.keys(snapshot.attributes).length} Attribute` : "Attribute: nicht erfasst"}
+                {" · "}
+                {snapshot.importantInfo ? `Wichtige Informationen ${fmt(snapshot.importantInfo.length)} Zeichen` : "Wichtige Informationen: nicht erfasst"}
+                {" · "}
+                {snapshot.aplusContent ? `A+-Inhalt ${fmt(snapshot.aplusContent.length)} Zeichen` : "A+-Inhalt: nicht erfasst"}
+              </p>
+              {snapshot.attributes && (
+                <p className="mt-1 text-muted">
+                  {Object.entries(snapshot.attributes).slice(0, 5).map(([k, v]) => `${k}: ${v.slice(0, 40)}`).join(" · ")}
+                  {Object.keys(snapshot.attributes).length > 5 ? " · …" : ""}
+                </p>
+              )}
             </div>
           )}
           {snapshot?.imageUrls && snapshot.imageUrls.length > 0 && (

@@ -369,6 +369,15 @@ export const listingSnapshots = sqliteTable("listing_snapshots", {
   reviewsTotal: integer("reviews_total"),
   ratingAvg: real("rating_avg"),
   ratingDist: text("rating_dist", { mode: "json" }).$type<Record<string, number>>(),
+  /**
+   * Erweiterte Listing-Quellen (D145): strukturierte Attribute (Produktinformation-
+   * Tabelle als Schlüssel→Wert), die Sektion „Wichtige Informationen" und der
+   * A+-Inhalt („Vom Hersteller") als Text. null = vom Import-Weg nicht erfasst —
+   * wird im UI ehrlich ausgewiesen, nie als „leer" gedeutet.
+   */
+  attributes: text("attributes", { mode: "json" }).$type<Record<string, string>>(),
+  importantInfo: text("important_info"),
+  aplusContent: text("aplus_content"),
   raw: text("raw", { mode: "json" }),
   createdAt: ts("created_at").notNull(),
 });
