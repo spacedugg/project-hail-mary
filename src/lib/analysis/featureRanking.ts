@@ -26,6 +26,8 @@ export type FeatureQuellen = {
   attributes: Record<string, string> | null;
   importantInfo: string | null;
   aplusContent: string | null;
+  /** Bild-Auslese (D158) als Text — Quelle „Bilder". */
+  bilder?: string | null;
 };
 
 const QUELL_LABEL: Record<string, string> = {
@@ -35,6 +37,7 @@ const QUELL_LABEL: Record<string, string> = {
   attributes: "Attribute",
   important_info: "Wichtige Informationen",
   aplus: "A+-Inhalt",
+  bilder: "Bilder",
 };
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
@@ -48,6 +51,7 @@ function quellTexte(q: FeatureQuellen): Record<string, string> {
     attributes: q.attributes ? Object.entries(q.attributes).map(([k, v]) => `${k}: ${v}`).join("\n") : "",
     important_info: q.importantInfo ?? "",
     aplus: q.aplusContent ?? "",
+    bilder: q.bilder ?? "",
   };
 }
 
@@ -153,7 +157,7 @@ AUFGABE: Extrahiere 5–10 PRODUKT-FEATURES aus den Listing-Quelltexten (Sprache
 REGELN:
 1. titel: das Feature in Klartext (max. 8 Wörter, z. B. "Gezielte Wirkung bei Sodbrennen & Grasfressen") — nur Features, die WIRKLICH im Listing stehen.
 2. beschreibung: 2–3 Sätze, was das Feature ist und leistet — nur Belegtes, keine Erfindungen.
-3. belege: je Quelle, in der das Feature vorkommt, ein Objekt {"quelle": "title|bullets|description|attributes|important_info|aplus", "zitat": "WORTWÖRTLICHER Ausschnitt (3–12 Wörter) aus GENAU dieser Quelle"}. Der Ausschnitt wird programmatisch geprüft — paraphrasieren lässt den Beleg platzen.
+3. belege: je Quelle, in der das Feature vorkommt, ein Objekt {"quelle": "title|bullets|description|attributes|important_info|aplus|bilder", "zitat": "WORTWÖRTLICHER Ausschnitt (3–12 Wörter) aus GENAU dieser Quelle"}. Der Ausschnitt wird programmatisch geprüft — paraphrasieren lässt den Beleg platzen.
 4. passendeAspekte: die WORTGLEICHEN Labels der Roh-Themen oben, die dieses Feature betreffen (leer lassen, wenn Kunden es nicht erwähnen — das ist ein ehrliches, wichtiges Signal).
 5. bildIdeen: 2–3 konkrete visuelle Umsetzungsideen. VERBOTEN: erfundene Autoritäts-Belege (Experten-Zitate, Testimonials, Siegel, Zertifikate), die nicht in den Quelltexten stehen.
 

@@ -282,6 +282,27 @@ export default async function ProductPage({
               })}
             </div>
           )}
+          {snapshot?.bilderText && snapshot.bilderText.length > 0 && (
+            <details className="mt-3">
+              <summary className="text-xs">Bild-Auslese ({snapshot.bilderText.length} Bilder gelesen{(snapshot.bildBefunde?.length ?? 0) > 0 ? ` · ${snapshot.bildBefunde!.length} Befund${snapshot.bildBefunde!.length === 1 ? "" : "e"}` : ""})</summary>
+              {(snapshot.bildBefunde?.length ?? 0) > 0 && (
+                <ul className="mt-2 space-y-0.5">
+                  {snapshot.bildBefunde!.map((b, i) => <li key={i} className="text-xs text-warn">△ {b}</li>)}
+                </ul>
+              )}
+              <ul className="mt-2 space-y-1.5">
+                {snapshot.bilderText.map((b) => (
+                  <li key={b.slot} className="rounded-xl bg-background p-2 text-xs">
+                    <b>Bild {b.slot}:</b> {b.inhalt}
+                    {b.textImBild.length > 0 && <span className="text-muted"> · Text im Bild: {b.textImBild.join(" | ")}</span>}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          {snapshot && !snapshot.bilderText && (snapshot.imageUrls?.length ?? 0) > 0 && (
+            <p className="mt-2 text-[11px] text-muted">Bilder noch nicht ausgelesen — passiert automatisch beim nächsten Listing-Import.</p>
+          )}
           <details className="mt-3">
             <summary className="cursor-pointer text-xs text-muted hover:text-foreground">Alternativ: Helium-10-Export (CSV) importieren</summary>
             <form action={uploadListingCsv} className="mt-2 flex items-center gap-2">

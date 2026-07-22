@@ -880,6 +880,7 @@ async function fuehreVerdichtungAus(db: Awaited<ReturnType<typeof getDb>>, produ
     snapshot?.title, ...(snapshot?.bullets ?? []), snapshot?.description,
     ...(snapshot?.attributes ? Object.entries(snapshot.attributes).map(([k, v]) => `${k}: ${v}`) : []),
     snapshot?.importantInfo, snapshot?.aplusContent,
+    (await import("@/lib/analysis/bildAuslese")).bilderAlsText(snapshot?.bilderText),
   ].filter(Boolean).join("\n");
 
   const { verdichteInsights } = await import("@/lib/reviews/verdichtung");
@@ -973,6 +974,7 @@ export async function rankeFeaturesAction(formData: FormData) {
     snapshot!.title, ...(snapshot!.bullets ?? []), snapshot!.description,
     ...(snapshot!.attributes ? Object.entries(snapshot!.attributes).map(([k, v]) => `${k}: ${v}`) : []),
     snapshot!.importantInfo, snapshot!.aplusContent,
+    (await import("@/lib/analysis/bildAuslese")).bilderAlsText(snapshot!.bilderText),
   ].filter(Boolean).join("\n");
 
   try {
@@ -985,6 +987,7 @@ export async function rankeFeaturesAction(formData: FormData) {
         attributes: snapshot!.attributes,
         importantInfo: snapshot!.importantInfo,
         aplusContent: snapshot!.aplusContent,
+        bilder: (await import("@/lib/analysis/bildAuslese")).bilderAlsText(snapshot!.bilderText) || null,
       },
       aspekte: { painPoints: p.painPoints, buyingTriggers: p.buyingTriggers },
       reviewsGesamt: p.stats.reviewsTotal,
@@ -1507,14 +1510,29 @@ export async function importListingFromAmazon(formData: FormData) {
   } catch (e) {
     redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Listing-Import: ${e instanceof Error ? e.message : String(e)}`)}&code=IMP-01`);
   }
+  const snapId = id();
   await db.insert(schema.listingSnapshots).values({
-    id: id(), productId, source,
+    id: snapId, productId, source,
     title: snap!.title, bullets: snap!.bullets, description: snap!.description,
     imageUrls: snap!.imageUrls,
     reviewsTotal: snap!.reviewsTotal, ratingAvg: snap!.ratingAvg, ratingDist: snap!.ratingDist,
     attributes: snap!.attributes, importantInfo: snap!.importantInfo, aplusContent: snap!.aplusContent,
     raw: snap!.raw,
   });
+
+  // Bild-Auslese + Bild-Audit (D158): automatisch, kein Extra-Schritt —
+  // scheitert sie, bleibt der Import gültig (null = ehrlich „nicht ausgelesen")
+  try {
+    const { leseBilderAus } = await import("@/lib/analysis/bildAuslese");
+    const auslese = await leseBilderAus(snap!.imageUrls, product.contentSprache);
+    if (auslese) {
+      await db.update(schema.listingSnapshots)
+        .set({ bilderText: auslese.bilder, bildBefunde: auslese.befunde })
+        .where(eq(schema.listingSnapshots.id, snapId));
+    }
+  } catch {
+    // Auslese ist Zusatz-Quelle, kein Blocker
+  }
 
   // Produkt-Fakten automatisch aus dem Import extrahieren (D70) — nur leere
   // Felder; scheitert leise (Import bleibt gültig, Felder bleiben prüfbar)

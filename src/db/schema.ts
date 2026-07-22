@@ -443,6 +443,15 @@ export const listingSnapshots = sqliteTable("listing_snapshots", {
   attributes: text("attributes", { mode: "json" }).$type<Record<string, string>>(),
   importantInfo: text("important_info"),
   aplusContent: text("aplus_content"),
+  /**
+   * Bild-Auslese (D158): Inhalte der Galeriebilder per Vision-Modell —
+   * Text-im-Bild wortwörtlich, objektive Beschreibung, gezeigte Claims.
+   * Läuft AUTOMATISCH beim Import (kein Extra-Schritt); null = nicht
+   * ausgelesen (z. B. ohne API-Key) — ehrlich ausgewiesen.
+   */
+  bilderText: text("bilder_text", { mode: "json" }).$type<Array<{ slot: number; textImBild: string[]; inhalt: string; claims: string[] }>>(),
+  /** Bild-Audit-Befunde (nur faktische Regel-Verstöße, z. B. Text auf dem Hauptbild). */
+  bildBefunde: text("bild_befunde", { mode: "json" }).$type<string[]>(),
   raw: text("raw", { mode: "json" }),
   createdAt: ts("created_at").notNull(),
 });

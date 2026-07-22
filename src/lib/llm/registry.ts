@@ -138,6 +138,7 @@ export const RECIPE_MODELS: Record<string, { provider: string; model: string }> 
   "keywords.filter": { provider: "anthropic", model: "claude-opus-4-8" },
   "keywords.brands": { provider: "anthropic", model: "claude-opus-4-8" },
   "facts.extract": { provider: "anthropic", model: "claude-opus-4-8" },
+  "listing.bild-auslese": { provider: "anthropic", model: "claude-opus-4-8" },
 };
 
 export function resolveRecipe(recipeKey: string): { provider: LlmProvider; model: string } {

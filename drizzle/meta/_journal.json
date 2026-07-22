@@ -134,6 +134,13 @@
       "when": 1784703902173,
       "tag": "0018_feature-ranking",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1784713455532,
+      "tag": "0019_bild-auslese",
+      "breakpoints": true
     }
   ]
 }
