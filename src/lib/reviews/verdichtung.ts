@@ -78,6 +78,28 @@ export function findeAspekt(ref: string, aspekte: RoheAspekte): BelegAspekt | nu
 }
 
 /**
+ * Tendenz einer gemischten Erkenntnis (D171): Rechnet der CODE aus den
+ * verifizierten Zählwerten beider Seiten — nie die KI. Nur sinnvoll, wenn
+ * die Karte Beleg-Aspekte BEIDER Typen mit Zählwerten bündelt (Gegensatz-
+ * Zusammenführung); sonst null.
+ */
+export function kartenTendenz(karte: Pick<InsightCard, "belegAspekte">): {
+  positiv: number;
+  negativ: number;
+  richtung: "positiv" | "negativ" | "ausgeglichen";
+} | null {
+  const summe = (typ: BelegAspekt["typ"]) =>
+    karte.belegAspekte.filter((b) => b.typ === typ && b.mentionCount !== null).reduce((s, b) => s + (b.mentionCount ?? 0), 0);
+  const hatBeide =
+    karte.belegAspekte.some((b) => b.typ === "buyingTrigger" && b.mentionCount !== null) &&
+    karte.belegAspekte.some((b) => b.typ === "painPoint" && b.mentionCount !== null);
+  if (!hatBeide) return null;
+  const positiv = summe("buyingTrigger");
+  const negativ = summe("painPoint");
+  return { positiv, negativ, richtung: positiv > negativ ? "positiv" : negativ > positiv ? "negativ" : "ausgeglichen" };
+}
+
+/**
  * Struktur ERZWINGEN (D103-Muster): LLM-Antwort → validierte Karten.
  * `quellen` wird hier auf jede Karte gestempelt — deterministisch vom Aufrufer.
  */
@@ -117,6 +139,8 @@ export function normalisiereInsightCards(
       .map((s) => String(s ?? "").trim())
       .filter(Boolean)
       .slice(0, 3);
+    // Schwerere Belege zuerst (D171): sortiert nach verifiziertem Zählwert
+    beleg.sort((a, b) => (b.mentionCount ?? 0) - (a.mentionCount ?? 0));
     cards.push({ titel: titel.slice(0, 120), beschreibung: beschreibung.slice(0, 800), relevanz, quellen, bildIdeen, belegAspekte: beleg });
   }
 
@@ -155,21 +179,22 @@ const SYSTEM =
 function prompt(aspekte: RoheAspekte, sprache: string): string {
   const fmt = (liste: RoheAspekte["painPoints"], typ: string) =>
     liste
-      .map((a) => `- [${typ}] "${a.label}"${a.quotes.length ? ` — O-Töne: ${a.quotes.slice(0, 2).map((q) => `„${q.slice(0, 120)}"`).join(" / ")}` : ""}`)
+      .map((a) => `- [${typ}] "${a.label}"${a.mentionCount !== null ? ` (${a.mentionCount}× belegt)` : ""}${a.quotes.length ? ` — O-Töne: ${a.quotes.slice(0, 2).map((q) => `„${q.slice(0, 120)}"`).join(" / ")}` : ""}`)
       .join("\n");
-  return `ROH-THEMEN AUS DER REVIEW-ANALYSE (bereits ausgezählt):
+  return `ROH-THEMEN AUS DER REVIEW-ANALYSE (Zählwerte = verifizierte Fundstellen in verschiedenen Reviews):
 ${fmt(aspekte.buyingTriggers, "Kaufauslöser") || "(keine Kaufauslöser)"}
 ${fmt(aspekte.painPoints, "Pain Point") || "(keine Pain Points)"}
 
 AUFGABE: Verdichte diese Roh-Themen zu 4–8 benannten Erkenntnissen (Insight-Karten) in Sprache "${sprache}".
 REGELN:
-1. Der Titel ist ein prägnanter Kaufgrund/Befund in Klartext (max. 8 Wörter) — KEIN wörtliches Kundenzitat, sondern die Abstraktion dahinter (Beispiel-Muster: "Stoppt Grasfressen & Sodbrennen schnell").
+1. Der Titel ist ein prägnanter Kaufgrund/Befund in Klartext (max. 10 Wörter) — KEIN wörtliches Kundenzitat, sondern die Abstraktion dahinter (Beispiel-Muster: "Stoppt Grasfressen & Sodbrennen schnell").
 2. Die Beschreibung (2–4 Sätze) erklärt nutzenorientiert, was dahintersteckt und warum es Kaufentscheidungen beeinflusst. Titel und Beschreibung dürfen NUR behaupten, was die O-Töne der Beleg-Aspekte wörtlich stützen — keine Steigerungen (aus „Bekannte haben es empfohlen" wird KEIN „Tierarzt-Tipp").
-3. GEGENSÄTZLICHE Roh-Themen zum selben Aspekt (z. B. "wirkt gut" 27× + "wirkt nicht" 6×) werden zu EINER ausgewogenen Erkenntnis gebündelt — ehrliches Erwartungs-Management, keine Schönfärberei und kein Verschweigen der Gegenseite.
-4. relevanz: 1–5 (5 = kaufentscheidend) — die Reihenfolge der Roh-Themen oben spiegelt ihr Gewicht.
-5. belegAspekte: die WORTGLEICHEN Labels der Roh-Themen oben, auf denen die Erkenntnis beruht (mindestens 1) — nichts erfinden, keine neuen Labels.
-6. bildIdeen: 2–3 konkrete visuelle Umsetzungsideen fürs Listing (Galeriebild, Infografik, A+-Modul). VERBOTEN: erfundene Autoritäts-Belege (Experten-Zitate, Testimonials, Siegel, Zertifikate, Zahlen), die nicht in den Roh-Themen belegt sind.
-7. kernThese: EIN Satz, der die wichtigste Erkenntnis der gesamten Analyse zusammenfasst.
+3. GEGENSATZ-PFLICHT: Positive und negative Roh-Themen zum SELBEN Aspekt (z. B. "riecht gut" 8× + "riecht unangenehm" 19×) MÜSSEN zu GENAU EINER Erkenntnis gebündelt werden — NIE dasselbe Thema als getrennte positive UND negative Erkenntnis, damit kann niemand arbeiten. Beide Seiten kommen in belegAspekte. Der Titel folgt der Seite mit MEHR belegten Fundstellen (Zählwerte oben) und benennt die Gegenseite ehrlich mit (Beispiel-Muster: "Hohe Akzeptanz bei vielen Hunden, aber für wählerische Fresser eine Herausforderung").
+4. GEGENMASSNAHME: Bei so gebündelten Erkenntnissen leiten Beschreibung und bildIdeen aus der negativen Seite eine KONKRETE, durch O-Töne gedeckte Maßnahme ab (Beispiel-Muster: Hunde verweigern die Drops → Galeriebild, das das Untermischen ins Futter zeigt) — aus der negativen Erfahrung wird ein umsetzbarer Listing-Hebel.
+5. relevanz: 1–5 (5 = kaufentscheidend) — nach den Zählwerten oben, nicht nach Bauchgefühl.
+6. belegAspekte: die WORTGLEICHEN Labels der Roh-Themen oben, auf denen die Erkenntnis beruht (mindestens 1) — nichts erfinden, keine neuen Labels.
+7. bildIdeen: 2–3 konkrete visuelle Umsetzungsideen fürs Listing (Galeriebild, Infografik, A+-Modul). VERBOTEN: erfundene Autoritäts-Belege (Experten-Zitate, Testimonials, Siegel, Zertifikate, Zahlen), die nicht in den Roh-Themen belegt sind.
+8. kernThese: EIN Satz, der die wichtigste Erkenntnis der gesamten Analyse zusammenfasst.
 
 JSON-Schema:
 {"kernThese":"...","insights":[{"titel":"...","beschreibung":"...","relevanz":N,"bildIdeen":["..."],"belegAspekte":["wortgleiches Label", "..."]}]}`;

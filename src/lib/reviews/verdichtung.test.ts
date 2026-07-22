@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filtereEinzelnennungen, normalisiereInsightCards, verdichteInsights } from "./verdichtung";
+import { filtereEinzelnennungen, kartenTendenz, normalisiereInsightCards, verdichteInsights } from "./verdichtung";
 import type { ReviewInsightsPayload } from "@/db/schema";
 
 /** Roh-Themen wie aus der Analyse-Etappe (D131-Basis). */
@@ -119,6 +119,41 @@ describe("verdichteInsights (Mock-Provider ohne Key)", () => {
     await expect(
       verdichteInsights({ ...payload, painPoints: [], buyingTriggers: [] }, { quellen: QUELLEN }),
     ).rejects.toThrow(/Roh-Themen/);
+  });
+});
+
+describe("kartenTendenz — Gegensatz-Gewichtung rechnet der Code (D171)", () => {
+  it("beide Seiten mit Zählwerten → Richtung aus den verifizierten Fundstellen", () => {
+    const t = kartenTendenz({
+      belegAspekte: [
+        { label: "Hund frisst die Drops nicht", typ: "painPoint", mentionCount: 19 },
+        { label: "Hund frisst die Drops gerne", typ: "buyingTrigger", mentionCount: 8 },
+      ],
+    });
+    expect(t).toEqual({ positiv: 8, negativ: 19, richtung: "negativ" });
+  });
+
+  it("nur eine Seite oder ohne Zählwerte → null (keine erfundene Tendenz)", () => {
+    expect(kartenTendenz({ belegAspekte: [{ label: "x", typ: "painPoint", mentionCount: 19 }] })).toBeNull();
+    expect(
+      kartenTendenz({
+        belegAspekte: [
+          { label: "x", typ: "painPoint", mentionCount: null },
+          { label: "y", typ: "buyingTrigger", mentionCount: 8 },
+        ],
+      }),
+    ).toBeNull();
+  });
+
+  it("Gleichstand → ausgeglichen", () => {
+    expect(
+      kartenTendenz({
+        belegAspekte: [
+          { label: "x", typ: "painPoint", mentionCount: 5 },
+          { label: "y", typ: "buyingTrigger", mentionCount: 5 },
+        ],
+      })?.richtung,
+    ).toBe("ausgeglichen");
   });
 });
 

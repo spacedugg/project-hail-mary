@@ -1,4 +1,5 @@
 import type { InsightCard } from "@/db/schema";
+import { kartenTendenz } from "@/lib/reviews/verdichtung";
 
 /**
  * Einheitliche Insight-Karte (D132/D140): EINE Render-Komponente für alle
@@ -23,6 +24,9 @@ export function InsightKarte({
   // Ehrliche Beleg-Angabe (D154): Anzahl der Beleg-Aspekte ist ein echter
   // Wert — LLM-geschätzte Erwähnungs-Zahlen werden nicht mehr angezeigt.
   const beleg = { text: belegHinweis ?? `${karte.belegAspekte.length} Beleg-Aspekt${karte.belegAspekte.length === 1 ? "" : "e"}` };
+  // Tendenz bei Gegensatz-Bündelung (D171): rechnet der Code aus den
+  // verifizierten Zählwerten beider Seiten — nie die KI.
+  const tendenz = kartenTendenz(karte);
 
   return (
     <details className="rounded-xl border border-hair bg-background">
@@ -36,6 +40,14 @@ export function InsightKarte({
           <span className="opacity-25">{"●".repeat(5 - karte.relevanz)}</span>
         </span>
         <span className="min-w-0 flex-1 text-sm font-medium">{karte.titel}</span>
+        {tendenz && (
+          <span
+            className={`flex-none text-[11px] tabular-nums ${tendenz.richtung === "positiv" ? "text-good" : tendenz.richtung === "negativ" ? "text-bad" : "text-muted"}`}
+            title="Verifizierte Fundstellen: positiv vs. negativ"
+          >
+            {tendenz.richtung === "ausgeglichen" ? "ausgeglichen" : `überwiegend ${tendenz.richtung}`} · {tendenz.positiv}× vs. {tendenz.negativ}×
+          </span>
+        )}
         <span className="flex-none text-[11px] tabular-nums text-muted">{beleg.text}</span>
       </summary>
       <div className="grid gap-4 border-t border-hair p-4 lg:grid-cols-2">
