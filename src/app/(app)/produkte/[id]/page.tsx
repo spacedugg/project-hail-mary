@@ -166,13 +166,12 @@ export default async function ProductPage({
           <CardHead
             icon={<IconUpload />}
             chip="chip-violet"
-            title="Original-Listing"
-            sub="ASIN genügt."
-            right={
+            title="Amazon Listing"
+                        right={
               <>
                 {snapshot && <span className="pill pill-good">✓ {snapshot.createdAt.toLocaleDateString("de-DE")}</span>}
                 {snapshot && ["apify", "anthropic", "crawler"].includes(snapshot.source) && Date.now() - snapshot.createdAt.getTime() < 24 * 60 * 60 * 1000 ? (
-                  <span className="text-[11px] text-muted">Stand von heute — neu laden ab morgen</span>
+                  <span className="text-[11px] text-muted"></span>
                 ) : (
                   <form action={importListingFromAmazon}>
                     <input type="hidden" name="productId" value={product.id} />
@@ -246,8 +245,7 @@ export default async function ProductPage({
             <CardHead
               icon={<IconSearch />}
               chip="chip-pink"
-              title="Keyword-Basis (Helium 10 Cerebro)"
-              sub="Cerebro-Export hochladen — mit Wettbewerber-ASINs entsteht zusätzlich das SOV-Audit."
+              title="Keywords"
               right={
                 <>
                   {kws.length > 0 && <span className="pill pill-neutral">{kws.filter((k) => !k.ausgeschlossen).length} aktiv</span>}
@@ -364,8 +362,7 @@ export default async function ProductPage({
           <CardHead
             icon={<IconReviews />}
             chip="chip-violet"
-            title="Bewertungs-Analyse"
-            sub="Scrape + Analyse laufen in einem Zug."
+            title="Bewertungen"
             right={insights ? <span className="pill pill-good">✓ analysiert · {insights.confidence}</span> : undefined}
           />
 
@@ -473,7 +470,6 @@ export default async function ProductPage({
             icon={<IconContent />}
             chip="chip-teal"
             title="Content"
-            sub="Sektionen laufen nacheinander, jede Version durchs Prüf-Gate."
             right={!insights ? <span className="pill pill-warn">gesperrt — Analyse fehlt</span> : undefined}
           />
           {/* Content-Gate (D108): ohne Bewertungs-Analyse nur mit doppelter Bestätigung */}

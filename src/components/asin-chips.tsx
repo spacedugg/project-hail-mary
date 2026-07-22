@@ -17,7 +17,7 @@ const ASIN_RE = /^B[A-Z0-9]{9}$/;
 export function AsinChips({
   name,
   mainAsin,
-  placeholder = "Wettbewerber-ASIN tippen, Leertaste drücken …",
+  placeholder = "ASIN eingeben …",
 }: {
   name: string;
   mainAsin?: string | null;
