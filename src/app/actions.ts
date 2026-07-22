@@ -418,11 +418,94 @@ async function nachTieringScore<K extends { keyword: string; searchVolume: numbe
   return [...kws].sort((a, b) => score(b) - score(a));
 }
 
+/** Generierungs-Fehler mit Fehlercode — der Kern wirft, die Actions leiten um. */
+class GenFehler extends Error {
+  constructor(msg: string, public code: string) {
+    super(msg);
+  }
+}
+
 export async function generateContent(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
   const section = String(formData.get("section") ?? "") as ListingSection;
   const db = await getDb();
+  try {
+    await generiereSektionKern(db, productId, section, String(formData.get("ohneAnalyseBestaetigt") ?? "") === "on");
+  } catch (e) {
+    const code = e instanceof GenFehler ? e.code : "GEN-01";
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(e instanceof Error ? e.message : String(e))}&code=${code}`);
+  }
+  revalidatePath(`/produkte/${productId}`);
+}
 
+/** Batch-Reihenfolge = Abhängigkeits-Reihenfolge: freigegebener Titel/Bullets fließen in spätere Sektionen. */
+const SEKTIONS_REIHENFOLGE: ListingSection[] = ["title", "bullets", "highlights", "backend", "description", "qa"];
+const SEKTIONS_LABEL: Record<string, string> = {
+  title: "Titel", bullets: "Bullet Points", highlights: "Item Highlights",
+  backend: "Backend-Keywords", description: "Beschreibung", qa: "Q&A",
+};
+
+/**
+ * Batch-Generierung (D156, Nutzer-Vorgabe): Sektionen anhaken → EIN Klick →
+ * alles läuft NACHEINANDER durch (D109-Serialisierung bleibt gewahrt, weil
+ * ein einziger Request der Reihe nach arbeitet). Zeit-Budget: Vor jeder
+ * Sektion wird geprüft, ob noch genug Rest im 300-s-Fenster ist — was fertig
+ * ist, ist gespeichert; der Rest wird benannt und läuft beim nächsten Klick
+ * weiter (Etappen-Muster D136, kein stiller Abbruch).
+ */
+export async function generateContentBatch(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const gewaehlt = formData.getAll("sections").map(String);
+  const sections = SEKTIONS_REIHENFOLGE.filter((s) => gewaehlt.includes(s));
+  if (sections.length === 0) {
+    redirect(`/produkte/${productId}?hinweis=${encodeURIComponent("Keine Sektion angehakt.")}#content`);
+  }
+  const bestaetigt = String(formData.get("ohneAnalyseBestaetigt") ?? "") === "on";
+  const db = await getDb();
+
+  const start = Date.now();
+  const BUDGET_MS = 200_000; // Rest des 300-s-Fensters bleibt für die laufende Sektion + Speichern
+  const fertig: string[] = [];
+  const fehlgeschlagen: string[] = [];
+  const offen: string[] = [];
+
+  for (const section of sections) {
+    if (Date.now() - start > BUDGET_MS) {
+      offen.push(SEKTIONS_LABEL[section]);
+      continue;
+    }
+    try {
+      await generiereSektionKern(db, productId, section, bestaetigt);
+      fertig.push(SEKTIONS_LABEL[section]);
+      revalidatePath(`/produkte/${productId}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // Gate-Fehler (Analyse fehlt / Sprache passt nicht) gelten für ALLE Sektionen — sofort raus
+      if (e instanceof GenFehler && e.code !== "GEN-01") {
+        redirect(`/produkte/${productId}?fehler=${encodeURIComponent(msg)}&code=${e.code}#content`);
+      }
+      fehlgeschlagen.push(`${SEKTIONS_LABEL[section]} (${msg.slice(0, 120)})`);
+    }
+  }
+
+  revalidatePath(`/produkte/${productId}`);
+  const teile = [
+    fertig.length ? `Generiert: ${fertig.join(", ")}.` : "",
+    fehlgeschlagen.length ? `Fehlgeschlagen: ${fehlgeschlagen.join(" · ")} — einzeln erneut versuchen.` : "",
+    offen.length ? `Zeit-Budget erreicht — noch offen: ${offen.join(", ")}. Erneut auf Generieren klicken, es geht dort weiter.` : "",
+  ].filter(Boolean).join(" ");
+  if (fehlgeschlagen.length && !fertig.length) {
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(teile)}&code=GEN-01#content`);
+  }
+  redirect(`/produkte/${productId}?hinweis=${encodeURIComponent(teile)}#content`);
+}
+
+async function generiereSektionKern(
+  db: Awaited<ReturnType<typeof getDb>>,
+  productId: string,
+  section: ListingSection,
+  ohneAnalyseBestaetigt: boolean,
+) {
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return;
   const brand = await db.query.brands.findFirst({ where: eq(schema.brands.id, product.brandId) });
@@ -444,13 +527,12 @@ export async function generateContent(formData: FormData) {
   // ausdrücklich doppelt bestätigt UND es gibt eine Ersatz-Grundlage
   // (Listing-IST oder Zusatz-Infos vom Team).
   if (!insights) {
-    const bestaetigt = String(formData.get("ohneAnalyseBestaetigt") ?? "") === "on";
-    if (!bestaetigt) {
-      redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Content ist gesperrt: Es liegt keine Bewertungs-Analyse vor — sie liefert Kundensprache, Pain Points und Kaufauslöser als Text-Grundlage. Erst analysieren (Karte oben) oder bewusst ohne Analyse bestätigen.")}&code=GEN-02`);
+    if (!ohneAnalyseBestaetigt) {
+      throw new GenFehler("Content ist gesperrt: Es liegt keine Bewertungs-Analyse vor — sie liefert Kundensprache, Pain Points und Kaufauslöser als Text-Grundlage. Erst analysieren oder bewusst ohne Analyse bestätigen.", "GEN-02");
     }
     const hatGrundlage = Boolean(snapshot?.title || snapshot?.bullets?.length || product.zusatzKontext?.trim());
     if (!hatGrundlage) {
-      redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Ohne Bewertungs-Analyse braucht die Generierung eine Ersatz-Grundlage: Listing importieren (IST-Zustand) oder Zusatz-Infos zum Produkt eintragen — sonst gäbe es nur erfundenen Text.")}&code=GEN-03`);
+      throw new GenFehler("Ohne Bewertungs-Analyse braucht die Generierung eine Ersatz-Grundlage: Listing importieren oder Zusatz-Infos eintragen — sonst gäbe es nur erfundenen Text.", "GEN-03");
     }
   }
 
@@ -460,7 +542,7 @@ export async function generateContent(formData: FormData) {
   if (kws.length > 0) {
     const erkannt = erkenneSprache(kws.map((k) => k.keyword)).sprache;
     if (erkannt && erkannt !== product.contentSprache) {
-      redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Die Keyword-Basis ist erkennbar ${SPRACH_NAMEN[erkannt]}, die Content-Sprache dieses Produkts ist aber ${SPRACH_NAMEN[product.contentSprache]}. Lokalisierter Content braucht eine Keyword-Analyse vom Ziel-Marktplatz.`)}&code=GEN-04`);
+      throw new GenFehler(`Die Keyword-Basis ist erkennbar ${SPRACH_NAMEN[erkannt]}, die Content-Sprache dieses Produkts ist aber ${SPRACH_NAMEN[product.contentSprache]}. Lokalisierter Content braucht eine Keyword-Analyse vom Ziel-Marktplatz.`, "GEN-04");
     }
   }
 
@@ -505,7 +587,7 @@ export async function generateContent(formData: FormData) {
   try {
     result = await generateSection(section, inputs);
   } catch (e) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Text-Generierung (${section}): ${e instanceof Error ? e.message : String(e)}`)}&code=GEN-01`);
+    throw new GenFehler(`Text-Generierung (${SEKTIONS_LABEL[section] ?? section}): ${e instanceof Error ? e.message : String(e)}`, "GEN-01");
   }
 
   const dbType = section === "backend" ? "backend_keywords" : section === "highlights" ? "item_highlights" : section;

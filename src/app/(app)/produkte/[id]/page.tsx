@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { saveKeywords, deriveKeywordsFromSov, generateContent, uploadCerebro, scrapeReviewsAction, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarktSprache } from "@/app/actions";
+import { saveKeywords, deriveKeywordsFromSov, generateContent, generateContentBatch, uploadCerebro, scrapeReviewsAction, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarktSprache } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
@@ -500,6 +500,25 @@ export default async function ProductPage({
             </form>
           </details>
           <GenerierSperre>
+          {/* Batch-Generierung (D156): anhaken → EIN Klick → nacheinander */}
+          <form action={generateContentBatch} className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-hair bg-background p-3">
+            <input type="hidden" name="productId" value={product.id} />
+            {SECTIONS.map(({ key, label }) => (
+              <label key={key} className="flex cursor-pointer items-center gap-1.5 text-xs">
+                <input type="checkbox" name="sections" value={key} defaultChecked />
+                {label}
+              </label>
+            ))}
+            {!insights && (
+              <label className="flex items-center gap-1.5 text-[11px] text-warn">
+                <input type="checkbox" name="ohneAnalyseBestaetigt" required />
+                ohne Bewertungs-Analyse generieren (bewusst bestätigt)
+              </label>
+            )}
+            <GenerierButton className="btn-primary px-3 py-1 text-xs" pendingLabel="Generiert nacheinander… (kann Minuten dauern)">
+              Ausgewählte generieren
+            </GenerierButton>
+          </form>
           <div className="mt-4 space-y-3">
             {SECTIONS.map(({ key, label }) => {
               const dbType = key === "backend" ? "backend_keywords" : key === "highlights" ? "item_highlights" : key;
