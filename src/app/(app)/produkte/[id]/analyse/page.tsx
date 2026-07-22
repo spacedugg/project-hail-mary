@@ -9,6 +9,8 @@ import { FehlerPopup } from "@/components/fehler-popup";
 import { fehlerInfo } from "@/lib/fehlercodes";
 import type { SovAudit } from "@/lib/sov/audit";
 import type { DeepAuditDimension } from "@/db/schema";
+import { befundKarten, massnahmenKarten } from "@/lib/analysis/auditKarten";
+import { InsightKarte } from "@/components/insight-karte";
 
 export const dynamic = "force-dynamic";
 // Tiefen-Audit (LLM): sonnet-5 denkt adaptiv und braucht bei großen Prompts
@@ -463,15 +465,37 @@ export default async function AnalysePage({
         )}
       </section>
 
+      {/* Stärken & Schwächen im Insight-Karten-Format (D135) — dasselbe Schema
+          wie die Review-Erkenntnisse, deterministisch aus dem Audit gemappt */}
+      {deepAudit && befundKarten(deepAudit.payload, deepAudit.dataBasis).length > 0 && (
+        <section className="mt-6">
+          <h2 className="sect-h">Stärken & Schwächen (aus dem Tiefen-Audit)</h2>
+          <div className="mt-2 space-y-2">
+            {befundKarten(deepAudit.payload, deepAudit.dataBasis).map((k, i) => (
+              <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={0} belegHinweis="aus Tiefen-Audit" />
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="mt-6">
         <h2 className="sect-h">Maßnahmen (priorisiert)</h2>
-        <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm">
-          {(deepAudit?.payload.topActions ?? []).map((a, i) => <li key={`ki-${i}`}>{a}</li>)}
-          {analysis.recommendations.map((r, i) => <li key={`det-${i}`}>{r}</li>)}
-          {(deepAudit?.payload.topActions ?? []).length + analysis.recommendations.length === 0 && (
-            <li className="list-none text-neutral-400">Keine offenen Maßnahmen — Listing ist regelkonform.</li>
-          )}
-        </ol>
+        {(() => {
+          const karten = massnahmenKarten(
+            deepAudit?.payload.topActions ?? [],
+            analysis.recommendations,
+            deepAudit?.dataBasis ?? [],
+          );
+          return karten.length > 0 ? (
+            <div className="mt-2 space-y-2">
+              {karten.map((k, i) => (
+                <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={0} belegHinweis={i < (deepAudit?.payload.topActions.length ?? 0) ? "Tiefen-Audit" : "Regel-Messung"} />
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-neutral-400">Keine offenen Maßnahmen — Listing ist regelkonform.</p>
+          );
+        })()}
       </section>
 
       {/* Keine Dopplungen (D111): Text-Begründungen stehen im Optimizer direkt

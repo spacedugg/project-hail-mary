@@ -12,14 +12,19 @@ export function InsightKarte({
   karte,
   rang,
   reviewsGesamt,
+  belegHinweis,
 }: {
   karte: InsightCard;
   rang: number;
   /** Stichproben-Größe für die Beleg-Stufe (D138) — 0 = unbekannt. */
   reviewsGesamt: number;
+  /** Ersetzt die Review-Beleg-Stufe, wenn die Karte NICHT aus Reviews stammt (z. B. Audit, D135). */
+  belegHinweis?: string;
 }) {
   const erwaehnungen = karte.belegAspekte.reduce((s, b) => s + (b.mentionCount ?? 0), 0);
-  const beleg = belegStufe(erwaehnungen > 0 ? erwaehnungen : null, reviewsGesamt);
+  const beleg = belegHinweis
+    ? { text: belegHinweis }
+    : belegStufe(erwaehnungen > 0 ? erwaehnungen : null, reviewsGesamt);
 
   return (
     <details className="rounded-xl border border-hair bg-background">
@@ -39,20 +44,24 @@ export function InsightKarte({
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Beschreibung</div>
           <p className="mt-1 text-sm">{karte.beschreibung}</p>
-          <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-muted">Beleg-Aspekte (Roh-Themen der Analyse)</div>
-          <ul className="mt-1 space-y-1">
-            {karte.belegAspekte.map((b, i) => (
-              <li key={i} className="flex items-baseline justify-between gap-2 text-xs">
-                <span>
-                  <span className={b.typ === "painPoint" ? "text-bad" : "text-good"}>
-                    {b.typ === "painPoint" ? "−" : "+"}
-                  </span>{" "}
-                  {b.label}
-                </span>
-                <span className="flex-none tabular-nums text-muted">{b.mentionCount !== null ? `${b.mentionCount}×` : "—"}</span>
-              </li>
-            ))}
-          </ul>
+          {karte.belegAspekte.length > 0 && (
+            <>
+              <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-muted">Belege</div>
+              <ul className="mt-1 space-y-1">
+                {karte.belegAspekte.map((b, i) => (
+                  <li key={i} className="flex items-baseline justify-between gap-2 text-xs">
+                    <span>
+                      <span className={b.typ === "painPoint" ? "text-bad" : "text-good"}>
+                        {b.typ === "painPoint" ? "−" : "+"}
+                      </span>{" "}
+                      {b.label}
+                    </span>
+                    <span className="flex-none tabular-nums text-muted">{b.mentionCount !== null ? `${b.mentionCount}×` : "—"}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           {karte.quellen.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {karte.quellen.map((q, i) => (
@@ -61,18 +70,20 @@ export function InsightKarte({
             </div>
           )}
         </div>
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Visuelle Umsetzungsideen (wahrheits-geprüft)</div>
-          {karte.bildIdeen.length > 0 ? (
-            <ul className="mt-1 space-y-1.5">
-              {karte.bildIdeen.map((idee, i) => (
-                <li key={i} className="rounded-lg border border-hair p-2 text-xs">📷 {idee}</li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-1 text-xs text-muted">Keine zulässige Bild-Idee — ggf. vom Wahrheits-Filter entfernt (Ausweis am Seitenende).</p>
-          )}
-        </div>
+        {(karte.bildIdeen.length > 0 || !belegHinweis) && (
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Visuelle Umsetzungsideen (wahrheits-geprüft)</div>
+            {karte.bildIdeen.length > 0 ? (
+              <ul className="mt-1 space-y-1.5">
+                {karte.bildIdeen.map((idee, i) => (
+                  <li key={i} className="rounded-lg border border-hair p-2 text-xs">📷 {idee}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1 text-xs text-muted">Keine zulässige Bild-Idee — ggf. vom Wahrheits-Filter entfernt (Ausweis am Seitenende).</p>
+            )}
+          </div>
+        )}
       </div>
     </details>
   );
