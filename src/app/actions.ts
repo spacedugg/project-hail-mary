@@ -1054,81 +1054,151 @@ export async function rankeFeaturesAction(formData: FormData) {
  * fehlende Match kostet Conversion. Pflicht-Datenbasis: Listing-Snapshot +
  * Bewertungs-Analyse; Redundanz-Guard nach D81-Muster.
  */
-export async function findeBlockerAction(formData: FormData) {
-  const productId = String(formData.get("productId") ?? "");
-  const db = await getDb();
-  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
-  if (!product) return;
-  const back = (msg: string, code: string) =>
-    redirect(`/produkte/${productId}?tab=blocker&fehler=${encodeURIComponent(msg)}&code=${code}`);
-
+/** Blocker-Kern (D167/D172-Pipeline-fähig): wirft GenFehler, Hinweis bei Redundanz-Guard. */
+async function blockerKern(
+  db: Awaited<ReturnType<typeof getDb>>,
+  product: NonNullable<Awaited<ReturnType<Awaited<ReturnType<typeof getDb>>["query"]["products"]["findFirst"]>>>,
+): Promise<string | null> {
+  const productId = product.id;
   const snapshot = await db.query.listingSnapshots.findFirst({
     where: eq(schema.listingSnapshots.productId, productId),
     orderBy: desc(schema.listingSnapshots.createdAt),
   });
-  if (!snapshot) back("Der Blocker-Lauf braucht den Listing-Import — er prüft, was Kunden dort NICHT beantwortet finden.", "BLK-01");
+  if (!snapshot) throw new GenFehler("Der Blocker-Lauf braucht den Listing-Import — er prüft, was Kunden dort NICHT beantwortet finden.", "BLK-01");
 
   const insight = await db.query.reviewInsights.findFirst({
     where: eq(schema.reviewInsights.productId, productId),
     orderBy: desc(schema.reviewInsights.createdAt),
   });
-  if (!insight) back("Der Blocker-Lauf braucht die Bewertungs-Analyse — ihre Kunden-Themen sind die eine Hälfte des Matches.", "BLK-01");
+  if (!insight) throw new GenFehler("Der Blocker-Lauf braucht die Bewertungs-Analyse — ihre Kunden-Themen sind die eine Hälfte des Matches.", "BLK-01");
 
   // Redundanz-Guard: dieselbe Datenbasis wird nicht doppelt geprüft
   const last = await db.query.conversionBlockers.findFirst({
     where: eq(schema.conversionBlockers.productId, productId),
     orderBy: desc(schema.conversionBlockers.createdAt),
   });
-  if (last && Math.max(snapshot!.createdAt.getTime(), insight!.createdAt.getTime()) <= last.createdAt.getTime()) {
-    redirect(`/produkte/${productId}?tab=blocker&hinweis=${encodeURIComponent("Die Datenbasis ist seit dem letzten Blocker-Lauf unverändert — das Ergebnis unten ist aktuell. Neu prüfen wird nach neuem Import oder neuer Analyse wieder frei.")}`);
+  if (last && Math.max(snapshot.createdAt.getTime(), insight.createdAt.getTime()) <= last.createdAt.getTime()) {
+    return "Die Datenbasis ist seit dem letzten Blocker-Lauf unverändert — das Ergebnis ist aktuell.";
   }
 
   const { normalisierePayload } = await import("@/lib/reviews/insights");
-  const p = normalisierePayload(insight!.payload);
+  const p = normalisierePayload(insight.payload);
 
   try {
     const { findeBlocker } = await import("@/lib/analysis/blocker");
     const payload = await findeBlocker({
       quellen: {
-        title: snapshot!.title,
-        bullets: snapshot!.bullets ?? [],
-        description: snapshot!.description,
-        attributes: snapshot!.attributes,
-        importantInfo: snapshot!.importantInfo,
-        aplusContent: snapshot!.aplusContent,
-        bilder: (await import("@/lib/analysis/bildAuslese")).bilderAlsText(snapshot!.bilderText) || null,
+        title: snapshot.title,
+        bullets: snapshot.bullets ?? [],
+        description: snapshot.description,
+        attributes: snapshot.attributes,
+        importantInfo: snapshot.importantInfo,
+        aplusContent: snapshot.aplusContent,
+        bilder: (await import("@/lib/analysis/bildAuslese")).bilderAlsText(snapshot.bilderText) || null,
       },
       aspekte: { painPoints: p.painPoints, buyingTriggers: p.buyingTriggers },
       reviewsGesamt: p.stats.reviewsTotal,
       sprache: product.contentSprache,
     });
     const dataBasis = [
-      `Listing-Import (${snapshot!.source}, ${snapshot!.createdAt.toLocaleDateString("de-DE")})`,
-      `Review-Insights (${insight!.dataBasis}, ${p.stats.reviewsTotal} Reviews)`,
+      `Listing-Import (${snapshot.source}, ${snapshot.createdAt.toLocaleDateString("de-DE")})`,
+      `Review-Insights (${insight.dataBasis}, ${p.stats.reviewsTotal} Reviews)`,
     ];
     await db.insert(schema.conversionBlockers).values({ id: id(), productId, payload, dataBasis });
   } catch (e) {
-    back(`Blocker-Lauf: ${e instanceof Error ? e.message : String(e)}`, "BLK-01");
+    throw new GenFehler(`Blocker-Lauf: ${e instanceof Error ? e.message : String(e)}`, "BLK-01");
   }
-  revalidatePath(`/produkte/${productId}`);
-  redirect(`/produkte/${productId}?tab=blocker`);
+  return null;
 }
 
-export async function scrapeReviewsAction(formData: FormData) {
+export async function findeBlockerAction(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return;
 
-  // Chip-Eingabe (D95): `asins` ist die KOMPLETTE Liste — die Haupt-ASIN ist
-  // als Chip vorbelegt (Default mit dabei), kann aber bewusst entfernt werden.
-  // Fallback `competitorAsins` (altes Feld): dort kam die Haupt-ASIN dazu.
-  const chipListe = String(formData.get("asins") ?? "").split(/[\s,;]+/).filter(Boolean);
-  const asins = chipListe.length
-    ? chipListe
-    : ([product.asin, ...String(formData.get("competitorAsins") ?? "").split(/[\s,;]+/).filter(Boolean)].filter(Boolean) as string[]);
+  let hinweis: string | null = null;
+  try {
+    hinweis = await blockerKern(db, product);
+  } catch (e) {
+    const code = e instanceof GenFehler ? e.code : "BLK-01";
+    redirect(`/produkte/${productId}?tab=analyse&fehler=${encodeURIComponent(e instanceof Error ? e.message : String(e))}&code=${code}`);
+  }
+  revalidatePath(`/produkte/${productId}`);
+  redirect(`/produkte/${productId}?tab=analyse${hinweis ? `&hinweis=${encodeURIComponent(hinweis)}` : ""}`);
+}
+
+/**
+ * Ein-Klick-Pipeline (D172): EINE Etappe je Aufruf — der Client-Runner reiht
+ * die Etappen und bleibt so unterm Vercel-Request-Limit (D136). Fehler kommen
+ * als Wert zurück (kein Redirect), damit der Runner sie anzeigen und die
+ * Etappe erneut anstoßen kann.
+ */
+export type PipelineErgebnis = { ok: boolean; hinweis?: string; fehler?: string; code?: string };
+
+export async function runPipelineStufe(
+  productId: string,
+  stufe: "listing" | "scrape" | "auswertung" | "verdichtung" | "blocker" | "content",
+  extra?: { asins?: string[]; section?: string },
+): Promise<PipelineErgebnis> {
+  const db = await getDb();
+  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  if (!product) return { ok: false, fehler: "Produkt nicht gefunden.", code: "ALG-00" };
+
+  try {
+    switch (stufe) {
+      case "listing":
+        return { ok: true, hinweis: (await importListingKern(db, product)) ?? undefined };
+      case "scrape": {
+        const asins = [...new Set((extra?.asins ?? []).map((a) => a.trim().toUpperCase()).filter(Boolean))];
+        return { ok: true, hinweis: (await scrapeKern(db, product, asins)) ?? undefined };
+      }
+      case "auswertung":
+        return { ok: true, hinweis: (await auswertungKern(db, product)) ?? undefined };
+      case "verdichtung": {
+        const insight = await db.query.reviewInsights.findFirst({
+          where: eq(schema.reviewInsights.productId, productId),
+          orderBy: desc(schema.reviewInsights.createdAt),
+        });
+        const { normalisierePayload } = await import("@/lib/reviews/insights");
+        if (insight && (normalisierePayload(insight.payload).insightCards?.length ?? 0) > 0) {
+          return { ok: true, hinweis: "Diese Analyse ist bereits verdichtet." };
+        }
+        await fuehreVerdichtungAus(db, productId);
+        return { ok: true };
+      }
+      case "blocker":
+        return { ok: true, hinweis: (await blockerKern(db, product)) ?? undefined };
+      case "content": {
+        const section = String(extra?.section ?? "");
+        const gueltig = ["title", "bullets", "description", "backend", "highlights", "qa"];
+        if (!gueltig.includes(section)) return { ok: false, fehler: `Unbekannte Sektion: ${section}`, code: "GEN-01" };
+        await generiereSektionKern(db, productId, section as ListingSection, true);
+        return { ok: true };
+      }
+    }
+  } catch (e) {
+    if (e instanceof GenFehler) return { ok: false, fehler: e.message, code: e.code };
+    const fallback = stufe === "verdichtung" ? "VER-01" : stufe === "content" ? "GEN-01" : "ALG-00";
+    return { ok: false, fehler: e instanceof Error ? e.message : String(e), code: fallback };
+  } finally {
+    revalidatePath(`/produkte/${productId}`);
+  }
+}
+
+/**
+ * Scrape-Kern (D172-Pipeline-fähig): scrapt + speichert, wirft GenFehler mit
+ * Code, gibt bei Redundanz-Guard einen Hinweis zurück. KEINE Auswertung —
+ * die ist eine eigene Etappe (auswertungKern).
+ */
+async function scrapeKern(
+  db: Awaited<ReturnType<typeof getDb>>,
+  product: NonNullable<Awaited<ReturnType<Awaited<ReturnType<typeof getDb>>["query"]["products"]["findFirst"]>>>,
+  asins: string[],
+): Promise<string | null> {
+  const productId = product.id;
   if (asins.length === 0) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Review-Scrape: keine ASIN angegeben — mindestens einen ASIN-Chip stehen lassen.")}&code=REV-04&tab=bewertungen#reviews`);
+    throw new GenFehler("Review-Scrape: keine ASIN angegeben — mindestens einen ASIN-Chip stehen lassen.", "REV-04");
   }
 
   // Redundanz-Guard (D81): identische ASIN-Menge, jünger als 24 h → kein
@@ -1144,7 +1214,7 @@ export async function scrapeReviewsAction(formData: FormData) {
     norm(lastScrape.asins) === norm(asins) &&
     Date.now() - lastScrape.createdAt.getTime() < 24 * 60 * 60 * 1000
   ) {
-    redirect(`/produkte/${productId}?hinweis=${encodeURIComponent("Diese ASINs wurden in den letzten 24 h bereits gescraped — Datenbasis unten. Für mehr Daten Wettbewerber-ASINs dazugeben; neue Reviews gibt es ab morgen.")}&tab=bewertungen#reviews`);
+    return "Diese ASINs wurden in den letzten 24 h bereits gescraped — Datenbasis ist aktuell.";
   }
 
   const { scrapeReviews } = await import("@/lib/reviews/apify");
@@ -1179,11 +1249,11 @@ export async function scrapeReviewsAction(formData: FormData) {
         { asin: asins[0] ?? "B000000000", rating: 1, title: "Mock", body: "kam zerkratzt an" },
       ];
     } else {
-      redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Review-Scrape: ${msg}`)}&code=${msg.includes("Zeitlimit") ? "REV-01" : "REV-03"}&tab=bewertungen#reviews`);
+      throw new GenFehler(`Review-Scrape: ${msg}`, msg.includes("Zeitlimit") ? "REV-01" : "REV-03");
     }
   }
   if (reviews.length === 0) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Review-Scrape: 0 Reviews gefunden — ASIN prüfen (neues Produkt ohne Bewertungen?).")}&code=REV-02&tab=bewertungen#reviews`);
+    throw new GenFehler("Review-Scrape: 0 Reviews gefunden — ASIN prüfen (neues Produkt ohne Bewertungen?).", "REV-02");
   }
 
   const starCounts: Record<string, number> = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
@@ -1207,31 +1277,87 @@ export async function scrapeReviewsAction(formData: FormData) {
     if (snap && (snap.reviewsTotal !== null || snap.ratingAvg !== null)) {
       amazonTotals = { reviewsTotal: snap.reviewsTotal, ratingAvg: snap.ratingAvg, dist: snap.ratingDist, asOf: snap.createdAt.toISOString() };
     } else {
-      notes = [...notes, "Amazon-Gesamtzahlen (Bewertungen gesamt, Ø) fehlen — oben zuerst das Listing importieren, dann stehen sie neben der Stichprobe."];
+      notes = [...notes, "Amazon-Gesamtzahlen (Bewertungen gesamt, Ø) fehlen — zuerst das Listing importieren, dann stehen sie neben der Stichprobe."];
     }
   }
 
-  const scrapeId = id();
-  await db.insert(schema.reviewScrapes).values({ id: scrapeId, productId, source, asins, reviews, starCounts, perAsin, notes, amazonTotals });
+  await db.insert(schema.reviewScrapes).values({ id: id(), productId, source, asins, reviews, starCounts, perAsin, notes, amazonTotals });
+  return null;
+}
 
-  // Analyse läuft AUTOMATISCH nach dem Scrape (D129, Nutzer-Vorgabe: kein
-  // manueller Zwischenschritt — Scrape und Analyse gehen ineinander über).
-  // Schlägt sie fehl, bleibt der Scrape gespeichert und der Nachhol-Knopf
-  // auf der Seite übernimmt (Ausbeute-Notizen zeigen die Datenbasis).
+/**
+ * Auswertungs-Kern (D172-Pipeline-fähig): Roh-Analyse des letzten Scrapes.
+ * Redundanz-Guard (D79): derselbe Scrape wird nie doppelt analysiert.
+ */
+async function auswertungKern(
+  db: Awaited<ReturnType<typeof getDb>>,
+  product: NonNullable<Awaited<ReturnType<Awaited<ReturnType<typeof getDb>>["query"]["products"]["findFirst"]>>>,
+): Promise<string | null> {
+  const productId = product.id;
+  const scrape = await db.query.reviewScrapes.findFirst({
+    where: eq(schema.reviewScrapes.productId, productId),
+    orderBy: desc(schema.reviewScrapes.createdAt),
+  });
+  if (!scrape) throw new GenFehler("Erst Reviews scrapen, dann auswerten.", "REV-05");
+
+  // Altbestand ohne scrapeId: Analyse nach dem Scrape gilt als dessen Analyse.
+  const existing = await db.query.reviewInsights.findFirst({
+    where: eq(schema.reviewInsights.productId, productId),
+    orderBy: desc(schema.reviewInsights.createdAt),
+  });
+  if (existing && (existing.scrapeId === scrape.id || (!existing.scrapeId && existing.createdAt > scrape.createdAt))) {
+    return "Dieser Scrape ist bereits ausgewertet.";
+  }
+
   const { extractInsights } = await import("@/lib/reviews/apify");
-  const dataBasis = source === "apify" ? "apify_scrape" : "none";
+  const dataBasis = scrape.source === "apify" ? "apify_scrape" : "none";
   try {
     const res = await extractInsights(
-      reviews,
-      asins.map((a) => `amazon.${amazonDomain(scrapeMarkt)}/dp/${a}`),
+      scrape.reviews,
+      scrape.asins.map((a) => `amazon.${product.marketplace}/dp/${a}`),
       dataBasis,
     );
     await db.insert(schema.reviewInsights).values({
-      id: id(), productId, scrapeId, dataBasis, confidence: res.confidence, payload: res.payload,
+      id: id(), productId, scrapeId: scrape.id, dataBasis, confidence: res.confidence, payload: res.payload,
     });
   } catch (e) {
+    throw new GenFehler(`Review-Analyse: ${e instanceof Error ? e.message : String(e)}`, "ANA-01");
+  }
+  return null;
+}
+
+export async function scrapeReviewsAction(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const db = await getDb();
+  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  if (!product) return;
+
+  // Chip-Eingabe (D95): `asins` ist die KOMPLETTE Liste — die Haupt-ASIN ist
+  // als Chip vorbelegt (Default mit dabei), kann aber bewusst entfernt werden.
+  // Fallback `competitorAsins` (altes Feld): dort kam die Haupt-ASIN dazu.
+  const chipListe = String(formData.get("asins") ?? "").split(/[\s,;]+/).filter(Boolean);
+  const asins = chipListe.length
+    ? chipListe
+    : ([product.asin, ...String(formData.get("competitorAsins") ?? "").split(/[\s,;]+/).filter(Boolean)].filter(Boolean) as string[]);
+
+  let hinweis: string | null = null;
+  try {
+    hinweis = await scrapeKern(db, product, asins);
+  } catch (e) {
+    const code = e instanceof GenFehler ? e.code : "REV-03";
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(e instanceof Error ? e.message : String(e))}&code=${code}&tab=bewertungen#reviews`);
+  }
+  if (hinweis) {
+    redirect(`/produkte/${productId}?hinweis=${encodeURIComponent(`${hinweis} Für mehr Daten Wettbewerber-ASINs dazugeben; neue Reviews gibt es ab morgen.`)}&tab=bewertungen#reviews`);
+  }
+
+  // Analyse läuft AUTOMATISCH nach dem Scrape (D129) — schlägt sie fehl,
+  // bleibt der Scrape gespeichert und der Nachhol-Knopf übernimmt.
+  try {
+    await auswertungKern(db, product);
+  } catch (e) {
     revalidatePath(`/produkte/${productId}`);
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Scrape fertig (${reviews.length} Reviews, Ausbeute unten) — aber die automatische Analyse schlug fehl: ${e instanceof Error ? e.message : String(e)}. Mit „Analyse nachholen" erneut versuchen.`)}&code=ANA-01&tab=bewertungen#reviews`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Scrape fertig (Ausbeute unten) — aber die automatische Analyse schlug fehl: ${e instanceof Error ? e.message : String(e)}. Mit „Analyse nachholen" erneut versuchen.`)}&code=ANA-01&tab=bewertungen#reviews`);
   }
 
   // Etappe 3 (D131/D136): Verdichtung als eigener, nachholbarer Schritt —
@@ -1251,37 +1377,12 @@ export async function analyzeReviewsAction(formData: FormData) {
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return;
-  const scrape = await db.query.reviewScrapes.findFirst({
-    where: eq(schema.reviewScrapes.productId, productId),
-    orderBy: desc(schema.reviewScrapes.createdAt),
-  });
-  if (!scrape) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Erst Reviews scrapen (Schritt 1), dann analysieren.")}&code=REV-05&tab=bewertungen#reviews`);
-  }
 
-  // Derselbe Scrape wird nie doppelt analysiert (D79) — direkt zum Dashboard.
-  // Altbestand ohne scrapeId: Analyse nach dem Scrape gilt als dessen Analyse.
-  const existing = await db.query.reviewInsights.findFirst({
-    where: eq(schema.reviewInsights.productId, productId),
-    orderBy: desc(schema.reviewInsights.createdAt),
-  });
-  if (existing && (existing.scrapeId === scrape!.id || (!existing.scrapeId && existing.createdAt > scrape!.createdAt))) {
-    redirect(`/produkte/${productId}?tab=bewertungen`);
-  }
-
-  const { extractInsights } = await import("@/lib/reviews/apify");
-  const dataBasis = scrape!.source === "apify" ? "apify_scrape" : "none";
   try {
-    const res = await extractInsights(
-      scrape!.reviews,
-      scrape!.asins.map((a) => `amazon.${product.marketplace}/dp/${a}`),
-      dataBasis,
-    );
-    await db.insert(schema.reviewInsights).values({
-      id: id(), productId, scrapeId: scrape!.id, dataBasis, confidence: res.confidence, payload: res.payload,
-    });
+    await auswertungKern(db, product);
   } catch (e) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Review-Analyse: ${e instanceof Error ? e.message : String(e)}`)}&code=ANA-01&tab=bewertungen#reviews`);
+    const code = e instanceof GenFehler ? e.code : "ANA-01";
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(e instanceof Error ? e.message : String(e))}&code=${code}&tab=bewertungen#reviews`);
   }
 
   // Etappe 3 (D131/D136): Verdichtung — eigener, nachholbarer Schritt
@@ -1564,13 +1665,13 @@ export async function setActionStatus(formData: FormData) {
 
 // ── Produktdaten-Import (D46): Amazon-Scrape / H10-CSV → Original-Snapshot ───
 
-export async function importListingFromAmazon(formData: FormData) {
-  const productId = String(formData.get("productId") ?? "");
-  const db = await getDb();
-  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
-  if (!product?.asin) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Produkt hat keine ASIN — Import nicht möglich.")}&code=IMP-02`);
-  }
+/**
+ * Listing-Import-Kern (D172-Pipeline-fähig): wirft GenFehler mit Code,
+ * gibt bei Redundanz-Guard einen Hinweis zurück statt zu redirecten.
+ */
+async function importListingKern(db: Awaited<ReturnType<typeof getDb>>, product: NonNullable<Awaited<ReturnType<Awaited<ReturnType<typeof getDb>>["query"]["products"]["findFirst"]>>>): Promise<string | null> {
+  const productId = product.id;
+  if (!product.asin) throw new GenFehler("Produkt hat keine ASIN — Import nicht möglich.", "IMP-02");
 
   // Redundanz-Guard (D81): erfolgreicher Import jünger als 24 h → kein Doppel-Import
   const lastSnap = await db.query.listingSnapshots.findFirst({
@@ -1578,36 +1679,35 @@ export async function importListingFromAmazon(formData: FormData) {
     orderBy: desc(schema.listingSnapshots.createdAt),
   });
   if (lastSnap && ["apify", "anthropic", "crawler"].includes(lastSnap.source) && Date.now() - lastSnap.createdAt.getTime() < 24 * 60 * 60 * 1000) {
-    redirect(`/produkte/${productId}?hinweis=${encodeURIComponent("Das Listing wurde in den letzten 24 h bereits geladen (Stand unten). Amazon-Änderungen sind frühestens morgen sinnvoll neu zu ziehen.")}`);
+    return "Das Listing wurde in den letzten 24 h bereits geladen — Stand ist aktuell.";
   }
 
   // Standard-Weg ist die Anthropic-API (D83); scheitert sie (Bot-Block),
   // springt automatisch der Produkt-Crawler ein (D84). Env-Override:
   // LISTING_IMPORT_PROVIDER=crawler|apify erzwingt einen Weg.
-  // Fehler landen als Banner an der Seite, nie als Server-Fehlerseite (D78).
   const forced = process.env.LISTING_IMPORT_PROVIDER;
   let snap: import("@/lib/scrape/apifyProduct").ProductSnapshot | null = null;
   let source: "anthropic" | "crawler" | "apify" = "anthropic";
   try {
     if (forced === "apify") {
       const { scrapeProduct } = await import("@/lib/scrape/apifyProduct");
-      snap = await scrapeProduct(product!.asin!, product!.marketplace, { timeoutSec: 50 });
+      snap = await scrapeProduct(product.asin, product.marketplace, { timeoutSec: 50 });
       source = "apify";
     } else if (forced === "crawler") {
       const { scrapeProductViaCrawler } = await import("@/lib/scrape/crawler");
-      snap = await scrapeProductViaCrawler(product!.asin!, product!.marketplace, { timeoutSec: 50 });
+      snap = await scrapeProductViaCrawler(product.asin, product.marketplace, { timeoutSec: 50 });
       source = "crawler";
     } else {
       // Beide Wege müssen zusammen ins 60-s-Function-Budget passen (D78)
       const { scrapeProductViaAnthropic } = await import("@/lib/scrape/anthropicProduct");
       try {
-        snap = await scrapeProductViaAnthropic(product!.asin!, product!.marketplace, { timeoutSec: 35 });
+        snap = await scrapeProductViaAnthropic(product.asin, product.marketplace, { timeoutSec: 35 });
         source = "anthropic";
       } catch (first) {
         // Bot-Block o. Ä. → Crawler-Fallback; wirft auch der, gewinnt der erste Fehler
         try {
           const { scrapeProductViaCrawler } = await import("@/lib/scrape/crawler");
-          snap = await scrapeProductViaCrawler(product!.asin!, product!.marketplace, { timeoutSec: 18 });
+          snap = await scrapeProductViaCrawler(product.asin, product.marketplace, { timeoutSec: 18 });
           source = "crawler";
         } catch {
           throw first;
@@ -1615,7 +1715,7 @@ export async function importListingFromAmazon(formData: FormData) {
       }
     }
   } catch (e) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Listing-Import: ${e instanceof Error ? e.message : String(e)}`)}&code=IMP-01`);
+    throw new GenFehler(`Listing-Import: ${e instanceof Error ? e.message : String(e)}`, "IMP-01");
   }
   const snapId = id();
   await db.insert(schema.listingSnapshots).values({
@@ -1627,7 +1727,7 @@ export async function importListingFromAmazon(formData: FormData) {
     raw: snap!.raw,
   });
 
-  // Bild-Auslese + Bild-Audit (D158): automatisch, kein Extra-Schritt —
+  // Bild-Auslese (D158): automatisch, kein Extra-Schritt —
   // scheitert sie, bleibt der Import gültig (null = ehrlich „nicht ausgelesen")
   try {
     const { leseBilderAus } = await import("@/lib/analysis/bildAuslese");
@@ -1650,7 +1750,23 @@ export async function importListingFromAmazon(formData: FormData) {
   } catch {
     // Autofill ist Komfort, kein Blocker
   }
+  return null;
+}
+
+export async function importListingFromAmazon(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const db = await getDb();
+  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  if (!product) return;
+  let hinweis: string | null = null;
+  try {
+    hinweis = await importListingKern(db, product);
+  } catch (e) {
+    const code = e instanceof GenFehler ? e.code : "IMP-01";
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(e instanceof Error ? e.message : String(e))}&code=${code}`);
+  }
   revalidatePath(`/produkte/${productId}`);
+  if (hinweis) redirect(`/produkte/${productId}?hinweis=${encodeURIComponent(hinweis)}`);
 }
 
 export async function uploadListingCsv(formData: FormData) {
