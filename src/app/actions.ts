@@ -101,7 +101,6 @@ export async function createProduct(formData: FormData) {
  */
 export async function deleteProductAction(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
-  if (String(formData.get("bestaetigt") ?? "") !== "on") return;
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return;

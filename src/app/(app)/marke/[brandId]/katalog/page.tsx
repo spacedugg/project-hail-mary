@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { createProduct } from "@/app/actions";
+import { createProduct, deleteProductAction } from "@/app/actions";
+import { LoeschButton } from "@/components/loesch-button";
 import { SubmitButton } from "@/components/submit-button";
 
 export const dynamic = "force-dynamic";
@@ -48,14 +49,22 @@ export default async function BrandKatalog({ params }: { params: Promise<{ brand
       <ul className="mt-6 card divide-y divide-hair overflow-hidden">
         {products.length === 0 && <li className="p-4 text-sm text-neutral-400">Noch keine Produkte.</li>}
         {products.map((p) => (
-          <li key={p.id}>
-            <Link href={`/produkte/${p.id}`} className="flex items-center justify-between p-4 hover:bg-background">
+          <li key={p.id} className="flex items-center">
+            <Link href={`/produkte/${p.id}`} className="flex flex-1 items-center justify-between p-4 hover:bg-background">
               <div>
                 <div className="text-sm font-medium">{p.name}</div>
                 {p.asin && <div className="font-mono text-xs text-neutral-500">{p.asin} · amazon.{p.marketplace}</div>}
               </div>
               <span className="text-xs text-primary-strong">öffnen →</span>
             </Link>
+            <div className="pr-3">
+              <LoeschButton
+                action={deleteProductAction}
+                felder={{ productId: p.id }}
+                frage={`„${p.name}" mit allen Daten endgültig löschen?`}
+                title="Produkt löschen"
+              />
+            </div>
           </li>
         ))}
       </ul>

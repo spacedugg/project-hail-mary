@@ -8,6 +8,7 @@ import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
 import { AsinChips } from "@/components/asin-chips";
 import { FehlerPopup } from "@/components/fehler-popup";
+import { LoeschButton } from "@/components/loesch-button";
 import { GenerierSperre, GenerierButton } from "@/components/generier-sperre";
 import { BewertungsDashboard } from "@/components/bewertungs-dashboard";
 import { fehlerInfo } from "@/lib/fehlercodes";
@@ -152,18 +153,13 @@ export default async function ProductPage({
           <option value="es">Spanisch</option>
         </select>
         <SubmitButton className="btn-ghost text-xs">Speichern</SubmitButton>
+        <LoeschButton
+          action={deleteProductAction}
+          felder={{ productId: product.id }}
+          frage={`„${product.name}" mit allen Daten (Keywords, Scrapes, Analysen, Content) endgültig löschen?`}
+          title="Produkt löschen"
+        />
       </form>
-      <details className="mt-1 text-xs">
-        <summary className="text-bad">Produkt löschen …</summary>
-        <form action={deleteProductAction} className="mt-1 flex flex-wrap items-center gap-2 rounded-xl border border-hair p-2">
-          <input type="hidden" name="productId" value={product.id} />
-          <label className="flex items-center gap-1.5">
-            <input type="checkbox" name="bestaetigt" required />
-            Ja, „{product.name}" mit ALLEN Daten (Keywords, Scrapes, Analysen, Content) endgültig löschen.
-          </label>
-          <SubmitButton className="btn-ghost text-xs !text-bad">Endgültig löschen</SubmitButton>
-        </form>
-      </details>
 
       {fehler && <FehlerPopup message={fehler} {...fehlerInfo(code)} />}
       {hinweis && <p className="mt-4 rounded-xl bg-[var(--primary-soft)] px-3 py-2 text-sm text-primary-strong">ℹ {hinweis}</p>}
@@ -413,19 +409,17 @@ export default async function ProductPage({
                 </ul>
               </details>
             )}
-            {/* Basis löschen (D94): bewusstes Gegenstück zur Zusammenführung — zweistufig statt Sofort-Klick */}
+            {/* Basis löschen (D94/D162): Icon + Rückfrage statt Aufklapp-Text */}
             {kws.some((k) => k.source === "cerebro") && (
-              <details className="mt-3">
-                <summary className="cursor-pointer text-xs text-muted hover:text-bad">Basis komplett löschen …</summary>
-                <form action={deleteKeywordBasis} className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-background p-3">
-                  <input type="hidden" name="productId" value={product.id} />
-                  <p className="min-w-0 flex-1 text-[11px] text-muted">
-                    Entfernt alle {kws.filter((k) => k.source === "cerebro").length} Upload-Keywords dieses Produkts samt SOV-Audit —
-                    manuelle Keywords bleiben. Danach startet der nächste Upload eine frische Basis (statt zusammenzuführen).
-                  </p>
-                  <SubmitButton className="btn-ghost flex-none text-xs !text-bad" pendingLabel="Löscht Basis…">Ja, Basis löschen</SubmitButton>
-                </form>
-              </details>
+              <div className="mt-3 flex items-center gap-1 text-xs text-muted">
+                Keyword-Basis löschen
+                <LoeschButton
+                  action={deleteKeywordBasis}
+                  felder={{ productId: product.id }}
+                  frage={`Alle ${kws.filter((k) => k.source === "cerebro").length} Upload-Keywords samt SOV-Audit endgültig löschen? Manuelle Keywords und Relevanz-Entscheidungen bleiben erhalten.`}
+                  title="Keyword-Basis löschen"
+                />
+              </div>
             )}
             <details className="mt-3" open={kws.length > 0 && kws.every((k) => k.source === "manual")}>
               <summary className="cursor-pointer text-xs text-muted hover:text-foreground">
