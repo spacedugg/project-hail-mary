@@ -342,3 +342,12 @@ body {
   .anim-in, .stagger > *, .bar-fill, .donut-seg, .card-hero::after { animation: none !important; }
   .card, .side-item, a.card:hover, .card-lift:hover { transition: none !important; transform: none !important; }
 }
+
+/* Aufklappbares fällt als klickbar auf (Nutzer-Vorgabe 22.07., D157) */
+details > summary {
+  color: var(--primary-strong);
+  cursor: pointer;
+}
+details > summary:hover {
+  text-decoration: underline;
+}

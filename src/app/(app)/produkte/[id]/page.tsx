@@ -62,10 +62,19 @@ export default async function ProductPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ fehler?: string; code?: string; hinweis?: string }>;
+  searchParams: Promise<{ fehler?: string; code?: string; hinweis?: string; tab?: string }>;
 }) {
   const { id } = await params;
-  const { fehler, code, hinweis } = await searchParams;
+  const { fehler, code, hinweis, tab: tabParam } = await searchParams;
+  const TABS = [
+    { key: "uebersicht", label: "Übersicht" },
+    { key: "listing", label: "Amazon Listing" },
+    { key: "keywords", label: "Keywords" },
+    { key: "bewertungen", label: "Bewertungen" },
+    { key: "content", label: "Content" },
+    { key: "marge", label: "Marge" },
+  ] as const;
+  const tab = TABS.some((t) => t.key === tabParam) ? (tabParam as (typeof TABS)[number]["key"]) : "uebersicht";
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, id) });
   if (!product) notFound();
@@ -117,51 +126,95 @@ export default async function ProductPage({
         <h1 className="page-title">
           {product.name}{" "}
           {product.asin && <span className="font-mono text-sm text-neutral-500">{product.asin} · amazon.{product.marketplace}</span>}{" "}
-          {/* Marktplatz & Content-Sprache (D128): Sprache unabhängig vom Marktplatz — steuert Generierung, Keyword-Gate und Scrape-Domain */}
-          <details className="inline-block align-middle text-sm font-normal">
-            <summary className="cursor-pointer select-none text-xs text-primary-strong hover:underline">
-              Marktplatz &amp; Sprache: amazon.{product.marketplace} · Content {product.contentSprache.toUpperCase()}
-            </summary>
-            <form action={saveMarktSprache} className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-background p-2">
-              <input type="hidden" name="productId" value={product.id} />
-              <select name="marketplace" defaultValue={product.marketplace} className="input w-36 text-xs" title="Marktplatz — Listing-Import läuft gegen diese Domain">
-                <option value="de">amazon.de</option>
-                <option value="uk">amazon.co.uk</option>
-                <option value="us">amazon.com</option>
-                <option value="fr">amazon.fr</option>
-                <option value="it">amazon.it</option>
-                <option value="es">amazon.es</option>
-                <option value="nl">amazon.nl</option>
-              </select>
-              <select name="contentSprache" defaultValue={product.contentSprache} className="input w-36 text-xs" title="Content-Sprache — unabhängig vom Marktplatz; Keyword-Basis und Review-Quellen müssen dazu passen (Sprach-Gates)">
-                <option value="de">Deutsch</option>
-                <option value="en">Englisch</option>
-                <option value="fr">Französisch</option>
-                <option value="it">Italienisch</option>
-                <option value="es">Spanisch</option>
-              </select>
-              <SubmitButton className="btn-ghost text-xs">Speichern</SubmitButton>
-              <span className="text-[10px] text-muted">Sprach-Gates: Keyword-Basis muss zur Content-Sprache passen; Review-Scrapes laufen gegen den Marktplatz der Content-Sprache.</span>
-            </form>
-          </details>
         </h1>
-        <div className="flex flex-none gap-2">
-          {snapshot || versions.length > 0 ? (
-            <>
-              <Link href={`/produkte/${product.id}/briefs`} className="btn-ghost font-medium">Creative-Briefs</Link>
-              <Link href={`/produkte/${product.id}/analyse`} className="btn-primary font-medium">Analyse öffnen →</Link>
-            </>
-          ) : (
-            <span className="text-xs text-muted">Analyse & Briefs werden aktiv, sobald ein Listing geladen ist.</span>
-          )}
-        </div>
       </div>
+      {/* Marktplatz & Content-Sprache (D128) — IMMER sichtbar (Nutzer-Vorgabe 22.07.): elementare Steuergrößen */}
+      <form action={saveMarktSprache} className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+        <input type="hidden" name="productId" value={product.id} />
+        <label className="text-muted">Marktplatz</label>
+        <select name="marketplace" defaultValue={product.marketplace} className="input w-32 text-xs">
+          <option value="de">amazon.de</option>
+          <option value="uk">amazon.co.uk</option>
+          <option value="us">amazon.com</option>
+          <option value="fr">amazon.fr</option>
+          <option value="it">amazon.it</option>
+          <option value="es">amazon.es</option>
+          <option value="nl">amazon.nl</option>
+        </select>
+        <label className="text-muted">Content-Sprache</label>
+        <select name="contentSprache" defaultValue={product.contentSprache} className="input w-32 text-xs">
+          <option value="de">Deutsch</option>
+          <option value="en">Englisch</option>
+          <option value="fr">Französisch</option>
+          <option value="it">Italienisch</option>
+          <option value="es">Spanisch</option>
+        </select>
+        <SubmitButton className="btn-ghost text-xs">Speichern</SubmitButton>
+      </form>
 
       {fehler && <FehlerPopup message={fehler} {...fehlerInfo(code)} />}
       {hinweis && <p className="mt-4 rounded-xl bg-[var(--primary-soft)] px-3 py-2 text-sm text-primary-strong">ℹ {hinweis}</p>}
 
+      {/* Reiter-Navigation (D157): Übersicht als Default, tiefer je Reiter */}
+      <nav className="mt-5 flex flex-wrap gap-1 border-b border-hair">
+        {TABS.map((t) => (
+          <Link
+            key={t.key}
+            href={`/produkte/${product.id}?tab=${t.key}`}
+            className={`rounded-t-lg px-3 py-2 text-sm ${tab === t.key ? "border-b-2 border-[var(--primary)] font-semibold text-primary-strong" : "text-muted hover:text-foreground"}`}
+          >
+            {t.label}
+          </Link>
+        ))}
+      </nav>
+
       <div className="stagger mt-6 space-y-3">
-        {/* Original-Listing (inkl. Bildplätze) */}
+        {tab === "uebersicht" && (
+          <section className="card p-5">
+            <h2 className="text-sm font-semibold">Der Weg zum optimierten Listing</h2>
+            <ol className="mt-3 space-y-2">
+              {[
+                {
+                  nr: 1, tabKey: "listing", label: "Amazon Listing laden",
+                  done: Boolean(snapshot),
+                  status: snapshot ? `geladen am ${snapshot.createdAt.toLocaleDateString("de-DE")} (${snapshot.imageUrls?.length ?? 0} Bilder)` : "noch nicht geladen",
+                },
+                {
+                  nr: 2, tabKey: "keywords", label: "Keywords importieren",
+                  done: kws.length > 0,
+                  status: kws.length > 0 ? `${kws.filter((k) => !k.ausgeschlossen).length} aktive Keywords` : "kein Cerebro-Export",
+                },
+                {
+                  nr: 3, tabKey: "bewertungen", label: "Bewertungen scrapen & analysieren",
+                  done: Boolean(insights),
+                  status: insights ? `analysiert${scrapeAnalyzed ? "" : " (älterer Scrape)"}` : scrape ? "gescraped — Analyse fehlt" : "noch nicht gescraped",
+                },
+                {
+                  nr: 4, tabKey: "content", label: "Content generieren & freigeben",
+                  done: versions.some((v) => v.status === "approved"),
+                  status: versions.length ? `${new Set(versions.map((v) => v.type)).size} von 6 Sektionen · ${versions.filter((v) => v.status === "approved").length} freigegeben` : "noch kein Content",
+                },
+                {
+                  nr: 5, tabKey: "marge", label: "Marge & Break-even (optional)",
+                  done: Boolean(mc),
+                  status: mc ? "berechnet" : "nicht berechnet",
+                },
+              ].map((st) => (
+                <li key={st.nr} className="flex flex-wrap items-baseline gap-2 rounded-xl border border-hair p-3">
+                  <span className={`flex h-5 w-5 flex-none items-center justify-center rounded-full text-[11px] font-semibold ${st.done ? "bg-[rgb(47_158_143/0.15)] text-good" : "bg-hair text-muted"}`}>{st.done ? "✓" : st.nr}</span>
+                  <Link href={`/produkte/${product.id}?tab=${st.tabKey}`} className="text-sm font-medium text-primary-strong hover:underline">{st.label}</Link>
+                  <span className="text-xs text-muted">{st.status}</span>
+                </li>
+              ))}
+            </ol>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {insights && <Link href={`/produkte/${product.id}/reviews`} className="btn-ghost text-xs">Bewertungs-Dashboard</Link>}
+              <Link href={`/produkte/${product.id}/analyse`} className="btn-ghost text-xs">Analyse</Link>
+              <Link href={`/produkte/${product.id}/briefs`} className="btn-ghost text-xs">Creative-Briefs</Link>
+            </div>
+          </section>
+        )}
+        {tab === "listing" && (
         <section className="card p-5">
           <CardHead
             icon={<IconUpload />}
@@ -238,9 +291,10 @@ export default async function ProductPage({
             </form>
           </details>
         </section>
+        )}
 
 
-        {/* Keyword-Basis (D89): EIN Upload — Cerebro-Export → Keywords immer, SOV wenn Wettbewerber drin */}
+        {tab === "keywords" && (
         <section className="card p-5">
             <CardHead
               icon={<IconSearch />}
@@ -356,8 +410,9 @@ export default async function ProductPage({
               </form>
             </details>
         </section>
+        )}
 
-        {/* Bewertungs-Analyse */}
+        {tab === "bewertungen" && (
         <section id="reviews" className="card p-5">
           <CardHead
             icon={<IconReviews />}
@@ -463,8 +518,9 @@ export default async function ProductPage({
             );
           })()}
         </section>
+        )}
 
-        {/* Content */}
+        {tab === "content" && (
         <section className="card p-5">
           <CardHead
             icon={<IconContent />}
@@ -633,8 +689,9 @@ export default async function ProductPage({
           </div>
           </GenerierSperre>
         </section>
+        )}
 
-        {/* Marge & Break-even */}
+        {tab === "marge" && (
         <section className="card p-5">
           <CardHead
             icon={<IconEuro />}
@@ -702,6 +759,7 @@ export default async function ProductPage({
             </form>
           </details>
         </section>
+        )}
       </div>
     </main>
   );

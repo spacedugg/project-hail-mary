@@ -458,7 +458,7 @@ export async function generateContentBatch(formData: FormData) {
   const gewaehlt = formData.getAll("sections").map(String);
   const sections = SEKTIONS_REIHENFOLGE.filter((s) => gewaehlt.includes(s));
   if (sections.length === 0) {
-    redirect(`/produkte/${productId}?hinweis=${encodeURIComponent("Keine Sektion angehakt.")}#content`);
+    redirect(`/produkte/${productId}?hinweis=${encodeURIComponent("Keine Sektion angehakt.")}&tab=content#content`);
   }
   const bestaetigt = String(formData.get("ohneAnalyseBestaetigt") ?? "") === "on";
   const db = await getDb();
@@ -482,7 +482,7 @@ export async function generateContentBatch(formData: FormData) {
       const msg = e instanceof Error ? e.message : String(e);
       // Gate-Fehler (Analyse fehlt / Sprache passt nicht) gelten für ALLE Sektionen — sofort raus
       if (e instanceof GenFehler && e.code !== "GEN-01") {
-        redirect(`/produkte/${productId}?fehler=${encodeURIComponent(msg)}&code=${e.code}#content`);
+        redirect(`/produkte/${productId}?fehler=${encodeURIComponent(msg)}&code=${e.code}&tab=content#content`);
       }
       fehlgeschlagen.push(`${SEKTIONS_LABEL[section]} (${msg.slice(0, 120)})`);
     }
@@ -495,9 +495,9 @@ export async function generateContentBatch(formData: FormData) {
     offen.length ? `Zeit-Budget erreicht — noch offen: ${offen.join(", ")}. Erneut auf Generieren klicken, es geht dort weiter.` : "",
   ].filter(Boolean).join(" ");
   if (fehlgeschlagen.length && !fertig.length) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(teile)}&code=GEN-01#content`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(teile)}&code=GEN-01&tab=content#content`);
   }
-  redirect(`/produkte/${productId}?hinweis=${encodeURIComponent(teile)}#content`);
+  redirect(`/produkte/${productId}?hinweis=${encodeURIComponent(teile)}&tab=content#content`);
 }
 
 async function generiereSektionKern(
@@ -906,7 +906,7 @@ export async function verdichteInsightsAction(formData: FormData) {
     orderBy: desc(schema.reviewInsights.createdAt),
   });
   if (!insight) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Verdichtung braucht die Roh-Analyse — erst Reviews scrapen und analysieren.")}&code=REV-05#reviews`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Verdichtung braucht die Roh-Analyse — erst Reviews scrapen und analysieren.")}&code=REV-05&tab=bewertungen#reviews`);
   }
   const { normalisierePayload } = await import("@/lib/reviews/insights");
   if ((normalisierePayload(insight!.payload).insightCards?.length ?? 0) > 0) {
@@ -1018,7 +1018,7 @@ export async function scrapeReviewsAction(formData: FormData) {
     ? chipListe
     : ([product.asin, ...String(formData.get("competitorAsins") ?? "").split(/[\s,;]+/).filter(Boolean)].filter(Boolean) as string[]);
   if (asins.length === 0) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Review-Scrape: keine ASIN angegeben — mindestens einen ASIN-Chip stehen lassen.")}&code=REV-04#reviews`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Review-Scrape: keine ASIN angegeben — mindestens einen ASIN-Chip stehen lassen.")}&code=REV-04&tab=bewertungen#reviews`);
   }
 
   // Redundanz-Guard (D81): identische ASIN-Menge, jünger als 24 h → kein
@@ -1034,7 +1034,7 @@ export async function scrapeReviewsAction(formData: FormData) {
     norm(lastScrape.asins) === norm(asins) &&
     Date.now() - lastScrape.createdAt.getTime() < 24 * 60 * 60 * 1000
   ) {
-    redirect(`/produkte/${productId}?hinweis=${encodeURIComponent("Diese ASINs wurden in den letzten 24 h bereits gescraped — Datenbasis unten. Für mehr Daten Wettbewerber-ASINs dazugeben; neue Reviews gibt es ab morgen.")}#reviews`);
+    redirect(`/produkte/${productId}?hinweis=${encodeURIComponent("Diese ASINs wurden in den letzten 24 h bereits gescraped — Datenbasis unten. Für mehr Daten Wettbewerber-ASINs dazugeben; neue Reviews gibt es ab morgen.")}&tab=bewertungen#reviews`);
   }
 
   const { scrapeReviews } = await import("@/lib/reviews/apify");
@@ -1069,11 +1069,11 @@ export async function scrapeReviewsAction(formData: FormData) {
         { asin: asins[0] ?? "B000000000", rating: 1, title: "Mock", body: "kam zerkratzt an" },
       ];
     } else {
-      redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Review-Scrape: ${msg}`)}&code=${msg.includes("Zeitlimit") ? "REV-01" : "REV-03"}#reviews`);
+      redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Review-Scrape: ${msg}`)}&code=${msg.includes("Zeitlimit") ? "REV-01" : "REV-03"}&tab=bewertungen#reviews`);
     }
   }
   if (reviews.length === 0) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Review-Scrape: 0 Reviews gefunden — ASIN prüfen (neues Produkt ohne Bewertungen?).")}&code=REV-02#reviews`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Review-Scrape: 0 Reviews gefunden — ASIN prüfen (neues Produkt ohne Bewertungen?).")}&code=REV-02&tab=bewertungen#reviews`);
   }
 
   const starCounts: Record<string, number> = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
@@ -1121,7 +1121,7 @@ export async function scrapeReviewsAction(formData: FormData) {
     });
   } catch (e) {
     revalidatePath(`/produkte/${productId}`);
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Scrape fertig (${reviews.length} Reviews, Ausbeute unten) — aber die automatische Analyse schlug fehl: ${e instanceof Error ? e.message : String(e)}. Mit „Analyse nachholen" erneut versuchen.`)}&code=ANA-01#reviews`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Scrape fertig (${reviews.length} Reviews, Ausbeute unten) — aber die automatische Analyse schlug fehl: ${e instanceof Error ? e.message : String(e)}. Mit „Analyse nachholen" erneut versuchen.`)}&code=ANA-01&tab=bewertungen#reviews`);
   }
 
   // Etappe 3 (D131/D136): Verdichtung als eigener, nachholbarer Schritt —
@@ -1146,7 +1146,7 @@ export async function analyzeReviewsAction(formData: FormData) {
     orderBy: desc(schema.reviewScrapes.createdAt),
   });
   if (!scrape) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Erst Reviews scrapen (Schritt 1), dann analysieren.")}&code=REV-05#reviews`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Erst Reviews scrapen (Schritt 1), dann analysieren.")}&code=REV-05&tab=bewertungen#reviews`);
   }
 
   // Derselbe Scrape wird nie doppelt analysiert (D79) — direkt zum Dashboard.
@@ -1171,7 +1171,7 @@ export async function analyzeReviewsAction(formData: FormData) {
       id: id(), productId, scrapeId: scrape!.id, dataBasis, confidence: res.confidence, payload: res.payload,
     });
   } catch (e) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Review-Analyse: ${e instanceof Error ? e.message : String(e)}`)}&code=ANA-01#reviews`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Review-Analyse: ${e instanceof Error ? e.message : String(e)}`)}&code=ANA-01&tab=bewertungen#reviews`);
   }
 
   // Etappe 3 (D131/D136): Verdichtung — eigener, nachholbarer Schritt
