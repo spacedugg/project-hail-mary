@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { saveKeywords, deriveKeywordsFromSov, generateContent, generateContentBatch, deleteProductAction, uploadCerebro, scrapeReviewsAction, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarktSprache } from "@/app/actions";
+import { saveKeywords, deriveKeywordsFromSov, generateContent, generateContentBatch, deleteProductAction, uploadCerebro, scrapeReviewsAction, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarktSprache, findeBlockerAction } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
@@ -12,9 +12,10 @@ import { FehlerPopup } from "@/components/fehler-popup";
 import { LoeschButton } from "@/components/loesch-button";
 import { GenerierSperre, GenerierButton } from "@/components/generier-sperre";
 import { BewertungsDashboard } from "@/components/bewertungs-dashboard";
+import { InsightKarte } from "@/components/insight-karte";
 import { fehlerInfo } from "@/lib/fehlercodes";
 import { normalisierePayload } from "@/lib/reviews/insights";
-import { IconUpload, IconCheck, IconSearch, IconReviews, IconContent, IconEuro } from "@/components/icons";
+import { IconUpload, IconCheck, IconSearch, IconReviews, IconContent, IconEuro, IconSichtbarkeit } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 // Apify-Scrapes & LLM-Generierung: sonnet-5 denkt adaptiv und braucht bei
@@ -74,6 +75,7 @@ export default async function ProductPage({
     { key: "listing", label: "Amazon Listing" },
     { key: "keywords", label: "Keywords" },
     { key: "bewertungen", label: "Bewertungen" },
+    { key: "blocker", label: "Blocker" },
     { key: "content", label: "Content" },
     { key: "marge", label: "Marge" },
   ] as const;
@@ -105,6 +107,10 @@ export default async function ProductPage({
   const snapshot = await db.query.listingSnapshots.findFirst({
     where: eq(schema.listingSnapshots.productId, id),
     orderBy: desc(schema.listingSnapshots.createdAt),
+  });
+  const blockerLauf = await db.query.conversionBlockers.findFirst({
+    where: eq(schema.conversionBlockers.productId, id),
+    orderBy: desc(schema.conversionBlockers.createdAt),
   });
   const latestOf = (t: string) => versions.find((v) => v.type === t);
   const input = "input-base";
@@ -206,7 +212,7 @@ export default async function ProductPage({
         const naechster = reihenfolge.find((k) => !done[k]);
         return (
           <nav className="mt-4 flex flex-wrap gap-1 border-b border-hair">
-            {TABS.map((t, i) => (
+            {TABS.map((t) => (
               <Link
                 key={t.key}
                 href={`/produkte/${product.id}?tab=${t.key}`}
@@ -214,7 +220,7 @@ export default async function ProductPage({
               >
                 {t.key in done && (
                   <span className={`flex h-4 w-4 flex-none items-center justify-center rounded-full text-[10px] font-semibold ${done[t.key] ? "bg-[rgb(47_158_143/0.15)] text-good" : t.key === naechster ? "bg-[var(--primary-soft)] text-primary-strong" : "bg-hair text-muted"}`}>
-                    {done[t.key] ? "✓" : i + 1}
+                    {done[t.key] ? "✓" : reihenfolge.indexOf(t.key) + 1}
                   </span>
                 )}
                 {t.label}
@@ -532,6 +538,49 @@ export default async function ProductPage({
         </section>
         {insights && <BewertungsDashboard insight={insights} scrape={scrape ?? null} productId={product.id} productAsin={product.asin} />}
         </>)}
+
+        {tab === "blocker" && (
+        <section className="card p-5">
+          <CardHead
+            icon={<IconSichtbarkeit />}
+            chip="chip-amber"
+            title="Conversion-Blocker"
+            right={
+              <form action={findeBlockerAction}>
+                <input type="hidden" name="productId" value={product.id} />
+                <SubmitButton className="btn-primary" disabled={!snapshot || !insights} pendingLabel="Prüft Listing gegen Kunden-Themen…" progress>
+                  {blockerLauf ? "Neu prüfen" : "Blocker finden"}
+                </SubmitButton>
+              </form>
+            }
+          />
+          <p className="mt-2 text-xs text-muted">Kunden-Themen mit echtem Gewicht, die Listing und Bilder nicht beantworten. Jeder Blocker zeigt die belegenden Kunden-Themen.</p>
+          {(!snapshot || !insights) && (
+            <p className="mt-3 text-xs text-warn">△ Dafür braucht es das importierte Listing und die Bewertungs-Analyse.</p>
+          )}
+          {blockerLauf && (
+            <>
+              <div className="stagger mt-4 space-y-2">
+                {blockerLauf.payload.cards.map((k, i) => (
+                  <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={blockerLauf.payload.stats.reviewsGesamt} />
+                ))}
+                {blockerLauf.payload.cards.length === 0 && (
+                  <p className="text-sm">✓ Kein Blocker gefunden. Die wichtigen Kunden-Themen sind im Listing beantwortet.</p>
+                )}
+              </div>
+              <div className="mt-3 space-y-0.5">
+                {blockerLauf.payload.hinweise.map((h, i) => (
+                  <p key={i} className="text-[11px] text-muted">ℹ {h}</p>
+                ))}
+                {blockerLauf.payload.verworfen > 0 && (
+                  <p className="text-[11px] text-warn">△ {blockerLauf.payload.verworfen} Blocker ohne echten Kunden-Aspekt verworfen.</p>
+                )}
+                <p className="text-[11px] text-muted">Datenbasis: {blockerLauf.dataBasis.join(" · ")} · Stand {blockerLauf.createdAt.toLocaleDateString("de-DE")}</p>
+              </div>
+            </>
+          )}
+        </section>
+        )}
 
         {tab === "content" && (
         <section className="card p-5">

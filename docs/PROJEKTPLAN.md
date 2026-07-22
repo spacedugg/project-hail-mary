@@ -142,6 +142,8 @@ Content-Sprache ist je Produkt/Auftrag wählbar — unabhängig vom Marktplatz. 
 | Kundenstimmen-Abgleich (Themen-Abgleich, komposita-bewusst) | 🧪 | Adressieren die Bullets die Top-Pain-Points? (D117 repariert) |
 | Insight-Schema auch für Audit-Ausgaben: Stärken/Schwächen, Maßnahmen, Kauf-Verhinderer als Insight-Karten (D135) | 🧪 | Ein Erkenntnis-Format über alle Analyse-Dimensionen statt sieben Ausgabeformate |
 | Feature-Relevanz-Ranking: Listing-Features (Titel/Bullets/Attribute/Wichtige Infos/A+) nach Kunden-Relevanz sortiert; hoch relevant + bei Wettbewerbern unbeleuchtet = echter USP (D146, braucht D145) | 🧪 | Beantwortet datenbasiert, welches Feature in Bildern/A+ zuerst gezeigt wird — Umkehrung des Kundenstimmen-Abgleichs |
+| Conversion-Blocker-Reiter: Kunden-Themen mit Gewicht OHNE Listing-Antwort, Aspekt-Match per Code erzwungen (D167) | 🧪 | Zeigt, wo das Listing auf nachweislich Kaufentscheidendes schweigt — jeder Blocker mit echten Beleg-Aspekten |
+| Produkt-Kopfkarte über allen Reitern: Bild, Listing-Titel, ASIN, Stand, Steuergrößen, Reviews analysiert (D166) | 🧪 | Ein Blick zeigt jederzeit, welches Produkt in welchem Zustand bearbeitet wird |
 | Druck-Layout | 🧪 | Kundentaugliche Aufbereitung |
 | Bild-Audit (automatische visuelle Prüfung) | ⬜ | Hauptbild = größter CRO-Hebel |
 | Echter Listing-Score (Engine statt Handeingabe) | ⬜ | Vergleichbarkeit über Produkte und Zeit |

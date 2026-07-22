@@ -43,6 +43,11 @@ export const FEHLER_CODES: Record<string, FehlerInfo> = {
     bedeutung: "Das Feature-Relevanz-Ranking braucht Listing-Inhalt (Import) UND eine Bewertungs-Analyse als Kunden-Echo — oder der Lauf selbst ist abgebrochen (Detail-Meldung oben).",
     loesung: "Erst Listing importieren und Reviews analysieren, dann erneut ranken. Bestehende Daten bleiben unberührt.",
   },
+  "BLK-01": {
+    titel: "Blocker-Lauf nicht möglich",
+    bedeutung: "Der Conversion-Blocker-Lauf braucht Listing-Inhalt (Import) UND die Kunden-Themen der Bewertungs-Analyse — der Match aus beidem ist der Blocker. Oder der Lauf selbst ist abgebrochen (Detail-Meldung oben).",
+    loesung: "Erst Listing importieren und Reviews analysieren, dann erneut starten. Bestehende Daten bleiben unberührt.",
+  },
   "VER-01": {
     titel: "Insight-Verdichtung fehlgeschlagen",
     bedeutung: "Die Verdichtungs-Etappe (Roh-Themen → benannte Erkenntnisse) ist abgebrochen. Scrape und Roh-Analyse sind unversehrt gespeichert — nur die Karten fehlen.",

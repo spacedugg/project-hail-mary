@@ -42,8 +42,8 @@ const QUELL_LABEL: Record<string, string> = {
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
 
-/** Quelltexte je Quelle — Basis der Verbatim-Verifikation. */
-function quellTexte(q: FeatureQuellen): Record<string, string> {
+/** Quelltexte je Quelle — Basis der Verbatim-Verifikation (auch vom Blocker-Lauf genutzt, D167). */
+export function quellTexte(q: FeatureQuellen): Record<string, string> {
   return {
     title: q.title ?? "",
     bullets: q.bullets.join("\n"),

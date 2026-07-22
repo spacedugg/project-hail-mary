@@ -311,6 +311,30 @@ export type FeatureRankingPayload = {
   stats: { reviewsGesamt: number };
 };
 
+/**
+ * Conversion-Blocker (D167): Kunden-Themen mit echtem Gewicht (Roh-Aspekte),
+ * die Listing/Bilder nicht oder schwach beantworten — der fehlende MATCH
+ * kostet Conversion. Karten im Insight-Schema (D132/D135); ein Blocker ohne
+ * aufgelösten Beleg-Aspekt fliegt (der Match IST die Existenzberechtigung).
+ */
+export const conversionBlockers = sqliteTable("conversion_blockers", {
+  id: text("id").primaryKey(),
+  productId: text("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  payload: text("payload", { mode: "json" }).$type<ConversionBlockerPayload>().notNull(),
+  dataBasis: text("data_basis", { mode: "json" }).$type<string[]>().notNull(),
+  createdAt: ts("created_at").notNull(),
+});
+
+export type ConversionBlockerPayload = {
+  cards: InsightCard[];
+  /** Blocker ohne aufgelösten Beleg-Aspekt — gezählt ausgewiesen, nie still (D133). */
+  verworfen: number;
+  hinweise: string[];
+  stats: { reviewsGesamt: number };
+};
+
 export const reviewInsights = sqliteTable("review_insights", {
   id: text("id").primaryKey(),
   productId: text("product_id")

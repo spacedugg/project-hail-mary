@@ -1046,6 +1046,71 @@ export async function rankeFeaturesAction(formData: FormData) {
   redirect(`/produkte/${productId}/analyse`);
 }
 
+/**
+ * Conversion-Blocker (D167): Kunden-Themen ohne Listing-Antwort — der
+ * fehlende Match kostet Conversion. Pflicht-Datenbasis: Listing-Snapshot +
+ * Bewertungs-Analyse; Redundanz-Guard nach D81-Muster.
+ */
+export async function findeBlockerAction(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const db = await getDb();
+  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  if (!product) return;
+  const back = (msg: string, code: string) =>
+    redirect(`/produkte/${productId}?tab=blocker&fehler=${encodeURIComponent(msg)}&code=${code}`);
+
+  const snapshot = await db.query.listingSnapshots.findFirst({
+    where: eq(schema.listingSnapshots.productId, productId),
+    orderBy: desc(schema.listingSnapshots.createdAt),
+  });
+  if (!snapshot) back("Der Blocker-Lauf braucht den Listing-Import — er prüft, was Kunden dort NICHT beantwortet finden.", "BLK-01");
+
+  const insight = await db.query.reviewInsights.findFirst({
+    where: eq(schema.reviewInsights.productId, productId),
+    orderBy: desc(schema.reviewInsights.createdAt),
+  });
+  if (!insight) back("Der Blocker-Lauf braucht die Bewertungs-Analyse — ihre Kunden-Themen sind die eine Hälfte des Matches.", "BLK-01");
+
+  // Redundanz-Guard: dieselbe Datenbasis wird nicht doppelt geprüft
+  const last = await db.query.conversionBlockers.findFirst({
+    where: eq(schema.conversionBlockers.productId, productId),
+    orderBy: desc(schema.conversionBlockers.createdAt),
+  });
+  if (last && Math.max(snapshot!.createdAt.getTime(), insight!.createdAt.getTime()) <= last.createdAt.getTime()) {
+    redirect(`/produkte/${productId}?tab=blocker&hinweis=${encodeURIComponent("Die Datenbasis ist seit dem letzten Blocker-Lauf unverändert — das Ergebnis unten ist aktuell. Neu prüfen wird nach neuem Import oder neuer Analyse wieder frei.")}`);
+  }
+
+  const { normalisierePayload } = await import("@/lib/reviews/insights");
+  const p = normalisierePayload(insight!.payload);
+
+  try {
+    const { findeBlocker } = await import("@/lib/analysis/blocker");
+    const payload = await findeBlocker({
+      quellen: {
+        title: snapshot!.title,
+        bullets: snapshot!.bullets ?? [],
+        description: snapshot!.description,
+        attributes: snapshot!.attributes,
+        importantInfo: snapshot!.importantInfo,
+        aplusContent: snapshot!.aplusContent,
+        bilder: (await import("@/lib/analysis/bildAuslese")).bilderAlsText(snapshot!.bilderText) || null,
+      },
+      aspekte: { painPoints: p.painPoints, buyingTriggers: p.buyingTriggers },
+      reviewsGesamt: p.stats.reviewsTotal,
+      sprache: product.contentSprache,
+    });
+    const dataBasis = [
+      `Listing-Import (${snapshot!.source}, ${snapshot!.createdAt.toLocaleDateString("de-DE")})`,
+      `Review-Insights (${insight!.dataBasis}, ${p.stats.reviewsTotal} Reviews)`,
+    ];
+    await db.insert(schema.conversionBlockers).values({ id: id(), productId, payload, dataBasis });
+  } catch (e) {
+    back(`Blocker-Lauf: ${e instanceof Error ? e.message : String(e)}`, "BLK-01");
+  }
+  revalidatePath(`/produkte/${productId}`);
+  redirect(`/produkte/${productId}?tab=blocker`);
+}
+
 export async function scrapeReviewsAction(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
   const db = await getDb();
