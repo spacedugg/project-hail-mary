@@ -167,7 +167,7 @@ export default async function ProductPage({
             icon={<IconUpload />}
             chip="chip-violet"
             title="Original-Listing"
-            sub="ASIN genügt — Titel, Bullets, Bilder und Bewertungs-Basics werden geladen."
+            sub="ASIN genügt."
             right={
               <>
                 {snapshot && <span className="pill pill-good">✓ {snapshot.createdAt.toLocaleDateString("de-DE")}</span>}
@@ -247,7 +247,7 @@ export default async function ProductPage({
               icon={<IconSearch />}
               chip="chip-pink"
               title="Keyword-Basis (Helium 10 Cerebro)"
-              sub="Cerebro-Export der zu optimierenden ASIN hochladen — optional mit Wettbewerber-ASINs, dann entsteht zusätzlich das SOV-Audit."
+              sub="Cerebro-Export hochladen — mit Wettbewerber-ASINs entsteht zusätzlich das SOV-Audit."
               right={
                 <>
                   {kws.length > 0 && <span className="pill pill-neutral">{kws.filter((k) => !k.ausgeschlossen).length} aktiv</span>}
@@ -266,7 +266,7 @@ export default async function ProductPage({
               </SubmitButton>
             </form>
             <p className="mt-2 text-[11px] text-muted">
-              Eine Datei, alles drin: Keyword-Basis entsteht immer (inkl. Relevanz-Filter — Marken, abweichende Maße/Anzahlen).
+              Keyword-Basis inkl. Relevanz-Filter entsteht automatisch.
               Enthält der Export Wettbewerber-ASIN-Spalten, entsteht daraus zusätzlich das SOV-Audit — nichts wird doppelt hochgeladen.
               {kws.some((k) => k.source === "cerebro") && (
                 <> Ein weiterer Upload ersetzt nichts: neue Datei und bestehende Basis werden zusammengeführt, identische Keywords erscheinen nur einmal.</>
@@ -365,7 +365,7 @@ export default async function ProductPage({
             icon={<IconReviews />}
             chip="chip-violet"
             title="Bewertungs-Analyse"
-            sub="Reviews scrapen (je ASIN und Sterne-Klasse eine eigene Anfrage, bis zu 100 aktuellste; Läufe gestaffelt) — die Analyse läuft danach AUTOMATISCH und mündet im Findings-Dashboard."
+            sub="Scrape + Analyse laufen in einem Zug."
             right={insights ? <span className="pill pill-good">✓ analysiert · {insights.confidence}</span> : undefined}
           />
 
@@ -378,10 +378,6 @@ export default async function ProductPage({
             </SubmitButton>
           </form>
           {!product.asin && <p className="mt-2 text-xs text-warn">△ Dafür braucht das Produkt eine ASIN.</p>}
-          {scrape && scrape.source === "apify" && Date.now() - scrape.createdAt.getTime() < 24 * 60 * 60 * 1000 && (
-            <p className="mt-2 text-[11px] text-muted">Dieselben ASINs werden 24 h nicht doppelt gescraped — neu scrapen lohnt mit zusätzlichen Wettbewerber-ASINs.</p>
-          )}
-
           {scrape && (() => {
             // Zahlen-Basen NIE mischen (D129, Nutzer-Befund): Die Amazon-Gesamtzahl
             // und die %-Verteilung gehören zum PRODUKT — daneben dürfen nur die
@@ -436,12 +432,7 @@ export default async function ProductPage({
                 </div>
               )}
               <p className="mt-2 text-[11px] text-muted">
-                Gescraped werden geschriebene Rezensionen (je ASIN und Sterne-Klasse die bis zu 100 aktuellsten) —
-                mehr als ~100 je Klasse gibt Amazon von außen nicht her (Seiten-Limit), das ist der harte Deckel von
-                max. ~500 je ASIN. Amazons Gesamtzahl zählt auch Sterne-Bewertungen OHNE Text mit, und Kurz-Rezensionen
-                ohne verwertbaren Text fallen raus — die Stichprobe ist deshalb kleiner als die Gesamtzahl, ohne dass
-                etwas fehlt. Sie bildet kein Gesamtverhältnis ab; alle Klassen fließen in Pain Points und Kaufauslöser ein.
-              </p>
+                Je ASIN und Sterne-Klasse bis zu 100 aktuellste geschriebene Rezensionen. </p>
               {(scrape.notes?.length ?? 0) > 0 && (
                 <div className="mt-2 space-y-0.5">
                   {scrape.notes!.map((n, i) =>
@@ -482,7 +473,7 @@ export default async function ProductPage({
             icon={<IconContent />}
             chip="chip-teal"
             title="Content"
-            sub="Grundlage ist die Bewertungs-Analyse (Kundensprache, Pain Points). Sektionen werden NACHEINANDER generiert — läuft eine, warten die anderen. Jede Version läuft durchs Validation-Gate."
+            sub="Sektionen laufen nacheinander, jede Version durchs Prüf-Gate."
             right={!insights ? <span className="pill pill-warn">gesperrt — Analyse fehlt</span> : undefined}
           />
           {/* Content-Gate (D108): ohne Bewertungs-Analyse nur mit doppelter Bestätigung */}
@@ -492,10 +483,7 @@ export default async function ProductPage({
                 △ Content ist gesperrt: Es liegt keine Bewertungs-Analyse vor.
               </p>
               <p className="mt-1 text-muted">
-                Die Analyse liefert die Text-Grundlage — echte Kundensprache, Pain Points, Kaufauslöser. Empfohlener Weg:
-                oben Reviews scrapen und analysieren. Wer bewusst ohne Analyse generiert, bestätigt das pro Sektion —
-                Grundlage sind dann das importierte Listing (IST) und die Zusatz-Infos unten.
-              </p>
+                Empfohlener Weg: erst analysieren, dann texten. </p>
             </div>
           )}
           {/* Zusatz-Infos (D108): fließen in JEDE Generierung ein */}

@@ -72,7 +72,7 @@ export function InsightKarte({
         </div>
         {(karte.bildIdeen.length > 0 || !belegHinweis) && (
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Visuelle Umsetzungsideen (wahrheits-geprüft)</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Bild-Ideen</div>
             {karte.bildIdeen.length > 0 ? (
               <ul className="mt-1 space-y-1.5">
                 {karte.bildIdeen.map((idee, i) => (
@@ -80,7 +80,7 @@ export function InsightKarte({
                 ))}
               </ul>
             ) : (
-              <p className="mt-1 text-xs text-muted">Keine zulässige Bild-Idee — ggf. vom Wahrheits-Filter entfernt (Ausweis am Seitenende).</p>
+              <p className="mt-1 text-xs text-muted">—</p>
             )}
           </div>
         )}

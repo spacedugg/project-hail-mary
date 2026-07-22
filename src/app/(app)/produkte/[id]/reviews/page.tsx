@@ -73,10 +73,7 @@ export default async function ReviewDashboard({
         <h1 className="page-title">Bewertungs-Analyse</h1>
         <span className="text-sm text-muted">{product.name}{product.asin ? ` · ${product.asin}` : ""}</span>
       </div>
-      <p className="page-sub">
-        Was Käufer wirklich stört und überzeugt — aus echten Bewertungen, mit O-Tönen. Pain Points gehören in Bullets/Q&A
-        (Einwände vorwegnehmen), Kaufauslöser in Headlines und Bild-Briefs.
-      </p>
+      <p className="page-sub">Was Käufer wirklich stört und überzeugt — aus echten Bewertungen.</p>
       {hinweis && <p className="mt-4 rounded-xl bg-[var(--primary-soft)] px-3 py-2 text-sm text-primary-strong">ℹ {hinweis}</p>}
 
       {/* Etappen-Protokoll + Trichter (D139/D143): macht das Verdichtungs-Prinzip
@@ -126,9 +123,7 @@ export default async function ReviewDashboard({
       {karten.length > 0 && (
         <section className="anim-in mt-3 card p-5">
           <h2 className="text-sm font-semibold">Erkenntnisse — verdichtet aus den Roh-Themen</h2>
-          <p className="mt-1 text-xs text-muted">
-            Abstrahierte Kaufgründe und Befunde (kein Kunde schreibt sie wörtlich) — jede Karte nennt ihre Beleg-Aspekte samt Zählwerten. Aufklappen für Beschreibung und Bild-Ideen.
-          </p>
+
           <div className="mt-3 space-y-2">
             {karten.map((k, i) => (
               <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={p.stats.reviewsTotal} />
@@ -169,9 +164,7 @@ export default async function ReviewDashboard({
               </div>
             </div>
           </div>
-          <p className="mt-2 text-[11px] text-muted">
-            Je Sterne-Klasse ein eigener Scrape-Lauf mit bis zu 100 der aktuellsten Reviews (Scrape-Maximum) — die Stichprobe bildet nicht das Verhältnis der Gesamtverteilung ab.
-          </p>
+
           {(scrape?.notes?.length ?? 0) > 0 && (
             <div className="mt-1.5 space-y-0.5">
               {scrape!.notes!.map((n, i) => (
@@ -214,7 +207,7 @@ export default async function ReviewDashboard({
             ))}
             {!scrape && p.sources.map((s) => <li key={s} className="truncate text-xs text-muted">{s}</li>)}
           </ul>
-          <p className="mt-3 text-[11px] text-muted">Alle Sterne-Klassen fließen in Pain Points UND Kaufauslöser ein — ein „gut, aber…" in 4★ ist oft der wertvollste Pain Point.</p>
+
         </div>
       </div>
 
@@ -289,10 +282,7 @@ export default async function ReviewDashboard({
       <div className="anim-in mt-3 card flex flex-wrap items-center justify-between gap-3 p-5">
         <div className="flex items-center gap-2.5">
           <span className="icon-chip chip-violet"><IconContent /></span>
-          <p className="text-sm">
-            <b>Nächster Schritt:</b> Diese Findings fließen automatisch in die Content-Generierung und die Creative-Briefs ein —
-            Pain Points als Einwand-Behandlung, Kaufauslöser als Headline-Material.
-          </p>
+          <p className="text-sm"><b>Nächster Schritt:</b> Findings fließen automatisch in Content & Briefs ein.</p>
         </div>
         <div className="flex gap-2">
           <Link href={`/produkte/${id}#reviews`} className="btn-ghost text-xs">Neu scrapen/analysieren</Link>
