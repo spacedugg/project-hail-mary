@@ -164,46 +164,37 @@ export default async function ProductPage({
       {fehler && <FehlerPopup message={fehler} {...fehlerInfo(code)} />}
       {hinweis && <p className="mt-4 rounded-xl bg-[var(--primary-soft)] px-3 py-2 text-sm text-primary-strong">ℹ {hinweis}</p>}
 
-      {/* Step-Guide (D160): IMMER sichtbar über den Reitern — die Führung durch die Optimierung */}
+      {/* EINE Leiste (D164): Reiter = Schritte, mit Status — keine zweite Link-Zeile */}
       {(() => {
-        const steps = [
-          { nr: 1, href: `/produkte/${product.id}?tab=listing`, label: "Amazon Listing", done: Boolean(snapshot) },
-          { nr: 2, href: `/produkte/${product.id}?tab=keywords`, label: "Keywords", done: kws.length > 0 },
-          { nr: 3, href: `/produkte/${product.id}?tab=bewertungen`, label: "Bewertungen", done: Boolean(insights) },
-          { nr: 4, href: `/produkte/${product.id}?tab=content`, label: "Content", done: versions.some((v) => v.status === "approved") },
-          { nr: 5, href: `/produkte/${product.id}/analyse`, label: "Prüfen & Übergeben", done: false, extra: true },
-        ];
-        const naechster = steps.find((st) => !st.done && !st.extra)?.nr ?? 5;
+        const done: Record<string, boolean> = {
+          listing: Boolean(snapshot),
+          keywords: kws.length > 0,
+          bewertungen: Boolean(insights),
+          content: versions.some((v) => v.status === "approved"),
+        };
+        const reihenfolge = ["listing", "keywords", "bewertungen", "content"];
+        const naechster = reihenfolge.find((k) => !done[k]);
         return (
-          <div className="mt-4 flex flex-wrap items-center gap-x-1 gap-y-2 rounded-xl border border-hair bg-card px-3 py-2">
-            {steps.map((st, i) => (
-              <span key={st.nr} className="flex items-center gap-1">
-                {i > 0 && <span className="mx-1 text-neutral-300">→</span>}
-                <span className={`flex h-5 w-5 flex-none items-center justify-center rounded-full text-[11px] font-semibold ${st.done ? "bg-[rgb(47_158_143/0.15)] text-good" : st.nr === naechster ? "bg-[var(--primary-soft)] text-primary-strong" : "bg-hair text-muted"}`}>
-                  {st.done ? "✓" : st.nr}
-                </span>
-                <Link href={st.href} className={`text-xs hover:underline ${st.nr === naechster ? "font-semibold text-primary-strong" : st.done ? "text-foreground" : "text-muted"}`}>
-                  {st.label}
-                </Link>
-                {st.nr === 5 && <Link href={`/produkte/${product.id}/briefs`} className="text-xs text-muted hover:underline">· Briefs</Link>}
-              </span>
+          <nav className="mt-4 flex flex-wrap gap-1 border-b border-hair">
+            {TABS.map((t, i) => (
+              <Link
+                key={t.key}
+                href={`/produkte/${product.id}?tab=${t.key}`}
+                className={`flex items-center gap-1.5 rounded-t-lg px-3 py-2 text-sm ${tab === t.key ? "border-b-2 border-[var(--primary)] font-semibold text-primary-strong" : "text-muted hover:text-foreground"}`}
+              >
+                {t.key in done && (
+                  <span className={`flex h-4 w-4 flex-none items-center justify-center rounded-full text-[10px] font-semibold ${done[t.key] ? "bg-[rgb(47_158_143/0.15)] text-good" : t.key === naechster ? "bg-[var(--primary-soft)] text-primary-strong" : "bg-hair text-muted"}`}>
+                    {done[t.key] ? "✓" : i + 1}
+                  </span>
+                )}
+                {t.label}
+              </Link>
             ))}
-          </div>
+            <Link href={`/produkte/${product.id}/analyse`} className="rounded-t-lg px-3 py-2 text-sm text-muted hover:text-foreground">Analyse</Link>
+            <Link href={`/produkte/${product.id}/briefs`} className="rounded-t-lg px-3 py-2 text-sm text-muted hover:text-foreground">Briefs</Link>
+          </nav>
         );
       })()}
-
-      {/* Reiter-Navigation (D157/D160): Amazon Listing als Default */}
-      <nav className="mt-3 flex flex-wrap gap-1 border-b border-hair">
-        {TABS.map((t) => (
-          <Link
-            key={t.key}
-            href={`/produkte/${product.id}?tab=${t.key}`}
-            className={`rounded-t-lg px-3 py-2 text-sm ${tab === t.key ? "border-b-2 border-[var(--primary)] font-semibold text-primary-strong" : "text-muted hover:text-foreground"}`}
-          >
-            {t.label}
-          </Link>
-        ))}
-      </nav>
 
       <div className="stagger mt-6 space-y-3">
         {tab === "listing" && (
