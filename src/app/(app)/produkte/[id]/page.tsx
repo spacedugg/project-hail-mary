@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { saveKeywords, deriveKeywordsFromSov, generateContent, generateContentBatch, deleteProductAction, uploadCerebro, scrapeReviewsAction, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarke, findeBlockerAction } from "@/app/actions";
+import { saveKeywords, deriveKeywordsFromSov, generateContent, deleteProductAction, uploadCerebro, scrapeReviewsAction, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarke, findeBlockerAction } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
@@ -17,7 +17,8 @@ import { BewertungsDashboard } from "@/components/bewertungs-dashboard";
 import { InsightKarte } from "@/components/insight-karte";
 import { fehlerInfo } from "@/lib/fehlercodes";
 import { normalisierePayload } from "@/lib/reviews/insights";
-import { IconUpload, IconCheck, IconSearch, IconReviews, IconContent, IconEuro, IconSichtbarkeit } from "@/components/icons";
+import { IconUpload, IconCheck, IconSearch, IconReviews, IconContent, IconEuro, IconSichtbarkeit, IconSparkle } from "@/components/icons";
+import { AnalyseStart } from "@/components/analyse-start";
 
 export const dynamic = "force-dynamic";
 // Apify-Scrapes & LLM-Generierung: sonnet-5 denkt adaptiv und braucht bei
@@ -73,12 +74,12 @@ export default async function ProductPage({
 }) {
   const { id } = await params;
   const { fehler, code, hinweis, tab: tabParam } = await searchParams;
+  // Reiter nach dem Analyse-Lauf (D172): Content vorn als Hauptaspekt,
+  // Analyse bündelt ALLES Hintergrundwissen — keine Schritt-Reiter mehr.
   const TABS = [
     { key: "listing", label: "Amazon Listing" },
-    { key: "keywords", label: "Keywords" },
-    { key: "bewertungen", label: "Bewertungen" },
-    { key: "blocker", label: "Blocker" },
     { key: "content", label: "Content" },
+    { key: "analyse", label: "Analyse" },
     { key: "marge", label: "Marge" },
   ] as const;
   const tab = TABS.some((t) => t.key === tabParam) ? (tabParam as (typeof TABS)[number]["key"]) : "listing";
@@ -183,40 +184,24 @@ export default async function ProductPage({
       {fehler && <FehlerPopup message={fehler} {...fehlerInfo(code)} />}
       {hinweis && <p className="mt-4 rounded-xl bg-[var(--primary-soft)] px-3 py-2 text-sm text-primary-strong">ℹ {hinweis}</p>}
 
-      {/* EINE Leiste (D164): Reiter = Schritte, mit Status — keine zweite Link-Zeile */}
-      {(() => {
-        const done: Record<string, boolean> = {
-          listing: Boolean(snapshot),
-          keywords: kws.length > 0,
-          bewertungen: Boolean(insights),
-          content: versions.some((v) => v.status === "approved"),
-        };
-        const reihenfolge = ["listing", "keywords", "bewertungen", "content"];
-        const naechster = reihenfolge.find((k) => !done[k]);
-        return (
-          <nav className="mt-4 flex flex-wrap gap-1 border-b border-hair">
-            {TABS.map((t) => (
-              <Link
-                key={t.key}
-                href={`/produkte/${product.id}?tab=${t.key}`}
-                className={`flex items-center gap-1.5 rounded-t-lg px-3 py-2 text-sm ${tab === t.key ? "border-b-2 border-[var(--primary)] font-semibold text-primary-strong" : "text-muted hover:text-foreground"}`}
-              >
-                {t.key in done && (
-                  <span className={`flex h-4 w-4 flex-none items-center justify-center rounded-full text-[10px] font-semibold ${done[t.key] ? "bg-[rgb(47_158_143/0.15)] text-good" : t.key === naechster ? "bg-[var(--primary-soft)] text-primary-strong" : "bg-hair text-muted"}`}>
-                    {done[t.key] ? "✓" : reihenfolge.indexOf(t.key) + 1}
-                  </span>
-                )}
-                {t.label}
-              </Link>
-            ))}
-            <Link href={`/produkte/${product.id}/analyse`} className="rounded-t-lg px-3 py-2 text-sm text-muted hover:text-foreground">Analyse</Link>
-            <Link href={`/produkte/${product.id}/briefs`} className="rounded-t-lg px-3 py-2 text-sm text-muted hover:text-foreground">Briefs</Link>
-          </nav>
-        );
-      })()}
+      {/* Reiter-Leiste (D172): erst nach dem Analyse-Lauf — davor führt die Start-Maske */}
+      {insights && (
+        <nav className="mt-4 flex flex-wrap gap-1 border-b border-hair">
+          {TABS.map((t) => (
+            <Link
+              key={t.key}
+              href={`/produkte/${product.id}?tab=${t.key}`}
+              className={`rounded-t-lg px-3 py-2 text-sm ${tab === t.key ? "border-b-2 border-[var(--primary)] font-semibold text-primary-strong" : "text-muted hover:text-foreground"}`}
+            >
+              {t.label}
+            </Link>
+          ))}
+          <Link href={`/produkte/${product.id}/briefs`} className="rounded-t-lg px-3 py-2 text-sm text-muted hover:text-foreground">Briefings</Link>
+        </nav>
+      )}
 
       <div className="stagger mt-6 space-y-3">
-        {tab === "listing" && (
+        {insights && tab === "listing" && (
         <section className="card p-5">
           <CardHead
             icon={<IconUpload />}
@@ -302,7 +287,9 @@ export default async function ProductPage({
         )}
 
 
-        {tab === "keywords" && (
+        {/* Keywords: in der Start-Phase der Prüf-Schritt vor dem Lauf (D172),
+            danach Teil des gebündelten Analyse-Reiters */}
+        {(!insights || tab === "analyse") && (
         <section className="card p-5">
             <CardHead
               icon={<IconSearch />}
@@ -418,7 +405,31 @@ export default async function ProductPage({
         </section>
         )}
 
-        {tab === "bewertungen" && (<>
+        {/* Start-Phase (D172): Zusatz-Infos + EIN Klick für den ganzen Lauf */}
+        {!insights && (
+        <section className="card p-5">
+          <CardHead icon={<IconSparkle />} chip="chip-violet" title="Analyse & Content" />
+          <details className="mt-3" open={Boolean(product.zusatzKontext?.trim())}>
+            <summary className="cursor-pointer text-xs text-muted hover:text-foreground">
+              Zusatz-Infos zum Produkt ({product.zusatzKontext?.trim() ? `${product.zusatzKontext.trim().length} Zeichen hinterlegt` : "leer"}) — fließen in jede Text-Generierung ein
+            </summary>
+            <form action={saveZusatzKontext} className="mt-2">
+              <input type="hidden" name="productId" value={product.id} />
+              <textarea
+                name="zusatzKontext"
+                rows={5}
+                defaultValue={product.zusatzKontext ?? ""}
+                placeholder={"Alles, was die Texte wissen sollen und nirgends steht:\n· Details/Fakten zum Produkt\n· eigene Bullets/Titel als Ausgangspunkt\n· gute Bullets, Titel, Beschreibungen ANDERER Produkte als Vorbild"}
+                className={`${input} w-full`}
+              />
+              <SubmitButton className="mt-2 btn-dark text-xs">Zusatz-Infos speichern</SubmitButton>
+            </form>
+          </details>
+          <AnalyseStart productId={product.id} mainAsin={product.asin} />
+        </section>
+        )}
+
+        {insights && tab === "analyse" && (<>
         <section id="reviews" className="card p-5">
           <CardHead
             icon={<IconReviews />}
@@ -522,7 +533,7 @@ export default async function ProductPage({
         {insights && <BewertungsDashboard insight={insights} scrape={scrape ?? null} productId={product.id} productAsin={product.asin} />}
         </>)}
 
-        {tab === "blocker" && (
+        {insights && tab === "analyse" && (
         <section className="card p-5">
           <CardHead
             icon={<IconSichtbarkeit />}
@@ -565,26 +576,15 @@ export default async function ProductPage({
         </section>
         )}
 
-        {tab === "content" && (
+        {insights && tab === "content" && (
         <section className="card p-5">
           <CardHead
             icon={<IconContent />}
             chip="chip-teal"
             title="Content"
-            right={!insights ? <span className="pill pill-warn">gesperrt — Analyse fehlt</span> : undefined}
           />
-          {/* Content-Gate (D108): ohne Bewertungs-Analyse nur mit doppelter Bestätigung */}
-          {!insights && (
-            <div className="mt-3 rounded-xl bg-[rgb(160_122_31/0.08)] p-3 text-xs">
-              <p className="font-medium text-warn">
-                △ Content ist gesperrt: Es liegt keine Bewertungs-Analyse vor.
-              </p>
-              <p className="mt-1 text-muted">
-                Empfohlener Weg: erst analysieren, dann texten. </p>
-            </div>
-          )}
           {/* Zusatz-Infos (D108): fließen in JEDE Generierung ein */}
-          <details className="mt-3" open={!insights && !product.zusatzKontext}>
+          <details className="mt-3">
             <summary className="cursor-pointer text-xs text-muted hover:text-foreground">
               Zusatz-Infos zum Produkt ({product.zusatzKontext?.trim() ? `${product.zusatzKontext.trim().length} Zeichen hinterlegt` : "leer"}) — fließen in jede Text-Generierung ein
             </summary>
@@ -600,26 +600,9 @@ export default async function ProductPage({
               <SubmitButton className="mt-2 btn-dark text-xs">Zusatz-Infos speichern</SubmitButton>
             </form>
           </details>
+          {/* EIN Weg je Sektion (D172): der Lauf hat generiert — hier steht das
+              Ergebnis, je Sektion genau EIN Neu-generieren */}
           <GenerierSperre>
-          {/* Batch-Generierung (D156): anhaken → EIN Klick → nacheinander */}
-          <form action={generateContentBatch} className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-hair bg-background p-3">
-            <input type="hidden" name="productId" value={product.id} />
-            {SECTIONS.map(({ key, label }) => (
-              <label key={key} className="flex cursor-pointer items-center gap-1.5 text-xs">
-                <input type="checkbox" name="sections" value={key} defaultChecked />
-                {label}
-              </label>
-            ))}
-            {!insights && (
-              <label className="flex items-center gap-1.5 text-[11px] text-warn">
-                <input type="checkbox" name="ohneAnalyseBestaetigt" required />
-                ohne Bewertungs-Analyse generieren (bewusst bestätigt)
-              </label>
-            )}
-            <GenerierButton className="btn-primary px-3 py-1 text-xs" pendingLabel="Generiert nacheinander… (kann Minuten dauern)">
-              Ausgewählte generieren
-            </GenerierButton>
-          </form>
           <div className="mt-4 space-y-3">
             {SECTIONS.map(({ key, label }) => {
               const dbType = key === "backend" ? "backend_keywords" : key === "highlights" ? "item_highlights" : key;
@@ -643,30 +626,11 @@ export default async function ProductPage({
                           <SubmitButton className="btn-ghost px-3 py-1 text-xs !text-good">✓ Freigeben</SubmitButton>
                         </form>
                       )}
-                      {insights ? (
-                        <form action={generateContent}>
-                          <input type="hidden" name="productId" value={product.id} />
-                          <input type="hidden" name="section" value={key} />
-                          <GenerierButton>{v ? "Neu generieren" : "Generieren"}</GenerierButton>
-                        </form>
-                      ) : (
-                        /* Doppelte Bestätigung (D108): aufklappen + ankreuzen, erst dann generieren */
-                        <details className="relative">
-                          <summary className="btn-ghost cursor-pointer px-3 py-1 text-xs list-none">🔒 {v ? "Neu generieren" : "Generieren"} …</summary>
-                          <form action={generateContent} className="absolute right-0 z-10 mt-1 w-72 rounded-xl border border-hair bg-card p-3 shadow-lg">
-                            <input type="hidden" name="productId" value={product.id} />
-                            <input type="hidden" name="section" value={key} />
-                            <p className="text-[11px] text-muted">
-                              Ohne Bewertungs-Analyse fehlen Kundensprache und Pain Points. Grundlage sind dann Listing-IST + Zusatz-Infos.
-                            </p>
-                            <label className="mt-2 flex items-start gap-2 text-[11px]">
-                              <input type="checkbox" name="ohneAnalyseBestaetigt" required className="mt-0.5" />
-                              <span>Ja, ich will diese Sektion bewusst ohne Bewertungs-Analyse generieren.</span>
-                            </label>
-                            <GenerierButton className="mt-2 btn-primary w-full px-3 py-1 text-xs">Trotzdem generieren</GenerierButton>
-                          </form>
-                        </details>
-                      )}
+                      <form action={generateContent}>
+                        <input type="hidden" name="productId" value={product.id} />
+                        <input type="hidden" name="section" value={key} />
+                        <GenerierButton>{v ? "Neu generieren" : "Generieren"}</GenerierButton>
+                      </form>
                     </div>
                   </div>
                   {payload?.text && (
@@ -736,7 +700,7 @@ export default async function ProductPage({
         </section>
         )}
 
-        {tab === "marge" && (
+        {insights && tab === "marge" && (
         <section className="card p-5">
           <CardHead
             icon={<IconEuro />}

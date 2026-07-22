@@ -950,19 +950,19 @@ export async function verdichteInsightsAction(formData: FormData) {
     orderBy: desc(schema.reviewInsights.createdAt),
   });
   if (!insight) {
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Verdichtung braucht die Roh-Analyse — erst Reviews scrapen und analysieren.")}&code=REV-05&tab=bewertungen#reviews`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Verdichtung braucht die Roh-Analyse — erst Reviews scrapen und analysieren.")}&code=REV-05&tab=analyse#reviews`);
   }
   const { normalisierePayload } = await import("@/lib/reviews/insights");
   if ((normalisierePayload(insight!.payload).insightCards?.length ?? 0) > 0) {
-    redirect(`/produkte/${productId}?tab=bewertungen&hinweis=${encodeURIComponent("Diese Analyse ist bereits verdichtet — neue Karten entstehen erst mit einer neuen Analyse (Redundanz-Guard).")}`);
+    redirect(`/produkte/${productId}?tab=analyse&hinweis=${encodeURIComponent("Diese Analyse ist bereits verdichtet — neue Karten entstehen erst mit einer neuen Analyse (Redundanz-Guard).")}`);
   }
   try {
     await fuehreVerdichtungAus(db, productId);
   } catch (e) {
-    redirect(`/produkte/${productId}?tab=bewertungen&fehler=${encodeURIComponent(`Insight-Verdichtung: ${e instanceof Error ? e.message : String(e)}`)}&code=VER-01`);
+    redirect(`/produkte/${productId}?tab=analyse&fehler=${encodeURIComponent(`Insight-Verdichtung: ${e instanceof Error ? e.message : String(e)}`)}&code=VER-01`);
   }
   revalidatePath(`/produkte/${productId}`);
-  redirect(`/produkte/${productId}?tab=bewertungen`);
+  redirect(`/produkte/${productId}?tab=analyse`);
 }
 
 /**
@@ -1345,10 +1345,10 @@ export async function scrapeReviewsAction(formData: FormData) {
     hinweis = await scrapeKern(db, product, asins);
   } catch (e) {
     const code = e instanceof GenFehler ? e.code : "REV-03";
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(e instanceof Error ? e.message : String(e))}&code=${code}&tab=bewertungen#reviews`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(e instanceof Error ? e.message : String(e))}&code=${code}&tab=analyse#reviews`);
   }
   if (hinweis) {
-    redirect(`/produkte/${productId}?hinweis=${encodeURIComponent(`${hinweis} Für mehr Daten Wettbewerber-ASINs dazugeben; neue Reviews gibt es ab morgen.`)}&tab=bewertungen#reviews`);
+    redirect(`/produkte/${productId}?hinweis=${encodeURIComponent(`${hinweis} Für mehr Daten Wettbewerber-ASINs dazugeben; neue Reviews gibt es ab morgen.`)}&tab=analyse#reviews`);
   }
 
   // Analyse läuft AUTOMATISCH nach dem Scrape (D129) — schlägt sie fehl,
@@ -1357,7 +1357,7 @@ export async function scrapeReviewsAction(formData: FormData) {
     await auswertungKern(db, product);
   } catch (e) {
     revalidatePath(`/produkte/${productId}`);
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Scrape fertig (Ausbeute unten) — aber die automatische Analyse schlug fehl: ${e instanceof Error ? e.message : String(e)}. Mit „Analyse nachholen" erneut versuchen.`)}&code=ANA-01&tab=bewertungen#reviews`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Scrape fertig (Ausbeute unten) — aber die automatische Analyse schlug fehl: ${e instanceof Error ? e.message : String(e)}. Mit „Analyse nachholen" erneut versuchen.`)}&code=ANA-01&tab=analyse#reviews`);
   }
 
   // Etappe 3 (D131/D136): Verdichtung als eigener, nachholbarer Schritt —
@@ -1366,10 +1366,10 @@ export async function scrapeReviewsAction(formData: FormData) {
     await fuehreVerdichtungAus(db, productId);
   } catch (e) {
     revalidatePath(`/produkte/${productId}`);
-    redirect(`/produkte/${productId}?tab=bewertungen&fehler=${encodeURIComponent(`Scrape und Roh-Analyse sind gespeichert — aber die Verdichtung schlug fehl: ${e instanceof Error ? e.message : String(e)}`)}&code=VER-01`);
+    redirect(`/produkte/${productId}?tab=analyse&fehler=${encodeURIComponent(`Scrape und Roh-Analyse sind gespeichert — aber die Verdichtung schlug fehl: ${e instanceof Error ? e.message : String(e)}`)}&code=VER-01`);
   }
   revalidatePath(`/produkte/${productId}`);
-  redirect(`/produkte/${productId}?tab=bewertungen`);
+  redirect(`/produkte/${productId}?tab=analyse`);
 }
 
 export async function analyzeReviewsAction(formData: FormData) {
@@ -1382,7 +1382,7 @@ export async function analyzeReviewsAction(formData: FormData) {
     await auswertungKern(db, product);
   } catch (e) {
     const code = e instanceof GenFehler ? e.code : "ANA-01";
-    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(e instanceof Error ? e.message : String(e))}&code=${code}&tab=bewertungen#reviews`);
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent(e instanceof Error ? e.message : String(e))}&code=${code}&tab=analyse#reviews`);
   }
 
   // Etappe 3 (D131/D136): Verdichtung — eigener, nachholbarer Schritt
@@ -1390,10 +1390,10 @@ export async function analyzeReviewsAction(formData: FormData) {
     await fuehreVerdichtungAus(db, productId);
   } catch (e) {
     revalidatePath(`/produkte/${productId}`);
-    redirect(`/produkte/${productId}?tab=bewertungen&fehler=${encodeURIComponent(`Roh-Analyse gespeichert — aber die Verdichtung schlug fehl: ${e instanceof Error ? e.message : String(e)}`)}&code=VER-01`);
+    redirect(`/produkte/${productId}?tab=analyse&fehler=${encodeURIComponent(`Roh-Analyse gespeichert — aber die Verdichtung schlug fehl: ${e instanceof Error ? e.message : String(e)}`)}&code=VER-01`);
   }
   revalidatePath(`/produkte/${productId}`);
-  redirect(`/produkte/${productId}?tab=bewertungen`);
+  redirect(`/produkte/${productId}?tab=analyse`);
 }
 
 /**
