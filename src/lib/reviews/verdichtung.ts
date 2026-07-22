@@ -122,7 +122,7 @@ const SYSTEM =
 function prompt(aspekte: RoheAspekte, sprache: string): string {
   const fmt = (liste: RoheAspekte["painPoints"], typ: string) =>
     liste
-      .map((a) => `- [${typ}] "${a.label}" (${a.mentionCount ?? "?"}× erwähnt)${a.quotes.length ? ` — O-Töne: ${a.quotes.slice(0, 2).map((q) => `„${q.slice(0, 120)}"`).join(" / ")}` : ""}`)
+      .map((a) => `- [${typ}] "${a.label}"${a.quotes.length ? ` — O-Töne: ${a.quotes.slice(0, 2).map((q) => `„${q.slice(0, 120)}"`).join(" / ")}` : ""}`)
       .join("\n");
   return `ROH-THEMEN AUS DER REVIEW-ANALYSE (bereits ausgezählt):
 ${fmt(aspekte.buyingTriggers, "Kaufauslöser") || "(keine Kaufauslöser)"}
@@ -133,7 +133,7 @@ REGELN:
 1. Der Titel ist ein prägnanter Kaufgrund/Befund in Klartext (max. 8 Wörter) — KEIN wörtliches Kundenzitat, sondern die Abstraktion dahinter (Beispiel-Muster: "Stoppt Grasfressen & Sodbrennen schnell").
 2. Die Beschreibung (2–4 Sätze) erklärt nutzenorientiert, was dahintersteckt und warum es Kaufentscheidungen beeinflusst. Titel und Beschreibung dürfen NUR behaupten, was die O-Töne der Beleg-Aspekte wörtlich stützen — keine Steigerungen (aus „Bekannte haben es empfohlen" wird KEIN „Tierarzt-Tipp").
 3. GEGENSÄTZLICHE Roh-Themen zum selben Aspekt (z. B. "wirkt gut" 27× + "wirkt nicht" 6×) werden zu EINER ausgewogenen Erkenntnis gebündelt — ehrliches Erwartungs-Management, keine Schönfärberei und kein Verschweigen der Gegenseite.
-4. relevanz: 1–5 (5 = kaufentscheidend), nach Gewicht der Erwähnungen UND strategischer Bedeutung.
+4. relevanz: 1–5 (5 = kaufentscheidend) — die Reihenfolge der Roh-Themen oben spiegelt ihr Gewicht.
 5. belegAspekte: die WORTGLEICHEN Labels der Roh-Themen oben, auf denen die Erkenntnis beruht (mindestens 1) — nichts erfinden, keine neuen Labels.
 6. bildIdeen: 2–3 konkrete visuelle Umsetzungsideen fürs Listing (Galeriebild, Infografik, A+-Modul). VERBOTEN: erfundene Autoritäts-Belege (Experten-Zitate, Testimonials, Siegel, Zertifikate, Zahlen), die nicht in den Roh-Themen belegt sind.
 7. kernThese: EIN Satz, der die wichtigste Erkenntnis der gesamten Analyse zusammenfasst.

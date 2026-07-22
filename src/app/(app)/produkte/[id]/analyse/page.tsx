@@ -66,19 +66,15 @@ function SterneDonut({ dist, avg, total }: { dist: Record<string, number>; avg: 
 
 // Erwähnungs-Vergleich: Pain Points vs. Kaufauslöser, sortiert nach Häufigkeit
 function HaeufigkeitsBalken({ titel, farbe, eintraege }: { titel: string; farbe: string; eintraege: Array<{ label: string; pct: number | null }> }) {
-  const max = Math.max(10, ...eintraege.map((e) => e.pct ?? 0));
   return (
     <div>
       <h4 className="text-xs font-semibold">{titel}</h4>
       <ul className="mt-1.5 space-y-1.5">
         {eintraege.map((e, i) => (
           <li key={i} className="text-xs">
-            <div className="flex items-baseline justify-between gap-2">
+            <div className="flex items-baseline gap-2">
+              <span className={`inline-block h-2 w-2 flex-none rounded-full ${farbe}`} />
               <span className="min-w-0 truncate" title={e.label}>{e.label}</span>
-              <span className="flex-none tabular-nums text-muted">{e.pct !== null ? `${e.pct} %` : "–"}</span>
-            </div>
-            <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-hair">
-              <div className={`h-full rounded-full ${farbe}`} style={{ width: `${((e.pct ?? 0) / max) * 100}%` }} />
             </div>
           </li>
         ))}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { belegStufe, beurteileAnalyseBasis } from "./konfidenz";
+import { beurteileAnalyseBasis } from "./konfidenz";
 
 /** D138: Konfidenz in Worten, deterministisch — keine Fassaden-Prozente. */
 describe("beurteileAnalyseBasis", () => {
@@ -33,26 +33,5 @@ describe("beurteileAnalyseBasis", () => {
 
   it("liefert die Herleitung zum Nachrechnen mit", () => {
     expect(beurteileAnalyseBasis(100, 374).herleitung).toContain("≥60 richtungsweisend");
-  });
-});
-
-describe("belegStufe", () => {
-  it("27 von 100 → stark, mit n-von-m-Ausweis", () => {
-    const b = belegStufe(27, 100);
-    expect(b.stufe).toBe("stark");
-    expect(b.text).toBe("stark belegt (27 von 100 Reviews)");
-  });
-
-  it("4 von 100 → dünn · 8 von 200 → mittel (Stück-Schwelle)", () => {
-    expect(belegStufe(4, 100).stufe).toBe("dünn");
-    expect(belegStufe(8, 200).stufe).toBe("mittel");
-  });
-
-  it("Anteils-Schwelle greift auch bei kleiner Stichprobe (5 von 30 = 17 % → stark)", () => {
-    expect(belegStufe(5, 30).stufe).toBe("stark");
-  });
-
-  it("ohne Zählwert: unbeziffert statt geratener Stufe", () => {
-    expect(belegStufe(null, 100).stufe).toBe("unbeziffert");
   });
 });

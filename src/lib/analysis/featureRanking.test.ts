@@ -16,14 +16,12 @@ const aspekte = {
   buyingTriggers: [{ label: "Produkt hilft gegen Sodbrennen", frequencyPct: null, mentionCount: 27, quotes: [] }],
 };
 
-describe("featureRelevanz — deterministisch aus dem Erwähnungs-Anteil", () => {
-  it("Schwellen: 15 % → 5 · 10 % → 4 · 5 % → 3 · 2 % → 2 · darunter 1", () => {
-    expect(featureRelevanz(15, 100)).toBe(5);
-    expect(featureRelevanz(10, 100)).toBe(4);
-    expect(featureRelevanz(5, 100)).toBe(3);
-    expect(featureRelevanz(2, 100)).toBe(2);
-    expect(featureRelevanz(1, 100)).toBe(1);
-    expect(featureRelevanz(0, 100)).toBe(1);
+describe("featureRelevanz — deterministisch aus der Anzahl echter Beleg-Aspekte (D154)", () => {
+  it("0 → 1 · 1 → 3 · 2 → 4 · ≥3 → 5", () => {
+    expect(featureRelevanz(0)).toBe(1);
+    expect(featureRelevanz(1)).toBe(3);
+    expect(featureRelevanz(2)).toBe(4);
+    expect(featureRelevanz(3)).toBe(5);
   });
 });
 
@@ -51,8 +49,7 @@ describe("normalisiereFeatureKarten — Verbatim-Verifikation (D133)", () => {
     );
     expect(verworfen).toBe(0);
     expect(cards[0].quellen).toEqual(["Bullets", "Titel"]); // description-Beleg platzt
-    expect(cards[0].belegAspekte[0].mentionCount).toBe(27); // Zählwert vom Code
-    expect(cards[0].relevanz).toBe(5); // 27 von 100 = 27 % ≥ 15 %
+    expect(cards[0].relevanz).toBe(3); // 1 echter Beleg-Aspekt (D154)
   });
 
   it("Feature ohne einen einzigen verifizierten Beleg fliegt GEZÄHLT raus", () => {

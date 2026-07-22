@@ -1,5 +1,4 @@
 import type { InsightCard } from "@/db/schema";
-import { belegStufe } from "@/lib/reviews/konfidenz";
 
 /**
  * Einheitliche Insight-Karte (D132/D140): EINE Render-Komponente für alle
@@ -21,10 +20,9 @@ export function InsightKarte({
   /** Ersetzt die Review-Beleg-Stufe, wenn die Karte NICHT aus Reviews stammt (z. B. Audit, D135). */
   belegHinweis?: string;
 }) {
-  const erwaehnungen = karte.belegAspekte.reduce((s, b) => s + (b.mentionCount ?? 0), 0);
-  const beleg = belegHinweis
-    ? { text: belegHinweis }
-    : belegStufe(erwaehnungen > 0 ? erwaehnungen : null, reviewsGesamt);
+  // Ehrliche Beleg-Angabe (D154): Anzahl der Beleg-Aspekte ist ein echter
+  // Wert — LLM-geschätzte Erwähnungs-Zahlen werden nicht mehr angezeigt.
+  const beleg = { text: belegHinweis ?? `${karte.belegAspekte.length} Beleg-Aspekt${karte.belegAspekte.length === 1 ? "" : "e"}` };
 
   return (
     <details className="rounded-xl border border-hair bg-background">
@@ -56,7 +54,6 @@ export function InsightKarte({
                       </span>{" "}
                       {b.label}
                     </span>
-                    <span className="flex-none tabular-nums text-muted">{b.mentionCount !== null ? `${b.mentionCount}×` : "—"}</span>
                   </li>
                 ))}
               </ul>

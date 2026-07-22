@@ -52,24 +52,3 @@ export function beurteileAnalyseBasis(gescrapt: number, amazonTotal: number | nu
       "Stufen: <20 nicht belastbar · 20–59 dünn · ≥60 richtungsweisend · ≥150 und ≥30 % der Gesamtzahl belastbar. Amazons Gesamtzahl zählt auch Bewertungen ohne Text — 100 % sind von außen nie erreichbar (~500/ASIN-Deckel, D130).",
   };
 }
-
-export type BelegStufe = "stark" | "mittel" | "dünn" | "unbeziffert";
-
-/**
- * Beleg-Stufe EINER Erkenntnis aus ihren Erwähnungen (D138) — der ehrliche
- * Ersatz für das „98 % Data Reliability" des Referenz-Tools.
- * Stufen: stark ≥ 20 Erwähnungen ODER ≥ 15 % der Stichprobe ·
- * mittel ≥ 8 ODER ≥ 5 % · sonst dünn · ohne Zählwert unbeziffert.
- */
-export function belegStufe(erwaehnungen: number | null, reviewsGesamt: number): { stufe: BelegStufe; text: string } {
-  if (erwaehnungen === null || erwaehnungen <= 0) {
-    return { stufe: "unbeziffert", text: "Beleg unbeziffert (kein Zählwert aus der Analyse)" };
-  }
-  const anteil = reviewsGesamt > 0 ? erwaehnungen / reviewsGesamt : 0;
-  const stufe: BelegStufe =
-    erwaehnungen >= 20 || anteil >= 0.15 ? "stark" : erwaehnungen >= 8 || anteil >= 0.05 ? "mittel" : "dünn";
-  return {
-    stufe,
-    text: `${stufe} belegt (${erwaehnungen} von ${reviewsGesamt} Reviews)`,
-  };
-}

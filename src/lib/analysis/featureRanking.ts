@@ -52,14 +52,12 @@ function quellTexte(q: FeatureQuellen): Record<string, string> {
 }
 
 /**
- * Relevanz DETERMINISTISCH aus dem Erwähnungs-Anteil der Beleg-Aspekte
- * (Formel dokumentiert): ≥15 % → 5 · ≥10 % → 4 · ≥5 % → 3 · ≥2 % → 2 ·
- * darunter/ohne Kunden-Echo → 1.
+ * Relevanz DETERMINISTISCH aus der ANZAHL zugeordneter Review-Aspekte
+ * (echter Wert; LLM-Zählwerte sind seit D154 verbannt):
+ * 0 Aspekte → 1 · 1 → 3 · 2 → 4 · ≥3 → 5.
  */
-export function featureRelevanz(erwaehnungen: number, reviewsGesamt: number): number {
-  if (reviewsGesamt <= 0 || erwaehnungen <= 0) return 1;
-  const anteil = erwaehnungen / reviewsGesamt;
-  return anteil >= 0.15 ? 5 : anteil >= 0.1 ? 4 : anteil >= 0.05 ? 3 : anteil >= 0.02 ? 2 : 1;
+export function featureRelevanz(anzahlBelegAspekte: number): number {
+  return anzahlBelegAspekte >= 3 ? 5 : anzahlBelegAspekte === 2 ? 4 : anzahlBelegAspekte === 1 ? 3 : 1;
 }
 
 type RawFeature = {
@@ -112,7 +110,6 @@ export function normalisiereFeatureKarten(
       .filter((a): a is NonNullable<typeof a> => a !== null)
       .filter((a, i, arr) => arr.findIndex((x) => x.label === a.label && x.typ === a.typ) === i);
 
-    const erwaehnungen = beleg.reduce((s, b) => s + (b.mentionCount ?? 0), 0);
     const bildIdeen = (Array.isArray(f.bildIdeen) ? f.bildIdeen : [])
       .map((s) => String(s ?? "").trim())
       .filter(Boolean)
@@ -121,7 +118,7 @@ export function normalisiereFeatureKarten(
     cards.push({
       titel: titel.slice(0, 120),
       beschreibung: beschreibung.slice(0, 800),
-      relevanz: featureRelevanz(erwaehnungen, reviewsGesamt),
+      relevanz: featureRelevanz(beleg.length),
       quellen: quellTags,
       bildIdeen,
       belegAspekte: beleg,
@@ -143,8 +140,8 @@ function prompt(quellen: FeatureQuellen, aspekte: RoheAspekte, sprache: string):
     .map(([k, v]) => `### QUELLE "${k}"\n${v.trim() ? v.slice(0, 4000) : "(nicht erfasst)"}`)
     .join("\n\n");
   const aspektBlock = [
-    ...aspekte.buyingTriggers.map((a) => `- [Kaufauslöser] "${a.label}" (${a.mentionCount ?? "?"}×)`),
-    ...aspekte.painPoints.map((a) => `- [Pain Point] "${a.label}" (${a.mentionCount ?? "?"}×)`),
+    ...aspekte.buyingTriggers.map((a) => `- [Kaufauslöser] "${a.label}"`),
+    ...aspekte.painPoints.map((a) => `- [Pain Point] "${a.label}"`),
   ].join("\n");
   return `LISTING-QUELLTEXTE:
 ${quellBlock}
@@ -196,7 +193,7 @@ export async function rankeFeatures(input: {
         {
           titel: `Mock-Feature: ${bullet.slice(0, 80)}`,
           beschreibung: "Mock-Ranking — in Produktion stehen hier die Listing-Features nach Kunden-Relevanz.",
-          relevanz: featureRelevanz(0, input.reviewsGesamt),
+          relevanz: featureRelevanz(0),
           quellen: [input.quellen.bullets.length ? "Bullets" : "Titel"],
           bildIdeen: [],
           belegAspekte: [],

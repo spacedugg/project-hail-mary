@@ -175,7 +175,7 @@ ${fmt(crit) || "(keine)"}
 REVIEWS 4–5★:
 ${fmt(pos) || "(keine)"}
 
-AUFGABE: Extrahiere 8–12 Pain Points und 6–10 Kaufauslöser, je mit Häufigkeit und 1–3 verbatim-Zitaten. Dazu Kundensprache zum Übernehmen (wörtliche Formulierungen) und Sprache zum Vermeiden.
+AUFGABE: Extrahiere 8–12 Pain Points und 6–10 Kaufauslöser, WICHTIGSTER ZUERST (Reihenfolge = Gewicht), je mit 1–3 verbatim-Zitaten. KEINE Zählwerte oder Prozentangaben — die wären Schätzungen. Dazu Kundensprache zum Übernehmen (wörtliche Formulierungen) und Sprache zum Vermeiden.
 WICHTIG: Werte ALLE Reviews auf BEIDES aus. Pain Points finden sich auch in 4–5★-Reviews (Einschränkungen, „gut, aber…", Wünsche) — das sind oft die wertvollsten, weil sie von überzeugten Käufern kommen. Kaufauslöser finden sich auch in 1–3★-Reviews (was trotz Enttäuschung überzeugt hat, warum gekauft wurde). Die Sterne-Zahl ist Kontext für die Gewichtung, kein Filter.
 BELEG-REGELN (WICHTIGSTE REGELN — Verstöße werden programmatisch aussortiert):
 1. Das Label darf NUR behaupten, was seine Zitate WÖRTLICH stützen. Beispiel-Fehler: Zitat „Nachdem medizinische Gründe ärztlich ausgeschlossen wurden, probierten wir es" belegt KEINE „Empfehlung durch Tierarzt" — der Arzt hat Ursachen ausgeschlossen, nicht das Produkt empfohlen.
@@ -184,8 +184,8 @@ BELEG-REGELN (WICHTIGSTE REGELN — Verstöße werden programmatisch aussortiert
 4. Jedes Zitat gehört zu GENAU dem Aspekt, den es belegt — keine Zitate umverteilen, keine sinngemäßen Umformulierungen (Zitate werden gegen die Review-Texte geprüft).
 5. Pain Point = der Käufer berichtet NEGATIVES zu diesem Aspekt; Kaufauslöser = der Käufer benennt POSITIV, was ihn überzeugt hat. Im Zweifel weglassen statt raten.
 JSON-Schema:
-{"painPoints":[{"label":"...","frequencyPct":N,"mentionCount":N,"quotes":["..."]}],
- "buyingTriggers":[{"label":"...","frequencyPct":N,"mentionCount":N,"quotes":["..."]}],
+{"painPoints":[{"label":"...","quotes":["..."]}],
+ "buyingTriggers":[{"label":"...","quotes":["..."]}],
  "languageToBorrow":["..."],"languageToAvoid":["..."]}`;
 }
 

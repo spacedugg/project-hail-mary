@@ -57,8 +57,6 @@ export default async function ReviewDashboard({
   // Lese-Schutz (D103): auch ein kaputt gespeicherter Payload (ältere
   // LLM-Antwort ohne erzwungene Struktur) darf die Seite nie crashen.
   const p = normalisierePayload(insight.payload);
-  const maxPain = Math.max(...p.painPoints.map((x) => x.frequencyPct ?? 0), 1);
-  const maxTrig = Math.max(...p.buyingTriggers.map((x) => x.frequencyPct ?? 0), 1);
 
   const rohThemen = p.painPoints.length + p.buyingTriggers.length;
   const karten = p.insightCards ?? [];
@@ -227,13 +225,7 @@ export default async function ReviewDashboard({
               <div key={i} className="rounded-xl border border-hair p-3">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-sm font-medium">{x.label}</span>
-                  <span className="flex-none text-xs tabular-nums text-muted">{x.mentionCount ? `${x.mentionCount}× ` : ""}{x.frequencyPct ? `· ${x.frequencyPct} %` : ""}</span>
                 </div>
-                {x.frequencyPct != null && (
-                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-hair">
-                    <div className="bar-fill h-full rounded-full bg-bad" style={{ width: `${(x.frequencyPct / maxPain) * 100}%` }} />
-                  </div>
-                )}
                 {x.quotes?.length > 0 && (
                   <blockquote className="mt-2 border-l-2 border-hair pl-2 text-xs italic text-muted">„{x.quotes[0]}"</blockquote>
                 )}
@@ -250,13 +242,7 @@ export default async function ReviewDashboard({
               <div key={i} className="rounded-xl border border-hair p-3">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-sm font-medium">{x.label}</span>
-                  <span className="flex-none text-xs tabular-nums text-muted">{x.mentionCount ? `${x.mentionCount}× ` : ""}{x.frequencyPct ? `· ${x.frequencyPct} %` : ""}</span>
                 </div>
-                {x.frequencyPct != null && (
-                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-hair">
-                    <div className="bar-fill h-full rounded-full bg-good" style={{ width: `${(x.frequencyPct / maxTrig) * 100}%` }} />
-                  </div>
-                )}
                 {x.quotes?.length > 0 && (
                   <blockquote className="mt-2 border-l-2 border-hair pl-2 text-xs italic text-muted">„{x.quotes[0]}"</blockquote>
                 )}
@@ -266,25 +252,6 @@ export default async function ReviewDashboard({
           </div>
         </section>
       </div>
-
-      {/* Kundensprache */}
-      <div className="stagger mt-3 grid gap-3 lg:grid-cols-2">
-        <section className="card p-5">
-          <div className="flex items-center gap-2"><span className="icon-chip chip-teal"><IconCheck /></span><h2 className="text-sm font-semibold">Kundensprache übernehmen</h2></div>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {p.languageToBorrow.map((w, i) => <span key={i} className="rounded-full bg-[rgb(47_158_143/0.12)] px-2.5 py-1 text-xs">„{w}"</span>)}
-            {p.languageToBorrow.length === 0 && <span className="text-sm text-muted">—</span>}
-          </div>
-        </section>
-        <section className="card p-5">
-          <h2 className="text-sm font-semibold">Sprache vermeiden</h2>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {p.languageToAvoid.map((w, i) => <span key={i} className="rounded-full bg-[rgb(220_38_38/0.08)] px-2.5 py-1 text-xs line-through decoration-[rgb(220_38_38/0.5)]">{w}</span>)}
-            {p.languageToAvoid.length === 0 && <span className="text-sm text-muted">—</span>}
-          </div>
-        </section>
-      </div>
-
       {/* Konsequenz */}
       <div className="anim-in mt-3 card flex flex-wrap items-center justify-between gap-3 p-5">
         <div className="flex items-center gap-2.5">
