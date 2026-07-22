@@ -740,6 +740,99 @@ export async function deleteKeywordBasis(formData: FormData) {
  * 2. Analyse — KI wertet den gespeicherten Scrape aus (Pain Points,
  *    Kaufauslöser, O-Töne) → eigenes Findings-Dashboard.
  */
+/**
+ * Verdichtungs-Etappe (D131/D136): läuft als EIGENER Schritt nach der
+ * Roh-Analyse — Zwischenstand (Scrape + Roh-Themen) bleibt bei einem Abbruch
+ * unversehrt gespeichert und die Etappe ist einzeln nachholbar (D129-Muster).
+ * Quellen-Tags (D133) und Beleg-Text (D134) setzt diese Funktion
+ * deterministisch aus dem, was tatsächlich eingeflossen ist.
+ */
+async function fuehreVerdichtungAus(db: Awaited<ReturnType<typeof getDb>>, productId: string): Promise<void> {
+  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  if (!product) throw new Error("Produkt nicht gefunden.");
+  const insight = await db.query.reviewInsights.findFirst({
+    where: eq(schema.reviewInsights.productId, productId),
+    orderBy: desc(schema.reviewInsights.createdAt),
+  });
+  if (!insight) throw new Error("Keine Roh-Analyse vorhanden — erst scrapen und analysieren.");
+
+  const { normalisierePayload } = await import("@/lib/reviews/insights");
+  const payload = normalisierePayload(insight.payload);
+
+  const scrape = insight.scrapeId
+    ? await db.query.reviewScrapes.findFirst({ where: eq(schema.reviewScrapes.id, insight.scrapeId) })
+    : await db.query.reviewScrapes.findFirst({
+        where: eq(schema.reviewScrapes.productId, productId),
+        orderBy: desc(schema.reviewScrapes.createdAt),
+      });
+
+  // Quellen-Tags (D133): vom Code aus der echten Datenbasis, nie von der KI
+  const norm = (a: string) => a.trim().toUpperCase();
+  const asins = (scrape?.asins ?? []).map(norm);
+  const eigene = product.asin && asins.includes(norm(product.asin));
+  const wettbewerber = asins.filter((a) => !product.asin || a !== norm(product.asin)).length;
+  const quellen = [
+    eigene ? `Reviews: eigenes Produkt (${product.asin})` : null,
+    wettbewerber > 0 ? `Reviews: ${wettbewerber} Wettbewerber-ASIN${wettbewerber === 1 ? "" : "s"}` : null,
+  ].filter((q): q is string => q !== null);
+  if (quellen.length === 0) quellen.push(`Reviews (Datenbasis: ${insight.dataBasis})`);
+
+  // Beleg-Text für den Bild-Ideen-Wahrheitsfilter (D134): Produkt-Wahrheit +
+  // Listing-IST inkl. der erweiterten Quellen (D145)
+  const snapshot = await db.query.listingSnapshots.findFirst({
+    where: eq(schema.listingSnapshots.productId, productId),
+    orderBy: desc(schema.listingSnapshots.createdAt),
+  });
+  const f = product.facts;
+  const belegText = [
+    f.productType, f.dimensions, ...(f.materials ?? []), ...(f.usps ?? []), f.targetAudience,
+    ...(f.certifications ?? []), ...Object.entries(f.specs ?? {}).map(([k, v]) => `${k}: ${v}`),
+    product.zusatzKontext,
+    snapshot?.title, ...(snapshot?.bullets ?? []), snapshot?.description,
+    ...(snapshot?.attributes ? Object.entries(snapshot.attributes).map(([k, v]) => `${k}: ${v}`) : []),
+    snapshot?.importantInfo, snapshot?.aplusContent,
+  ].filter(Boolean).join("\n");
+
+  const { verdichteInsights } = await import("@/lib/reviews/verdichtung");
+  const res = await verdichteInsights(payload, { quellen, sprache: product.contentSprache, belegText });
+  await db
+    .update(schema.reviewInsights)
+    .set({
+      payload: {
+        ...payload,
+        insightCards: res.cards,
+        kernThese: res.kernThese,
+        verworfeneKarten: res.verworfen,
+        entfernteBildIdeen: res.entfernteBildIdeen,
+      },
+    })
+    .where(eq(schema.reviewInsights.id, insight.id));
+}
+
+export async function verdichteInsightsAction(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const db = await getDb();
+  const insight = await db.query.reviewInsights.findFirst({
+    where: eq(schema.reviewInsights.productId, productId),
+    orderBy: desc(schema.reviewInsights.createdAt),
+  });
+  if (!insight) {
+    redirect(`/produkte/${productId}?fehler=${encodeURIComponent("Verdichtung braucht die Roh-Analyse — erst Reviews scrapen und analysieren.")}&code=REV-05#reviews`);
+  }
+  const { normalisierePayload } = await import("@/lib/reviews/insights");
+  if ((normalisierePayload(insight!.payload).insightCards?.length ?? 0) > 0) {
+    redirect(`/produkte/${productId}/reviews?hinweis=${encodeURIComponent("Diese Analyse ist bereits verdichtet — neue Karten entstehen erst mit einer neuen Analyse (Redundanz-Guard).")}`);
+  }
+  try {
+    await fuehreVerdichtungAus(db, productId);
+  } catch (e) {
+    redirect(`/produkte/${productId}/reviews?fehler=${encodeURIComponent(`Insight-Verdichtung: ${e instanceof Error ? e.message : String(e)}`)}&code=VER-01`);
+  }
+  revalidatePath(`/produkte/${productId}/reviews`);
+  revalidatePath(`/produkte/${productId}`);
+  redirect(`/produkte/${productId}/reviews`);
+}
+
 export async function scrapeReviewsAction(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
   const db = await getDb();
@@ -859,6 +952,15 @@ export async function scrapeReviewsAction(formData: FormData) {
     revalidatePath(`/produkte/${productId}`);
     redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Scrape fertig (${reviews.length} Reviews, Ausbeute unten) — aber die automatische Analyse schlug fehl: ${e instanceof Error ? e.message : String(e)}. Mit „Analyse nachholen" erneut versuchen.`)}&code=ANA-01#reviews`);
   }
+
+  // Etappe 3 (D131/D136): Verdichtung als eigener, nachholbarer Schritt —
+  // scheitert sie, bleiben Scrape + Roh-Analyse unversehrt gespeichert.
+  try {
+    await fuehreVerdichtungAus(db, productId);
+  } catch (e) {
+    revalidatePath(`/produkte/${productId}`);
+    redirect(`/produkte/${productId}/reviews?fehler=${encodeURIComponent(`Scrape und Roh-Analyse sind gespeichert — aber die Verdichtung schlug fehl: ${e instanceof Error ? e.message : String(e)}`)}&code=VER-01`);
+  }
   revalidatePath(`/produkte/${productId}`);
   redirect(`/produkte/${productId}/reviews`);
 }
@@ -899,6 +1001,14 @@ export async function analyzeReviewsAction(formData: FormData) {
     });
   } catch (e) {
     redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Review-Analyse: ${e instanceof Error ? e.message : String(e)}`)}&code=ANA-01#reviews`);
+  }
+
+  // Etappe 3 (D131/D136): Verdichtung — eigener, nachholbarer Schritt
+  try {
+    await fuehreVerdichtungAus(db, productId);
+  } catch (e) {
+    revalidatePath(`/produkte/${productId}`);
+    redirect(`/produkte/${productId}/reviews?fehler=${encodeURIComponent(`Roh-Analyse gespeichert — aber die Verdichtung schlug fehl: ${e instanceof Error ? e.message : String(e)}`)}&code=VER-01`);
   }
   revalidatePath(`/produkte/${productId}`);
   redirect(`/produkte/${productId}/reviews`);

@@ -4,6 +4,11 @@ import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { IconReviews, IconCheck, IconContent } from "@/components/icons";
 import { normalisierePayload } from "@/lib/reviews/insights";
+import { beurteileAnalyseBasis } from "@/lib/reviews/konfidenz";
+import { InsightKarte } from "@/components/insight-karte";
+import { FehlerPopup } from "@/components/fehler-popup";
+import { fehlerInfo } from "@/lib/fehlercodes";
+import { verdichteInsightsAction } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -11,12 +16,20 @@ const fmt = (n: number) => new Intl.NumberFormat("de-DE").format(n);
 
 /**
  * Findings-Dashboard der Bewertungs-Analyse (D71): Datenbasis transparent
- * (Sterne-Verteilung, ASINs, Konfidenz), Pain Points & Kaufauslöser mit
- * Häufigkeits-Balken und O-Tönen, Kundensprache zum Übernehmen/Vermeiden —
- * mit klarer Konsequenz Richtung Content.
+ * (Sterne-Verteilung, ASINs, Konfidenz), Etappen-Protokoll mit Trichter
+ * (D139/D143), verdichtete Erkenntnis-Karten (D131/D132), Pain Points &
+ * Kaufauslöser mit Häufigkeits-Balken und O-Tönen, Kundensprache — mit
+ * klarer Konsequenz Richtung Content.
  */
-export default async function ReviewDashboard({ params }: { params: Promise<{ id: string }> }) {
+export default async function ReviewDashboard({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ fehler?: string; code?: string; hinweis?: string }>;
+}) {
   const { id } = await params;
+  const { fehler, code, hinweis } = await searchParams;
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, id) });
   if (!product) notFound();
@@ -47,8 +60,14 @@ export default async function ReviewDashboard({ params }: { params: Promise<{ id
   const maxPain = Math.max(...p.painPoints.map((x) => x.frequencyPct ?? 0), 1);
   const maxTrig = Math.max(...p.buyingTriggers.map((x) => x.frequencyPct ?? 0), 1);
 
+  const rohThemen = p.painPoints.length + p.buyingTriggers.length;
+  const karten = p.insightCards ?? [];
+  // Konfidenz in Worten (D138) — deterministisch aus Stichprobe + Amazon-Gesamtzahl
+  const konfidenz = beurteileAnalyseBasis(p.stats.reviewsTotal, scrape?.amazonTotals?.reviewsTotal ?? null);
+
   return (
     <main className="w-full p-8">
+      {fehler && <FehlerPopup message={fehler} {...fehlerInfo(code)} />}
       <Link href={`/produkte/${id}`} className="text-xs text-neutral-500 hover:underline">← Werkbank</Link>
       <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="page-title">Bewertungs-Analyse</h1>
@@ -58,6 +77,75 @@ export default async function ReviewDashboard({ params }: { params: Promise<{ id
         Was Käufer wirklich stört und überzeugt — aus echten Bewertungen, mit O-Tönen. Pain Points gehören in Bullets/Q&A
         (Einwände vorwegnehmen), Kaufauslöser in Headlines und Bild-Briefs.
       </p>
+      {hinweis && <p className="mt-4 rounded-xl bg-[var(--primary-soft)] px-3 py-2 text-sm text-primary-strong">ℹ {hinweis}</p>}
+
+      {/* Etappen-Protokoll + Trichter (D139/D143): macht das Verdichtungs-Prinzip
+          selbsterklärend — alle Zahlen existieren, reine Darstellung */}
+      <div className="anim-in mt-6 card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold">Analyse-Lauf (Etappen)</h2>
+          <span className="text-[11px] text-muted" title={konfidenz.herleitung}>{konfidenz.text}</span>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          <div className="rounded-xl border border-hair p-3">
+            <div className="text-[11px] uppercase tracking-wide text-muted">Etappe 1 · Scrape</div>
+            <div className="mt-1 text-2xl font-semibold tabular-nums">{fmt(p.stats.reviewsTotal)}</div>
+            <div className="text-xs text-muted">Reviews {scrape ? `(${scrape.createdAt.toLocaleDateString("de-DE")})` : ""}</div>
+          </div>
+          <div className="rounded-xl border border-hair p-3">
+            <div className="text-[11px] uppercase tracking-wide text-muted">Etappe 2 · Roh-Analyse</div>
+            <div className="mt-1 text-2xl font-semibold tabular-nums">{fmt(rohThemen)}</div>
+            <div className="text-xs text-muted">Roh-Themen ({p.painPoints.length} Pain Points · {p.buyingTriggers.length} Kaufauslöser)</div>
+          </div>
+          <div className="rounded-xl border border-hair p-3">
+            <div className="text-[11px] uppercase tracking-wide text-muted">Etappe 3 · Verdichtung</div>
+            {karten.length > 0 ? (
+              <>
+                <div className="mt-1 text-2xl font-semibold tabular-nums">{fmt(karten.length)}</div>
+                <div className="text-xs text-muted">Erkenntnisse{p.verworfeneKarten ? ` · ${p.verworfeneKarten} ohne Beleg/doppelt verworfen` : ""}</div>
+              </>
+            ) : (
+              <form action={verdichteInsightsAction} className="mt-1">
+                <input type="hidden" name="productId" value={id} />
+                <div className="text-xs text-muted">steht aus</div>
+                <button type="submit" className="btn-primary mt-1.5 text-xs">Verdichtung nachholen</button>
+              </form>
+            )}
+          </div>
+        </div>
+        {p.kernThese && (
+          <blockquote className="mt-3 rounded-xl bg-[var(--primary-soft)] px-3 py-2 text-sm italic">
+            <b>Kern-These:</b> {p.kernThese}
+          </blockquote>
+        )}
+      </div>
+
+      {/* Verdichtete Erkenntnisse (D131/D132): benannte Kaufgründe/Befunde in
+          Klartext, nach Relevanz sortiert — die Roh-Themen bleiben darunter
+          als Beleg-Kette erhalten */}
+      {karten.length > 0 && (
+        <section className="anim-in mt-3 card p-5">
+          <h2 className="text-sm font-semibold">Erkenntnisse — verdichtet aus den Roh-Themen</h2>
+          <p className="mt-1 text-xs text-muted">
+            Abstrahierte Kaufgründe und Befunde (kein Kunde schreibt sie wörtlich) — jede Karte nennt ihre Beleg-Aspekte samt Zählwerten. Aufklappen für Beschreibung und Bild-Ideen.
+          </p>
+          <div className="mt-3 space-y-2">
+            {karten.map((k, i) => (
+              <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={p.stats.reviewsTotal} />
+            ))}
+          </div>
+          {(p.entfernteBildIdeen?.length ?? 0) > 0 && (
+            <div className="mt-3 rounded-xl border border-hair p-3">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-warn">Vom Wahrheits-Filter entfernte Bild-Ideen (ausgewiesen, nie still)</div>
+              <ul className="mt-1 space-y-1">
+                {p.entfernteBildIdeen!.map((e, i) => (
+                  <li key={i} className="text-[11px] text-muted">✕ „{e.idee}" — {e.grund}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Datenbasis */}
       <div className="stagger mt-6 grid gap-3 lg:grid-cols-3">
