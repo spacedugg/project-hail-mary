@@ -177,6 +177,12 @@ ${fmt(pos) || "(keine)"}
 
 AUFGABE: Extrahiere 8–12 Pain Points und 6–10 Kaufauslöser, je mit Häufigkeit und 1–3 verbatim-Zitaten. Dazu Kundensprache zum Übernehmen (wörtliche Formulierungen) und Sprache zum Vermeiden.
 WICHTIG: Werte ALLE Reviews auf BEIDES aus. Pain Points finden sich auch in 4–5★-Reviews (Einschränkungen, „gut, aber…", Wünsche) — das sind oft die wertvollsten, weil sie von überzeugten Käufern kommen. Kaufauslöser finden sich auch in 1–3★-Reviews (was trotz Enttäuschung überzeugt hat, warum gekauft wurde). Die Sterne-Zahl ist Kontext für die Gewichtung, kein Filter.
+BELEG-REGELN (WICHTIGSTE REGELN — Verstöße werden programmatisch aussortiert):
+1. Das Label darf NUR behaupten, was seine Zitate WÖRTLICH stützen. Beispiel-Fehler: Zitat „Nachdem medizinische Gründe ärztlich ausgeschlossen wurden, probierten wir es" belegt KEINE „Empfehlung durch Tierarzt" — der Arzt hat Ursachen ausgeschlossen, nicht das Produkt empfohlen.
+2. HOFFNUNG/ERWARTUNG ist kein Wirkungs-Beleg: „Ich hoffe, es wird besser" belegt weder Wirkung noch Kaufauslöser „Wirkung" — höchstens den Kaufauslöser „Hoffnung auf Lösung", dann auch so benennen.
+3. Empfehlungen Dritter (Tierarzt, Bekannte, Influencer) NUR als Aspekt aufnehmen, wenn ein Zitat die Empfehlung EXPLIZIT ausspricht.
+4. Jedes Zitat gehört zu GENAU dem Aspekt, den es belegt — keine Zitate umverteilen, keine sinngemäßen Umformulierungen (Zitate werden gegen die Review-Texte geprüft).
+5. Pain Point = der Käufer berichtet NEGATIVES zu diesem Aspekt; Kaufauslöser = der Käufer benennt POSITIV, was ihn überzeugt hat. Im Zweifel weglassen statt raten.
 JSON-Schema:
 {"painPoints":[{"label":"...","frequencyPct":N,"mentionCount":N,"quotes":["..."]}],
  "buyingTriggers":[{"label":"...","frequencyPct":N,"mentionCount":N,"quotes":["..."]}],
@@ -197,6 +203,7 @@ export async function extractInsights(
   };
 
   let core: Omit<ReviewInsightsPayload, "sources" | "stats">;
+  let qualitaetsNotizen: string[];
   if (provider.name === "mock") {
     core = {
       painPoints: [{ label: "Mock: Dichtung undicht nach 2 Wochen", frequencyPct: 30, mentionCount: 3, quotes: ["tropft in der Tasche"] }],
@@ -204,22 +211,90 @@ export async function extractInsights(
       languageToBorrow: ["nach 24h noch eiskalt"],
       languageToAvoid: ["Premium-Qualität"],
     };
+    qualitaetsNotizen = [];
   } else {
     const res = await generateForRecipe("reviews.pain-points", {
       system: INSIGHTS_SYSTEM,
       messages: [{ role: "user", content: insightsPrompt(reviews) }],
-      maxTokens: 4000,
+      maxTokens: 8000,
       temperature: 0,
     });
     // Struktur ERZWINGEN statt blind speichern (D103): kaputte/abweichende
     // LLM-Antworten crashten das Findings-Dashboard beim Rendern.
     const { normalisiereInsights } = await import("./insights");
     core = normalisiereInsights(parseLlmJson(res.text));
+
+    // Beleg-Prüfung (D152): Verbatim-Gate + Beleg-Pflicht + Sentiment-Signal —
+    // deterministisch, VOR dem Speichern; Entferntes wird ausgewiesen.
+    const { verifiziereZitate } = await import("./belegPruefung");
+    const pp = verifiziereZitate(core.painPoints, reviews, "painPoint");
+    const bt = verifiziereZitate(core.buyingTriggers, reviews, "buyingTrigger");
+    core = { ...core, painPoints: pp.aspekte, buyingTriggers: bt.aspekte };
+    qualitaetsNotizen = [...pp.notizen, ...bt.notizen];
+
+    // Label↔Zitat-Gegencheck (D152): eine zweite, unabhängige KI-Instanz prüft
+    // je Aspekt, ob die (verbatim-belegten) Zitate das Label WIRKLICH stützen —
+    // die Fehlerklasse „Empfehlung durch Tierarzt" ohne Empfehlungs-Zitat.
+    try {
+      const urteile = await belegCheck(core.painPoints, core.buyingTriggers);
+      core = {
+        ...core,
+        painPoints: core.painPoints.filter((a) => !urteile.has(a.label)),
+        buyingTriggers: core.buyingTriggers.filter((a) => !urteile.has(a.label)),
+      };
+      for (const [label, grund] of urteile) {
+        qualitaetsNotizen.push(`Aspekt „${label}" verworfen — Gegencheck: ${grund}`);
+      }
+    } catch {
+      qualitaetsNotizen.push("△ Label↔Zitat-Gegencheck konnte nicht laufen — Aspekte sind verbatim-geprüft, aber nicht gegengeprüft.");
+    }
+
     if (core.painPoints.length === 0 && core.buyingTriggers.length === 0) {
-      throw new Error("Die Analyse lieferte kein verwertbares Ergebnis (keine Findings im Antwort-JSON) — bitte erneut starten.");
+      throw new Error("Die Analyse lieferte kein belegbares Ergebnis (alle Aspekte ohne wörtliche Zitat-Belege) — bitte erneut starten.");
     }
   }
 
   const confidence = reviews.length >= 60 ? "high" : reviews.length >= 20 ? "medium" : "low";
-  return { payload: { sources, stats, ...core }, confidence: dataBasis === "apify_scrape" ? confidence : "medium" };
+  return {
+    payload: { sources, stats, ...core, qualitaetsNotizen },
+    confidence: dataBasis === "apify_scrape" ? confidence : "medium",
+  };
+}
+
+/**
+ * Label↔Zitat-Gegencheck (D152): unabhängige Prüf-Instanz. Liefert je Aspekt,
+ * dessen Zitate das Label NICHT stützen, den Grund — der Code verwirft dann.
+ */
+async function belegCheck(
+  painPoints: ReviewInsightsPayload["painPoints"],
+  buyingTriggers: ReviewInsightsPayload["buyingTriggers"],
+): Promise<Map<string, string>> {
+  const { resolveRecipe: rr } = await import("@/lib/llm/registry");
+  if (rr("reviews.beleg-check").provider.name === "mock") return new Map();
+
+  const fmt = (liste: ReviewInsightsPayload["painPoints"], typ: string) =>
+    liste.map((a) => `- [${typ}] Label: "${a.label}" — Zitate: ${a.quotes.map((q) => `„${q.slice(0, 160)}"`).join(" / ")}`).join("\n");
+  const res = await generateForRecipe("reviews.beleg-check", {
+    system:
+      "Du prüfst als unabhängige Instanz, ob Review-Zitate ein Aspekt-Label WIRKLICH stützen. Sei streng: " +
+      "Hoffnung/Erwartung belegt keine Wirkung; ein Arzt, der Ursachen ausschließt, ist keine Produkt-Empfehlung; " +
+      "das Zitat muss die Behauptung des Labels tragen, nicht nur zum Thema passen. Antworte NUR mit JSON.",
+    messages: [
+      {
+        role: "user",
+        content: `ASPEKTE MIT ZITATEN:\n${fmt(painPoints, "Pain Point")}\n${fmt(buyingTriggers, "Kaufauslöser")}\n\nGib NUR die Aspekte zurück, deren Zitate das Label NICHT stützen oder deren Pain-Point/Kaufauslöser-Einordnung den Zitaten widerspricht:\n{"nichtGestuetzt":[{"label":"exaktes Label","grund":"ein Satz"}]}`,
+      },
+    ],
+    maxTokens: 3000,
+    temperature: 0,
+  });
+  const raw = parseLlmJson<{ nichtGestuetzt?: Array<{ label?: unknown; grund?: unknown }> }>(res.text);
+  const map = new Map<string, string>();
+  const labels = new Set([...painPoints, ...buyingTriggers].map((a) => a.label));
+  for (const u of raw.nichtGestuetzt ?? []) {
+    const label = String(u.label ?? "").trim();
+    // Nur exakt existierende Labels verwerfen — der Prüfer darf nichts erfinden
+    if (labels.has(label)) map.set(label, String(u.grund ?? "Zitate stützen das Label nicht.").trim());
+  }
+  return map;
 }

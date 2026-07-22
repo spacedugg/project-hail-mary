@@ -172,6 +172,13 @@ export default async function ReviewDashboard({
               ))}
             </div>
           )}
+          {(p.qualitaetsNotizen?.length ?? 0) > 0 && (
+            <div className="mt-1.5 space-y-0.5">
+              {p.qualitaetsNotizen!.map((n, i) => (
+                <p key={`q-${i}`} className="text-[11px] text-muted">✕ {n}</p>
+              ))}
+            </div>
+          )}
           {scrape?.amazonTotals?.dist ? (
             <div className="mt-4 space-y-1.5">
               {(["5", "4", "3", "2", "1"] as const).map((star) => {

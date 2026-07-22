@@ -129,7 +129,10 @@ export const RECIPE_MODELS: Record<string, { provider: string; model: string }> 
   "listing.backend": { provider: "anthropic", model: "claude-opus-4-8" },
   "listing.highlights": { provider: "anthropic", model: "claude-opus-4-8" },
   "listing.qa": { provider: "anthropic", model: "claude-opus-4-8" },
-  "reviews.pain-points": { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
+  // Roh-Analyse auf Sonnet (D152): Haiku produzierte Fehl-Abstraktionen (Label ohne Zitat-Deckung)
+  "reviews.pain-points": { provider: "anthropic", model: "claude-sonnet-5" },
+  // Unabhängiger Label↔Zitat-Gegencheck (D152)
+  "reviews.beleg-check": { provider: "anthropic", model: "claude-sonnet-5" },
   // Verdichtung (D131): Abstraktion + ausgewogene Bündelung ist die schwerste
   // Stufe der Review-Strecke — Sonnet statt Haiku (Qualität vor Tempo, D136).
   "reviews.verdichtung": { provider: "anthropic", model: "claude-sonnet-5" },

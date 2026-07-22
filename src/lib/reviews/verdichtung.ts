@@ -131,7 +131,7 @@ ${fmt(aspekte.painPoints, "Pain Point") || "(keine Pain Points)"}
 AUFGABE: Verdichte diese Roh-Themen zu 4–8 benannten Erkenntnissen (Insight-Karten) in Sprache "${sprache}".
 REGELN:
 1. Der Titel ist ein prägnanter Kaufgrund/Befund in Klartext (max. 8 Wörter) — KEIN wörtliches Kundenzitat, sondern die Abstraktion dahinter (Beispiel-Muster: "Stoppt Grasfressen & Sodbrennen schnell").
-2. Die Beschreibung (2–4 Sätze) erklärt nutzenorientiert, was dahintersteckt und warum es Kaufentscheidungen beeinflusst.
+2. Die Beschreibung (2–4 Sätze) erklärt nutzenorientiert, was dahintersteckt und warum es Kaufentscheidungen beeinflusst. Titel und Beschreibung dürfen NUR behaupten, was die O-Töne der Beleg-Aspekte wörtlich stützen — keine Steigerungen (aus „Bekannte haben es empfohlen" wird KEIN „Tierarzt-Tipp").
 3. GEGENSÄTZLICHE Roh-Themen zum selben Aspekt (z. B. "wirkt gut" 27× + "wirkt nicht" 6×) werden zu EINER ausgewogenen Erkenntnis gebündelt — ehrliches Erwartungs-Management, keine Schönfärberei und kein Verschweigen der Gegenseite.
 4. relevanz: 1–5 (5 = kaufentscheidend), nach Gewicht der Erwähnungen UND strategischer Bedeutung.
 5. belegAspekte: die WORTGLEICHEN Labels der Roh-Themen oben, auf denen die Erkenntnis beruht (mindestens 1) — nichts erfinden, keine neuen Labels.
