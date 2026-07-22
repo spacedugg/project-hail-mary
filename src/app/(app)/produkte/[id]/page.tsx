@@ -16,6 +16,7 @@ import { BewertungsDashboard } from "@/components/bewertungs-dashboard";
 import { InsightKarte } from "@/components/insight-karte";
 import { fehlerInfo } from "@/lib/fehlercodes";
 import { normalisierePayload } from "@/lib/reviews/insights";
+import { kartenKlasse } from "@/lib/reviews/verdichtung";
 import { IconUpload, IconCheck, IconSearch, IconReviews, IconContent, IconEuro, IconSichtbarkeit, IconSparkle } from "@/components/icons";
 import { AnalyseStart } from "@/components/analyse-start";
 import { TabLeiste } from "@/components/tab-leiste";
@@ -569,6 +570,23 @@ export default async function ProductPage({
         {insights && <BewertungsDashboard insight={insights} scrape={scrape ?? null} productId={product.id} productAsin={product.asin} />}
         </>)}
 
+        {/* Conversion Drivers (D178): was Kunden kaufen lässt — Insight-Karten
+            mit code-gerechneter positiver Klasse, nach Relevanz sortiert */}
+        {insights && tab === "analyse" && (() => {
+          const treiber = (normalisierePayload(insights.payload).insightCards ?? []).filter((k) => kartenKlasse(k) === "positiv");
+          if (treiber.length === 0) return null;
+          return (
+            <section className="card p-5">
+              <CardHead icon={<IconCheck />} chip="chip-teal" title="Conversion Drivers" />
+              <div className="mt-4 space-y-2">
+                {treiber.map((k, i) => (
+                  <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={normalisierePayload(insights.payload).stats.reviewsTotal} />
+                ))}
+              </div>
+            </section>
+          );
+        })()}
+
         {insights && tab === "analyse" && (
         <section className="card p-5">
           <CardHead
@@ -611,7 +629,6 @@ export default async function ProductPage({
             deepAudit={deepAudit ?? null}
             auditStale={auditStale}
             featureRanking={featureRanking ?? null}
-            original={snapshot ?? null}
           />
         )}
 

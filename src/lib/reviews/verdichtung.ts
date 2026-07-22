@@ -100,6 +100,18 @@ export function kartenTendenz(karte: Pick<InsightCard, "belegAspekte">): {
 }
 
 /**
+ * Karten-Klasse (D178): positiv/negativ/gemischt — deterministisch aus den
+ * Beleg-Aspekten (Tendenz-Zählwerte, sonst Aspekt-Typen), nie von der KI.
+ */
+export function kartenKlasse(karte: Pick<InsightCard, "belegAspekte">): "positiv" | "negativ" | "gemischt" {
+  const t = kartenTendenz(karte);
+  if (t) return t.richtung === "ausgeglichen" ? "gemischt" : t.richtung;
+  const typen = new Set(karte.belegAspekte.map((b) => b.typ));
+  if (typen.size === 1) return typen.has("buyingTrigger") ? "positiv" : "negativ";
+  return "gemischt";
+}
+
+/**
  * Struktur ERZWINGEN (D103-Muster): LLM-Antwort → validierte Karten.
  * `quellen` wird hier auf jede Karte gestempelt — deterministisch vom Aufrufer.
  */

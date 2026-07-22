@@ -1,6 +1,5 @@
 import type { analyzeListing } from "@/lib/analysis/listingAudit";
 import type { DeepAuditPayload, FeatureRankingPayload } from "@/db/schema";
-import type { listingSnapshots } from "@/db/schema";
 import { befundKarten } from "@/lib/analysis/auditKarten";
 import { InsightKarte } from "@/components/insight-karte";
 
@@ -15,51 +14,19 @@ import { InsightKarte } from "@/components/insight-karte";
 type Analysis = ReturnType<typeof analyzeListing>;
 type DeepAuditRow = { payload: DeepAuditPayload; dataBasis: string[]; createdAt: Date } | null;
 type FeatureRow = { payload: FeatureRankingPayload; dataBasis: string[]; createdAt: Date } | null;
-type Original = typeof listingSnapshots.$inferSelect | null;
 
 const fmt = (n: number) => new Intl.NumberFormat("de-DE").format(n);
-
-/** Sterne-Gruppierung (D172): schlecht = 1–3★ · neutral = 4★ · positiv = 5★. */
-export function SterneGruppen({ dist, avg, total }: { dist: Record<string, number>; avg: number | null; total: number | null }) {
-  const gruppen = [
-    { label: "Positiv", sterne: "5 ★", pct: dist["5"] ?? 0, farbe: "var(--cat-2)" },
-    { label: "Neutral", sterne: "4 ★", pct: dist["4"] ?? 0, farbe: "var(--warn)" },
-    { label: "Schlecht", sterne: "1–3 ★", pct: (dist["1"] ?? 0) + (dist["2"] ?? 0) + (dist["3"] ?? 0), farbe: "var(--bad)" },
-  ];
-  return (
-    <div>
-      <p className="text-sm font-semibold tabular-nums">
-        {avg !== null ? `Ø ${new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(avg)} ★` : "Ø –"}
-        {total !== null && <span className="font-normal text-muted"> · {fmt(total)} Bewertungen</span>}
-      </p>
-      <div className="mt-2 space-y-1.5">
-        {gruppen.map((g) => (
-          <div key={g.label} className="flex items-center gap-2 text-xs tabular-nums">
-            <span className="w-16 flex-none">{g.label}</span>
-            <span className="w-10 flex-none text-muted">{g.sterne}</span>
-            <div className="h-2 flex-1 overflow-hidden rounded-full bg-hair">
-              <div className="bar-fill h-full rounded-full" style={{ width: `${Math.min(100, g.pct)}%`, background: g.farbe }} />
-            </div>
-            <span className="w-12 flex-none text-right font-medium">{g.pct} %</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export function AnalyseHintergrund({
   analysis,
   deepAudit,
   auditStale,
   featureRanking,
-  original,
 }: {
   analysis: Analysis;
   deepAudit: DeepAuditRow;
   auditStale: boolean;
   featureRanking: FeatureRow;
-  original: Original;
 }) {
   return (
     <>
@@ -93,16 +60,7 @@ export function AnalyseHintergrund({
         )}
       </section>
 
-      {/* Sterne-Verteilung (Gruppierung D172) */}
-      {original?.ratingDist && (
-        <section className="card p-5">
-          <h2 className="text-sm font-semibold">Sterne-Verteilung</h2>
-          <p className="text-[11px] text-muted">Amazon-Gesamtwerte, Import {original.createdAt.toLocaleDateString("de-DE")}</p>
-          <div className="mt-3 max-w-md">
-            <SterneGruppen dist={original.ratingDist} avg={original.ratingAvg} total={original.reviewsTotal} />
-          </div>
-        </section>
-      )}
+      {/* KEINE zweite Sterne-Verteilung (D178): die steht bereits im Bewertungs-Block */}
 
       {/* Markt-Position (Share of Voice) */}
       {analysis.sov && (

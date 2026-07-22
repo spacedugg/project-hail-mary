@@ -1,5 +1,6 @@
 import { reviewInsights, reviewScrapes } from "@/db/schema";
 import { normalisierePayload } from "@/lib/reviews/insights";
+import { kartenKlasse } from "@/lib/reviews/verdichtung";
 import { InsightKarte } from "@/components/insight-karte";
 import { verdichteInsightsAction } from "@/app/actions";
 
@@ -68,15 +69,31 @@ export function BewertungsDashboard({
         )}
       </div>
 
-      {/* Verdichtete Erkenntnisse (D131/D132) */}
+      {/* Review Insights (D178): Findings gegliedert nach positiv/negativ/gemischt —
+          Klasse rechnet der Code aus den Beleg-Aspekten */}
       {karten.length > 0 && (
         <div className="rounded-xl border border-hair p-4">
-          <h3 className="text-sm font-semibold">Erkenntnisse</h3>
-          <div className="mt-3 space-y-2">
-            {karten.map((k, i) => (
-              <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={p.stats.reviewsTotal} />
-            ))}
+          <h3 className="text-sm font-semibold">Review Insights</h3>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {([["positiv", "text-good"], ["negativ", "text-bad"], ["gemischt", "text-muted"]] as const).map(([klasse, farbe]) => {
+              const n = karten.filter((k) => kartenKlasse(k) === klasse).length;
+              return <span key={klasse} className={`rounded-full bg-hair px-2.5 py-1 text-xs tabular-nums ${farbe}`}>{n} {klasse}</span>;
+            })}
           </div>
+          {([["positiv", "Positiv", "text-good"], ["negativ", "Negativ", "text-bad"], ["gemischt", "Gemischt", "text-muted"]] as const).map(([klasse, label, farbe]) => {
+            const gruppe = karten.filter((k) => kartenKlasse(k) === klasse);
+            if (gruppe.length === 0) return null;
+            return (
+              <div key={klasse} className="mt-3">
+                <h4 className={`text-xs font-semibold uppercase tracking-wide ${farbe}`}>{label}</h4>
+                <div className="mt-1.5 space-y-2">
+                  {gruppe.map((k, i) => (
+                    <InsightKarte key={i} karte={k} rang={karten.indexOf(k) + 1} reviewsGesamt={p.stats.reviewsTotal} />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
           {(p.entfernteBildIdeen?.length ?? 0) > 0 && (
             <div className="mt-3 rounded-xl border border-hair p-3">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-warn">Entfernte Bild-Ideen</div>
