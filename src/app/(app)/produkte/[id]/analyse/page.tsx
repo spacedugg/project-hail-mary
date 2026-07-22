@@ -3,12 +3,14 @@ import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { analyzeListing, deckungsgrad, wirksamesListing, type SektionsQuelle } from "@/lib/analysis/listingAudit";
-import { runDeepAuditAction } from "@/app/actions";
+import { runDeepAuditAction, rankeFeaturesAction } from "@/app/actions";
 import { SubmitButton } from "@/components/submit-button";
 import { FehlerPopup } from "@/components/fehler-popup";
 import { fehlerInfo } from "@/lib/fehlercodes";
 import type { SovAudit } from "@/lib/sov/audit";
 import type { DeepAuditDimension } from "@/db/schema";
+import { befundKarten, massnahmenKarten } from "@/lib/analysis/auditKarten";
+import { InsightKarte } from "@/components/insight-karte";
 
 export const dynamic = "force-dynamic";
 // Tiefen-Audit (LLM): sonnet-5 denkt adaptiv und braucht bei großen Prompts
@@ -114,6 +116,10 @@ export default async function AnalysePage({
   const deepAudit = await db.query.deepAudits.findFirst({
     where: eq(schema.deepAudits.productId, id),
     orderBy: desc(schema.deepAudits.createdAt),
+  });
+  const featureRanking = await db.query.featureRankings.findFirst({
+    where: eq(schema.featureRankings.productId, id),
+    orderBy: desc(schema.featureRankings.createdAt),
   });
   const lastScrape = await db.query.reviewScrapes.findFirst({
     where: eq(schema.reviewScrapes.productId, id),
@@ -463,15 +469,76 @@ export default async function AnalysePage({
         )}
       </section>
 
+      {/* Stärken & Schwächen im Insight-Karten-Format (D135) — dasselbe Schema
+          wie die Review-Erkenntnisse, deterministisch aus dem Audit gemappt */}
+      {deepAudit && befundKarten(deepAudit.payload, deepAudit.dataBasis).length > 0 && (
+        <section className="mt-6">
+          <h2 className="sect-h">Stärken & Schwächen (aus dem Tiefen-Audit)</h2>
+          <div className="mt-2 space-y-2">
+            {befundKarten(deepAudit.payload, deepAudit.dataBasis).map((k, i) => (
+              <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={0} belegHinweis="aus Tiefen-Audit" />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Feature-Relevanz-Ranking (D141/D146): Listing-Features nach Kunden-Echo —
+          Quellen-Tags nur nach verifiziertem Verbatim-Beleg, Relevanz rechnet der Code */}
+      <section className="mt-6 print:hidden">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="sect-h">Feature-Relevanz-Ranking — welche Listing-Features Kunden honorieren</h2>
+          <form action={rankeFeaturesAction}>
+            <input type="hidden" name="productId" value={id} />
+            <SubmitButton className="btn-ghost text-xs" pendingLabel="Rankt… (kann Minuten dauern)" progress>
+              {featureRanking ? "Neu ranken" : "Features ranken"}
+            </SubmitButton>
+          </form>
+        </div>
+        {featureRanking ? (
+          <>
+            <div className="mt-2 space-y-2">
+              {featureRanking.payload.cards.map((k, i) => (
+                <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={featureRanking.payload.stats.reviewsGesamt} />
+              ))}
+            </div>
+            <div className="mt-2 space-y-0.5">
+              {featureRanking.payload.hinweise.map((h, i) => (
+                <p key={i} className="text-[11px] text-muted">ℹ {h}</p>
+              ))}
+              {featureRanking.payload.verworfen > 0 && (
+                <p className="text-[11px] text-warn">△ {featureRanking.payload.verworfen} Feature(s) ohne verifizierten Listing-Beleg verworfen (ausgewiesen, nie still).</p>
+              )}
+              {featureRanking.payload.entfernteBildIdeen.map((e, i) => (
+                <p key={`b-${i}`} className="text-[11px] text-warn">✕ Bild-Idee entfernt: „{e.idee}" — {e.grund}</p>
+              ))}
+              <p className="text-[11px] text-muted">Datenbasis: {featureRanking.dataBasis.join(" · ")} · Stand {featureRanking.createdAt.toLocaleDateString("de-DE")}</p>
+            </div>
+          </>
+        ) : (
+          <p className="mt-2 text-sm text-muted">
+            Noch kein Ranking. Braucht Listing-Import + Bewertungs-Analyse — dann zeigt es, welche Features in Bilder/A+ nach vorn gehören (Relevanz aus echtem Kunden-Echo, keine KI-Schätzung).
+          </p>
+        )}
+      </section>
+
       <section className="mt-6">
         <h2 className="sect-h">Maßnahmen (priorisiert)</h2>
-        <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm">
-          {(deepAudit?.payload.topActions ?? []).map((a, i) => <li key={`ki-${i}`}>{a}</li>)}
-          {analysis.recommendations.map((r, i) => <li key={`det-${i}`}>{r}</li>)}
-          {(deepAudit?.payload.topActions ?? []).length + analysis.recommendations.length === 0 && (
-            <li className="list-none text-neutral-400">Keine offenen Maßnahmen — Listing ist regelkonform.</li>
-          )}
-        </ol>
+        {(() => {
+          const karten = massnahmenKarten(
+            deepAudit?.payload.topActions ?? [],
+            analysis.recommendations,
+            deepAudit?.dataBasis ?? [],
+          );
+          return karten.length > 0 ? (
+            <div className="mt-2 space-y-2">
+              {karten.map((k, i) => (
+                <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={0} belegHinweis={i < (deepAudit?.payload.topActions.length ?? 0) ? "Tiefen-Audit" : "Regel-Messung"} />
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-neutral-400">Keine offenen Maßnahmen — Listing ist regelkonform.</p>
+          );
+        })()}
       </section>
 
       {/* Keine Dopplungen (D111): Text-Begründungen stehen im Optimizer direkt

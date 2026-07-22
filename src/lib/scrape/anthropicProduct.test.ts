@@ -52,6 +52,29 @@ describe("coerceListing — LLM generiert, Code erzwingt", () => {
     expect(snap.title).toBeNull();
     expect(snap.bullets).toEqual([]);
     expect(snap.ratingDist).toBeNull();
+    expect(snap.attributes).toBeNull();
+    expect(snap.importantInfo).toBeNull();
+    expect(snap.aplusContent).toBeNull();
     expect(snap.raw).toEqual({ provider: "anthropic", url: URL });
+  });
+
+  it("übernimmt Attribute nur als echte Schlüssel→Wert-Paare, geklemmt (D145)", () => {
+    const snap = coerceListing(
+      {
+        attributes: { Marke: " Acme ", Volumen: 750 as unknown as string, Leer: "", "": "verwaist" },
+        importantInfo: "  Nur handspülen.  ",
+        aplusContent: "Vom Hersteller: Unsere Geschichte.",
+      },
+      URL,
+    );
+    expect(snap.attributes).toEqual({ Marke: "Acme", Volumen: "750" });
+    expect(snap.importantInfo).toBe("Nur handspülen.");
+    expect(snap.aplusContent).toBe("Vom Hersteller: Unsere Geschichte.");
+  });
+
+  it("nur leere Attribut-Werte → attributes bleibt ehrlich null (D145)", () => {
+    const snap = coerceListing({ attributes: { A: "", B: "   " }, importantInfo: "" }, URL);
+    expect(snap.attributes).toBeNull();
+    expect(snap.importantInfo).toBeNull();
   });
 });

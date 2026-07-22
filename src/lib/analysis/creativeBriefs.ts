@@ -35,6 +35,8 @@ export function buildAplusBrief(i: BriefInputs, variante: "basic" | "premium" = 
   const pains = (i.reviewInsights?.painPoints ?? []).slice(0, 4).map((p) => p.label);
   const triggers = (i.reviewInsights?.buyingTriggers ?? []).slice(0, 4).map((t) => t.label);
   const borrow = (i.reviewInsights?.languageToBorrow ?? []).slice(0, 5);
+  // D134: verdichtete Erkenntnisse samt geprüfter Bild-Ideen — Kaufgrund → Modul-Idee
+  const cards = (i.reviewInsights?.insightCards ?? []).slice(0, 5);
 
   const kopf = `A+ CONTENT BRIEF (${variante === "basic" ? "BASIC" : "PREMIUM"}) — ${i.brand} · ${i.productName}${i.asin ? ` (${i.asin})` : ""}
 ================================================================
@@ -95,6 +97,8 @@ ${list(pains, "Bewertungs-Analyse ausführen für echte Pain Points")}
 ${list(triggers, "Kaufauslöser aus der Bewertungs-Analyse")}
   Kundensprache (nah dran formulieren):
 ${list(borrow, "—")}
+  Verdichtete Erkenntnisse → Modul-Ideen (Bild-Ideen sind wahrheits-geprüft — keine erfundenen Zitate/Siegel):
+${cards.length ? cards.map((c) => `  - ${c.titel} (Relevanz ${c.relevanz}/5)${c.bildIdeen[0] ? ` → z. B. ${c.bildIdeen[0]}` : ""}`).join("\n") : "  - Verdichtungs-Etappe der Bewertungs-Analyse ausführen"}
   Zielgruppe/Nutzungskontext: ${i.facts.targetAudience ?? "(Zielgruppe erfassen)"}
 
 PRODUKT-WAHRHEIT (Referenz — NICHTS erfinden, Reference-Fidelity)

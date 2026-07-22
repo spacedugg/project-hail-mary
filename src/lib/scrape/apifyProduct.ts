@@ -17,8 +17,69 @@ export type ProductSnapshot = {
   ratingAvg: number | null;
   /** Sterne-Verteilung in % je Klasse ("1"–"5"), wie im Amazon-Histogramm. */
   ratingDist: Record<string, number> | null;
+  /**
+   * Erweiterte Listing-Quellen (D145) — null heißt „vom Import-Weg nicht
+   * erfasst" (ehrlich ausweisen), NIE „Produktseite hat keine".
+   */
+  attributes: Record<string, string> | null;
+  importantInfo: string | null;
+  aplusContent: string | null;
   raw: Record<string, unknown>;
 };
+
+/**
+ * Strukturierte Attribute (Produktinformation-Tabelle) tolerant erkennen (D145).
+ * Actor-Varianten: Array [{name/key/label, value}], Objekt {"Marke": "…"} oder
+ * verschachtelt (productInformation/productDetails/attributes/technicalDetails).
+ */
+export function parseAttributes(it: Record<string, unknown>): Record<string, string> | null {
+  const candidates = [it.productInformation, it.productDetails, it.attributes, it.technicalDetails, it.productOverview];
+  for (const c of candidates) {
+    const out: Record<string, string> = {};
+    if (Array.isArray(c)) {
+      for (const row of c) {
+        if (typeof row !== "object" || row === null) continue;
+        const r = row as Record<string, unknown>;
+        const key = String(r.name ?? r.key ?? r.label ?? "").trim();
+        const value = String(r.value ?? r.content ?? "").trim();
+        if (key && value) out[key] = value.slice(0, 500);
+      }
+    } else if (typeof c === "object" && c !== null) {
+      for (const [k, v] of Object.entries(c as Record<string, unknown>)) {
+        const key = k.trim();
+        const value = typeof v === "string" || typeof v === "number" ? String(v).trim() : "";
+        if (key && value) out[key] = value.slice(0, 500);
+      }
+    }
+    if (Object.keys(out).length >= 2) return out;
+  }
+  return null;
+}
+
+/** „Wichtige Informationen" tolerant erkennen: String, String-Array oder Sektionen [{title, content}]. */
+export function parseImportantInfo(it: Record<string, unknown>): string | null {
+  const candidates = [it.importantInformation, it.important_information, it.importantInfo, it.legalDisclaimer];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c.trim().slice(0, 8000);
+    if (Array.isArray(c)) {
+      const text = c
+        .map((row) => {
+          if (typeof row === "string") return row.trim();
+          if (typeof row === "object" && row !== null) {
+            const r = row as Record<string, unknown>;
+            const title = String(r.title ?? r.name ?? "").trim();
+            const content = String(r.content ?? r.text ?? r.value ?? "").trim();
+            return [title, content].filter(Boolean).join(": ");
+          }
+          return "";
+        })
+        .filter(Boolean)
+        .join("\n");
+      if (text.trim()) return text.trim().slice(0, 8000);
+    }
+  }
+  return null;
+}
 
 /** "4,6 von 5 Sternen" / "4.6 out of 5 stars" / 4.6 → 4.6 */
 function parseAvg(v: unknown): number | null {
@@ -119,6 +180,9 @@ export async function scrapeProduct(
     reviewsTotal: parseCount(it.countReview ?? it.countReviews ?? it.reviewsCount ?? it.ratingsCount ?? it.countRatings),
     ratingAvg: parseAvg(it.productRating ?? it.rating ?? it.averageRating ?? it.ratingScore),
     ratingDist: parseDist(it),
+    attributes: parseAttributes(it),
+    importantInfo: parseImportantInfo(it),
+    aplusContent: null, // Produkt-Detail-Actor liefert keinen A+-Inhalt — ehrlich „nicht erfasst"
     raw: it,
   };
 }
@@ -166,6 +230,9 @@ export function parseListingCsv(text: string): ProductSnapshot {
     reviewsTotal: null,
     ratingAvg: null,
     ratingDist: null,
+    attributes: null, // H10-Export führt keine Produktinformation-Tabelle — „nicht erfasst" (D145)
+    importantInfo: null,
+    aplusContent: null,
     raw: { header: header.slice(0, 40) },
   };
 }

@@ -21,6 +21,9 @@ type RawListing = {
   reviewsTotal?: number | null;
   ratingAvg?: number | null;
   ratingDist?: Record<string, number> | null;
+  attributes?: Record<string, string> | null;
+  importantInfo?: string | null;
+  aplusContent?: string | null;
 };
 
 /** Deterministische Durchsetzung: nur belegbare Werte, nichts Halluziniertes. */
@@ -52,6 +55,18 @@ export function coerceListing(raw: RawListing, url: string): ProductSnapshot {
     if (Object.keys(out).length >= 3) ratingDist = out;
   }
 
+  // Attribute (D145): nur echte Schlüssel→Wert-Paare, geklemmt — nichts Erfundenes
+  let attributes: Record<string, string> | null = null;
+  if (raw.attributes && typeof raw.attributes === "object" && !Array.isArray(raw.attributes)) {
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(raw.attributes)) {
+      const key = str(k);
+      const value = typeof v === "string" || typeof v === "number" ? String(v).trim() : "";
+      if (key && value) out[key] = value.slice(0, 500);
+    }
+    if (Object.keys(out).length > 0) attributes = out;
+  }
+
   return {
     title: str(raw.title) || null,
     bullets,
@@ -60,6 +75,9 @@ export function coerceListing(raw: RawListing, url: string): ProductSnapshot {
     reviewsTotal,
     ratingAvg,
     ratingDist,
+    attributes,
+    importantInfo: str(raw.importantInfo).slice(0, 8000) || null,
+    aplusContent: str(raw.aplusContent).slice(0, 8000) || null,
     raw: { provider: "anthropic", url },
   };
 }
@@ -78,7 +96,10 @@ JSON-Schema (Felder weglassen, die auf der Seite nicht belegt sind):
  "imageUrls": ["URLs der Produkt-Galerie-Bilder (media-amazon.com, größte Variante)"],
  "reviewsTotal": Gesamtzahl der Bewertungen als Zahl,
  "ratingAvg": Durchschnittsbewertung als Zahl (z. B. 4.6),
- "ratingDist": {"5": Prozent, "4": Prozent, "3": Prozent, "2": Prozent, "1": Prozent} aus dem Bewertungs-Histogramm}`;
+ "ratingDist": {"5": Prozent, "4": Prozent, "3": Prozent, "2": Prozent, "1": Prozent} aus dem Bewertungs-Histogramm,
+ "attributes": {"Schlüssel": "Wert"} — die Produktinformation-Tabelle bzw. der Produkt-Überblick (z. B. Marke, Artikelform, Geschmacksrichtung, Menge, Maße), wortwörtlich als Schlüssel-Wert-Paare,
+ "importantInfo": "kompletter Text der Sektion 'Wichtige Informationen' (Inhaltsstoffe, Dosierung/Anwendung, Warnhinweise)",
+ "aplusContent": "sichtbarer TEXT der 'Vom Hersteller'-/A+-Sektion (Überschriften + Absätze, ohne Bild-Beschreibungen)"}`;
 
 export async function scrapeProductViaAnthropic(
   asin: string,
@@ -99,6 +120,9 @@ export async function scrapeProductViaAnthropic(
         reviewsTotal: 1343,
         ratingAvg: 4.6,
         ratingDist: { "5": 70, "4": 15, "3": 6, "2": 3, "1": 6 },
+        attributes: { Marke: "Mock", Material: "Edelstahl", Volumen: "750 ml" },
+        importantInfo: "Mock: Nur handspülen. Nicht für kohlensäurehaltige Getränke.",
+        aplusContent: "Mock: A+-Abschnitt — in Produktion steht hier der 'Vom Hersteller'-Text.",
       },
       url,
     );

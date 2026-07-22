@@ -1,6 +1,6 @@
 # temoa OS — Bauplan (v3)
 
-> **Status:** v3.6, 2026-07-21 (neu: Mehrsprachigkeit/Lokalisierung im Optimizer mit zwei Sicherheits-Gates). Fortschreibung nach jedem abgeschlossenen Feature.
+> **Status:** v3.7, 2026-07-21 (neu: Insight-Schema der Analyse-Ausgaben nach Referenz-Tool-Sichtung II, D131–D140). Fortschreibung nach jedem abgeschlossenen Feature.
 > Fundament: `docs/product-scope.md` (Scope-Session 07.07.) + Baustand `docs/DECISIONS.md`.
 > **Das ist das Accountability-Dokument:** Gebaut wird, was hier steht.
 > **Neu in v3 (Nutzer-Entscheidung 21.07.):** Der Plan ist nicht mehr nach Sprints sortiert, sondern ist der **Bauplan des Tools** — gegliedert wie die linke Seitenleiste: Menüpunkt → Untermenü → Features. Ein Menüpunkt/Feature wird komplett gebaut und **in sich getestet**, dann kommt der nächste. So wächst das Tool entlang seiner eigenen Struktur statt querbeet.
@@ -75,6 +75,7 @@ Das Content-Kraftwerk. Untermenüs = die Bereiche des Produkt-Arbeitsplatzes.
 | Feature | Status | Handlung/Nutzen |
 |---|---|---|
 | Listing-Import von Amazon (Titel, Bullets, Bilder, Bewertungszahlen) | ✅ | Ist-Zustand als Arbeitsgrundlage, ohne Abtippen |
+| Import-Erweiterung: Attribute (Produktinformation-Tabelle), „Wichtige Informationen", A+-Inhalt (D145) | 🧪 | Die verlässlichsten Produktdaten (strukturierte Attribute, Inhaltsstoffe wörtlich) für Fakten-Autofill (D70) und Quellen-Ausweis (D133); nicht Lieferbares ehrlich „nicht erfasst" |
 
 **Untermenü: Keyword-Basis**
 
@@ -101,8 +102,18 @@ Content-Sprache ist je Produkt/Auftrag wählbar — unabhängig vom Marktplatz. 
 | Feature | Status | Handlung/Nutzen |
 |---|---|---|
 | Review-Scrape je ASIN × Sterne-Klasse (eigenes Produkt + Wettbewerber, ASIN-Chips) | 🔶 | Mehr-ASIN-Abbruch behoben (D102) — erneuter Praxistest nötig |
+| Wettbewerbs-Kontext als eigener Analyse-Baustein: Wettbewerber zeigen Produkt-Einordnung, Zielgruppe, gelöste Pain Points, unbeleuchtete eigene Features (D141) | 🧪 | Optimieren nur mit eigenen Daten = luftleerer Raum; Hand-Eingabe der ASINs bleibt und gewinnt immer |
+| Wettbewerber-Vorschlag in 4 Stufen: Kandidaten über Top-Keywords (+ optional Unterkategorie-Bestseller) → Eignungs-Filter (Rating/Rezensionen/BSR als Proxys) → KI-Ähnlichkeits-Gate gegen Produkt-Wahrheit → begründete Vorschlags-Liste zum Bestätigen (D142) | 🔒 auf Hold (D144) | Keyword-Match statt Kategorie-Nachbarschaft; Datenweg ungeklärt — manueller Weg (Hand-ASINs + Helium 10) IST der Stand; erst wieder aufgreifen, wenn der Nutzer es aufruft |
 | Ehrliche Datenbasis (Amazon-Gesamtzahlen neben Stichprobe, Ausbeute je Lauf) | 🧪 | Keine Selbsttäuschung über die Datenlage |
+| Konfidenz-Einordnung in Worten an den Insight-Ausgaben („Basis: X von Y", Beleg-Stufe je Erkenntnis, deterministisch hergeleitet — keine Fassaden-Prozente) (D138) | 🧪 | Nachrechenbare Einordnung statt grüner Prozentzahlen; Herleitung steht in Daten & Formeln |
 | Findings-Dashboard: Pain Points, Kaufauslöser, Kundensprache, O-Töne | 🔶 | Crash behoben (D103) — erneuter Praxistest nötig |
+| Insight-Verdichtung: Roh-Themen → benannte Kaufgründe/Erkenntnisse in Klartext, nach Relevanz sortiert, mit Rückverweis auf Belege (D131) | 🧪 | Die Stufe zwischen Zählung und Content — Kaufgründe, die man Kunden und Grafikern vorlegen kann |
+| Zwei-Ebenen-Ausgabe: je Insight die zugeordneten Roh-Aspekte mit Zählwerten aufklappbar; gegensätzliche Aspekte → EIN ausgewogenes Insight; Dedup-Gate gegen Wiederholungen (D137) | 🧪 | Beleg-Kette sichtbar; Widersprüche werden Erwartungs-Management statt Schönfärberei |
+| Einheitliche Insight-Karte als Schema ALLER Erkenntnisse: Titel · Beschreibung · Relevanz/Häufigkeit · Datenquellen · Bild-Ideen · Beleg-Aspekte (D132, verschlankt per D140 — ohne Sentiment-Label & Journey-Phase) | 🧪 | Eine Struktur, eine Render-Komponente; Briefs & Generierung konsumieren jede Erkenntnis gleich |
+| Datenquellen-Ausweis je Erkenntnis — Quellen-Tags werden durch die Pipeline MITGEFÜHRT, Erkenntnis ohne Quelle fliegt raus (D133) | 🧪 | Jede Erkenntnis prüfbar (welche Reviews/Sektionen sagen das?); Wahrheits-Filter gegen KI-Erfindungen |
+| Mehrstufige Insight-Pipeline in Etappen: je Schritt ein Request, Zwischenstände gespeichert, Fortschritt sichtbar, Etappen einzeln nachholbar (D136) | 🧪 | Qualität vor Tempo — Gesamtlaufzeit von Minuten ist ok; 300 s gelten je Etappe, nie als Qualitäts-Budget der Analyse |
+| Analyse-Trichter am Kopf der Insight-Ausgabe: X Reviews → Y Roh-Aspekte → Z Insights (D139) | 🧪 | Macht das Verdichtungs-Prinzip selbsterklärend; Zahlen existieren schon, reine Darstellung |
+| Etappen-Protokoll des ganzen Analyse-Laufs: je Etappe zählbarer Output (Features · Reviews · Wettbewerber · Driver/Blocker) + Kern-These der Reasoning-Stufe in einem Satz (D143) | 🧪 | Der Langlauf (D136) wird erlebbar statt Blackbox-Wartezeit; Referenz-Workflow ist Untermenge — unsere Extra-Stufen bleiben |
 | Erkenntnisse fließen automatisch in Content + Briefs (NIE als Spec-Quelle) | 🧪 | Kein Übertragen von Hand; Reviews liefern Sprache, nie technische Daten |
 | Review-Bezug: bleibt Scraping | ✅ entschieden | Amazons APIs liefern keine Review-Texte (E1, 20.07.) |
 
@@ -129,6 +140,8 @@ Content-Sprache ist je Produkt/Auftrag wählbar — unabhängig vom Marktplatz. 
 | Tiefen-Audit (8 Dimensionen) | 🧪 | Vollbild des Listings → priorisierte Baustellen |
 | Regel-Messung des WIRKSAMEN Stands (freigegeben sonst Original, je Sektion ausgewiesen) | 🧪 | Gemessen wird, was auf Amazon live gehen kann (D110) |
 | Kundenstimmen-Abgleich (Themen-Abgleich, komposita-bewusst) | 🧪 | Adressieren die Bullets die Top-Pain-Points? (D117 repariert) |
+| Insight-Schema auch für Audit-Ausgaben: Stärken/Schwächen, Maßnahmen, Kauf-Verhinderer als Insight-Karten (D135) | 🧪 | Ein Erkenntnis-Format über alle Analyse-Dimensionen statt sieben Ausgabeformate |
+| Feature-Relevanz-Ranking: Listing-Features (Titel/Bullets/Attribute/Wichtige Infos/A+) nach Kunden-Relevanz sortiert; hoch relevant + bei Wettbewerbern unbeleuchtet = echter USP (D146, braucht D145) | 🧪 | Beantwortet datenbasiert, welches Feature in Bildern/A+ zuerst gezeigt wird — Umkehrung des Kundenstimmen-Abgleichs |
 | Druck-Layout | 🧪 | Kundentaugliche Aufbereitung |
 | Bild-Audit (automatische visuelle Prüfung) | ⬜ | Hauptbild = größter CRO-Hebel |
 | Echter Listing-Score (Engine statt Handeingabe) | ⬜ | Vergleichbarkeit über Produkte und Zeit |
@@ -138,6 +151,7 @@ Content-Sprache ist je Produkt/Auftrag wählbar — unabhängig vom Marktplatz. 
 | Feature | Status | Handlung/Nutzen |
 |---|---|---|
 | Bild-Briefs (Vorgaben für Grafiker aus Daten) | 🧪 | Grafiker bekommt Fakten statt Bauchgefühl |
+| Bild-Ideen je Erkenntnis: Insight-Karten liefern 2–3 visuelle Umsetzungsideen, Briefs zitieren Erkenntnis + Idee (D134) | 🧪 | Direkter Weg Kaufgrund → Bild; Ideen unterliegen denselben Wahrheits-Regeln wie Text (keine erfundenen Testimonials/Siegel) |
 | A+-Briefs Basic & Premium (nach Design-Guide: Maße, Module, Text nur im Bild, Desktop-only) | 🧪 | Design-Auftrag nach den echten Agentur-Regeln (D113) |
 
 ### Menüpunkt: Tool-Einstellungen (`/einstellungen` + Daten & Formeln)

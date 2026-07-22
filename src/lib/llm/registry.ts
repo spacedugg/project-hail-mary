@@ -129,6 +129,11 @@ export const RECIPE_MODELS: Record<string, { provider: string; model: string }> 
   "listing.highlights": { provider: "anthropic", model: "claude-sonnet-5" },
   "listing.qa": { provider: "anthropic", model: "claude-sonnet-5" },
   "reviews.pain-points": { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
+  // Verdichtung (D131): Abstraktion + ausgewogene Bündelung ist die schwerste
+  // Stufe der Review-Strecke — Sonnet statt Haiku (Qualität vor Tempo, D136).
+  "reviews.verdichtung": { provider: "anthropic", model: "claude-sonnet-5" },
+  // Feature-Ranking (D146): Extraktion + Verbatim-Belege + Aspekt-Zuordnung
+  "listing.feature-ranking": { provider: "anthropic", model: "claude-sonnet-5" },
   "listing.deep-audit": { provider: "anthropic", model: "claude-sonnet-5" },
   "listing.scrape": { provider: "anthropic", model: "claude-sonnet-5" },
   "keywords.filter": { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
