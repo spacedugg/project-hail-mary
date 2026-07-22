@@ -7,6 +7,7 @@ import { getDb, schema } from "@/db/client";
 import { generateSection, type ListingSection, type RecipeInputs } from "@/lib/recipes/listing";
 import type { ContentSprache, Marketplace, ProductFacts } from "@/db/schema";
 import { amazonDomain, erkenneSprache, marktplatzFuerSprache, marktplatzSprache, SPRACH_NAMEN } from "@/lib/text/sprache";
+import { contentMarkenKontext } from "@/lib/text/marken";
 
 const id = () => crypto.randomUUID();
 const slugify = (s: string) =>
@@ -403,6 +404,8 @@ function fremdmarkenAusKeywords(kws: Array<{ ausschlussGrund: string | null }>):
   ];
 }
 
+// Marken-Kontext für Content (D149): siehe src/lib/text/marken.ts
+
 /**
  * Keywords in Tiering-Reihenfolge (D97): sortiert nach demselben Score wie
  * die Tier-Vergabe (SV × Cluster-Relevanzgewicht, src/lib/sov/tiering.ts) —
@@ -470,8 +473,12 @@ export async function generateContent(formData: FormData) {
   });
   const latest = (t: string) => versions.find((v) => v.type === t)?.payload as Record<string, unknown> | undefined;
 
+  // Marken-Kontext (D149): Werkbank-Name nie als Marke, Eigenmarke nie auf der Blacklist
+  const mk = contentMarkenKontext(brand ?? undefined, snapshot?.title, fremdmarkenAusKeywords(alleKws));
+
   const inputs: RecipeInputs = {
-    brand: brand?.name ?? "",
+    brand: mk.marke,
+    eigenmarkeAusListing: mk.eigenmarkeAusListing,
     productName: product.name,
     marketplace: product.marketplace,
     facts: product.facts,
@@ -487,7 +494,7 @@ export async function generateContent(formData: FormData) {
       title: latest("title")?.text as string | undefined,
       bullets: latest("bullets")?.items as string[] | undefined,
     },
-    competitorBrands: fremdmarkenAusKeywords(alleKws),
+    competitorBrands: mk.fremdmarken,
     listingIst: snapshot ? { title: snapshot.title, bullets: snapshot.bullets } : null,
     zusatzKontext: product.zusatzKontext,
     sprache: product.contentSprache,
@@ -1511,11 +1518,12 @@ export async function saveContentManual(formData: FormData) {
     orderBy: desc(schema.listingSnapshots.createdAt),
   });
   const latest = (t: string) => versions.find((v) => v.type === t)?.payload as Record<string, unknown> | undefined;
+  const manuBrand = await db.query.brands.findFirst({ where: eq(schema.brands.id, product.brandId) });
   const ctx = {
     facts: product.facts,
     primaryKeywords: kws.filter((k) => k.tier === "primary").map((k) => k.keyword),
-    // Auch Handarbeit läuft gegen die Fremdmarken-Blacklist (D97)
-    competitorBrands: fremdmarkenAusKeywords(alleKws),
+    // Auch Handarbeit läuft gegen die Fremdmarken-Blacklist (D97) — Marken-Kontext D149
+    competitorBrands: contentMarkenKontext(manuBrand ?? undefined, manuSnapshot?.title, fremdmarkenAusKeywords(alleKws)).fremdmarken,
     // … und gegen den Zahlen-Herkunfts-Check (D114) — gleiche Quellen wie die Generierung
     zahlenQuellen: [
       product.name,
