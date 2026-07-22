@@ -71,7 +71,7 @@ export const FEHLER_CODES: Record<string, FehlerInfo> = {
   "GEN-04": {
     titel: "Keyword-Sprache passt nicht zur Content-Sprache",
     bedeutung: "Die Keyword-Basis ist erkennbar in einer anderen Sprache als die eingestellte Content-Sprache dieses Produkts. Lokalisierter Content braucht Keywords vom Ziel-Marktplatz — Übersetzen reicht nicht, weil das Suchverhalten je Land anders ist.",
-    loesung: "Entweder die Content-Sprache des Produkts umstellen (Kopfzeile der Produktseite) — oder eine Keyword-Analyse (Cerebro) vom Ziel-Marktplatz hochladen und die alte Basis löschen.",
+    loesung: "Eine Keyword-Analyse (Cerebro) vom Ziel-Marktplatz hochladen und die alte Basis löschen. Marktplatz und Content-Sprache sind beim Produkt fest (werden beim Anlegen bestimmt) — für einen anderen Marktplatz das Produkt neu anlegen.",
   },
   "IMP-01": {
     titel: "Listing-Import fehlgeschlagen",

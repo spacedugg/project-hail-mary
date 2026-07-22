@@ -111,16 +111,17 @@ export async function deleteProductAction(formData: FormData) {
 }
 
 /** Marktplatz & Content-Sprache je Produkt (D128) — Sprache unabhängig vom Marktplatz wählbar. */
-export async function saveMarktSprache(formData: FormData) {
+/**
+ * Marktplatz + Content-Sprache sind nach dem Anlegen FEST (D169, Nutzer-
+ * Vorgabe 22.07.) — änderbar ist nur noch die Marke, und die speichert
+ * automatisch beim Verlassen des Felds (kein Speichern-Knopf).
+ */
+export async function saveMarke(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
-  const MARKETPLACES: Marketplace[] = ["de", "uk", "us", "fr", "it", "es", "nl"];
-  const SPRACHEN: ContentSprache[] = ["de", "en", "fr", "it", "es"];
-  const mp = String(formData.get("marketplace") ?? "") as Marketplace;
-  const sprache = String(formData.get("contentSprache") ?? "") as ContentSprache;
-  if (!productId || !MARKETPLACES.includes(mp) || !SPRACHEN.includes(sprache)) return;
   const marke = String(formData.get("marke") ?? "").trim();
+  if (!productId || !marke) return;
   const db = await getDb();
-  await db.update(schema.products).set({ marketplace: mp, contentSprache: sprache, ...(marke ? { marke } : {}) }).where(eq(schema.products.id, productId));
+  await db.update(schema.products).set({ marke }).where(eq(schema.products.id, productId));
   revalidatePath(`/produkte/${productId}`);
 }
 

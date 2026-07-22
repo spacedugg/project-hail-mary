@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { saveKeywords, deriveKeywordsFromSov, generateContent, generateContentBatch, deleteProductAction, uploadCerebro, scrapeReviewsAction, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarktSprache, findeBlockerAction } from "@/app/actions";
+import { saveKeywords, deriveKeywordsFromSov, generateContent, generateContentBatch, deleteProductAction, uploadCerebro, scrapeReviewsAction, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarke, findeBlockerAction } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
@@ -10,6 +10,8 @@ import { AsinChips } from "@/components/asin-chips";
 import { AussortierteKeywords } from "@/components/aussortierte-keywords";
 import { FehlerPopup } from "@/components/fehler-popup";
 import { LoeschButton } from "@/components/loesch-button";
+import { MarkeFeld } from "@/components/marke-feld";
+import { amazonDomain, SPRACH_NAMEN } from "@/lib/text/sprache";
 import { GenerierSperre, GenerierButton } from "@/components/generier-sperre";
 import { BewertungsDashboard } from "@/components/bewertungs-dashboard";
 import { InsightKarte } from "@/components/insight-karte";
@@ -151,40 +153,21 @@ export default async function ProductPage({
                 {snapshot?.title && snapshot.title !== product.name && (
                   <p className="mt-0.5 line-clamp-2 text-xs text-muted">{snapshot.title}</p>
                 )}
+                {/* Marktplatz + Content-Sprache sind nach dem Anlegen fest (D169) — hier nur Anzeige */}
                 <p className="mt-1 text-xs text-muted">
-                  {product.asin && <span className="font-mono">{product.asin}</span>}
-                  {stand && <>{product.asin ? " · " : ""}Stand {stand.toLocaleDateString("de-DE")}</>}
+                  {product.asin && <span className="font-mono">{product.asin} · </span>}
+                  amazon.{amazonDomain(product.marketplace)} · {SPRACH_NAMEN[product.contentSprache]}
+                  {stand && <> · Stand {stand.toLocaleDateString("de-DE")}</>}
                 </p>
-                <form action={saveMarktSprache} className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                  <input type="hidden" name="productId" value={product.id} />
-                  <label className="text-muted">Marke</label>
-                  <input name="marke" defaultValue={product.marke ?? ""} placeholder="Pflicht für Content" required className="input w-36 text-xs" />
-                  <label className="text-muted">Marktplatz</label>
-                  <select name="marketplace" defaultValue={product.marketplace} className="input w-32 text-xs">
-                    <option value="de">amazon.de</option>
-                    <option value="uk">amazon.co.uk</option>
-                    <option value="us">amazon.com</option>
-                    <option value="fr">amazon.fr</option>
-                    <option value="it">amazon.it</option>
-                    <option value="es">amazon.es</option>
-                    <option value="nl">amazon.nl</option>
-                  </select>
-                  <label className="text-muted">Content-Sprache</label>
-                  <select name="contentSprache" defaultValue={product.contentSprache} className="input w-32 text-xs">
-                    <option value="de">Deutsch</option>
-                    <option value="en">Englisch</option>
-                    <option value="fr">Französisch</option>
-                    <option value="it">Italienisch</option>
-                    <option value="es">Spanisch</option>
-                  </select>
-                  <SubmitButton className="btn-ghost text-xs">Speichern</SubmitButton>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <MarkeFeld action={saveMarke} productId={product.id} wert={product.marke ?? ""} />
                   <LoeschButton
                     action={deleteProductAction}
                     felder={{ productId: product.id }}
                     frage={`„${product.name}" mit allen Daten (Keywords, Scrapes, Analysen, Content) endgültig löschen?`}
                     title="Produkt löschen"
                   />
-                </form>
+                </div>
               </div>
               {reviewsAnalysiert !== null && reviewsAnalysiert > 0 && (
                 <div className="flex-none rounded-xl bg-background px-4 py-2 text-center">
