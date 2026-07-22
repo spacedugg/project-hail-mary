@@ -95,7 +95,6 @@ export default async function ProductPage({
     orderBy: desc(schema.listingSnapshots.createdAt),
   });
   const latestOf = (t: string) => versions.find((v) => v.type === t);
-  const f = product.facts;
   const input = "input-base";
   const mc = product.marginCalc ?? null;
   const mi = mc?.inputs;
@@ -105,7 +104,6 @@ export default async function ProductPage({
 
   const parentBrand = await db.query.brands.findFirst({ where: eq(schema.brands.id, product.brandId) });
   const backHref = parentBrand?.kind === "workbench" ? "/optimizer" : `/marke/${product.brandId}/katalog`;
-  const hasFacts = Boolean(f.productType || f.dimensions || f.materials?.length || f.usps?.length || f.targetAudience || f.certifications?.length);
   // Der aktuelle Scrape ist analysiert (D79) → kein Analyse-Button mehr, nur Dashboard.
   // Altbestand ohne scrapeId: Analyse nach dem Scrape gilt als dessen Analyse.
   const scrapeAnalyzed = Boolean(
@@ -242,42 +240,6 @@ export default async function ProductPage({
           </details>
         </section>
 
-        {/* Produkt-Wahrheit — reine Anzeige, KEIN Formular (D77) */}
-        <section className="card p-5">
-          <CardHead
-            icon={<IconCheck />}
-            chip="chip-teal"
-            title="Produkt-Wahrheit — automatisch abgeleitet"
-            sub="Aus Listing-Import und Tiefen-Audit. Dient den Texten & Briefs als Fakten-Anker."
-          />
-          {hasFacts ? (
-            <div className="mt-4 grid gap-x-6 gap-y-3 text-xs sm:grid-cols-2">
-              {f.productType && <div><div className="text-[10px] uppercase tracking-wide text-neutral-400">Produkttyp</div><div className="mt-0.5">{f.productType}</div></div>}
-              {f.dimensions && <div><div className="text-[10px] uppercase tracking-wide text-neutral-400">Maße / Menge</div><div className="mt-0.5">{f.dimensions}</div></div>}
-              {(f.materials?.length ?? 0) > 0 && (
-                <div className="sm:col-span-2">
-                  <div className="text-[10px] uppercase tracking-wide text-neutral-400">Materialien</div>
-                  <div className="mt-1 flex flex-wrap gap-1">{f.materials!.map((m, i) => <span key={i} className="tag">{m}</span>)}</div>
-                </div>
-              )}
-              {(f.usps?.length ?? 0) > 0 && (
-                <div className="sm:col-span-2">
-                  <div className="text-[10px] uppercase tracking-wide text-neutral-400">USPs (hergeleitet)</div>
-                  <ul className="mt-1 space-y-0.5">{f.usps!.map((u, i) => <li key={i}>✓ {u}</li>)}</ul>
-                </div>
-              )}
-              {f.targetAudience && <div className="sm:col-span-2"><div className="text-[10px] uppercase tracking-wide text-neutral-400">Zielgruppe (aus Reviews)</div><div className="mt-0.5">{f.targetAudience}</div></div>}
-              {(f.certifications?.length ?? 0) > 0 && (
-                <div className="sm:col-span-2">
-                  <div className="text-[10px] uppercase tracking-wide text-neutral-400">Zertifikate</div>
-                  <div className="mt-1 flex flex-wrap gap-1">{f.certifications!.map((c, i) => <span key={i} className="tag">{c}</span>)}</div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="mt-3 text-xs text-muted">Noch nichts abgeleitet — Listing laden, Bewertungs-Analyse fahren, Tiefen-Audit starten. Alles füllt sich von selbst.</p>
-          )}
-        </section>
 
         {/* Keyword-Basis (D89): EIN Upload — Cerebro-Export → Keywords immer, SOV wenn Wettbewerber drin */}
         <section className="card p-5">
