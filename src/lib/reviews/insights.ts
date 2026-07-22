@@ -53,13 +53,50 @@ export function normalisiereInsights(raw: unknown): Kern {
   };
 }
 
+/** Insight-Karten (D131/D132) beim LESEN absichern — validiert geschrieben, trotzdem render-sicher. */
+function karten(v: unknown): ReviewInsightsPayload["insightCards"] {
+  if (!Array.isArray(v)) return undefined;
+  const out = v
+    .map((x) => {
+      const c = (x ?? {}) as Record<string, unknown>;
+      const titel = String(c.titel ?? "").trim();
+      const beschreibung = String(c.beschreibung ?? "").trim();
+      if (!titel) return null;
+      const beleg = arr(c.belegAspekte)
+        .map((b) => {
+          const a = (b ?? {}) as Record<string, unknown>;
+          const label = String(a.label ?? "").trim();
+          if (!label) return null;
+          const typ = a.typ === "painPoint" ? ("painPoint" as const) : ("buyingTrigger" as const);
+          return { label, typ, mentionCount: num(a.mentionCount) };
+        })
+        .filter((b): b is NonNullable<typeof b> => b !== null);
+      const rel = num(c.relevanz);
+      return {
+        titel,
+        beschreibung,
+        relevanz: rel !== null ? Math.min(5, Math.max(1, Math.round(rel))) : 3,
+        quellen: strings(c.quellen),
+        bildIdeen: strings(c.bildIdeen).slice(0, 3),
+        belegAspekte: beleg,
+      };
+    })
+    .filter((c): c is NonNullable<typeof c> => c !== null);
+  return out.length ? out : undefined;
+}
+
 /** Kompletter Lese-Schutz fürs Dashboard: auch sources/stats absichern. */
 export function normalisierePayload(raw: unknown): ReviewInsightsPayload {
   const o = (raw ?? {}) as Record<string, unknown>;
   const stats = (o.stats ?? {}) as Record<string, unknown>;
+  const kernThese = String(o.kernThese ?? "").trim();
   return {
     sources: strings(o.sources),
     stats: { reviewsTotal: num(stats.reviewsTotal) ?? 0, ratingAvg: num(stats.ratingAvg) },
     ...normalisiereInsights(o),
+    // Verdichtungs-Felder (D131/D143) NICHT verlieren — Lese-Reparatur inklusive
+    insightCards: karten(o.insightCards),
+    kernThese: kernThese || null,
+    verworfeneKarten: num(o.verworfeneKarten) ?? undefined,
   };
 }

@@ -1,0 +1,186 @@
+import { generateForRecipe, resolveRecipe } from "@/lib/llm/registry";
+import { parseLlmJson } from "@/lib/llm/json";
+import type { BelegAspekt, InsightCard, ReviewInsightsPayload } from "@/db/schema";
+
+/**
+ * Insight-Verdichtung (D131/D132/D133/D137) — die zweite Stufe über den
+ * Roh-Themen: Aus gezählten Pain Points / Kaufauslösern werden benannte
+ * Erkenntnisse in Klartext („Stoppt Grasfressen & Sodbrennen schnell"),
+ * nach Relevanz sortiert. Regeln („LLM generiert, Code erzwingt"):
+ * - Jede Karte MUSS auf Roh-Aspekte zurückverweisen; Karten ohne gültigen
+ *   Beleg fliegen raus und werden GEZÄHLT ausgewiesen (D133, nie still).
+ * - Zählwerte der Beleg-Aspekte kommen aus der Roh-Analyse (Code), nie vom LLM.
+ * - Quellen-Tags setzt der AUFRUFER aus dem, was tatsächlich einfloss (D133).
+ * - Gegensätzliche Aspekte dürfen zu EINER ausgewogenen Karte gebündelt
+ *   werden (D137) — Erwartungs-Management statt Schönfärberei.
+ * - Dedup-Gate (D137): identische Titel oder identische Beleg-Mengen werden
+ *   zusammengelegt (Referenz-Tool zeigte dasselbe Insight dreifach).
+ */
+
+type RoheAspekte = Pick<ReviewInsightsPayload, "painPoints" | "buyingTriggers">;
+
+export type VerdichtungsErgebnis = {
+  cards: InsightCard[];
+  kernThese: string | null;
+  verworfen: number;
+};
+
+const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, "").replace(/\s+/g, " ").trim();
+
+/** Aspekt-Referenz des LLM gegen die ECHTEN Roh-Themen auflösen (wortgleich oder enthalten). */
+function findeAspekt(ref: string, aspekte: RoheAspekte): BelegAspekt | null {
+  const n = norm(ref);
+  if (!n) return null;
+  const suche = (
+    liste: RoheAspekte["painPoints"],
+    typ: BelegAspekt["typ"],
+  ): BelegAspekt | null => {
+    const exakt = liste.find((a) => norm(a.label) === n);
+    const enthalten = exakt ?? liste.find((a) => norm(a.label).includes(n) || n.includes(norm(a.label)));
+    return enthalten ? { label: enthalten.label, typ, mentionCount: enthalten.mentionCount } : null;
+  };
+  return suche(aspekte.buyingTriggers, "buyingTrigger") ?? suche(aspekte.painPoints, "painPoint");
+}
+
+/**
+ * Struktur ERZWINGEN (D103-Muster): LLM-Antwort → validierte Karten.
+ * `quellen` wird hier auf jede Karte gestempelt — deterministisch vom Aufrufer.
+ */
+export function normalisiereInsightCards(
+  raw: unknown,
+  aspekte: RoheAspekte,
+  quellen: string[],
+): { cards: InsightCard[]; verworfen: number } {
+  const o = (raw ?? {}) as Record<string, unknown>;
+  const liste = Array.isArray(o.insights) ? o.insights : [];
+  let verworfen = 0;
+
+  const cards: InsightCard[] = [];
+  for (const x of liste) {
+    const c = (x ?? {}) as Record<string, unknown>;
+    const titel = String(c.titel ?? c.title ?? "").trim();
+    const beschreibung = String(c.beschreibung ?? c.description ?? "").trim();
+    if (!titel || !beschreibung) {
+      verworfen++;
+      continue;
+    }
+    const refs = Array.isArray(c.belegAspekte) ? c.belegAspekte : [];
+    const beleg: BelegAspekt[] = [];
+    for (const r of refs) {
+      const a = findeAspekt(String(r ?? ""), aspekte);
+      // Nur echte Roh-Themen zählen als Beleg; Duplikate (gleiches Label) nicht doppelt
+      if (a && !beleg.some((b) => b.label === a.label && b.typ === a.typ)) beleg.push(a);
+    }
+    if (beleg.length === 0) {
+      // Erkenntnis ohne zuordenbare Quelle fliegt raus (D133) — gezählt, nie still
+      verworfen++;
+      continue;
+    }
+    const rel = Number(c.relevanz ?? c.relevance);
+    const relevanz = Number.isFinite(rel) ? Math.min(5, Math.max(1, Math.round(rel))) : 3;
+    const bildIdeen = (Array.isArray(c.bildIdeen) ? c.bildIdeen : [])
+      .map((s) => String(s ?? "").trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    cards.push({ titel: titel.slice(0, 120), beschreibung: beschreibung.slice(0, 800), relevanz, quellen, bildIdeen, belegAspekte: beleg });
+  }
+
+  // Dedup-Gate (D137): gleicher Titel ODER identische Beleg-Menge → zusammenlegen
+  const dedup: InsightCard[] = [];
+  for (const card of cards) {
+    const belegKey = card.belegAspekte.map((b) => `${b.typ}:${norm(b.label)}`).sort().join("|");
+    const doppelt = dedup.find(
+      (d) =>
+        norm(d.titel) === norm(card.titel) ||
+        d.belegAspekte.map((b) => `${b.typ}:${norm(b.label)}`).sort().join("|") === belegKey,
+    );
+    if (doppelt) {
+      // Die stärkere Karte gewinnt; Bild-Ideen werden gemerged (max. 3)
+      if (card.relevanz > doppelt.relevanz) {
+        doppelt.titel = card.titel;
+        doppelt.beschreibung = card.beschreibung;
+        doppelt.relevanz = card.relevanz;
+      }
+      doppelt.bildIdeen = [...new Set([...doppelt.bildIdeen, ...card.bildIdeen])].slice(0, 3);
+      verworfen++;
+      continue;
+    }
+    dedup.push(card);
+  }
+
+  const erwaehnungen = (c: InsightCard) => c.belegAspekte.reduce((s, b) => s + (b.mentionCount ?? 0), 0);
+  dedup.sort((a, b) => b.relevanz - a.relevanz || erwaehnungen(b) - erwaehnungen(a));
+  return { cards: dedup.slice(0, 10), verworfen };
+}
+
+const SYSTEM =
+  "Du verdichtest ausgezählte Themen aus Amazon-Kundenrezensionen zu benannten Kauf-Erkenntnissen für die Listing-Optimierung. " +
+  "Antworte AUSSCHLIESSLICH mit validem JSON nach dem geforderten Schema.";
+
+function prompt(aspekte: RoheAspekte, sprache: string): string {
+  const fmt = (liste: RoheAspekte["painPoints"], typ: string) =>
+    liste
+      .map((a) => `- [${typ}] "${a.label}" (${a.mentionCount ?? "?"}× erwähnt)${a.quotes.length ? ` — O-Töne: ${a.quotes.slice(0, 2).map((q) => `„${q.slice(0, 120)}"`).join(" / ")}` : ""}`)
+      .join("\n");
+  return `ROH-THEMEN AUS DER REVIEW-ANALYSE (bereits ausgezählt):
+${fmt(aspekte.buyingTriggers, "Kaufauslöser") || "(keine Kaufauslöser)"}
+${fmt(aspekte.painPoints, "Pain Point") || "(keine Pain Points)"}
+
+AUFGABE: Verdichte diese Roh-Themen zu 4–8 benannten Erkenntnissen (Insight-Karten) in Sprache "${sprache}".
+REGELN:
+1. Der Titel ist ein prägnanter Kaufgrund/Befund in Klartext (max. 8 Wörter) — KEIN wörtliches Kundenzitat, sondern die Abstraktion dahinter (Beispiel-Muster: "Stoppt Grasfressen & Sodbrennen schnell").
+2. Die Beschreibung (2–4 Sätze) erklärt nutzenorientiert, was dahintersteckt und warum es Kaufentscheidungen beeinflusst.
+3. GEGENSÄTZLICHE Roh-Themen zum selben Aspekt (z. B. "wirkt gut" 27× + "wirkt nicht" 6×) werden zu EINER ausgewogenen Erkenntnis gebündelt — ehrliches Erwartungs-Management, keine Schönfärberei und kein Verschweigen der Gegenseite.
+4. relevanz: 1–5 (5 = kaufentscheidend), nach Gewicht der Erwähnungen UND strategischer Bedeutung.
+5. belegAspekte: die WORTGLEICHEN Labels der Roh-Themen oben, auf denen die Erkenntnis beruht (mindestens 1) — nichts erfinden, keine neuen Labels.
+6. bildIdeen: 2–3 konkrete visuelle Umsetzungsideen fürs Listing (Galeriebild, Infografik, A+-Modul). VERBOTEN: erfundene Autoritäts-Belege (Experten-Zitate, Testimonials, Siegel, Zertifikate, Zahlen), die nicht in den Roh-Themen belegt sind.
+7. kernThese: EIN Satz, der die wichtigste Erkenntnis der gesamten Analyse zusammenfasst.
+
+JSON-Schema:
+{"kernThese":"...","insights":[{"titel":"...","beschreibung":"...","relevanz":N,"bildIdeen":["..."],"belegAspekte":["wortgleiches Label", "..."]}]}`;
+}
+
+export async function verdichteInsights(
+  payload: ReviewInsightsPayload,
+  opts: { quellen: string[]; sprache?: string },
+): Promise<VerdichtungsErgebnis> {
+  const aspekte: RoheAspekte = { painPoints: payload.painPoints, buyingTriggers: payload.buyingTriggers };
+  if (aspekte.painPoints.length === 0 && aspekte.buyingTriggers.length === 0) {
+    throw new Error("Verdichtung braucht Roh-Themen — die Review-Analyse (Etappe davor) hat keine geliefert.");
+  }
+
+  const { provider } = resolveRecipe("reviews.verdichtung");
+  if (provider.name === "mock") {
+    // Dev ohne Key: deterministische Karten aus den ECHTEN Top-Aspekten — kein erfundener Inhalt
+    const top = [
+      ...aspekte.buyingTriggers.slice(0, 1).map((a) => ({ a, typ: "buyingTrigger" as const })),
+      ...aspekte.painPoints.slice(0, 1).map((a) => ({ a, typ: "painPoint" as const })),
+    ];
+    return {
+      cards: top.map(({ a, typ }, i) => ({
+        titel: `Mock-Erkenntnis: ${a.label.slice(0, 90)}`,
+        beschreibung: `Mock-Verdichtung aus dem Roh-Thema „${a.label}" (${a.mentionCount ?? "?"}× erwähnt) — in Produktion steht hier die abstrahierte Erkenntnis.`,
+        relevanz: 5 - i,
+        quellen: opts.quellen,
+        bildIdeen: ["Mock-Bildidee: Galeriebild zum Thema"],
+        belegAspekte: [{ label: a.label, typ, mentionCount: a.mentionCount }],
+      })),
+      kernThese: "Mock-Kern-These — in Produktion fasst EIN Satz die Analyse zusammen.",
+      verworfen: 0,
+    };
+  }
+
+  const res = await generateForRecipe("reviews.verdichtung", {
+    system: SYSTEM,
+    messages: [{ role: "user", content: prompt(aspekte, opts.sprache ?? "de") }],
+    maxTokens: 6000,
+    temperature: 0,
+  });
+  const raw = parseLlmJson<Record<string, unknown>>(res.text);
+  const { cards, verworfen } = normalisiereInsightCards(raw, aspekte, opts.quellen);
+  if (cards.length === 0) {
+    throw new Error("Die Verdichtung lieferte keine belegbare Erkenntnis (alle Karten ohne gültigen Roh-Themen-Beleg) — bitte erneut starten.");
+  }
+  const kernThese = String((raw as { kernThese?: unknown }).kernThese ?? "").trim() || null;
+  return { cards, kernThese, verworfen };
+}

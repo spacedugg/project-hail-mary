@@ -307,6 +307,40 @@ export type ReviewInsightsPayload = {
   }>;
   languageToBorrow: string[];
   languageToAvoid: string[];
+  /**
+   * Verdichtungs-Etappe (D131/D132): benannte Erkenntnisse ÜBER den Roh-Themen.
+   * Optional, weil sie als eigene, nachholbare Etappe NACH der Roh-Analyse
+   * läuft (D136) — fehlt sie, zeigt das UI ehrlich „Verdichtung steht aus".
+   */
+  insightCards?: InsightCard[];
+  /** Kern-These der Analyse in EINEM Satz (D143, „Reasoning over the data"). */
+  kernThese?: string | null;
+  /** Von der Normalisierung verworfene Karten (ohne gültigen Beleg) — ausgewiesen statt still (D133). */
+  verworfeneKarten?: number;
+};
+
+/** Beleg-Aspekt einer Insight-Karte (D137): Rückverweis auf ein Roh-Thema MIT Zählwert — vom Code gesetzt, nie vom LLM behauptet. */
+export type BelegAspekt = {
+  label: string;
+  typ: "painPoint" | "buyingTrigger";
+  mentionCount: number | null;
+};
+
+/**
+ * Einheitliche Insight-Karte (D132, verschlankt per D140 — bewusst OHNE
+ * Sentiment-Label und Journey-Phase): das Schema ALLER verdichteten
+ * Analyse-Erkenntnisse. `quellen` trägt die Datenquellen-Tags (D133) —
+ * deterministisch aus der Pipeline mitgeführt, nie von der KI behauptet.
+ */
+export type InsightCard = {
+  titel: string;
+  beschreibung: string;
+  /** 1–5, Liste absteigend sortiert (D132). */
+  relevanz: number;
+  quellen: string[];
+  /** 2–3 visuelle Umsetzungsideen (D134) — unterliegen den Wahrheits-Regeln. */
+  bildIdeen: string[];
+  belegAspekte: BelegAspekt[];
 };
 
 /** Hochgeladene Berichte, getaggt mit Marke·Land·Periode (geführter Upload). */
