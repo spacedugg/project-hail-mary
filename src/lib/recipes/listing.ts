@@ -26,6 +26,13 @@ export const SECTION_ORDER: ListingSection[] = ["title", "bullets", "highlights"
 
 export type RecipeInputs = {
   brand: string;
+  /**
+   * Erstes Wort des Original-Listing-Titels (D149) — auf Amazon fast immer
+   * die Produktmarke. Wird bei leerem `brand` (Werkbank-Auftrag) als
+   * belegter Marken-Kandidat in den Prompt gegeben, statt dass das Modell
+   * eine Marke erfindet oder einen Werkzeug-Namen verwendet.
+   */
+  eigenmarkeAusListing?: string;
   productName: string;
   marketplace: string; // "de"
   facts: ProductFacts;
@@ -73,8 +80,16 @@ const VOICE_DEFAULT =
 function contextBlock(inputs: RecipeInputs): string {
   const f = inputs.facts;
   const ri = inputs.reviewInsights;
+  // MARKE (D149): Ein leerer Marken-Slot heißt Werkbank-Auftrag — dann ist
+  // die einzige belegte Marken-Quelle das Original-Listing. NIEMALS darf ein
+  // Werkzeug-/Container-Name („Listing Optimizer") als Marke auftauchen.
+  const markeZeile = inputs.brand
+    ? `MARKE: ${inputs.brand}`
+    : inputs.eigenmarkeAusListing
+      ? `MARKE: „${inputs.eigenmarkeAusListing}" (aus dem Original-Listing übernommen — wortwörtlich verwenden, KEINE andere Marke erfinden)`
+      : "MARKE: unbekannt — der Titel beginnt mit dem PRODUKTTYP. KEINE Marke erfinden, keinen Projekt- oder Werkzeug-Namen verwenden.";
   const lines: string[] = [
-    `MARKE: ${inputs.brand}`,
+    markeZeile,
     `PRODUKT: ${inputs.productName}`,
     `MARKTPLATZ: amazon.${inputs.marketplace}`,
     // Zielsprache (D128): lokalisieren, nicht übersetzen — bei Deutsch kein Extra-Block nötig.
@@ -106,6 +121,11 @@ function contextBlock(inputs: RecipeInputs): string {
   // aber der Prompt soll sie gar nicht erst entstehen lassen.
   lines.push(
     "FAKTEN-SPERRE (WICHTIGSTE REGEL): Jede Zahl, jedes Material, jede Norm und jeder Messwert im Text MUSS wörtlich aus den Angaben dieses Prompts stammen (Produkt-Wahrheit, Listing-IST, Zusatz-Infos, Keywords). Fehlt eine Angabe (z. B. Material, Farbtemperatur, Schutzklasse): WEGLASSEN — niemals schätzen, ableiten oder erfinden. NIEMALS Tests, Prüfungen oder Belege behaupten, die nicht in den Angaben stehen (kein ‚interne Falltests belegen', kein ‚geprüft nach…'). Kundenstimmen liefern Sprache, Prioritäten und Einwände — NIEMALS technische Daten (sie können sich auf andere Produkte beziehen).",
+  );
+  // Bezeichnungs-Treue (D149, Nutzer-Befund: „Drops" wurde zu „Tropfen"):
+  // die etablierte Produktbezeichnung ist Such- und Wiedererkennungs-Anker.
+  lines.push(
+    "BEZEICHNUNGS-TREUE: Die Produktbezeichnung wortwörtlich aus dem Original-Listing und der Kundensprache übernehmen — NIE übersetzen, eindeutschen oder umbenennen (‚Drops' bleibt ‚Drops' und wird nicht zu ‚Tropfen'). Weicht der PRODUKTTYP im Prompt von der Bezeichnung im Original-Listing ab, gewinnt das Original-Listing.",
   );
   // Ohne Bewertungs-Analyse (D108, nur nach doppelter Bestätigung): ehrlich
   // benennen, worauf die Texte dann bauen — und Kundensprache NICHT erfinden.

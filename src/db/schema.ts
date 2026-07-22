@@ -346,6 +346,8 @@ export type ReviewInsightsPayload = {
   verworfeneKarten?: number;
   /** Vom Bild-Ideen-Wahrheitsfilter (D134) Aussortiertes — ausgewiesen, nie still. */
   entfernteBildIdeen?: Array<{ idee: string; grund: string }>;
+  /** Beleg-Prüfung der Roh-Analyse (D152): Verbatim-Gate, verworfene Aspekte, Sentiment-Hinweise. */
+  qualitaetsNotizen?: string[];
 };
 
 /** Beleg-Aspekt einer Insight-Karte (D137): Rückverweis auf ein Roh-Thema MIT Zählwert — vom Code gesetzt, nie vom LLM behauptet. */

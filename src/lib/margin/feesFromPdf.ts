@@ -130,7 +130,7 @@ export function validateExtractedFees(raw: RawExtract, current: FeeConfig): FeeE
 export async function extractFeeConfigFromPdf(pdfBase64: string, current: FeeConfig): Promise<FeeExtraction> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY fehlt — für die PDF-Extraktion nötig (kein Mock: falsche Gebühren wären gefährlich).");
-  const model = process.env.RECIPE_MODEL_FEES ?? "claude-sonnet-5";
+  const model = process.env.RECIPE_MODEL_FEES ?? "claude-opus-4-8";
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",

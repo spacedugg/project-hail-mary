@@ -77,7 +77,7 @@ export default async function BriefsPage({ params }: { params: Promise<{ id: str
     {
       key: "bilder",
       titel: "Listing-Bilder-Brief (7 Slots)",
-      hinweis: "Deterministisch aus Analyse + Produkt-Wahrheit — inkl. Reference-Fidelity-Lock und spelling-safe Headlines.",
+      hinweis: "Deterministisch aus der Analyse assembliert.",
       text: buildImageBrief({ brand: brandName, productName: displayName, asin: product.asin, facts: product.facts, snapshot, analysis, reviewInsights: insights?.payload ?? null }),
     },
     {
@@ -108,10 +108,7 @@ export default async function BriefsPage({ params }: { params: Promise<{ id: str
         <span className="text-sm text-muted">{product.name}{product.asin ? ` · ${product.asin}` : ""}</span>
       </div>
       <p className="page-sub">
-        Finale Konzepte für Designer & Bildgen-Tools — das Tool erstellt keine Bilder, es liefert die Grundlage:
-        Richtlinien, Spezifikationen, Brand- und Produktinformationen. Je vollständiger Produkt-Wahrheit, Keywords und
-        Review-Insights, desto konkreter die Briefs.
-      </p>
+        Finale Konzepte für Designer & Bildgen-Tools.</p>
 
       <div className="stagger mt-6 space-y-4">
         {briefs.map((b) => (

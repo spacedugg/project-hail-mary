@@ -239,9 +239,7 @@ export default async function AnalysePage({
         </div>
         {!deepAudit && (
           <p className="mt-1 text-xs text-muted">
-            Die KI-Bewertung leitet Zielgruppe, Positionierung und USPs aus echten Daten her (Listing + Kundenstimmen) und
-            liefert je Sektion einen Befund — alles auf DIESER Fläche, kein separater Layer.
-            Voraussetzung: Listing geladen <b>und</b> Bewertungs-Analyse gefahren.
+            KI-Bewertung aus Listing + Kundenstimmen. <b>und</b> Bewertungs-Analyse gefahren.
             {!insights && <> <span className="text-warn">△ Bewertungs-Analyse fehlt noch (Produktseite, Sektion 2c).</span></>}
           </p>
         )}
@@ -465,7 +463,7 @@ export default async function AnalysePage({
           </div>
         )}
         {deepAudit && (
-          <p className="mt-2 text-[11px] text-muted">Datenbasis: {deepAudit.dataBasis.join(" · ")} · KI-Befunde durch den Wahrheits-Filter geprüft (nachweislich falsche Behauptungen werden entfernt und ausgewiesen) · Bilder bewertet der Code, nie die KI.</p>
+          <p className="mt-2 text-[11px] text-muted">Datenbasis: {deepAudit.dataBasis.join(" · ")}</p>
         )}
       </section>
 
@@ -515,9 +513,7 @@ export default async function AnalysePage({
             </div>
           </>
         ) : (
-          <p className="mt-2 text-sm text-muted">
-            Noch kein Ranking. Braucht Listing-Import + Bewertungs-Analyse — dann zeigt es, welche Features in Bilder/A+ nach vorn gehören (Relevanz aus echtem Kunden-Echo, keine KI-Schätzung).
-          </p>
+          <p className="mt-2 text-sm text-muted">Noch kein Ranking — braucht Listing-Import + Bewertungs-Analyse.</p>
         )}
       </section>
 
@@ -546,9 +542,7 @@ export default async function AnalysePage({
       <section className="mt-8 print:hidden">
         <div className="card flex flex-wrap items-center justify-between gap-3 p-4">
           <p className="text-xs text-muted">
-            Text-Begründungen (warum jeder Baustein so formuliert ist) stehen im Optimizer direkt unter jeder Sektion.
-            Bild- und A+-Briefs zum Copy-Pasten liegen gesammelt unter Creative-Briefs.
-          </p>
+            Begründungen stehen im Optimizer, Briefs unter Creative-Briefs. </p>
           <div className="flex flex-none gap-2">
             <Link href={`/produkte/${id}`} className="btn-ghost text-xs">Zum Optimizer</Link>
             <Link href={`/produkte/${id}/briefs`} className="btn-ghost text-xs">Zu den Creative-Briefs →</Link>

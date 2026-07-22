@@ -95,6 +95,7 @@ export function normalisierePayload(raw: unknown): ReviewInsightsPayload {
     stats: { reviewsTotal: num(stats.reviewsTotal) ?? 0, ratingAvg: num(stats.ratingAvg) },
     ...normalisiereInsights(o),
     // Verdichtungs-Felder (D131/D143) NICHT verlieren — Lese-Reparatur inklusive
+    qualitaetsNotizen: strings(o.qualitaetsNotizen).length ? strings(o.qualitaetsNotizen) : undefined,
     insightCards: karten(o.insightCards),
     kernThese: kernThese || null,
     verworfeneKarten: num(o.verworfeneKarten) ?? undefined,

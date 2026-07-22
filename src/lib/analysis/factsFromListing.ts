@@ -40,13 +40,15 @@ export async function extractFactsFromListing(
   const res = await generateForRecipe("facts.extract", {
     system:
       "Du extrahierst Produkt-Fakten aus einem Amazon-Listing. NUR belegte Fakten aus dem Text — nichts erfinden, " +
-      "keine Werbesprache. Antworte NUR mit JSON.",
+      "keine Werbesprache. Begriffe WORTWÖRTLICH übernehmen — NIE übersetzen oder eindeutschen " +
+      "(steht im Listing ‚Drops', heißt es ‚Drops', nicht ‚Tropfen'; D149). Antworte NUR mit JSON.",
     messages: [
       {
         role: "user",
         content:
           `Listing-Text:\n${text}\n\n` +
-          'Extrahiere als JSON: {"productType": string (Gattungsbegriff, z. B. "Trinkflasche"), ' +
+          'Extrahiere als JSON: {"productType": string (Gattungsbegriff mit der WÖRTLICHEN Produktbezeichnung aus dem Listing, z. B. "Trinkflasche"; ' +
+          'bei fremdsprachigen Bezeichnungen die Original-Bezeichnung behalten), ' +
           '"dimensions": string (Maße/Menge/Volumen, wie im Text), ' +
           '"materials": string[] (ehrlich, inkl. Hybride), ' +
           '"usps": string[] (max. 5 konkrete, belegte Produktvorteile — keine Floskeln), ' +
