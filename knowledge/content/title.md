@@ -9,8 +9,8 @@
 | Regel | Wert | Quelle |
 |---|---|---|
 | Max. Länge | **75 Zeichen** (hart) | Amazon-Neuerung, Nutzer 07/2026 |
-| Ziel-Länge | **70–75 Zeichen** (unter 70 = Warnung „Budget nicht ausgenutzt") | Nutzer-Vorgabe 07/2026 |
-| Hauptkeyword | muss im Titel vorkommen (Fenster = ganzer Titel) | abgeleitet aus alter 80-Zeichen-Regel |
+| Ziel-Länge | **70–75 Zeichen PFLICHT** (unter 70 = FEHLER, erzwingt Regenerierung — verschenkter Platz; verschärft 23.07.2026, D190) | Nutzer-Vorgabe 07/2026 + 23.07. |
+| Hauptkeyword | muss im Titel **abgedeckt** sein — Wortstamm-Abdeckung, Flexion/Komposita zählen („Ulmenrinde-Drops für Hunde" deckt „ulmenrinde für hunde"); NIE als wörtliche Phrase erzwungen (D190: die Phrasen-Pflicht erzwang Stuffing) | abgeleitet aus alter 80-Zeichen-Regel, präzisiert 23.07. |
 | Keyword-Wiederholung | **Jedes Keyword max. 1×** | Blog 06 („Wiederholung bringt kein Ranking"). Überstimmt seo-os (erlaubte 2×) |
 | Begründungs-Pflicht | Jeder generierte Titel liefert eine **Komponenten-Begründung** mit: welcher Bestandteil woher kommt (Keyword-Analyse/SV, USP, Produkt-Wahrheit, Marke) | Nutzer-Vorgabe 07/2026 — „auf Knopfdruck sehen, warum der Titel so formuliert ist" |
 | Verboten | Werbephrasen („Bestseller", „Sale", „Angebot", „Top", „Nr. 1"), Emojis, dekorative Sonderzeichen, durchgängige Versalien-Wörter (außer Marke/Norm), Wettbewerber-Marken, Preis-/Versandangaben, unbelegte Superlative | Blog 06 + sales-room-Presets + Amazon-Styleguide |

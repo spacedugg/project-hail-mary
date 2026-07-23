@@ -79,14 +79,26 @@ describe("validateTitle", () => {
     const long = "AquaNova Edelstahl-Trinkflasche 750 ml, auslaufsicher, doppelwandig isoliert und robust";
     expect(validateTitle(long, ctx).map((i) => i.rule)).toContain("title.max-length");
   });
-  it("unter 70 Zeichen ist WARNUNG (Budget nicht ausgenutzt)", () => {
+  it("unter 70 Zeichen ist FEHLER (Pflichtband 70–75, Nutzer-Regel 23.07./D190)", () => {
     const short = "AquaNova Edelstahl-Trinkflasche 750 ml";
     const hits = validateTitle(short, ctx).filter((i) => i.rule === "title.budget");
     expect(hits).toHaveLength(1);
-    expect(hits[0].severity).toBe("warning");
+    expect(hits[0].severity).toBe("error");
   });
   it("fehlendes Hauptkeyword ist ERROR", () => {
     expect(validateTitle("AquaNova Flasche 750 ml, auslaufsicher, isoliert, BPA-frei, mattschwarz", ctx).map((i) => i.rule)).toContain("title.keyword-window");
+  });
+  it("Hauptkeyword zählt per WORTSTAMM-Abdeckung — Flexion/Komposita statt wörtlicher Phrase (D190)", () => {
+    // „Ulmenrinde-Drops für Hunde" deckt „ulmenrinde für hunde" — kein Fehler
+    const flektiert = validateTitle("Tierliebhaber Ulmenrinde-Drops für Hunde bei Sodbrennen, 350 g Dose ca", {
+      primaryKeywords: ["ulmenrinde für hunde"],
+    });
+    expect(flektiert.map((i) => i.rule)).not.toContain("title.keyword-window");
+    // fehlt ein Inhaltswort-Stamm (hunde), schlägt der Check an
+    const fehlt = validateTitle("Tierliebhaber Ulmenrinde-Drops bei Sodbrennen, 350 g in der Vorratsdose", {
+      primaryKeywords: ["ulmenrinde für hunde"],
+    });
+    expect(fehlt.map((i) => i.rule)).toContain("title.keyword-window");
   });
   it("erkennt Werbephrasen und Emojis", () => {
     expect(validateTitle("Bestseller Trinkflasche 🔥", ctx).map((i) => i.rule)).toEqual(

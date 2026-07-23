@@ -122,6 +122,28 @@ const FUNKTIONSWOERTER = new Set([
   "zu", "zum", "zur", "von", "vom", "aus", "nach", "über", "unter", "vor", "als", "wie",
 ]);
 
+/**
+ * Wortstamm-Abdeckung (D190): Alle Inhaltswort-Stämme des Keywords kommen im
+ * Text vor — Flexion und Komposita zählen. Amazon matcht Wortstämme; eine
+ * wörtliche Phrasen-Pflicht würde Keyword-Stuffing ERZWINGEN.
+ */
+export function keywordStammAbgedeckt(keyword: string, text: string): boolean {
+  const normText = text
+    .split(/[\s\-–—/,.]+/)
+    .map(normalizeToken)
+    .filter(Boolean)
+    .join(" ");
+  // Kompakt-Variante als Rückfallebene: deckt Kompositum-Keywords, die im
+  // Text getrennt/mit Bindestrich stehen (und umgekehrt).
+  const kompakt = normText.replace(/ /g, "");
+  return keyword
+    .split(/[\s\-–—/]+/)
+    .filter((w) => !FUNKTIONSWOERTER.has(w.toLowerCase()))
+    .map(normalizeToken)
+    .filter((s) => s.length >= 3)
+    .every((s) => normText.includes(s) || kompakt.includes(s));
+}
+
 export function pruefeKeywordEcho(text: string, keywords: string[], rulePrefix: string): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const lower = text.toLowerCase();
@@ -206,13 +228,18 @@ export function validateTitle(title: string, ctx: Ctx = {}): ValidationIssue[] {
   const chars = charLength(t);
   if (chars > RULES.title.maxChars)
     issues.push(issue("title.max-length", "error", `Titel ${chars} Zeichen > ${RULES.title.maxChars} (Amazon-Limit 07/2026).`));
+  // Pflichtband 70–75 (Nutzer-Regel 23.07., D190): unter 70 ist verschenkter
+  // Platz und damit FEHLER (erzwingt Regenerierung), nicht mehr nur Warnung.
   if (chars < RULES.title.targetMinChars && chars <= RULES.title.maxChars)
-    issues.push(issue("title.budget", "warning", `Titel nur ${chars} Zeichen — Ziel 70–75, Budget nicht ausgenutzt.`));
+    issues.push(issue("title.budget", "error", `Titel nur ${chars} Zeichen — Pflichtband ${RULES.title.targetMinChars}–${RULES.title.maxChars}: das Budget MUSS ausgenutzt werden (weiteres belegtes Attribut/Nutzen ergänzen).`));
 
-  // Hauptkeyword muss vorkommen (bei 75 Zeichen ist der ganze Titel das Fenster)
+  // Hauptkeyword muss ABGEDECKT sein (bei 75 Zeichen ist der ganze Titel das
+  // Fenster). Wortstamm-Abdeckung statt wörtlicher Phrase (D190): Amazon
+  // matcht Stämme — die alte includes()-Pflicht zwang das Modell, ungrammatische
+  // Suchphrasen einzukleben, und kollidierte mit sprache.keyword-natuerlich.
   const primary = ctx.primaryKeywords?.[0];
-  if (primary && !t.toLowerCase().includes(primary.toLowerCase()))
-    issues.push(issue("title.keyword-window", "error", `Hauptkeyword „${primary}" fehlt im Titel.`));
+  if (primary && !keywordStammAbgedeckt(primary, t))
+    issues.push(issue("title.keyword-window", "error", `Hauptkeyword „${primary}" ist im Titel nicht abgedeckt — jeder Wortstamm muss vorkommen (Flexion/Komposita zählen: „Ulmenrinde-Drops für Hunde" deckt „ulmenrinde für hunde").`));
 
   issues.push(...pruefeZahlenTreue(t, ctx.zahlenQuellen ?? "", "title"));
 
