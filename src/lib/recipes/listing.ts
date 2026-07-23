@@ -1,7 +1,8 @@
 import { generateForRecipe, resolveRecipe } from "@/lib/llm/registry";
 import { parseLlmJson } from "@/lib/llm/json";
 import { trimToBytesByWord, trimToBytesBySentence } from "@/lib/text/bytes";
-import { fixeWhitespace, fixeWhitespaceListe } from "@/lib/text/fixers";
+import { fixeWhitespace, fixeWhitespaceListe, fixeTitelLaenge } from "@/lib/text/fixers";
+import { keywordStammAbgedeckt } from "@/lib/validation/gate";
 import { pruefeKontrakt } from "@/lib/llm/contracts";
 import { regelnAlsPromptBlock } from "@/lib/validation/register";
 import { pruefeMitLlm } from "@/lib/validation/pruefer";
@@ -396,7 +397,15 @@ function baueErgebnis(
 ): SectionResult {
   switch (section) {
     case "title": {
-      const text = fixeWhitespace(String(parsed.title ?? ""));
+      // Längen-Fixer (D184/D192): Zeichen zählt und kürzt der CODE — ein zu
+      // langer Titel geht nie zurück ans LLM (das nicht zählen kann), sondern
+      // wird verlustarm von hinten gekürzt; Hauptkeyword-Abdeckung bleibt Pflicht.
+      const primary = inputs.keywords.primary[0];
+      const text = fixeTitelLaenge(fixeWhitespace(String(parsed.title ?? "")), {
+        max: RULES.title.maxChars,
+        min: RULES.title.targetMinChars,
+        istZulaessig: (s) => !primary || keywordStammAbgedeckt(primary, s),
+      });
       return { section, payload: { text, rationale: extractRationale(parsed, text) }, issues: validateTitle(text, ctx), raw, provider: providerName, model };
     }
     case "highlights": {
