@@ -34,8 +34,18 @@ function pruefeRationale(parsed: Record<string, unknown>, verstoesse: KontraktVe
  * Prüft das geparste LLM-JSON gegen den Sektions-Kontrakt.
  * Leeres Ergebnis = Kontrakt erfüllt. Jeder Eintrag ist eine präzise,
  * ans LLM zurückspielbare Abweisung.
+ *
+ * `rationaleOptional` (D200): In der zweiphasigen Generierung schreibt die
+ * COPY-Phase ohne Begründungs-Zwang (befreit die Prosa vom Selbst-Rechtfertigen);
+ * die Begründung liefert eine separate zweite Phase. Der FINALE, zusammengebaute
+ * Datensatz trägt weiterhin rationale — D183 bleibt erfüllt. Default false:
+ * die Kontrakt-Grenze des Endprodukts verlangt rationale wie bisher.
  */
-export function pruefeKontrakt(section: KontraktSektion, parsed: Record<string, unknown>): KontraktVerstoss[] {
+export function pruefeKontrakt(
+  section: KontraktSektion,
+  parsed: Record<string, unknown>,
+  opts: { rationaleOptional?: boolean } = {},
+): KontraktVerstoss[] {
   const verstoesse: KontraktVerstoss[] = [];
 
   switch (section) {
@@ -83,6 +93,17 @@ export function pruefeKontrakt(section: KontraktSektion, parsed: Record<string, 
     }
   }
 
+  if (!opts.rationaleOptional) pruefeRationale(parsed, verstoesse);
+  return verstoesse;
+}
+
+/**
+ * Kontrakt der Begründungs-Phase (D200/D183): die separat generierte rationale
+ * muss ein nicht-leeres Array aus {part, source} sein — an dieser Grenze
+ * abgewiesen, nie stillschweigend leer weitergereicht.
+ */
+export function pruefeRationaleKontrakt(parsed: Record<string, unknown>): KontraktVerstoss[] {
+  const verstoesse: KontraktVerstoss[] = [];
   pruefeRationale(parsed, verstoesse);
   return verstoesse;
 }
