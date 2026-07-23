@@ -1,6 +1,10 @@
 import { generateForRecipe, resolveRecipe } from "@/lib/llm/registry";
 import { parseLlmJson } from "@/lib/llm/json";
 import { trimToBytesByWord, trimToBytesBySentence } from "@/lib/text/bytes";
+import { fixeWhitespace, fixeWhitespaceListe } from "@/lib/text/fixers";
+import { pruefeKontrakt } from "@/lib/llm/contracts";
+import { regelnAlsPromptBlock } from "@/lib/validation/register";
+import { pruefeMitLlm } from "@/lib/validation/pruefer";
 import { RULES } from "@/lib/validation/rules";
 import {
   validateTitle,
@@ -154,7 +158,26 @@ const SYSTEM =
   "Du bist Senior-SEO-Texter für Amazon-Listings (DE-Markt) bei temoa. " +
   "Du hältst dich exakt an die Regeln im Prompt. Antworte AUSSCHLIESSLICH mit dem geforderten JSON, ohne Markdown-Zäune, ohne Vorwort.";
 
-export function sectionPrompt(section: ListingSection, inputs: RecipeInputs): string {
+/**
+ * Prompt = Kontext + Bau-Anleitung (sektionsspezifisch) + GESETZE aus dem
+ * Regel-Register (D181: eine Quelle für Prompt, Gate und Prüfer) + optionaler
+ * KORREKTUR-AUFTRAG mit den Findings des vorherigen Versuchs (D182).
+ */
+export function sectionPrompt(section: ListingSection, inputs: RecipeInputs, korrektur: ValidationIssue[] = []): string {
+  const parts = [basePrompt(section, inputs)];
+  const gesetze = regelnAlsPromptBlock(section);
+  if (gesetze)
+    parts.push(`GESETZE (Regel-Register — werden maschinell geprüft, jeder Verstoß erzwingt Regenerierung):\n${gesetze}`);
+  if (korrektur.length)
+    parts.push(
+      `KORREKTUR-AUFTRAG: Dein vorheriger Entwurf hat das Qualitäts-Gate NICHT bestanden. Verletzte Regeln:\n${korrektur
+        .map((i) => `- [${i.rule}] ${i.message}`)
+        .join("\n")}\nErzeuge eine NEUE Version, die GENAU diese Verstöße behebt und alle übrigen Regeln weiter einhält.`,
+    );
+  return parts.join("\n\n");
+}
+
+function basePrompt(section: ListingSection, inputs: RecipeInputs): string {
   const ctx = contextBlock(inputs);
   const kw = inputs.keywords;
   switch (section) {
@@ -164,7 +187,6 @@ export function sectionPrompt(section: ListingSection, inputs: RecipeInputs): st
 AUFGABE: Schreibe den Amazon-Produkttitel.
 REGELN (knowledge/content/title.md, Amazon-Neuerung 07/2026):
 - HART: ${RULES.title.targetMinChars}–${RULES.title.maxChars} Zeichen — das 75er-Budget bestmöglich ausnutzen, NIE überschreiten. Zähle sorgfältig.
-- REIHENFOLGE (Best Practice, Nutzer-Vorgabe 22.07.): Marke → Hauptkeyword → Produkttyp → wichtigste Key Features → Größe/Menge → Material → Kundennutzen — gekürzt auf das, was ins 75er-Budget passt; Lesbarkeit schlägt Keyword-Dichte, KEIN Keyword-Stuffing.
 - Hauptkeyword „${kw.primary[0] ?? ""}" MUSS vorkommen. PRIMARY-Keywords (je max. 1×): ${kw.primary.join(", ")}
 - Zahlen als Ziffern. Keine Werbephrasen, keine Emojis, keine Versalien-Wörter außer Marke/Norm.
 - BEGRÜNDUNG: Erkläre jeden Titelbestandteil — woraus er sich ableitet (Keyword-Analyse, USP, Produkt-Wahrheit, Marke) und warum er das Budget verdient.
@@ -175,9 +197,7 @@ JSON: {"title": "...", "rationale": [{"part": "<Bestandteil>", "source": "<Herle
 AUFGABE: Schreibe genau ${RULES.bullets.count} Bullet Points.
 REGELN (knowledge/content/bullets.md + Blog 07/2026):
 - Jeder Bullet: HEADLINE IN VERSALIEN (3–5 Wörter) + Doppelpunkt + max. 3 Sätze.
-- BENEFIT ZUERST (erste 5–8 Wörter): die Headline IST eine kurze Benefit-Aussage, NIE ein Feature-Name („BLEIBT JAHRELANG SCHARF", nicht „GEHÄRTETER EDELSTAHL"). Kunden kaufen, was Features ihnen bringen.
 - DREI-POSITIONEN-ANATOMIE (Schaubild Blog 07/2026) — jeder Bullet in dieser Reihenfolge: POSITION 1 = Benefit zuerst (Headline + erste 5–8 Wörter). POSITION 2 = das Feature dahinter als Beleg, mit dem Secondary Keyword NATÜRLICH integriert. POSITION 3 = Use Case + konkrete Details: für wen/wann geeignet + Material, Maß, Prüfnorm oder Garantie. Beispiel: „Bleibt jahrelang scharf im täglichen Einsatz. Gehärteter Edelstahl mit dreifach geschliffener Klinge. Kein Nachschärfen nötig. 20 cm Klinge. 10 Jahre Garantie."
-- EIN BULLET = EIN THEMA: Jeder Satz eines Bullets belegt die Kernaussage seiner Headline. Ein Fakt, der nicht zum Thema gehört (z. B. Farbtemperatur im Stoßfestigkeits-Bullet), gehört in einen anderen Bullet oder fällt weg.
 - DREI JOBS je Bullet: einen wahrscheinlichen Einwand entkräften + einen konkreten Use Case bestätigen + ein Secondary Keyword NATÜRLICH unterbringen. Keyword-Stapeln auf Kosten der Lesbarkeit verliert alle drei — Kunden scannen in 2 Sekunden.
 - BUDGET AUSNUTZEN: Ziel ≥${RULES.bullets.utilizationMinBytes} Bytes pro Bullet, hartes Max ${RULES.bullets.hardMaxChars} Zeichen — so viel Substanz wie möglich, kein Füllwort-Padding.
 - Slot-Logik: 1 HOOK (stärkster USP) · 2 PROBLEM→BENEFIT (häufigster Pain Point!) · 3 TRUST (Material/Norm mit Beleg) · 4 USAGE · 5 CLOSE (Lieferumfang/Erwartungsmanagement). Häufigster Pain Point darf nach vorn rücken.
@@ -262,11 +282,20 @@ function templateDraft(section: ListingSection, inputs: RecipeInputs): Record<st
     case "bullets": {
       const heads = ["STARKER ALLTAGS-NUTZEN", "PROBLEM GELÖST", "GEPRÜFTE QUALITÄT", "EINFACHE ANWENDUNG", "DURCHDACHTER LIEFERUMFANG"];
       const usps = f.usps ?? [];
+      // Je Slot ein EIGENER Belegsatz — identische Sätze über Bullets würden
+      // (zu Recht) am Satz-Dopplungs-Check des Gates scheitern (D181).
+      const slotSaetze = [
+        `Konkreter Nutzen für ${f.targetAudience ?? "den Alltag"}, klar belegt statt versprochen.`,
+        "Löst das häufigste Problem der Zielgruppe mit nachvollziehbaren Fakten.",
+        "Material und Verarbeitung sind belegt, nichts wird geschätzt.",
+        "Anwendung ohne Vorkenntnisse, direkt einsatzbereit.",
+        "Lieferumfang und Erwartungen ehrlich benannt.",
+      ];
       return {
         bullets: heads.map((h, i) => {
           const usp = usps[i] ? `${usps[i]}. ` : "";
           const kwHint = kw.secondary[i] ? ` Ideal als ${kw.secondary[i]}.` : "";
-          return `${h}: ${usp}Konkreter Nutzen für ${f.targetAudience ?? "den Alltag"} — ohne leere Versprechen, mit klaren Fakten beschrieben.${kwHint}`;
+          return `${h}: ${usp}${slotSaetze[i]}${kwHint}`;
         }),
         rationale: heads.map((h, i) => ({
           part: h,
@@ -287,8 +316,11 @@ function templateDraft(section: ListingSection, inputs: RecipeInputs): Record<st
       };
     case "qa": {
       const pains = inputs.reviewInsights?.painPoints?.slice(0, 5) ?? [];
+      // Ordinal-WÖRTER statt Ziffern: „Frage 1 zu …" scheiterte (zu Recht) am
+      // Zahlen-Herkunfts-Check des Gates — erfundene Zahlen gibt es auch im Mock nicht.
+      const ordinale = ["Erste", "Zweite", "Dritte", "Vierte", "Fünfte"];
       const pairs = Array.from({ length: RULES.qa.pairs }, (_, i) => ({
-        q: pains[i] ? `Ist das Problem "${pains[i].label}" gelöst?` : `Typische Frage ${i + 1} zu ${f.productType ?? inputs.productName}?`,
+        q: pains[i] ? `Ist das Problem "${pains[i].label}" gelöst?` : `${ordinale[i] ?? "Weitere"} typische Frage zu ${f.productType ?? inputs.productName}?`,
         a: `Faktenbasierte Antwort aus der Produkt-Wahrheit: ${(f.usps ?? ["konkreter Nutzen"]).join(", ")}. Ausführlich genug formuliert, um das Antwort-Budget sinnvoll zu nutzen und dem Algorithmus Substanz zu geben.`,
       }));
       return { pairs, rationale: pairs.map((p, i) => ({ part: p.q.slice(0, 40), source: pains[i] ? `Pain Point #${i + 1} aus Reviews` : "Typische Kaufhürde (Template)" })) };
@@ -314,7 +346,98 @@ function extractRationale(parsed: Record<string, unknown>, text: string): TitleR
     });
 }
 
-// ── Öffentliche API ──────────────────────────────────────────────────────────
+// ── QM-Schleife & öffentliche API (D182: hartes Gate, D183: Kontrakt-Grenze) ─
+
+/**
+ * Hart-Block (D182, Nutzer-Entscheid 23.07.): Bleiben nach allen Versuchen
+ * Error-Findings, wird KEIN Entwurf sichtbar — dieser Fehler trägt den
+ * vollständigen Prüfbericht. Jeder Block ist zugleich ein Bau-Auftrag
+ * (neuer Fixer/Check/Input-Pflicht) und wird deshalb strukturiert geloggt.
+ */
+export class QmBlockFehler extends Error {
+  constructor(
+    public section: ListingSection,
+    public issues: ValidationIssue[],
+    public versuche: number,
+  ) {
+    super(
+      `QM-Gate: ${issues.length} Regelverstoß/-verstöße nach ${versuche} Versuch(en) nicht behebbar — Ergebnis wird nicht angezeigt. ` +
+        issues.slice(0, 5).map((i) => `[${i.rule}] ${i.message}`).join(" · "),
+    );
+  }
+}
+
+/** Max. Generier-Versuche je Sektion (1 Erstversuch + 2 Korrektur-Schleifen). */
+const MAX_VERSUCHE = 3;
+
+function nurErrors(issues: ValidationIssue[]): ValidationIssue[] {
+  return issues.filter((i) => i.severity === "error");
+}
+
+/** Extraktion + deterministische Fixer (D184) + deterministisches Gate. */
+function baueErgebnis(
+  section: ListingSection,
+  parsed: Record<string, unknown>,
+  inputs: RecipeInputs,
+  ctx: Parameters<typeof validateTitle>[1],
+  raw: string,
+  providerName: string,
+  model: string,
+): SectionResult {
+  switch (section) {
+    case "title": {
+      const text = fixeWhitespace(String(parsed.title ?? ""));
+      return { section, payload: { text, rationale: extractRationale(parsed, text) }, issues: validateTitle(text, ctx), raw, provider: providerName, model };
+    }
+    case "highlights": {
+      const text = fixeWhitespace(String(parsed.highlights ?? ""));
+      return { section, payload: { text, rationale: extractRationale(parsed, text) }, issues: validateItemHighlights(text, ctx), raw, provider: providerName, model };
+    }
+    case "qa": {
+      const pairs = Array.isArray(parsed.pairs)
+        ? (parsed.pairs as Array<{ q?: unknown; a?: unknown }>).map((p) => ({ q: fixeWhitespace(String(p.q ?? "")), a: fixeWhitespace(String(p.a ?? "")) }))
+        : [];
+      const joined = pairs.map((p) => `${p.q} ${p.a}`).join(" ");
+      return { section, payload: { pairs, rationale: extractRationale(parsed, joined) }, issues: validateQa(pairs, ctx), raw, provider: providerName, model };
+    }
+    case "bullets": {
+      const items = Array.isArray(parsed.bullets) ? fixeWhitespaceListe(parsed.bullets.map(String)) : [];
+      return { section, payload: { items, rationale: extractRationale(parsed, items.join(" ")) }, issues: validateBullets(items, ctx), raw, provider: providerName, model };
+    }
+    case "backend": {
+      // Deterministische Byte-Durchsetzung NACH dem LLM (temoa-os-Muster);
+      // Satzzeichen raus (Amazon ignoriert sie — verschwendete Bytes, Blog 07/2026)
+      const text = trimToBytesByWord(String(parsed.backend ?? "").replace(/[,;.!?:„“‚’"']/g, " ").replace(/\s+/g, " ").trim(), RULES.backendKeywords.maxBytes);
+      const visible = [
+        typeof inputs.approved?.title === "string" ? inputs.approved.title : "",
+        ...(Array.isArray(inputs.approved?.bullets) ? inputs.approved.bullets : []),
+      ].join(" ");
+      return { section, payload: { text, rationale: extractRationale(parsed, text) }, issues: validateBackendKeywords(text, visible, ctx), raw, provider: providerName, model };
+    }
+    case "description": {
+      const text = trimToBytesBySentence(fixeWhitespace(String(parsed.description ?? "")), RULES.description.maxBytes);
+      const bullets = Array.isArray(inputs.approved?.bullets) ? (inputs.approved.bullets as string[]) : [];
+      return { section, payload: { text, rationale: extractRationale(parsed, text) }, issues: validateDescription(text, bullets, ctx), raw, provider: providerName, model };
+    }
+  }
+}
+
+/** Der Text, den der LLM-Prüfer zu sehen bekommt (payload-form-unabhängig). */
+function textFuerPruefer(result: SectionResult): string {
+  if (result.payload.items) return result.payload.items.map((b, i) => `Bullet ${i + 1}: ${b}`).join("\n");
+  if (result.payload.pairs) return result.payload.pairs.map((p, i) => `Q${i + 1}: ${p.q}\nA${i + 1}: ${p.a}`).join("\n");
+  return result.payload.text ?? "";
+}
+
+/** Datengrundlage für den Prüfer: Fakten + Keywords (für Keyword-/Synonym-/Fakten-Urteile). */
+function prueferKontext(inputs: RecipeInputs): string {
+  return [
+    `MARKE: ${inputs.brand || inputs.eigenmarkeAusListing || "unbekannt"}`,
+    `PRODUKT: ${inputs.productName}`,
+    `PRODUKT-FAKTEN: ${JSON.stringify(inputs.facts)}`,
+    `KEYWORDS (dürfen ausschließlich grammatisch integriert vorkommen): ${Object.values(inputs.keywords).flat().join(", ")}`,
+  ].join("\n");
+}
 
 export async function generateSection(
   section: ListingSection,
@@ -322,26 +445,6 @@ export async function generateSection(
 ): Promise<SectionResult> {
   const recipeKey = `listing.${section === "backend" ? "backend" : section}`;
   const { provider, model } = resolveRecipe(recipeKey);
-
-  let parsed: Record<string, unknown>;
-  let raw = "";
-  if (provider.name === "mock") {
-    parsed = templateDraft(section, inputs);
-    raw = JSON.stringify(parsed);
-  } else {
-    const res = await generateForRecipe(recipeKey, {
-      system: SYSTEM,
-      messages: [{ role: "user", content: sectionPrompt(section, inputs) }],
-      // 16000 statt 3000 (D106): Sonnet-5 denkt automatisch (adaptive thinking)
-      // und max_tokens deckelt Denken + Antwort GEMEINSAM. Mit 3000 fraß die
-      // Denkphase bei komplexen Prompts (Bullets seit D98) das ganze Budget —
-      // Antwort leer → „KI-Antwort enthielt kein JSON" (Nutzer-Screenshot).
-      maxTokens: 16000,
-      temperature: 0.4,
-    });
-    raw = res.text;
-    parsed = parseJson(raw);
-  }
 
   // Zahlen-Herkunfts-Quellen (D114): NUR eigene Wahrheit — Produkt-Fakten,
   // eigenes Listing-IST, Zusatz-Infos, Keywords, bereits freigegebene eigene
@@ -360,45 +463,74 @@ export async function generateSection(
   const ctx = {
     facts: inputs.facts,
     primaryKeywords: inputs.keywords.primary,
+    // ALLE Keywords für den Keyword-Echo-Check (D181)
+    alleKeywords: Object.values(inputs.keywords).flat(),
     // Erkannte Fremdmarken (Relevanz-Filter) — das Gate flaggt jedes Vorkommen (D97)
     competitorBrands: inputs.competitorBrands ?? [],
     zahlenQuellen,
   };
 
-  switch (section) {
-    case "title": {
-      const text = String(parsed.title ?? "").trim();
-      return { section, payload: { text, rationale: extractRationale(parsed, text) }, issues: validateTitle(text, ctx), raw, provider: provider.name, model };
+  // QM-Schleife (D182): generieren → Kontrakt (D183) → Fixer + Gate → LLM-Prüfer
+  // → bei Error-Findings Korrektur-Versuch mit konkreter Fehlerliste. Der Mock
+  // ist deterministisch — Wiederholen änderte nichts, daher genau 1 Versuch.
+  const maxVersuche = provider.name === "mock" ? 1 : MAX_VERSUCHE;
+  let findings: ValidationIssue[] = [];
+
+  for (let versuch = 1; versuch <= maxVersuche; versuch++) {
+    let parsed: Record<string, unknown>;
+    let raw = "";
+    if (provider.name === "mock") {
+      parsed = templateDraft(section, inputs);
+      raw = JSON.stringify(parsed);
+    } else {
+      const res = await generateForRecipe(recipeKey, {
+        system: SYSTEM,
+        messages: [{ role: "user", content: sectionPrompt(section, inputs, findings) }],
+        // 16000 statt 3000 (D106): Sonnet-5 denkt automatisch (adaptive thinking)
+        // und max_tokens deckelt Denken + Antwort GEMEINSAM. Mit 3000 fraß die
+        // Denkphase bei komplexen Prompts (Bullets seit D98) das ganze Budget —
+        // Antwort leer → „KI-Antwort enthielt kein JSON" (Nutzer-Screenshot).
+        maxTokens: 16000,
+        temperature: 0.4,
+      });
+      raw = res.text;
+      try {
+        parsed = parseJson(raw);
+      } catch (e) {
+        findings = [{ rule: `${section}.kontrakt`, severity: "error", message: e instanceof Error ? e.message : String(e), evidence: "deterministic" }];
+        continue;
+      }
     }
-    case "highlights": {
-      const text = String(parsed.highlights ?? "").trim();
-      return { section, payload: { text, rationale: extractRationale(parsed, text) }, issues: validateItemHighlights(text, ctx), raw, provider: provider.name, model };
+
+    // Kontrakt-Grenze (D183): Schema-Verstoß wird abgewiesen, nie weitergereicht.
+    const kontrakt = pruefeKontrakt(section, parsed);
+    if (kontrakt.length > 0) {
+      findings = kontrakt.map((v) => ({
+        rule: `${section}.kontrakt`,
+        severity: "error" as const,
+        message: `Feld „${v.feld}": ${v.problem}`,
+        evidence: "deterministic" as const,
+      }));
+      continue;
     }
-    case "qa": {
-      const pairs = Array.isArray(parsed.pairs)
-        ? (parsed.pairs as Array<{ q?: unknown; a?: unknown }>).map((p) => ({ q: String(p.q ?? "").trim(), a: String(p.a ?? "").trim() }))
-        : [];
-      const joined = pairs.map((p) => `${p.q} ${p.a}`).join(" ");
-      return { section, payload: { pairs, rationale: extractRationale(parsed, joined) }, issues: validateQa(pairs, ctx), raw, provider: provider.name, model };
+
+    const result = baueErgebnis(section, parsed, inputs, ctx, raw, provider.name, model);
+    let issues = result.issues;
+
+    // Immer-LLM-Prüfer (D182): Kein Ergebnis wird ohne bestandene LLM-Prüfung
+    // sichtbar. Bei deterministischen Errors wird ohne Prüfer-Call regeneriert
+    // (das Ergebnis wird ohnehin verworfen) — das FINALE Ergebnis hat die
+    // Prüfung immer durchlaufen. Im Mock-Modus ehrlich ungeprüft (pruefer.ts).
+    if (nurErrors(issues).length === 0) {
+      issues = [...issues, ...(await pruefeMitLlm(section, textFuerPruefer(result), prueferKontext(inputs)))];
     }
-    case "bullets": {
-      const items = Array.isArray(parsed.bullets) ? parsed.bullets.map(String) : [];
-      return { section, payload: { items, rationale: extractRationale(parsed, items.join(" ")) }, issues: validateBullets(items, ctx), raw, provider: provider.name, model };
-    }
-    case "backend": {
-      // Deterministische Byte-Durchsetzung NACH dem LLM (temoa-os-Muster);
-      // Satzzeichen raus (Amazon ignoriert sie — verschwendete Bytes, Blog 07/2026)
-      const text = trimToBytesByWord(String(parsed.backend ?? "").replace(/[,;.!?:„“‚’"']/g, " ").replace(/\s+/g, " ").trim(), RULES.backendKeywords.maxBytes);
-      const visible = [
-        typeof inputs.approved?.title === "string" ? inputs.approved.title : "",
-        ...(Array.isArray(inputs.approved?.bullets) ? inputs.approved.bullets : []),
-      ].join(" ");
-      return { section, payload: { text, rationale: extractRationale(parsed, text) }, issues: validateBackendKeywords(text, visible, ctx), raw, provider: provider.name, model };
-    }
-    case "description": {
-      const text = trimToBytesBySentence(String(parsed.description ?? "").trim(), RULES.description.maxBytes);
-      const bullets = Array.isArray(inputs.approved?.bullets) ? (inputs.approved.bullets as string[]) : [];
-      return { section, payload: { text, rationale: extractRationale(parsed, text) }, issues: validateDescription(text, bullets, ctx), raw, provider: provider.name, model };
-    }
+
+    if (nurErrors(issues).length === 0) return { ...result, issues };
+    findings = nurErrors(issues);
   }
+
+  // Hart blockieren (D182): kein Entwurf mit Regelverstößen wird sichtbar.
+  // Log = Bau-Auftrag: welcher Check/Fixer/Input fehlt, damit das nie mehr blockt?
+  console.error(`[QM-BLOCK] listing.${section}`, JSON.stringify({ versuche: maxVersuche, findings }));
+  throw new QmBlockFehler(section, findings, maxVersuche);
 }

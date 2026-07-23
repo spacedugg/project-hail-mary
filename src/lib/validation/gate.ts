@@ -11,6 +11,8 @@ import type { ValidationIssue, ValidationReport, ProductFacts } from "@/db/schem
 type Ctx = {
   facts?: ProductFacts;
   primaryKeywords?: string[]; // 3–4, aus Analyse
+  /** ALLE Keywords (alle Tiers) — Basis des Keyword-Echo-Checks (D181/D184). */
+  alleKeywords?: string[];
   competitorBrands?: string[]; // Blacklist
   /**
    * Zahlen-Herkunfts-Check (D114): Quelltext, aus dem JEDE Zahl im
@@ -106,6 +108,77 @@ function issue(
   return { rule, severity, message, evidence: "deterministic" };
 }
 
+// ── Keyword-Echo-Check (D181, Ulmenrinde-Befund D180) ────────────────────────
+// Rohe, kleingeschriebene Suchphrasen mitten im Text („die kot und grasfresser
+// drops hund riechen") sind das deterministisch fassbare Ende des Keyword-
+// Stuffings. Konservativ: geflaggt wird nur, wenn ALLE Inhaltswörter der im
+// Text gefundenen Phrase kleingeschrieben sind (Adjektiv-Keywords wie
+// „spülmaschinenfeste Flasche" bleiben straffrei — den Rest beurteilt der
+// LLM-Prüfer über sprache.keyword-natuerlich).
+
+const FUNKTIONSWOERTER = new Set([
+  "der", "die", "das", "den", "dem", "des", "ein", "eine", "einen", "einem", "einer", "eines",
+  "und", "oder", "für", "gegen", "mit", "ohne", "bei", "beim", "im", "in", "am", "an", "auf",
+  "zu", "zum", "zur", "von", "vom", "aus", "nach", "über", "unter", "vor", "als", "wie",
+]);
+
+export function pruefeKeywordEcho(text: string, keywords: string[], rulePrefix: string): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const lower = text.toLowerCase();
+  const gemeldet = new Set<string>();
+  for (const kw of keywords) {
+    const phrase = kw.trim().toLowerCase();
+    if (!phrase || phrase.split(/\s+/).length < 2 || gemeldet.has(phrase)) continue;
+    for (let idx = lower.indexOf(phrase); idx !== -1; idx = lower.indexOf(phrase, idx + 1)) {
+      // Wortgrenzen: kein Treffer mitten in einem längeren Wort
+      const vor = idx === 0 ? " " : text[idx - 1];
+      const nach = idx + phrase.length >= text.length ? " " : text[idx + phrase.length];
+      if (/[a-zäöüß0-9]/i.test(vor) || /[a-zäöüß0-9]/i.test(nach)) continue;
+      const fund = text.slice(idx, idx + phrase.length);
+      const inhaltswoerter = fund
+        .split(/\s+/)
+        .filter((w) => w.length >= 2 && !FUNKTIONSWOERTER.has(w.toLowerCase()) && /[a-zäöüß]/i.test(w));
+      if (inhaltswoerter.length >= 2 && inhaltswoerter.every((w) => w[0] === w[0].toLowerCase())) {
+        issues.push(issue(`${rulePrefix}.keyword-echo`, "error",
+          `Suchphrase roh eingeklebt: „${fund}" — Keywords werden flektiert und großgeschrieben integriert, nie als kleingeschriebene Keyword-Kette.`));
+        gemeldet.add(phrase);
+        break;
+      }
+    }
+  }
+  return issues;
+}
+
+// ── Cross-Bullet-Satzdopplung (D181) ─────────────────────────────────────────
+// Fast wörtlich wiederholte Aussagen zwischen Bullets („bindet überschüssige
+// Magensäure …" in Bullet 1 UND 5) via 5-Wort-Shingles auf Wortstamm-Basis.
+
+const SHINGLE_LAENGE = 5;
+
+export function pruefeBulletDopplung(bullets: string[]): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const gesehen = new Map<string, number>(); // Shingle → Bullet-Index
+  const gemeldetePaare = new Set<string>();
+  for (const [i, b] of bullets.entries()) {
+    const tokens = b.split(/\s+/).map(normalizeToken).filter((t) => t.length >= 2);
+    for (let s = 0; s + SHINGLE_LAENGE <= tokens.length; s++) {
+      const shingle = tokens.slice(s, s + SHINGLE_LAENGE).join(" ");
+      const erster = gesehen.get(shingle);
+      if (erster === undefined) {
+        gesehen.set(shingle, i);
+      } else if (erster !== i) {
+        const paar = `${erster}-${i}`;
+        if (!gemeldetePaare.has(paar)) {
+          gemeldetePaare.add(paar);
+          issues.push(issue("bullets.satz-dopplung", "error",
+            `Bullet ${erster + 1} und Bullet ${i + 1} wiederholen dieselbe Aussage (u. a. „…${shingle}…") — jede Aussage genau 1×.`));
+        }
+      }
+    }
+  }
+  return issues;
+}
+
 function findBanned(text: string, list: readonly string[], rulePrefix: string): ValidationIssue[] {
   const lower = text.toLowerCase();
   return list
@@ -155,6 +228,7 @@ export function validateTitle(title: string, ctx: Ctx = {}): ValidationIssue[] {
 
   if (EMOJI_RE.test(t)) issues.push(issue("title.emoji", "error", "Emojis im Titel sind verboten."));
 
+  issues.push(...pruefeKeywordEcho(t, ctx.alleKeywords ?? [], "title"));
   issues.push(...findBanned(t, RULES.bannedPhrases, "title"));
   issues.push(...findBanned(t, RULES.bannedClaims, "title"));
   issues.push(...findCompetitorBrands(t, ctx, "title"));
@@ -193,6 +267,20 @@ export function validateBullets(bullets: string[], ctx: Ctx = {}): ValidationIss
     else if (headWords.length < 2 || headWords.length > 6)
       issues.push(issue("bullets.headline-length", "warning", `Bullet ${n}: Headline ${headWords.length} Wörter (Ziel 3–5).`));
 
+    // Feature-Headline, deterministisches Ende (D181): eine Headline, die mit
+    // einer Zahl beginnt („350 G MIT CA. 160 DROPS"), ist eine Mengenangabe,
+    // nie eine Benefit-Aussage — den semantischen Rest prüft der LLM-Prüfer.
+    if (/^\s*\d/.test(headline))
+      issues.push(issue("bullets.headline-feature", "error", `Bullet ${n}: Headline beginnt mit einer Zahl — sie muss eine Benefit-Aussage sein, kein Feature/Mengenangabe.`));
+
+    // Headline-Echo, wortgleiches Ende (D181): erster Satz beginnt mit den
+    // Headline-Wörtern („BERUHIGT DEN MAGEN …: Beruhigt den Magen …").
+    const body = t.split(":").slice(1).join(":").trim();
+    const headStamm = headline.trim().split(/\s+/).map(normalizeToken).filter(Boolean);
+    const bodyStamm = body.split(/\s+/).map(normalizeToken).filter(Boolean);
+    if (headStamm.length >= 3 && headStamm.slice(0, 3).every((w, k) => bodyStamm[k] === w))
+      issues.push(issue("bullets.headline-echo-wortgleich", "error", `Bullet ${n}: Der erste Satz wiederholt die Headline wörtlich — er muss stattdessen den Feature-Beleg liefern.`));
+
     const sentences = (t.split(":").slice(1).join(":").match(/[.!?]+/g) ?? []).length;
     if (sentences > RULES.bullets.maxSentences)
       issues.push(issue("bullets.sentences", "warning", `Bullet ${n}: ${sentences} Sätze (max. ${RULES.bullets.maxSentences}).`));
@@ -207,6 +295,8 @@ export function validateBullets(bullets: string[], ctx: Ctx = {}): ValidationIss
   });
 
   issues.push(...pruefeZahlenTreue(bullets.join("\n"), ctx.zahlenQuellen ?? "", "bullets"));
+  issues.push(...pruefeKeywordEcho(bullets.join("\n"), ctx.alleKeywords ?? [], "bullets"));
+  issues.push(...pruefeBulletDopplung(bullets));
 
   // USP-Einmaligkeit über alle Bullets (Cross-Content-Regel — Kern des USP-Problems)
   const usps = ctx.facts?.usps ?? [];

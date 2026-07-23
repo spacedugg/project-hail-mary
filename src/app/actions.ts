@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eq, desc, and } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { generateSection, type ListingSection, type RecipeInputs } from "@/lib/recipes/listing";
+import { generateSection, QmBlockFehler, type ListingSection, type RecipeInputs } from "@/lib/recipes/listing";
 import type { ContentSprache, Marketplace, ProductFacts } from "@/db/schema";
 import { amazonDomain, erkenneSprache, marktplatzFuerSprache, marktplatzSprache, SPRACH_NAMEN } from "@/lib/text/sprache";
 import { contentMarkenKontext } from "@/lib/text/marken";
@@ -562,11 +562,22 @@ async function generiereSektionKern(
     sprache: product.contentSprache,
   };
 
-  // Fehler (API, Zeitbudget, kaputtes JSON) als Banner, nie als Fehlerseite (D81)
+  // Fehler (API, Zeitbudget, kaputtes JSON) als Banner, nie als Fehlerseite (D81).
+  // QM-Block (D182): Nach allen Korrektur-Schleifen blieben Regelverstöße —
+  // es wird KEIN Entwurf gespeichert oder angezeigt, der Banner trägt den
+  // Prüfbericht. Jeder Block ist ein Bau-Auftrag (Log in generateSection).
   let result: Awaited<ReturnType<typeof generateSection>>;
   try {
     result = await generateSection(section, inputs);
   } catch (e) {
+    if (e instanceof QmBlockFehler) {
+      throw new GenFehler(
+        `QM-Gate (${SEKTIONS_LABEL[section] ?? section}): Ergebnis nach ${e.versuche} Versuch(en) nicht regelkonform — nichts gespeichert. Verstöße: ${e.issues
+          .map((i) => `[${i.rule}] ${i.message}`)
+          .join(" · ")}`,
+        "QM-01",
+      );
+    }
     throw new GenFehler(`Text-Generierung (${SEKTIONS_LABEL[section] ?? section}): ${e instanceof Error ? e.message : String(e)}`, "GEN-01");
   }
 

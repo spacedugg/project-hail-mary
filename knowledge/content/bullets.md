@@ -41,4 +41,6 @@ Weitere Recipe-Regeln:
 
 ## VALIDATION (Checks im Gate)
 
-Anzahl = 5 · Byte-Range je Bullet · Headline-Pattern (Versalien + Doppelpunkt) · USP-Dedup über alle Bullets · Keyword-Frequenz-Fenster · Blacklists (Phrasen, Claims, Marken) · Satz-Anzahl ≤2 · Reference-Fidelity (Material-/Form-Claims gegen Produkt-Stammdaten).
+Anzahl = 5 · Byte-Range je Bullet · Headline-Pattern (Versalien + Doppelpunkt) · USP-Dedup über alle Bullets · Keyword-Frequenz-Fenster · Blacklists (Phrasen, Claims, Marken) · Satz-Anzahl ≤3 (= SPEC, Drift-Fix 23.07.) · Keyword-Echo (roh eingeklebte kleingeschriebene Suchphrasen) · Cross-Bullet-Satzdopplung (Shingle-Overlap) · Feature-Headline (Ziffern-Start) · Headline-Echo im ersten Satz · Reference-Fidelity (Material-/Form-Claims gegen Produkt-Stammdaten).
+
+> **Maschinenwirksame Form (D181):** Die qualitativen Regeln dieses Dokuments stehen strukturiert in `src/lib/validation/register.ts` und fließen von dort in Prompt, Gate und LLM-Prüfer. Änderungen HIER ohne Register-Änderung sind wirkungslos.

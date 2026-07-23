@@ -34,4 +34,6 @@
 
 ## VALIDATION (Checks im Gate)
 
-Länge ≤ Kategorie-Limit · Hauptkeyword-Position ≤80 · Keyword-Dedup (Wortstamm) · Phrasen-/Zeichen-Blacklist · CAPS-Ratio · Wettbewerber-Marken-Blacklist · Mindestdichte (≥120 Zeichen Warnung) · Material-/Claim-Wahrheit gegen Produkt-Stammdaten (Reference-Fidelity, siehe content-knowledge-system.md).
+Länge ≤ Kategorie-Limit · Hauptkeyword-Position ≤80 · Keyword-Dedup (Wortstamm) · Phrasen-/Zeichen-Blacklist · CAPS-Ratio · Wettbewerber-Marken-Blacklist · Mindestdichte (≥120 Zeichen Warnung) · Keyword-Echo (roh eingeklebte kleingeschriebene Suchphrasen) · Material-/Claim-Wahrheit gegen Produkt-Stammdaten (Reference-Fidelity, siehe content-knowledge-system.md).
+
+> **Maschinenwirksame Form (D181):** Die qualitativen Regeln (Lesbarkeit, Keyword-Integration, Wirkversprechen, Reihenfolge) stehen strukturiert in `src/lib/validation/register.ts` und fließen von dort in Prompt, Gate und LLM-Prüfer. Änderungen HIER ohne Register-Änderung sind wirkungslos.

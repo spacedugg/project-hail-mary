@@ -187,3 +187,70 @@ describe("validateListing (Gesamt-Gate)", () => {
     expect(report.issues.filter((i) => i.severity === "error").length).toBeGreaterThanOrEqual(4);
   });
 });
+
+// ── Neue Checks der Verbindlichkeits-Architektur (D181, Ulmenrinde-Befund) ───
+
+describe("Keyword-Echo-Check (D181)", () => {
+  it("roh eingeklebte kleingeschriebene Suchphrase = Fehler (Ulmenrinde-Fall)", () => {
+    const issues = validateBullets(
+      ["WERDEN GERN GEFRESSEN: Die kot und grasfresser drops hund riechen nach Kräutern und schmecken."],
+      { alleKeywords: ["grasfresser drops hund", "ulmenrinde hund"] },
+    );
+    expect(issues.map((i) => i.rule)).toContain("bullets.keyword-echo");
+  });
+
+  it("grammatisch integrierte (großgeschriebene) Keywords passieren", () => {
+    const issues = validateBullets(
+      ["WERDEN GERN GEFRESSEN: Diese Grasfresser Drops für den Hund riechen nach Kräutern und schmecken gut."],
+      { alleKeywords: ["grasfresser drops"] },
+    );
+    expect(issues.map((i) => i.rule)).not.toContain("bullets.keyword-echo");
+  });
+
+  it("Adjektiv-Keywords mit korrekt großem Substantiv passieren (konservativ)", () => {
+    const issues = validateTitle("AquaNova spülmaschinenfeste Flasche 750 ml, isoliert und auslaufsicher", {
+      alleKeywords: ["spülmaschinenfeste flasche"],
+    });
+    expect(issues.map((i) => i.rule)).not.toContain("title.keyword-echo");
+  });
+
+  it("Titel mit roher Kleinschreib-Phrase = Fehler", () => {
+    const issues = validateTitle("Tierliebhaber ulmenrinde hund Drops 350 g für empfindliche Mägen geeignet", {
+      alleKeywords: ["ulmenrinde hund"],
+    });
+    expect(issues.map((i) => i.rule)).toContain("title.keyword-echo");
+  });
+});
+
+describe("Cross-Bullet-Satzdopplung (D181)", () => {
+  it("fast wörtlich wiederholte Aussage in zwei Bullets = Fehler (Magensäure-Fall)", () => {
+    const issues = validateBullets([
+      "BERUHIGT DEN MAGEN: Die Drops binden überschüssige Magensäure bei empfindlichen Hunden zuverlässig im Alltag.",
+      "GUTE AKZEPTANZ: Riechen nach Kräutern und werden gern gefressen, auch von wählerischen Tieren.",
+      "PRAKTISCHE DOSE: Diese Drops binden überschüssige Magensäure bei empfindlichen Hunden und sind einfach dosierbar.",
+    ]);
+    expect(issues.map((i) => i.rule)).toContain("bullets.satz-dopplung");
+  });
+
+  it("unterschiedliche Aussagen passieren", () => {
+    const issues = validateBullets(goodBullets);
+    expect(issues.map((i) => i.rule)).not.toContain("bullets.satz-dopplung");
+  });
+});
+
+describe("Feature-Headline & Headline-Echo (D181)", () => {
+  it("Headline mit Zahl am Anfang = Fehler (350-g-Fall)", () => {
+    const issues = validateBullets(["350 G MIT CA. 160 DROPS: Eine Packung reicht über viele Wochen für mittelgroße Hunde."]);
+    expect(issues.map((i) => i.rule)).toContain("bullets.headline-feature");
+  });
+
+  it("erster Satz wiederholt die Headline wörtlich = Fehler (Beruhigt-den-Magen-Fall)", () => {
+    const issues = validateBullets(["BERUHIGT DEN MAGEN SPÜRBAR: Beruhigt den Magen mit Heilerde, Anis und Fenchel bei täglicher Gabe."]);
+    expect(issues.map((i) => i.rule)).toContain("bullets.headline-echo-wortgleich");
+  });
+
+  it("erster Satz mit Feature-Beleg statt Echo passiert", () => {
+    const issues = validateBullets(["BERUHIGT DEN MAGEN SPÜRBAR: Heilerde, Anis und Fenchel binden überschüssige Säure auf natürliche Weise."]);
+    expect(issues.map((i) => i.rule)).not.toContain("bullets.headline-echo-wortgleich");
+  });
+});
