@@ -67,11 +67,18 @@ function zahlClaims(text: string): Array<{ zahl: string; kontext: string[]; roh:
   return claims;
 }
 
-export function pruefeZahlenTreue(text: string, quellen: string, rulePrefix: string): ValidationIssue[] {
+/**
+ * Kern-Detektor (D198): liefert die unbelegten/widersprüchlichen Zahl-Claims
+ * eines Textes. EINE Quelle für den Gate-Check UND den deterministischen
+ * Fakten-Fixer — beide fassen exakt dieselben Claims.
+ */
+export type ZahlBefund = { roh: string; art: "ohne-quelle" | "widerspruch"; umfeld: string[] };
+
+export function unbelegteZahlen(text: string, quellen: string): ZahlBefund[] {
   if (!quellen.trim()) return []; // ohne Quellen ehrlich passiv
-  const issues: ValidationIssue[] = [];
   const q = quellen.toLowerCase().replace(/,(?=\d)/g, ".");
   const qZahlen = new Set((q.match(/\d+(?:\.\d+)?/g) ?? []).map(normZahl));
+  const befunde: ZahlBefund[] = [];
 
   for (const c of zahlClaims(text)) {
     const zahlBekannt = qZahlen.has(c.zahl);
@@ -88,18 +95,55 @@ export function pruefeZahlenTreue(text: string, quellen: string, rulePrefix: str
         }
       }
       if (!kontextTrifftZahl && umfeldZahlen.size > 0) {
-        issues.push(issue(`${rulePrefix}.zahl-widerspruch`, "error",
-          `Zahlen-Widerspruch: Text sagt „${c.roh}", die Quellen nennen dort ${[...umfeldZahlen].slice(0, 3).join("/")} — Spezifikationen NIE verändern.`));
+        befunde.push({ roh: c.roh, art: "widerspruch", umfeld: [...umfeldZahlen] });
         continue;
       }
       if (kontextTrifftZahl) continue;
     }
-    if (!zahlBekannt) {
-      issues.push(issue(`${rulePrefix}.zahl-ohne-quelle`, "error",
-        `Zahl ohne Quelle: „${c.roh}" kommt in keiner Daten-Quelle vor (Produkt-Wahrheit, Listing, Zusatz-Infos, Keywords) — nichts erfinden.`));
-    }
+    if (!zahlBekannt) befunde.push({ roh: c.roh, art: "ohne-quelle", umfeld: [] });
   }
-  return issues;
+  return befunde;
+}
+
+export function pruefeZahlenTreue(text: string, quellen: string, rulePrefix: string): ValidationIssue[] {
+  return unbelegteZahlen(text, quellen).map((b) =>
+    b.art === "widerspruch"
+      ? issue(`${rulePrefix}.zahl-widerspruch`, "error",
+          `Zahlen-Widerspruch: Text sagt „${b.roh}", die Quellen nennen dort ${b.umfeld.slice(0, 3).join("/")} — Spezifikationen NIE verändern.`)
+      : issue(`${rulePrefix}.zahl-ohne-quelle`, "error",
+          `Zahl ohne Quelle: „${b.roh}" kommt in keiner Daten-Quelle vor (Produkt-Wahrheit, Listing, Zusatz-Infos, Keywords) — nichts erfinden.`),
+  );
+}
+
+/**
+ * Deterministischer Fakten-Fixer (D198, Nutzer-Befund 23.07.: „sieben
+ * Bestandteile"/„einer Woche" blockten 3× in Folge): Sätze mit erfundener oder
+ * widersprüchlicher Zahl werden GESTRICHEN — Zahlen entscheidet der Code, nicht
+ * das LLM (D184). Ein Zähl-/Fakten-Fehler geht damit nie mehr als Korrektur-
+ * Auftrag ans Modell zurück. Nur Body-Sätze werden entfernt (Headline bleibt),
+ * und nie wird der ganze Text geleert — bleibt kein sauberer Satz übrig,
+ * übernimmt die Regenerierung.
+ */
+export function entferneUnbelegteZahlSaetze(text: string, quellen: string): { text: string; entfernt: string[] } {
+  if (!quellen.trim() || unbelegteZahlen(text, quellen).length === 0) return { text, entfernt: [] };
+  const doppel = text.indexOf(":");
+  const kopf = doppel >= 0 ? text.slice(0, doppel + 1) : "";
+  const body = (doppel >= 0 ? text.slice(doppel + 1) : text).trim();
+  // Zahl steckt in der Headline (vor dem Doppelpunkt) → nicht satzweise fixbar
+  if (kopf && unbelegteZahlen(kopf, quellen).length > 0) return { text, entfernt: [] };
+  const saetze = body.match(/[^.!?]+[.!?]+(\s|$)/g);
+  if (!saetze || saetze.length < 2) return { text, entfernt: [] }; // nicht satzweise trennbar → Regenerierung
+  const entfernt: string[] = [];
+  const behalten = saetze.filter((s) => {
+    if (unbelegteZahlen(s, quellen).length > 0) {
+      entfernt.push(s.trim());
+      return false;
+    }
+    return true;
+  });
+  if (entfernt.length === 0 || behalten.length === 0) return { text, entfernt: [] };
+  const neu = `${kopf ? `${kopf} ` : ""}${behalten.join(" ")}`.replace(/\s+/g, " ").trim();
+  return { text: neu, entfernt };
 }
 
 function issue(

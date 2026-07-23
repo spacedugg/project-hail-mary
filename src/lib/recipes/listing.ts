@@ -2,7 +2,7 @@ import { generateForRecipe, resolveRecipe } from "@/lib/llm/registry";
 import { parseLlmJson } from "@/lib/llm/json";
 import { trimToBytesByWord, trimToBytesBySentence } from "@/lib/text/bytes";
 import { fixeWhitespace, fixeWhitespaceListe, fixeTitelLaenge } from "@/lib/text/fixers";
-import { keywordStammAbgedeckt } from "@/lib/validation/gate";
+import { keywordStammAbgedeckt, entferneUnbelegteZahlSaetze } from "@/lib/validation/gate";
 import { pruefeKontrakt } from "@/lib/llm/contracts";
 import { regelnAlsPromptBlock } from "@/lib/validation/register";
 import { pruefeMitLlm } from "@/lib/validation/pruefer";
@@ -517,7 +517,8 @@ function baueErgebnis(
       return { section, payload: { text, rationale: extractRationale(parsed, text) }, issues: validateTitle(text, ctx), raw, provider: providerName, model };
     }
     case "highlights": {
-      const text = fixeWhitespace(String(parsed.highlights ?? ""));
+      // Fakten-Fixer (D198): erfundene Zahl-Sätze streichen, bevor das Gate prüft
+      const text = entferneUnbelegteZahlSaetze(fixeWhitespace(String(parsed.highlights ?? "")), ctx?.zahlenQuellen ?? "").text;
       return { section, payload: { text, rationale: extractRationale(parsed, text) }, issues: validateItemHighlights(text, ctx), raw, provider: providerName, model };
     }
     case "qa": {
@@ -528,7 +529,10 @@ function baueErgebnis(
       return { section, payload: { pairs, rationale: extractRationale(parsed, joined) }, issues: validateQa(pairs, ctx), raw, provider: providerName, model };
     }
     case "bullets": {
-      const items = Array.isArray(parsed.bullets) ? fixeWhitespaceListe(parsed.bullets.map(String)) : [];
+      // Fakten-Fixer je Bullet (D198): erfundene Zahl-Sätze streichen, bevor das Gate prüft
+      const items = Array.isArray(parsed.bullets)
+        ? fixeWhitespaceListe(parsed.bullets.map(String)).map((b) => entferneUnbelegteZahlSaetze(b, ctx?.zahlenQuellen ?? "").text)
+        : [];
       return { section, payload: { items, rationale: extractRationale(parsed, items.join(" ")) }, issues: validateBullets(items, ctx), raw, provider: providerName, model };
     }
     case "backend": {
@@ -547,7 +551,9 @@ function baueErgebnis(
       return { section, payload: { text, rationale: extractRationale(parsed, text) }, issues: validateBackendKeywords(text, visible, ctx), raw, provider: providerName, model };
     }
     case "description": {
-      const text = trimToBytesBySentence(fixeWhitespace(String(parsed.description ?? "")), RULES.description.maxBytes);
+      // Fakten-Fixer (D198) VOR dem Byte-Trim: erfundene Zahl-Sätze streichen
+      const gefixt = entferneUnbelegteZahlSaetze(fixeWhitespace(String(parsed.description ?? "")), ctx?.zahlenQuellen ?? "").text;
+      const text = trimToBytesBySentence(gefixt, RULES.description.maxBytes);
       const bullets = Array.isArray(inputs.approved?.bullets) ? (inputs.approved.bullets as string[]) : [];
       return { section, payload: { text, rationale: extractRationale(parsed, text) }, issues: validateDescription(text, bullets, ctx), raw, provider: providerName, model };
     }

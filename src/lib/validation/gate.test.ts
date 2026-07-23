@@ -310,3 +310,32 @@ describe("Titel-Dopplungs-Check der Item Highlights (D197)", () => {
     expect(issues.filter((i) => i.rule === "highlights.titel-dopplung")).toEqual([]);
   });
 });
+
+describe("Fakten-Fixer: erfundene Zahl-Sätze streichen (D198)", () => {
+  const { entferneUnbelegteZahlSaetze } = require("./gate") as typeof import("./gate");
+  const quellen = "Ulmenrinde Heilerde Moor Fenchel Anis 350 g 160 Drops 2 Drops pro 5 kg";
+
+  it("streicht den Satz mit erfundener Zahl, behält belegte Sätze (der Live-Fall)", () => {
+    const bullet = "BERUHIGT DEN MAGEN: Aus sieben natürlichen Bestandteilen zusammengesetzt. Mit Ulmenrinde und Heilerde bei Magenbeschwerden.";
+    const { text, entfernt } = entferneUnbelegteZahlSaetze(bullet, quellen);
+    expect(entfernt.length).toBe(1);
+    expect(text).not.toMatch(/sieben/);
+    expect(text).toContain("Ulmenrinde und Heilerde");
+    // Ergebnis ist jetzt zahlen-sauber
+    const { pruefeZahlenTreue } = require("./gate") as typeof import("./gate");
+    expect(pruefeZahlenTreue(text, quellen, "bullets").filter((i) => i.rule.startsWith("bullets.zahl"))).toEqual([]);
+  });
+
+  it("belegte Zahlen bleiben unangetastet", () => {
+    const bullet = "DOSIERUNG: 2 Drops pro 5 kg Körpergewicht täglich. Die 350 g Dose reicht lange.";
+    const { entfernt } = entferneUnbelegteZahlSaetze(bullet, quellen);
+    expect(entfernt).toEqual([]);
+  });
+
+  it("leert nie den ganzen Text — bleibt kein sauberer Satz, Regenerierung übernimmt", () => {
+    const bullet = "TITEL: Nach einer Woche kein Grasfressen mehr.";
+    const { text, entfernt } = entferneUnbelegteZahlSaetze(bullet, quellen);
+    expect(text).toBe(bullet);
+    expect(entfernt).toEqual([]);
+  });
+});
