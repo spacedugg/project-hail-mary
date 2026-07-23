@@ -7,6 +7,8 @@ import {
   validateDescription,
   validateListing,
   validateItemHighlights,
+  entferneUnbelegteZahlSaetze,
+  pruefeZahlenTreue,
 } from "./gate";
 
 const VALID_BULLET = (head: string, body: string) => `${head}: ${body}`;
@@ -312,7 +314,6 @@ describe("Titel-Dopplungs-Check der Item Highlights (D197)", () => {
 });
 
 describe("Fakten-Fixer: erfundene Zahl-Sätze streichen (D198)", () => {
-  const { entferneUnbelegteZahlSaetze } = require("./gate") as typeof import("./gate");
   const quellen = "Ulmenrinde Heilerde Moor Fenchel Anis 350 g 160 Drops 2 Drops pro 5 kg";
 
   it("streicht den Satz mit erfundener Zahl, behält belegte Sätze (der Live-Fall)", () => {
@@ -322,7 +323,6 @@ describe("Fakten-Fixer: erfundene Zahl-Sätze streichen (D198)", () => {
     expect(text).not.toMatch(/sieben/);
     expect(text).toContain("Ulmenrinde und Heilerde");
     // Ergebnis ist jetzt zahlen-sauber
-    const { pruefeZahlenTreue } = require("./gate") as typeof import("./gate");
     expect(pruefeZahlenTreue(text, quellen, "bullets").filter((i) => i.rule.startsWith("bullets.zahl"))).toEqual([]);
   });
 
