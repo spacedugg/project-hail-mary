@@ -1,5 +1,5 @@
-import { generateForRecipe, resolveRecipe } from "@/lib/llm/registry";
-import { parseLlmJson } from "@/lib/llm/json";
+import { resolveRecipe } from "@/lib/llm/registry";
+import { llmJsonLauf } from "@/lib/llm/qmLauf";
 import type { ReviewInsightsPayload } from "@/db/schema";
 
 /**
@@ -213,17 +213,24 @@ export async function extractInsights(
     };
     qualitaetsNotizen = [];
   } else {
-    const res = await generateForRecipe("reviews.pain-points", {
+    // Struktur ERZWINGEN statt blind speichern (D103) + QM-Lauf (D182/D183):
+    // kaputtes JSON oder eine Antwort ohne die geforderten Felder wird mit
+    // Korrektur-Auftrag automatisch wiederholt statt die Etappe zu killen.
+    const { normalisiereInsights } = await import("./insights");
+    core = await llmJsonLauf<ReturnType<typeof normalisiereInsights>>({
+      recipeKey: "reviews.pain-points",
       system: INSIGHTS_SYSTEM,
-      messages: [{ role: "user", content: insightsPrompt(reviews) }],
+      prompt: insightsPrompt(reviews),
       // Bis zu 15 Fundstellen je Aspekt (D170) brauchen Antwort-Budget
       maxTokens: 16000,
       temperature: 0,
+      kontrakt: (parsed) => {
+        const erwartete = ["painPoints", "buyingTriggers", "languageToBorrow", "languageToAvoid", "stats"];
+        return erwartete.some((k) => k in parsed)
+          ? { wert: normalisiereInsights(parsed) }
+          : { verstoesse: [`Die Antwort enthält keines der geforderten Felder (${erwartete.join(", ")}) — liefere exakt das geforderte JSON-Format.`] };
+      },
     });
-    // Struktur ERZWINGEN statt blind speichern (D103): kaputte/abweichende
-    // LLM-Antworten crashten das Findings-Dashboard beim Rendern.
-    const { normalisiereInsights } = await import("./insights");
-    core = normalisiereInsights(parseLlmJson(res.text));
 
     // Beleg-Prüfung (D152): Verbatim-Gate + Beleg-Pflicht + Sentiment-Signal —
     // deterministisch, VOR dem Speichern; Entferntes wird ausgewiesen.
@@ -281,21 +288,22 @@ async function belegCheck(
 
   const fmt = (liste: ReviewInsightsPayload["painPoints"], typ: string) =>
     liste.map((a) => `- [${typ}] Label: "${a.label}" — Zitate: ${a.quotes.map((q) => `„${q.slice(0, 160)}"`).join(" / ")}`).join("\n");
-  const res = await generateForRecipe("reviews.beleg-check", {
+  // QM-Lauf (D182/D183): das Prüf-Urteil braucht zwingend das
+  // nichtGestuetzt-Array — sonst Korrektur-Versuch statt stillem Durchwinken.
+  const raw = await llmJsonLauf<{ nichtGestuetzt: Array<{ label?: unknown; grund?: unknown }> }>({
+    recipeKey: "reviews.beleg-check",
     system:
       "Du prüfst als unabhängige Instanz, ob Review-Zitate ein Aspekt-Label WIRKLICH stützen. Sei streng: " +
       "Hoffnung/Erwartung belegt keine Wirkung; ein Arzt, der Ursachen ausschließt, ist keine Produkt-Empfehlung; " +
       "das Zitat muss die Behauptung des Labels tragen, nicht nur zum Thema passen. Antworte NUR mit JSON.",
-    messages: [
-      {
-        role: "user",
-        content: `ASPEKTE MIT ZITATEN:\n${fmt(painPoints, "Pain Point")}\n${fmt(buyingTriggers, "Kaufauslöser")}\n\nGib NUR die Aspekte zurück, deren Zitate das Label NICHT stützen oder deren Pain-Point/Kaufauslöser-Einordnung den Zitaten widerspricht:\n{"nichtGestuetzt":[{"label":"exaktes Label","grund":"ein Satz"}]}`,
-      },
-    ],
+    prompt: `ASPEKTE MIT ZITATEN:\n${fmt(painPoints, "Pain Point")}\n${fmt(buyingTriggers, "Kaufauslöser")}\n\nGib NUR die Aspekte zurück, deren Zitate das Label NICHT stützen oder deren Pain-Point/Kaufauslöser-Einordnung den Zitaten widerspricht:\n{"nichtGestuetzt":[{"label":"exaktes Label","grund":"ein Satz"}]}`,
     maxTokens: 3000,
     temperature: 0,
+    kontrakt: (parsed) =>
+      Array.isArray(parsed.nichtGestuetzt)
+        ? { wert: { nichtGestuetzt: parsed.nichtGestuetzt as Array<{ label?: unknown; grund?: unknown }> } }
+        : { verstoesse: ["Feld „nichtGestuetzt“ fehlt oder ist kein Array — auch bei null Beanstandungen ein leeres Array liefern."] },
   });
-  const raw = parseLlmJson<{ nichtGestuetzt?: Array<{ label?: unknown; grund?: unknown }> }>(res.text);
   const map = new Map<string, string>();
   const labels = new Set([...painPoints, ...buyingTriggers].map((a) => a.label));
   for (const u of raw.nichtGestuetzt ?? []) {

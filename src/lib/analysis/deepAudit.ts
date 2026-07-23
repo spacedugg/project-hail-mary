@@ -1,5 +1,5 @@
-import { generateForRecipe, resolveRecipe } from "@/lib/llm/registry";
-import { parseLlmJson } from "@/lib/llm/json";
+import { resolveRecipe } from "@/lib/llm/registry";
+import { llmJsonLauf } from "@/lib/llm/qmLauf";
 import { normalizeToken } from "@/lib/text/bytes";
 import type { DeepAuditDimension, DeepAuditPayload, ReviewInsightsPayload } from "@/db/schema";
 
@@ -277,13 +277,19 @@ export async function buildDeepAudit(input: DeepAuditInput): Promise<DeepAuditPa
       topActions: ["Mock: Titel um Haupt-Keyword ergänzen", "Mock: Dichtungs-Einwand in Bullet 1 entkräften"],
     };
   } else {
-    const res = await generateForRecipe("listing.deep-audit", {
+    // QM-Lauf (D182/D183): kaputtes JSON oder fehlendes dimensions-Array wird
+    // mit Korrektur-Auftrag automatisch wiederholt.
+    raw = await llmJsonLauf<Record<string, unknown>>({
+      recipeKey: "listing.deep-audit",
       system: SYSTEM,
-      messages: [{ role: "user", content: buildPrompt(input, llmDims) }],
+      prompt: buildPrompt(input, llmDims),
       maxTokens: 16000, // Sonnet-5: Denkphase + Antwort teilen sich max_tokens (D106)
       temperature: 0.2,
+      kontrakt: (parsed) =>
+        Array.isArray(parsed.dimensions) && parsed.dimensions.length > 0
+          ? { wert: parsed }
+          : { verstoesse: ["Das JSON braucht ein nicht-leeres dimensions-Array — ein Eintrag je angefragter Dimension mit key, score10, aktuell, probleme, empfehlung."] },
     });
-    raw = parseLlmJson(res.text);
   }
   const payload = pruefeAuditBehauptungen(enforceDeepAudit(raw, llmDims), input);
   // Bild-Dimension deterministisch einsetzen (der Code rechnet, nicht die KI)
