@@ -254,3 +254,19 @@ describe("Feature-Headline & Headline-Echo (D181)", () => {
     expect(issues.map((i) => i.rule)).not.toContain("bullets.headline-echo-wortgleich");
   });
 });
+
+describe("Keyword-Echo auch in Beschreibung & Highlights (Scheibe 2)", () => {
+  it("rohe Kleinschreib-Phrase in der Beschreibung = Fehler", () => {
+    const issues = validateDescription(
+      "Die Flasche hält lange kalt. Perfekt als outdoor flasche für unterwegs und im Büro einsetzbar.",
+      [],
+      { alleKeywords: ["outdoor flasche"] },
+    );
+    expect(issues.map((i) => i.rule)).toContain("description.keyword-echo");
+  });
+
+  it("grammatisch integriert passiert die Beschreibung", () => {
+    const issues = validateDescription(goodDescription, [], { alleKeywords: ["outdoor flasche", "edelstahl trinkflasche"] });
+    expect(issues.map((i) => i.rule)).not.toContain("description.keyword-echo");
+  });
+});

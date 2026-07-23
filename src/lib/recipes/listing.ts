@@ -309,11 +309,15 @@ function templateDraft(section: ListingSection, inputs: RecipeInputs): Record<st
     }
     case "backend":
       return { backend: trimToBytesByWord(kw.backendPool.join(" "), RULES.backendKeywords.maxBytes), rationale: [{ part: "Pool-Reihenfolge", source: "Backend-Pool aus Keyword-Analyse (Template)" }] };
-    case "description":
+    case "description": {
+      // Tertiary-Keywords großgeschrieben in einen Trägersatz — roh
+      // kleingeschriebene Phrasen scheiterten (zu Recht) am Keyword-Echo-Check.
+      const tertiaer = kw.tertiary.slice(0, 5).map((k) => k.charAt(0).toUpperCase() + k.slice(1));
       return {
-        description: `${inputs.brand} ${inputs.productName}: entwickelt für ${f.targetAudience ?? "anspruchsvolle Nutzer"}. ${(f.usps ?? []).join(". ")}. Wie wird es angewendet? Einfach und ohne Vorkenntnisse. ${kw.tertiary.slice(0, 5).join(", ")} — alle Details oben im Überblick.`,
+        description: `${inputs.brand} ${inputs.productName}: entwickelt für ${f.targetAudience ?? "anspruchsvolle Nutzer"}. ${(f.usps ?? []).join(". ")}. Wie wird es angewendet? Einfach und ohne Vorkenntnisse.${tertiaer.length ? ` Relevante Eigenschaften: ${tertiaer.join(", ")}.` : ""} Alle Details oben im Überblick.`,
         rationale: [{ part: "Aufbau", source: "Positionierung → Nutzen → Q&A-Denke (Template)" }],
       };
+    }
     case "qa": {
       const pains = inputs.reviewInsights?.painPoints?.slice(0, 5) ?? [];
       // Ordinal-WÖRTER statt Ziffern: „Frage 1 zu …" scheiterte (zu Recht) am

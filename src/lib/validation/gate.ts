@@ -364,6 +364,7 @@ export function validateDescription(description: string, bullets: string[] = [],
   const t = description.trim();
   if (!t) return [issue("description.empty", "error", "Beschreibung fehlt.")];
   issues.push(...pruefeZahlenTreue(t, ctx.zahlenQuellen ?? "", "description"));
+  issues.push(...pruefeKeywordEcho(t, ctx.alleKeywords ?? [], "description"));
 
   const bytes = byteLength(t);
   if (bytes > RULES.description.maxBytes)
@@ -391,6 +392,7 @@ export function validateItemHighlights(text: string, ctx: Ctx = {}): ValidationI
   const t = text.trim();
   if (!t) return [issue("highlights.empty", "error", "Item Highlights fehlen.")];
   issues.push(...pruefeZahlenTreue(t, ctx.zahlenQuellen ?? "", "highlights"));
+  issues.push(...pruefeKeywordEcho(t, ctx.alleKeywords ?? [], "highlights"));
   const chars = charLength(t);
   if (chars > RULES.itemHighlights.maxChars)
     issues.push(issue("highlights.max-length", "error", `${chars} Zeichen > ${RULES.itemHighlights.maxChars}.`));
