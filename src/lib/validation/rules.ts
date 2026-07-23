@@ -7,9 +7,11 @@
 export const RULES = {
   title: {
     // Spec-Update 07/2026: Amazon beschränkt Titel auf 75 Zeichen.
-    // Ziel 70–75 — Budget bestmöglich ausnutzen. Kategorie-Override via Wissens-Layer.
+    // PFLICHTBAND 68–75 (Nutzer 23.07., D192): unter 68 = Fehler (verschenkter
+    // Platz), 68–69 als Puffer, damit der deterministische Kürzungs-Fixer und
+    // die Generierung nicht an 1–2 Zeichen scheitern. Kategorie-Override via Wissens-Layer.
     maxChars: 75,
-    targetMinChars: 70,
+    targetMinChars: 68,
     maxKeywordOccurrence: 1,
   },
   /**

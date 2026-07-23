@@ -1,7 +1,8 @@
 import { generateForRecipe, resolveRecipe } from "@/lib/llm/registry";
 import { parseLlmJson } from "@/lib/llm/json";
 import { trimToBytesByWord, trimToBytesBySentence } from "@/lib/text/bytes";
-import { fixeWhitespace, fixeWhitespaceListe } from "@/lib/text/fixers";
+import { fixeWhitespace, fixeWhitespaceListe, fixeTitelLaenge } from "@/lib/text/fixers";
+import { keywordStammAbgedeckt } from "@/lib/validation/gate";
 import { pruefeKontrakt } from "@/lib/llm/contracts";
 import { regelnAlsPromptBlock } from "@/lib/validation/register";
 import { pruefeMitLlm } from "@/lib/validation/pruefer";
@@ -62,6 +63,11 @@ export type RecipeInputs = {
   zusatzKontext?: string | null;
   /** Content-Sprache (D128) — unabhängig vom Marktplatz; Default Deutsch. */
   sprache?: ContentSprache | null;
+  /**
+   * Conversion-Blocker (D167/D194): unbeantwortete Kunden-Themen mit Gewicht —
+   * die neuen Texte MÜSSEN sie adressieren, sonst bleibt die Conversion-Lücke.
+   */
+  conversionBlocker?: Array<{ titel: string; beschreibung: string }> | null;
 };
 
 export type TitleRationale = Array<{ part: string; source: string; verified: boolean }>;
@@ -145,7 +151,24 @@ function contextBlock(inputs: RecipeInputs): string {
     if (bt.length) lines.push(`KAUFAUSLÖSER: ${bt.join(" | ")}`);
     if (ri.languageToBorrow.length) lines.push(`KUNDENSPRACHE (nah dran formulieren): ${ri.languageToBorrow.slice(0, 6).join(" | ")}`);
     if (ri.languageToAvoid.length) lines.push(`SPRACHE VERMEIDEN: ${ri.languageToAvoid.slice(0, 6).join(" | ")}`);
+    // Quintessenz der Analyse (D194, Nutzer-Befund: lag im Payload, wurde aber
+    // nie gerendert): Kern-These + verdichtete Erkenntnisse steuern die Themen.
+    if (ri.kernThese) lines.push(`KERN-THESE DER BEWERTUNGS-ANALYSE: ${ri.kernThese}`);
+    if (ri.insightCards?.length)
+      lines.push(
+        `VERDICHTETE ERKENNTNISSE (Quintessenz — Themen-Steuerung für die Texte):\n${ri.insightCards
+          .slice(0, 6)
+          .map((c) => `- ${c.titel}: ${c.beschreibung.slice(0, 160)}`)
+          .join("\n")}`,
+      );
   }
+  if (inputs.conversionBlocker?.length)
+    lines.push(
+      `CONVERSION-BLOCKER (Kunden-Themen, die das bisherige Listing NICHT beantwortet — die neuen Texte MÜSSEN sie adressieren, D167):\n${inputs.conversionBlocker
+        .slice(0, 5)
+        .map((b) => `- ${b.titel}: ${b.beschreibung.slice(0, 160)}`)
+        .join("\n")}`,
+    );
   const approved = inputs.approved ?? {};
   for (const [sec, val] of Object.entries(approved)) {
     if (!val) continue;
@@ -208,7 +231,7 @@ REGELN (knowledge/content/bullets.md + Blog 07/2026):
 - BUDGET AUSNUTZEN: Ziel ≥${RULES.bullets.utilizationMinBytes} Bytes pro Bullet, hartes Max ${RULES.bullets.hardMaxChars} Zeichen — so viel Substanz wie möglich, kein Füllwort-Padding.
 - Slot-Logik: 1 HOOK (stärkster USP) · 2 PROBLEM→BENEFIT (häufigster Pain Point!) · 3 TRUST (Material/Norm mit Beleg) · 4 USAGE · 5 CLOSE (Lieferumfang/Erwartungsmanagement). Häufigster Pain Point darf nach vorn rücken.
 - Jede USP aus dem USP-SET genau EINMAL über alle Bullets. Keine Emojis.
-- SECONDARY-Keywords natürlich verteilen: ${kw.secondary.join(", ")}
+- SECONDARY-Keywords über die fünf Bullets VERTEILEN (je Bullet ein bis drei, KEIN Keyword in zwei Bullets), grammatisch natürlich integriert — die Verteilung folgt den Themen: Keywords und Kunden-Nutzen so aufteilen, dass kein Bullet einen anderen inhaltlich wiederholt: ${kw.secondary.join(", ")}
 - BEGRÜNDUNG: pro Bullet 1 Eintrag — welcher Slot, welcher Einwand/Use Case/Pain Point/USP/Keyword-Beleg dahintersteht.
 JSON: {"bullets": ["...", "...", "...", "...", "..."], "rationale": [{"part": "<Headline>", "source": "<Slot + Herleitung>"}]}`;
     case "highlights":
@@ -396,7 +419,15 @@ function baueErgebnis(
 ): SectionResult {
   switch (section) {
     case "title": {
-      const text = fixeWhitespace(String(parsed.title ?? ""));
+      // Längen-Fixer (D184/D192): Zeichen zählt und kürzt der CODE — ein zu
+      // langer Titel geht nie zurück ans LLM (das nicht zählen kann), sondern
+      // wird verlustarm von hinten gekürzt; Hauptkeyword-Abdeckung bleibt Pflicht.
+      const primary = inputs.keywords.primary[0];
+      const text = fixeTitelLaenge(fixeWhitespace(String(parsed.title ?? "")), {
+        max: RULES.title.maxChars,
+        min: RULES.title.targetMinChars,
+        istZulaessig: (s) => !primary || keywordStammAbgedeckt(primary, s),
+      });
       return { section, payload: { text, rationale: extractRationale(parsed, text) }, issues: validateTitle(text, ctx), raw, provider: providerName, model };
     }
     case "highlights": {
@@ -439,14 +470,44 @@ function textFuerPruefer(result: SectionResult): string {
   return result.payload.text ?? "";
 }
 
-/** Datengrundlage für den Prüfer: Fakten + Keywords (für Keyword-/Synonym-/Fakten-Urteile). */
+/**
+ * Datengrundlage für den Prüfer: Fakten + Keywords + BELEG-QUELLEN.
+ * Original-Listing und Zusatz-Infos sind Pflicht-Kontext (D194): ohne sie
+ * konnte der Prüfer belegte Wirkaussagen („gegen Sodbrennen" steht im
+ * Original-Titel) nicht von erfundenen unterscheiden und flaggte Belegtes.
+ */
 function prueferKontext(inputs: RecipeInputs): string {
   return [
     `MARKE: ${inputs.brand || inputs.eigenmarkeAusListing || "unbekannt"}`,
     `PRODUKT: ${inputs.productName}`,
-    `PRODUKT-FAKTEN: ${JSON.stringify(inputs.facts)}`,
+    `PRODUKT-FAKTEN (Beleg-Quelle): ${JSON.stringify(inputs.facts)}`,
+    inputs.listingIst?.title || inputs.listingIst?.bullets?.length
+      ? `ORIGINAL-LISTING (Beleg-Quelle — dort stehende Aussagen und Wirkangaben gelten als BELEGT):${inputs.listingIst.title ? `\nTitel: ${inputs.listingIst.title}` : ""}${inputs.listingIst.bullets?.length ? `\nBullets: ${inputs.listingIst.bullets.join(" • ")}` : ""}`
+      : "",
+    inputs.zusatzKontext?.trim() ? `ZUSATZ-INFOS (Beleg-Quelle):\n${inputs.zusatzKontext.trim().slice(0, 2000)}` : "",
     `KEYWORDS (dürfen ausschließlich grammatisch integriert vorkommen): ${Object.values(inputs.keywords).flat().join(", ")}`,
-  ].join("\n");
+  ].filter(Boolean).join("\n");
+}
+
+/**
+ * Bullet-weise Korrektur (D194, Nutzer 23.07.: „wenn ein Bullet passt, wird
+ * nicht das gesamte Konzept neu gewürfelt — nur der fehlerhafte Bullet wird
+ * neu geschrieben"): Aus den Error-Findings die betroffenen Bullet-Indizes
+ * lesen; Findings ohne Bullet-Bezug gelten als global (alle betroffen).
+ */
+export function betroffeneBullets(findings: ValidationIssue[], anzahl: number): Set<number> {
+  const betroffen = new Set<number>();
+  let global = false;
+  for (const f of findings) {
+    const treffer = [...f.message.matchAll(/Bullet\s+(\d+)/gi)];
+    if (treffer.length === 0) global = true;
+    for (const m of treffer) {
+      const i = parseInt(m[1], 10) - 1;
+      if (i >= 0 && i < anzahl) betroffen.add(i);
+    }
+  }
+  if (global || betroffen.size === 0) return new Set(Array.from({ length: anzahl }, (_, i) => i));
+  return betroffen;
 }
 
 export async function generateSection(
@@ -486,6 +547,8 @@ export async function generateSection(
   const maxVersuche = provider.name === "mock" ? 1 : MAX_VERSUCHE;
   let findings: ValidationIssue[] = [];
   let letzterEntwurf: string | null = null;
+  /** Regelkonforme Bullets aus dem Vorversuch — der Code erzwingt ihre wörtliche Übernahme (D184/D194). */
+  let gesperrteBullets: Map<number, string> | null = null;
 
   for (let versuch = 1; versuch <= maxVersuche; versuch++) {
     let parsed: Record<string, unknown>;
@@ -511,6 +574,15 @@ export async function generateSection(
         findings = [{ rule: `${section}.kontrakt`, severity: "error", message: e instanceof Error ? e.message : String(e), evidence: "deterministic" }];
         continue;
       }
+    }
+
+    // Gesperrte Bullets erzwingen (D184/D194): Was den Vorversuch bestanden
+    // hat, wird wörtlich übernommen — egal, was das Modell zurückliefert.
+    // Kein Neuwürfeln regelkonformer Bullets.
+    if (section === "bullets" && gesperrteBullets && Array.isArray(parsed.bullets)) {
+      const items = (parsed.bullets as unknown[]).map(String);
+      for (const [i, text] of gesperrteBullets) if (i < items.length) items[i] = text;
+      parsed = { ...parsed, bullets: items };
     }
 
     // Kontrakt-Grenze (D183): Schema-Verstoß wird abgewiesen, nie weitergereicht.
@@ -539,6 +611,18 @@ export async function generateSection(
     if (nurErrors(issues).length === 0) return { ...result, issues };
     findings = nurErrors(issues);
     letzterEntwurf = textFuerPruefer(result);
+
+    // Bullet-weise Korrektur (D194): regelkonforme Bullets sperren, im
+    // Korrektur-Auftrag markieren — nur die betroffenen werden neu geschrieben.
+    if (section === "bullets" && result.payload.items?.length) {
+      const items = result.payload.items;
+      const betroffen = betroffeneBullets(findings, items.length);
+      gesperrteBullets = new Map(items.map((t, i) => [i, t] as const).filter(([i]) => !betroffen.has(i)));
+      if (gesperrteBullets.size === 0) gesperrteBullets = null;
+      letzterEntwurf = items
+        .map((b, i) => `Bullet ${i + 1} (${betroffen.has(i) ? "NEU SCHREIBEN — siehe Verstöße" : "FREIGEGEBEN — wörtlich unverändert übernehmen"}): ${b}`)
+        .join("\n");
+    }
   }
 
   // Hart blockieren (D182): kein Entwurf mit Regelverstößen wird sichtbar.

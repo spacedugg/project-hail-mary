@@ -39,7 +39,10 @@ export function FehlerPopup({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" role="alertdialog" aria-modal="true" aria-labelledby="fehler-titel">
-      <div className="card w-full max-w-lg p-5 shadow-2xl">
+      {/* max-h + eigenes Scrollen (Nutzer-Befund 23.07., D193): lange QM-Prüfprotokolle
+          sprengten den Viewport, ohne scrollbar zu sein. Der Dialog bleibt im
+          Bildschirm; die Detail-Meldung scrollt in ihrem eigenen Kasten. */}
+      <div className="card flex max-h-[85vh] w-full max-w-lg flex-col p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <span className="icon-chip bg-[rgb(220_38_38/0.12)] text-bad">✕</span>
@@ -49,7 +52,7 @@ export function FehlerPopup({
             </div>
           </div>
         </div>
-        <p className="mt-3 rounded-xl bg-[rgb(220_38_38/0.08)] px-3 py-2 text-sm text-bad">{message}</p>
+        <p className="mt-3 overflow-y-auto rounded-xl bg-[rgb(220_38_38/0.08)] px-3 py-2 text-sm text-bad">{message}</p>
         <div className="mt-3 space-y-2 text-xs">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Was das bedeutet</div>

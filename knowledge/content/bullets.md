@@ -39,6 +39,16 @@ Weitere Recipe-Regeln:
 - Konkrete Zahlen statt Adjektive („hält 24 h kalt" statt „lange kalt").
 - **Erwartungsmanagement nicht vergessen** (sales-room-Preset): was das Produkt NICHT kann, ehrlich rahmen → weniger Retouren + bessere Reviews.
 
+## Anatomie = Best Practice mit Toleranz (Nutzer 23.07.2026, D194)
+
+Die Anatomie (Benefit-Headline, EIN Thema, Drei Positionen) ist **Richtschnur, kein Dogma** — sie darf produktabhängig abweichen (Wirkstoff-Headline, Marken-/Service-Bullet, gebündelte Anwendungs-Details). Die UNVERHANDELBAREN Gesetze bleiben: keine erfundenen Fakten (Fakten-Sperre), keine UNBELEGTEN Wirkversprechen (belegte — z. B. „gegen Sodbrennen" aus dem Original-Listing — sind zulässig), keine INHALTLICHE Wiederholung zwischen Bullets (Wort-Wiederholung allein ist ok), Keywords grammatisch integriert. Im Register: Anatomie-Regeln = warning, Wahrheits-/Sprach-Regeln = error.
+
+**Gold-Standard-Referenz** (Nutzer-Screenshot 23.07., Ulmenrinde-Produkt): Frage-Hook im Problem-Bullet („Hund frisst ständig Gras oder Kot?"), Wirkstoff-Kombination als Trust-Headline, Anwendungs-Bullet bündelt Dosierung + Packungsgröße + Konsistenz, CLOSE als Marken-/Service-Versprechen mit Erwartungsmanagement. SECONDARY-Keywords und Kunden-Nutzen disjunkt über die fünf Bullets verteilt.
+
+## Korrektur-Verfahren (D194)
+
+Scheitert ein Entwurf am QM-Gate, wird NICHT neu gewürfelt: Regelkonforme Bullets werden GESPERRT (der Code erzwingt ihre wörtliche Übernahme), nur die von Verstößen betroffenen Bullets werden neu geschrieben.
+
 ## VALIDATION (Checks im Gate)
 
 Anzahl = 5 · Byte-Range je Bullet · Headline-Pattern (Versalien + Doppelpunkt) · USP-Dedup über alle Bullets · Keyword-Frequenz-Fenster · Blacklists (Phrasen, Claims, Marken) · Satz-Anzahl ≤3 (= SPEC, Drift-Fix 23.07.) · Keyword-Echo (roh eingeklebte kleingeschriebene Suchphrasen) · Cross-Bullet-Satzdopplung (Shingle-Overlap) · Feature-Headline (Ziffern-Start) · Headline-Echo im ersten Satz · Reference-Fidelity (Material-/Form-Claims gegen Produkt-Stammdaten).

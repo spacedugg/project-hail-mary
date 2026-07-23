@@ -294,11 +294,12 @@ export function validateBullets(bullets: string[], ctx: Ctx = {}): ValidationIss
     else if (headWords.length < 2 || headWords.length > 6)
       issues.push(issue("bullets.headline-length", "warning", `Bullet ${n}: Headline ${headWords.length} Wörter (Ziel 3–5).`));
 
-    // Feature-Headline, deterministisches Ende (D181): eine Headline, die mit
-    // einer Zahl beginnt („350 G MIT CA. 160 DROPS"), ist eine Mengenangabe,
-    // nie eine Benefit-Aussage — den semantischen Rest prüft der LLM-Prüfer.
+    // Feature-Headline, deterministisches Ende (D181, Toleranz D194): eine
+    // Headline, die mit einer Zahl beginnt („350 G MIT CA. 160 DROPS"), ist
+    // eine Mengenangabe ohne Kaufgrund — Warnung (Anatomie ist Best Practice,
+    // kein Block-Grund); den semantischen Rest beurteilt der LLM-Prüfer.
     if (/^\s*\d/.test(headline))
-      issues.push(issue("bullets.headline-feature", "error", `Bullet ${n}: Headline beginnt mit einer Zahl — sie muss eine Benefit-Aussage sein, kein Feature/Mengenangabe.`));
+      issues.push(issue("bullets.headline-feature", "warning", `Bullet ${n}: Headline beginnt mit einer Zahl — Best Practice ist ein Kaufgrund/Benefit, keine Mengenangabe.`));
 
     // Headline-Echo, wortgleiches Ende (D181): erster Satz beginnt mit den
     // Headline-Wörtern („BERUHIGT DEN MAGEN …: Beruhigt den Magen …").

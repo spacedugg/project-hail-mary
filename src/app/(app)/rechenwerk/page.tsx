@@ -3,7 +3,7 @@ import { RECHENWERK, BERICHTE, KOMBI_KENNZAHLEN } from "@/lib/rechenwerk";
 import { DATENFLUSS } from "@/lib/datenfluss/register";
 import { BerichteSuche, KpiSuche } from "@/components/register-suche";
 import { RULES } from "@/lib/validation/rules";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { getFeeConfigState } from "@/lib/settings";
 import type { FeeConfig } from "@/lib/margin/fees";
@@ -32,6 +32,22 @@ export default async function RechenwerkPage() {
   const db = await getDb();
   const pendingRow = await db.query.settings.findFirst({ where: eq(schema.settings.key, "fee_config_pending") });
   const pending = (pendingRow?.value as PendingFees | undefined) ?? null;
+
+  // QM-Blockier-Log (D182/D193): welche Regel scheitert wie oft? Jeder Block
+  // ist ein Bau-Auftrag — diese Auswertung macht ihn sichtbar statt flüchtig.
+  const qmBlockRows = await db.query.qmBlocks.findMany({ orderBy: desc(schema.qmBlocks.createdAt), limit: 100 });
+  const regelStatistik = new Map<string, { anzahl: number; zuletzt: Date; beispiel: string }>();
+  for (const b of qmBlockRows)
+    for (const f of b.findings) {
+      const e = regelStatistik.get(f.rule);
+      if (e) {
+        e.anzahl++;
+        if (b.createdAt > e.zuletzt) { e.zuletzt = b.createdAt; e.beispiel = f.message; }
+      } else {
+        regelStatistik.set(f.rule, { anzahl: 1, zuletzt: b.createdAt, beispiel: f.message });
+      }
+    }
+  const regelnNachHaeufigkeit = [...regelStatistik.entries()].sort((a, b) => b[1].anzahl - a[1].anzahl);
 
   return (
     <OsShell>
@@ -94,6 +110,40 @@ export default async function RechenwerkPage() {
               </details>
             ))}
           </div>
+        </section>
+
+        {/* QM-Blockier-Log (D182/D193): jeder Block ist ein Bau-Auftrag */}
+        <section className="mt-3 card p-4">
+          <div className="flex items-center gap-2.5">
+            <span className="icon-chip chip-amber"><IconCheck /></span>
+            <div>
+              <h2 className="text-sm font-semibold">QM-Blockier-Log — welche Regel scheitert wie oft?</h2>
+              <p className="text-xs text-muted">Jeder harte QM-Block wird hier gezählt. Häufige Wiederholungen derselben Regel sind Bau-Aufträge (neuer Fixer, bessere Regel oder fehlender Input), keine Zufälle.</p>
+            </div>
+          </div>
+          {regelnNachHaeufigkeit.length === 0 ? (
+            <p className="mt-3 text-xs text-muted">Keine Blockier-Ereignisse aufgezeichnet.</p>
+          ) : (
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-hair text-left text-[11px] uppercase text-neutral-500">
+                    <th className="py-1 pr-3">Regel</th><th className="pr-3">Verstöße</th><th className="pr-3">Zuletzt</th><th>Letzter Beleg</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {regelnNachHaeufigkeit.map(([regel, s]) => (
+                    <tr key={regel} className="border-b border-hair align-top last:border-0">
+                      <td className="py-1.5 pr-3 font-mono text-xs">{regel}</td>
+                      <td className="pr-3 tabular-nums font-medium">{s.anzahl}</td>
+                      <td className="pr-3 whitespace-nowrap text-xs text-muted">{s.zuletzt.toLocaleString("de-DE")}</td>
+                      <td className="text-xs text-neutral-700 dark:text-neutral-300">{s.beispiel.slice(0, 160)}{s.beispiel.length > 160 ? "…" : ""}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
 
         {/* Kombinierte Kennzahlen: entstehen erst aus mehreren Quellen */}

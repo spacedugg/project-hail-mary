@@ -83,6 +83,25 @@ describe("listing recipes (mock)", () => {
     expect(mitAnalyse).not.toContain("KEINE Bewertungs-Analyse");
   });
 
+  it("Quintessenz erreicht den Prompt: Kern-These, Erkenntnisse, Conversion-Blocker (D194)", () => {
+    const prompt = sectionPrompt("bullets", {
+      ...inputs,
+      reviewInsights: {
+        sources: [], stats: { reviewsTotal: 50, ratingAvg: 4.2 },
+        painPoints: [{ label: "Dichtung undicht", quotes: [] }],
+        buyingTriggers: [{ label: "hält wirklich kalt", quotes: [] }],
+        languageToBorrow: [], languageToAvoid: [],
+        kernThese: "Käufer lieben die Isolierung, fürchten aber Undichtigkeit.",
+        insightCards: [{ titel: "Dichtheit ist die Kauf-Hürde", beschreibung: "Viele zögern wegen Berichten über undichte Deckel.", relevanz: 5, quellen: [], bildIdeen: [], belegAspekte: [] }],
+      },
+      conversionBlocker: [{ titel: "Spülmaschinen-Frage unbeantwortet", beschreibung: "Kunden fragen nach Reinigung, das Listing schweigt." }],
+    });
+    expect(prompt).toContain("KERN-THESE DER BEWERTUNGS-ANALYSE");
+    expect(prompt).toContain("Dichtheit ist die Kauf-Hürde");
+    expect(prompt).toContain("CONVERSION-BLOCKER");
+    expect(prompt).toContain("Spülmaschinen-Frage unbeantwortet");
+  });
+
   it("erkannte Fremdmarken erreichen das Gate — Marke im Text BLOCKT den Entwurf hart (D97 + D182)", async () => {
     try {
       await generateSection("title", {

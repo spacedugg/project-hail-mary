@@ -560,6 +560,15 @@ async function generiereSektionKern(
     listingIst: snapshot ? { title: snapshot.title, bullets: snapshot.bullets } : null,
     zusatzKontext: product.zusatzKontext,
     sprache: product.contentSprache,
+    // Conversion-Blocker in die Content-Prompts (D194, Nutzer 23.07.):
+    // unbeantwortete Kunden-Themen sind Pflicht-Input der Text-Erstellung.
+    conversionBlocker: await (async () => {
+      const blocker = await db.query.conversionBlockers.findFirst({
+        where: eq(schema.conversionBlockers.productId, productId),
+        orderBy: desc(schema.conversionBlockers.createdAt),
+      });
+      return blocker?.payload.cards.map((c) => ({ titel: c.titel, beschreibung: c.beschreibung })) ?? null;
+    })(),
   };
 
   // Fehler (API, Zeitbudget, kaputtes JSON) als Banner, nie als Fehlerseite (D81).
@@ -571,10 +580,22 @@ async function generiereSektionKern(
     result = await generateSection(section, inputs);
   } catch (e) {
     if (e instanceof QmBlockFehler) {
+      // QM-Block-Log (D182/D193): jeder Block ist ein Bau-Auftrag — persistent
+      // gespeichert und unter „Daten & Formeln" ausgewertet (welche Regel
+      // scheitert wie oft?). Log-Fehler dürfen den eigentlichen Befund nie verdecken.
+      try {
+        await db.insert(schema.qmBlocks).values({
+          id: id(), productId, bereich: `listing.${section}`, findings: e.issues, versuche: e.versuche,
+        });
+      } catch (logFehler) {
+        console.error("[QM-BLOCK-LOG] Speichern fehlgeschlagen", logFehler);
+      }
+      // Banner-Deckel (D193, Nutzer-Befund: Protokoll sprengte den Bildschirm):
+      // die ersten 6 Verstöße + Verweis, das volle Protokoll liegt im QM-Log.
+      const kopf = e.issues.slice(0, 6).map((i) => `[${i.rule}] ${i.message}`).join(" · ");
+      const rest = e.issues.length > 6 ? ` … +${e.issues.length - 6} weitere Verstöße.` : "";
       throw new GenFehler(
-        `QM-Gate (${SEKTIONS_LABEL[section] ?? section}): Ergebnis nach ${e.versuche} Versuch(en) nicht regelkonform — nichts gespeichert. Verstöße: ${e.issues
-          .map((i) => `[${i.rule}] ${i.message}`)
-          .join(" · ")}`,
+        `QM-Gate (${SEKTIONS_LABEL[section] ?? section}): Ergebnis nach ${e.versuche} Versuch(en) nicht regelkonform — nichts gespeichert. Verstöße: ${kopf}${rest} Vollständiges Protokoll: QM-Log unter „Daten & Formeln".`,
         "QM-01",
       );
     }

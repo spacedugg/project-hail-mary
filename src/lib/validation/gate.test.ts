@@ -79,7 +79,7 @@ describe("validateTitle", () => {
     const long = "AquaNova Edelstahl-Trinkflasche 750 ml, auslaufsicher, doppelwandig isoliert und robust";
     expect(validateTitle(long, ctx).map((i) => i.rule)).toContain("title.max-length");
   });
-  it("unter 70 Zeichen ist FEHLER (Pflichtband 70–75, Nutzer-Regel 23.07./D190)", () => {
+  it("unter 68 Zeichen ist FEHLER (Pflichtband 68–75, Nutzer-Regel 23.07./D190+D192)", () => {
     const short = "AquaNova Edelstahl-Trinkflasche 750 ml";
     const hits = validateTitle(short, ctx).filter((i) => i.rule === "title.budget");
     expect(hits).toHaveLength(1);
