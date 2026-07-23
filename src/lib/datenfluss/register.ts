@@ -92,12 +92,13 @@ export const DATENFLUSS: Datenpunkt[] = [
     speicher: "review_scrapes → review_insights",
     analysen: [
       { name: "Roh-Analyse", modul: "src/lib/reviews/insights.ts", outcome: "Roh-Aspekte mit Fundstellen, Pain Points, Kaufauslöser, Kundensprache" },
-      { name: "Beleg-Prüfung (verbatim)", modul: "src/lib/reviews/belegPruefung.ts", outcome: "nur code-verifizierte Fundstellen überleben; echte Zählwerte je Aspekt (D152/D170)" },
+      { name: "Beleg-Prüfung (verbatim)", modul: "src/lib/reviews/belegPruefung.ts", outcome: "nur code-verifizierte Fundstellen überleben; echte Zählwerte je Aspekt (D152/D170) + Herkunfts-Attribution eigene/Wettbewerbs-ASIN je Aspekt (D196)" },
+      { name: "Übertragbarkeits-Prüfung", modul: "src/lib/reviews/uebertragbarkeit.ts", outcome: "wettbewerbs-dominante Aspekte erhalten Urteil ja/nein/unbekannt gegen UNSERE Produkt-Wahrheit + Listing (D196)" },
       { name: "Verdichtung", modul: "src/lib/reviews/verdichtung.ts", outcome: "Erkenntnisse mit Gegensatz-Pflicht + code-gerechneter Tendenz (D171)" },
       { name: "Konfidenz", modul: "src/lib/reviews/konfidenz.ts", outcome: "Belastbarkeits-Urteil der Datenbasis; Signifikanz-Gate (D170)" },
     ],
     verwendung: [
-      "Content-Prompts: Pain Points, Kaufauslöser, Kundensprache — NIE als Zahlen-/Spec-Quelle (D114)",
+      "Content-Prompts: strategische Blöcke nach Herkunft × Übertragbarkeit — Kern-Content (eigene Kaufauslöser), fehlender Kern-Content (übertragbare Wettbewerbs-Kaufauslöser), Angriffs-Lücken (nicht-übertragbare Wettbewerbs-Pain-Points), Erwartungsmanagement (eigene + übertragbare Pain Points); geteilte Themen nur auf ihrer Mehrheits-Seite (D196). NIE als Zahlen-/Spec-Quelle (D114)",
       "Conversion-Blocker & Conversion Drivers (D167/D178)",
       "Briefings (Bild-Ideen aus Gegenmaßnahmen, D171)",
     ],

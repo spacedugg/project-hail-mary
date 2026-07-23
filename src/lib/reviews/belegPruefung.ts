@@ -25,10 +25,13 @@ const norm = (s: string) => s.toLowerCase().replace(/["„“‚’'«»]/g, "")
 
 export function verifiziereZitate(
   aspekte: Aspekt[],
-  reviews: Array<Pick<RawReview, "rating" | "title" | "body">>,
+  reviews: Array<Pick<RawReview, "rating" | "title" | "body"> & { asin?: string }>,
   typ: "painPoint" | "buyingTrigger",
+  /** Eigene Produkt-ASIN (D196) — Basis der Herkunfts-Attribution je Aspekt. */
+  eigeneAsin?: string,
 ): { aspekte: Aspekt[]; notizen: string[] } {
-  const texte = reviews.map((r) => ({ text: norm(`${r.title} ${r.body}`), rating: r.rating }));
+  const texte = reviews.map((r) => ({ text: norm(`${r.title} ${r.body}`), rating: r.rating, asin: (r.asin ?? "").toUpperCase() }));
+  const eigene = (eigeneAsin ?? "").toUpperCase();
   const notizen: string[] = [];
   let entfernteZitate = 0;
   const behalten: Aspekt[] = [];
@@ -48,6 +51,18 @@ export function verifiziereZitate(
         entfernteZitate++;
       }
     }
+    // Herkunfts-Attribution (D196): der Code kennt die ASIN jedes verifizierten
+    // Fund-Reviews — eigene vs. Wettbewerbs-Fundstellen werden GEZÄHLT, nie geraten.
+    const jeAsin: Record<string, number> = {};
+    for (const idx of fundReviews) {
+      const asin = texte[idx].asin || "unbekannt";
+      jeAsin[asin] = (jeAsin[asin] ?? 0) + 1;
+    }
+    const herkunft = {
+      eigene: eigene ? (jeAsin[eigene] ?? 0) : 0,
+      fremde: Object.entries(jeAsin).reduce((s, [asin, n]) => (asin !== eigene ? s + n : s), 0),
+      jeAsin,
+    };
     if (belegt.length === 0) {
       notizen.push(`Aspekt „${a.label}" verworfen — kein Zitat wörtlich in den Reviews auffindbar (${typ === "painPoint" ? "Pain Point" : "Kaufauslöser"}).`);
       continue;
@@ -56,8 +71,8 @@ export function verifiziereZitate(
     if (typ === "buyingTrigger" && avg <= 2.5) {
       notizen.push(`△ Kaufauslöser „${a.label}": Beleg-Zitate stammen im Schnitt aus ${avg.toFixed(1)}★-Reviews — Einordnung als Kaufauslöser prüfen.`);
     }
-    // Echter Zählwert (D170): verschiedene Reviews mit verifizierter Fundstelle
-    behalten.push({ ...a, quotes: belegt, mentionCount: fundReviews.size, frequencyPct: null });
+    // Echter Zählwert (D170) + Herkunft (D196): verschiedene Reviews mit verifizierter Fundstelle
+    behalten.push({ ...a, quotes: belegt, mentionCount: fundReviews.size, frequencyPct: null, herkunft });
   }
   if (entfernteZitate > 0) {
     notizen.push(`${entfernteZitate} Zitat(e) ohne wörtliche Fundstelle in den Reviews entfernt (Verbatim-Gate).`);

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { generateSection, sectionPrompt, QmBlockFehler, SECTION_ORDER, type RecipeInputs } from "./listing";
+import { generateSection, sectionPrompt, einseitigeAspekte, QmBlockFehler, SECTION_ORDER, type RecipeInputs } from "./listing";
 
 /**
  * Recipe-Pipeline im Mock-Modus (LLM_FORCE_MOCK): deterministischer Template-Pfad.
@@ -115,5 +115,59 @@ describe("listing recipes (mock)", () => {
       expect(e).toBeInstanceOf(QmBlockFehler);
       expect((e as QmBlockFehler).issues.map((i) => i.rule)).toContain("title.competitor-brand");
     }
+  });
+});
+
+describe("Ein-Seiten-Zuordnung + strategische Blöcke (D196)", () => {
+  const aspekt = (label: string, eigene: number, fremde: number, urteil?: "ja" | "nein" | "unbekannt") => ({
+    label, frequencyPct: null, mentionCount: eigene + fremde, quotes: [],
+    herkunft: { eigene, fremde, jeAsin: {} },
+    ...(urteil ? { uebertragbarkeit: { urteil, grund: "Spezifikations-Vergleich" } } : {}),
+  });
+
+  it("geteilte Themen landen nur auf ihrer Mehrheits-Seite (Zählwert entscheidet)", () => {
+    const ri = {
+      sources: [], stats: { reviewsTotal: 100, ratingAvg: 4 },
+      painPoints: [aspekt("wirkt nicht", 3, 0)],
+      buyingTriggers: [aspekt("wirkt zuverlässig", 12, 0)],
+      languageToBorrow: [], languageToAvoid: [],
+      insightCards: [{
+        titel: "Wirkung überzeugt die Mehrheit", beschreibung: "", relevanz: 5, quellen: [], bildIdeen: [],
+        belegAspekte: [
+          { label: "wirkt zuverlässig", typ: "buyingTrigger" as const, mentionCount: 12 },
+          { label: "wirkt nicht", typ: "painPoint" as const, mentionCount: 3 },
+        ],
+      }],
+    };
+    const seiten = einseitigeAspekte(ri);
+    expect(seiten.buyingTriggers.map((a) => a.label)).toContain("wirkt zuverlässig");
+    expect(seiten.painPoints.map((a) => a.label)).not.toContain("wirkt nicht");
+  });
+
+  it("Herkunft × Übertragbarkeit steuert die Prompt-Blöcke (Kern-Content, fehlender Kern-Content, Angriffs-Lücke)", () => {
+    const prompt = sectionPrompt("bullets", {
+      ...inputs,
+      reviewInsights: {
+        sources: [], stats: { reviewsTotal: 200, ratingAvg: 4.3 },
+        painPoints: [
+          aspekt("Deckel undicht", 6, 1),
+          aspekt("Tablette zu groß zum Schlucken", 0, 9, "nein"),
+        ],
+        buyingTriggers: [
+          aspekt("hält lange kalt", 8, 2),
+          aspekt("angenehmer Kräuterduft", 1, 7, "ja"),
+          aspekt("hübsche Geschenkbox", 0, 5, "nein"),
+        ],
+        languageToBorrow: [], languageToAvoid: [],
+      },
+    });
+    expect(prompt).toContain("KAUFAUSLÖSER EIGENER KUNDEN");
+    expect(prompt).toContain("hält lange kalt");
+    expect(prompt).toContain("ÜBERTRAGBARE WETTBEWERBS-KAUFAUSLÖSER");
+    expect(prompt).toContain("angenehmer Kräuterduft");
+    expect(prompt).toContain("ANGRIFFS-LÜCKEN");
+    expect(prompt).toContain("Tablette zu groß zum Schlucken");
+    // nicht übertragbarer Wettbewerbs-Kaufauslöser wird weggelassen
+    expect(prompt).not.toContain("hübsche Geschenkbox");
   });
 });
