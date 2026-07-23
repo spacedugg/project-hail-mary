@@ -3,7 +3,7 @@ import { parseLlmJson } from "@/lib/llm/json";
 import { trimToBytesByWord, trimToBytesBySentence } from "@/lib/text/bytes";
 import { fixeWhitespace, fixeWhitespaceListe, fixeTitelLaenge } from "@/lib/text/fixers";
 import { keywordStammAbgedeckt, entferneUnbelegteZahlSaetze } from "@/lib/validation/gate";
-import { pruefeKontrakt } from "@/lib/llm/contracts";
+import { pruefeKontrakt, pruefeRationaleKontrakt } from "@/lib/llm/contracts";
 import { regelnAlsPromptBlock } from "@/lib/validation/register";
 import { pruefeMitLlm } from "@/lib/validation/pruefer";
 import { RULES } from "@/lib/validation/rules";
@@ -281,6 +281,33 @@ function behebungFuer(rule: string): string | null {
   return null;
 }
 
+/** Sektions-Labels für die Begründungs-Phase (D200). */
+const SECTION_LABEL: Record<ListingSection, string> = {
+  title: "Titel",
+  highlights: "Item Highlights",
+  bullets: "Bullet Points",
+  backend: "Backend-Keywords",
+  description: "Beschreibung",
+  qa: "Q&A",
+};
+
+/**
+ * Copy-Schema der ersten Phase (D200, Nutzer 23.07.: „JSON/rationale-Korsett
+ * lockern“): NUR die Text-Felder, KEINE rationale. Die Prosa wird so nicht vom
+ * gleichzeitigen Selbst-Rechtfertigen abgelenkt (Ursache der Meta-Floskeln im
+ * Screenshot). Die Begründung liefert eine separate zweite Phase (rationalePrompt)
+ * zum bereits fertigen Text — der zusammengebaute Datensatz trägt rationale wie
+ * bisher (D183 unangetastet).
+ */
+const COPY_SCHEMA: Record<ListingSection, string> = {
+  title: `{"title": "<der fertige Titel>"}`,
+  highlights: `{"highlights": "<die fertigen Item Highlights>"}`,
+  bullets: `{"bullets": ["<Bullet 1>", "<Bullet 2>", "<Bullet 3>", "<Bullet 4>", "<Bullet 5>"]}`,
+  backend: `{"backend": "wort1 wort2 wort3 ..."}`,
+  description: `{"description": "<die fertige Beschreibung>"}`,
+  qa: `{"pairs": [{"q": "...", "a": "..."}]}`,
+};
+
 export function sectionPrompt(section: ListingSection, inputs: RecipeInputs, korrektur: ValidationIssue[] = [], vorherigerEntwurf?: string | null): string {
   const parts = [basePrompt(section, inputs)];
   const gesetze = regelnAlsPromptBlock(section);
@@ -300,7 +327,26 @@ export function sectionPrompt(section: ListingSection, inputs: RecipeInputs, kor
         })
         .join("\n")}\nKorrigiere MINIMAL-INVASIV: Behebe GENAU diese Verstöße und behalte alles Regelkonforme möglichst wörtlich bei.`,
     );
+  // Copy-Phase (D200): NUR die Text-Felder, KEINE Begründung — die Prosa soll
+  // ohne Selbst-Rechtfertigung entstehen. Antworte exakt mit diesem JSON.
+  parts.push(`AUSGABE: Antworte AUSSCHLIESSLICH mit diesem JSON — exakt diese Felder, KEINE Begründung, KEIN weiteres Feld, kein Markdown:\n${COPY_SCHEMA[section]}`);
   return parts.join("\n\n");
+}
+
+/**
+ * Begründungs-Phase (D200): erklärt den BEREITS FERTIGEN Text — verändert ihn
+ * nicht. Läuft erst, wenn die Copy alle Error-Checks (Gate + LLM-Prüfer)
+ * bestanden hat; kann die geprüfte Copy also nicht mehr verschlechtern.
+ */
+export function rationalePrompt(section: ListingSection, inputs: RecipeInputs, finalText: string): string {
+  return `${contextBlock(inputs)}
+
+FERTIGER TEXT — Sektion „${SECTION_LABEL[section]}" (bereits final und geprüft — NICHT verändern, nur erklären):
+${finalText}
+
+AUFGABE: Begründe den obigen, fertigen Text. Pro sinntragendem Bestandteil (Titelteil, Bullet-Headline, Highlight-Fakt, Abschnitt) ein Eintrag: WORAUS er sich ableitet — Keyword-Analyse, USP, Produkt-Wahrheit, Slot-Logik (HOOK/PROBLEM→BENEFIT/TRUST/USAGE/CLOSE), Pain Point oder Kaufauslöser. Du schreibst den Text NICHT um.
+AUSGABE: Antworte AUSSCHLIESSLICH mit diesem JSON, kein Markdown:
+{"rationale": [{"part": "<Bestandteil>", "source": "<Herleitung>"}]}`;
 }
 
 function basePrompt(section: ListingSection, inputs: RecipeInputs): string {
@@ -315,9 +361,7 @@ REGELN (knowledge/content/title.md, Amazon-Neuerung 07/2026):
 - HART: ${RULES.title.targetMinChars}–${RULES.title.maxChars} Zeichen — PFLICHTBAND, unter ${RULES.title.targetMinChars} ist verschenkter Platz und wird abgewiesen. Zähle sorgfältig.
 - HAUPTKEYWORD „${kw.primary[0] ?? ""}" MUSS abgedeckt sein — WORTSTAMM-Abdeckung zählt: Flexion und Komposita sind erlaubt und erwünscht („Ulmenrinde-Drops für Hunde" deckt „ulmenrinde für hunde"). NIE eine Suchphrase wörtlich einkleben, wenn sie ungrammatisch ist — Amazon matcht Wortstämme, geklebte Phrasen bringen NULL Ranking-Vorteil.
 - Weitere PRIMARY-Keywords (${kw.primary.slice(1).join(", ") || "keine"}): nur einbauen, was grammatisch natürlich passt — Vollständigkeit ist KEINE Pflicht, Lesbarkeit gewinnt immer. Kein Wortstamm mehrfach.
-- Zahlen als Ziffern. Keine Werbephrasen, keine Emojis, keine Versalien-Wörter außer Marke/Norm.
-- BEGRÜNDUNG: Erkläre jeden Titelbestandteil — woraus er sich ableitet (Keyword-Analyse, USP, Produkt-Wahrheit, Marke) und warum er das Budget verdient.
-JSON: {"title": "...", "rationale": [{"part": "<Bestandteil>", "source": "<Herleitung, z. B. 'Hauptkeyword aus Keyword-Analyse' oder 'USP #1: hält 24 h kalt'>"}]}`;
+- Zahlen als Ziffern. Keine Werbephrasen, keine Emojis, keine Versalien-Wörter außer Marke/Norm.`;
     case "bullets":
       return `${ctx}
 
@@ -330,8 +374,11 @@ REGELN (knowledge/content/bullets.md + Blog 07/2026):
 - Slot-Logik: 1 HOOK (stärkster USP) · 2 PROBLEM→BENEFIT (häufigster Pain Point!) · 3 TRUST (Material/Norm mit Beleg) · 4 USAGE · 5 CLOSE (Lieferumfang/Erwartungsmanagement). Häufigster Pain Point darf nach vorn rücken.
 - Jede USP aus dem USP-SET genau EINMAL über alle Bullets. Keine Emojis.
 - SECONDARY-Keywords über die fünf Bullets VERTEILEN (je Bullet ein bis drei, KEIN Keyword in zwei Bullets), grammatisch natürlich integriert — die Verteilung folgt den Themen: Keywords und Kunden-Nutzen so aufteilen, dass kein Bullet einen anderen inhaltlich wiederholt: ${kw.secondary.join(", ")}
-- BEGRÜNDUNG: pro Bullet 1 Eintrag — welcher Slot, welcher Einwand/Use Case/Pain Point/USP/Keyword-Beleg dahintersteht.
-JSON: {"bullets": ["...", "...", "...", "...", "..."], "rationale": [{"part": "<Headline>", "source": "<Slot + Herleitung>"}]}`;
+- PRODUKT-FOKUS (härteste Regel, wird blockierend geprüft): Jeder Satz beschreibt das PRODUKT und seinen konkreten Nutzen — NIE das Listing, die Kennzeichnung/Auszeichnung, die Produktbilder oder euren Anbieter-Standpunkt. Verbotene Meta-Floskeln: „wir weisen … aus“, „ein Foto finden Sie in unseren Produktbildern“, „diese Transparenz ist uns wichtig(er als …)“.
+- HEADLINE = KAUFGRUND, nie eine nackte Menge/Dosierung (wird blockierend geprüft). Erlaubt: Benefit-Aussage, Wirkstoff-Kombination, Marken-Versprechen. Falsch: „PRO KAPSEL 610 MG“, „350 G MIT 160 DROPS“.
+- VORHER→NACHHER — lerne den Unterschied an einem echten Fall:
+  SCHLECHT: „PRO KAPSEL 610 MG, KLAR AUSGEWIESEN: Sie wissen genau, was Sie einnehmen. Wir weisen beide Werte getrennt aus.“ → Headline = nur Menge; Text = Meta über die Kennzeichnung; kein Nutzen, kein Keyword, Budget verschenkt.
+  GUT: „HOCHDOSIERT FÜR DIE TÄGLICHE BALLASTSTOFFZUFUHR: 610 mg indischer Flohsamen (Psyllium Husk) pro Kapsel liefern konzentrierte Ballaststoffe für eine sanfte Verdauung. Ideal für Erwachsene, die ohne Anrühren von losem Pulver dosieren möchten.“ → Headline = Nutzen; die Zahl 610 mg dient als Beleg; Keyword integriert; konkreter Use Case; Budget genutzt.`;
     case "highlights":
       return `${ctx}
 
@@ -340,8 +387,7 @@ REGELN (Ausschöpfungs-Prinzip 07/2026):
 - HART: max ${RULES.itemHighlights.maxChars} Zeichen GESAMT; Ziel ${RULES.itemHighlights.targetMinChars}–${RULES.itemHighlights.maxChars} — Budget ausnutzen, sorgfältig zählen.
 - NULL TITEL-DOPPLUNG (wird maschinell geprüft, D197): Titel und Highlights stehen im Listing DIREKT nebeneinander — kein Wort, kein Fakt, keine Zahl aus dem Titel darf wieder auftauchen.${typeof inputs.approved?.title === "string" ? `\n- FREIGEGEBENER TITEL (NICHTS hieraus wiederholen): "${inputs.approved.title}"` : ""}
 - Stattdessen die 2–3 kaufentscheidendsten ZUSÄTZLICHEN Fakten: Wirkstoffe/Materialien, Herkunft/Entwicklung, Anwendungsdauer/-art, Zertifikate — kompakt und konkret aus den belegten Quellen.
-- BEGRÜNDUNG: woraus sich jeder Fakt ableitet.
-JSON: {"highlights": "...", "rationale": [{"part": "...", "source": "..."}]}`;
+- BUDGET AUSNUTZEN: Ziel ${RULES.itemHighlights.targetMinChars}–${RULES.itemHighlights.maxChars} Zeichen — so viele ZUSÄTZLICHE belegte Fakten aufnehmen, wie das Budget fasst, statt früh abzubrechen. Kein Füllwort-Padding.`;
     case "backend":
       return `${ctx}
 
@@ -351,8 +397,7 @@ REGELN (knowledge/content/backend-keywords.md + Blog 07/2026):
 - KEIN Wort, das schon in Titel/Bullets sichtbar ist (Main Keywords hier = verschwendeter Platz). Keine Markennamen (Policy + Account Health). Singular ODER Plural, nie beides.
 - Priorität (Nutzer-Vorgabe 22.07.): (1) Synonyme/Abkürzungen/andere Formulierungen ZUERST (Titel „Edelstahl Rührschüssel" → Backend „salatschüssel backschüssel teigschüssel prep bowl"), (2) andere Schreibweisen inkl. gängiger Vertipper, (3) ENGLISCHE Suchbegriffe auf amazon.de („mixing bowl" statt „rührschüssel" — die fängt kaum jemand ab), (4) Rest-Long-Tails, (5) Kundensprache/Regionalbegriffe.
 - BUDGET AUSNUTZEN: möglichst nah an ${RULES.backendKeywords.maxBytes} Bytes (nie darüber).
-- POOL: ${kw.backendPool.join(", ")}
-JSON: {"backend": "wort1 wort2 wort3 ...", "rationale": [{"part": "<Wortgruppe>", "source": "<Herleitung: invisible/Long-Tail/Kundensprache>"}]}`;
+- POOL: ${kw.backendPool.join(", ")}`;
     case "description":
       return `${ctx}
 
@@ -362,16 +407,14 @@ REGELN (knowledge/content/description.md):
 - AEO-tauglich: typische Kundenfragen explizit beantworten (vollständige Sätze).
 - BUDGET AUSNUTZEN: möglichst nah an ${RULES.description.maxBytes} Bytes (nie darüber) — maximale Datengrundlage für den Algorithmus, ohne Füllphrasen.
 - Bullets NICHT wörtlich wiederholen. TERTIARY-Keywords organisch: ${kw.tertiary.join(", ")}
-JSON: {"description": "...", "rationale": [{"part": "<Abschnitt-Kurzname>", "source": "<Herleitung>"}]}`;
+- PRODUKT-FOKUS (wird blockierend geprüft): über das Produkt und seinen Nutzen schreiben — NICHT über das Listing, die Kennzeichnung/Auszeichnung oder die Produktbilder („diese Transparenz ist uns wichtiger als …“, „ein Foto finden Sie in den Produktbildern“ sind verboten).`;
     case "qa":
       return `${ctx}
 
 AUFGABE: Schreibe ${RULES.qa.pairs} Q&A-Paare (Kundenfragen + Antworten) — Datengrundlage für KI-Assistenten (Alexa for Shopping).
 REGELN (Ausschöpfungs-Prinzip 07/2026):
 - Genau ${RULES.qa.pairs} Paare. Frage max ${RULES.qa.questionMaxChars} Zeichen; Antwort max ${RULES.qa.answerMaxChars}, Ziel ≥${RULES.qa.answerUtilizationMinChars} — Budget ausnutzen.
-- Echte Kaufhürden-Fragen (aus Pain Points/Reviews, wenn vorhanden), faktenbasierte Antworten aus der Produkt-Wahrheit.
-- BEGRÜNDUNG: pro Frage, woraus sie sich ableitet (Pain Point, Review-Zitat, typische Kaufhürde).
-JSON: {"pairs": [{"q": "...", "a": "..."}], "rationale": [{"part": "<Frage-Kurzform>", "source": "<Herleitung>"}]}`;
+- Echte Kaufhürden-Fragen (aus Pain Points/Reviews, wenn vorhanden), faktenbasierte Antworten aus der Produkt-Wahrheit.`;
   }
 }
 
@@ -620,6 +663,37 @@ export function betroffeneBullets(findings: ValidationIssue[], anzahl: number): 
   return betroffen;
 }
 
+/**
+ * Zweite Phase (D200): Begründung zum bereits geprüften Text ergänzen.
+ * Die geprüfte Copy wird NICHT mehr verändert — schlägt die Begründungs-Phase
+ * fehl, bleibt das Ergebnis gültig (rationale ist Zusatz-Metadatum, kein
+ * Sperrgrund für bereits bestandene Copy). Im Mock-Modus liefert templateDraft
+ * die rationale bereits mit → kein zusätzlicher Call.
+ */
+async function ergaenzeRationale(result: SectionResult, inputs: RecipeInputs): Promise<SectionResult> {
+  if (result.provider === "mock") return result;
+  if (result.payload.rationale && result.payload.rationale.length > 0) return result;
+  const finalText = textFuerPruefer(result);
+  const recipeKey = `listing.${result.section === "backend" ? "backend" : result.section}`;
+  try {
+    const res = await generateForRecipe(recipeKey, {
+      system: SYSTEM,
+      messages: [{ role: "user", content: rationalePrompt(result.section, inputs, finalText) }],
+      maxTokens: 4000,
+      temperature: 0,
+    });
+    const parsed = parseJson(res.text);
+    // Kontrakt der Begründungs-Grenze (D183): nur eine schema-gültige rationale
+    // wird übernommen — sonst bleibt das Feld leer statt halb-kaputt.
+    if (pruefeRationaleKontrakt(parsed).length === 0) {
+      result.payload.rationale = extractRationale(parsed, finalText);
+    }
+  } catch {
+    // Begründung optional — die Copy ist bereits vollständig geprüft.
+  }
+  return result;
+}
+
 export async function generateSection(
   section: ListingSection,
   inputs: RecipeInputs,
@@ -698,7 +772,9 @@ export async function generateSection(
     }
 
     // Kontrakt-Grenze (D183): Schema-Verstoß wird abgewiesen, nie weitergereicht.
-    const kontrakt = pruefeKontrakt(section, parsed);
+    // Copy-Phase (D200): rationale ist hier NICHT Pflicht — sie kommt aus der
+    // zweiten Phase; der finale Datensatz trägt sie dann wieder.
+    const kontrakt = pruefeKontrakt(section, parsed, { rationaleOptional: true });
     if (kontrakt.length > 0) {
       findings = kontrakt.map((v) => ({
         rule: `${section}.kontrakt`,
@@ -720,7 +796,7 @@ export async function generateSection(
       issues = [...issues, ...(await pruefeMitLlm(section, textFuerPruefer(result), prueferKontext(inputs)))];
     }
 
-    if (nurErrors(issues).length === 0) return { ...result, issues };
+    if (nurErrors(issues).length === 0) return await ergaenzeRationale({ ...result, issues }, inputs);
     findings = nurErrors(issues);
     letzterEntwurf = textFuerPruefer(result);
 

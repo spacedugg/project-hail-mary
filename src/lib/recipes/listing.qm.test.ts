@@ -71,9 +71,11 @@ function skriptProvider(genAntworten: string[], prueferAntworten: string[]) {
 }
 
 describe("QM-Schleife (D182/D183)", () => {
-  it("Kontrakt-Verstoß wird abgewiesen → Korrektur-Prompt trägt die Findings → 2. Versuch besteht", async () => {
-    const ohneRationale = JSON.stringify({ title: GUTER_TITEL });
-    const { genPrompts, prueferCallCount } = skriptProvider([ohneRationale, gueltig], [prueferAntwort()]);
+  it("Kontrakt-Verstoß (fehlendes Copy-Feld) wird abgewiesen → Korrektur-Prompt trägt die Findings → 2. Versuch besteht", async () => {
+    // Copy-Phase (D200): rationale ist kein Pflichtfeld mehr — ein FEHLENDES
+    // Text-Feld (title) ist der echte Kontrakt-Verstoß, der die Korrektur auslöst.
+    const ohneTitle = JSON.stringify({ foo: "bar" });
+    const { genPrompts, prueferCallCount } = skriptProvider([ohneTitle, gueltig], [prueferAntwort()]);
 
     const res = await generateSection("title", inputs);
     expect(res.payload.text).toBe(GUTER_TITEL);
@@ -83,8 +85,27 @@ describe("QM-Schleife (D182/D183)", () => {
     expect(genPrompts[0]).toContain("[sprache.keyword-natuerlich]");
     // Der 2. Versuch bekommt den konkreten Kontrakt-Verstoß als Korrektur-Auftrag
     expect(genPrompts[1]).toContain("KORREKTUR-AUFTRAG");
-    expect(genPrompts[1]).toContain("rationale");
+    expect(genPrompts[1]).toContain("title");
     // Immer-LLM-Prüfer: das finale Ergebnis wurde geprüft
+    expect(prueferCallCount()).toBe(1);
+  });
+
+  it("Begründung entsteht in separater 2. Phase zum fertigen Text (D200: JSON/rationale-Korsett gelockert)", async () => {
+    // Copy-Antwort OHNE rationale (Copy-Phase verlangt sie nicht mehr) →
+    // rationale kommt aus einem zweiten Call zum bereits fertigen Titel.
+    const copyOhneRationale = JSON.stringify({ title: GUTER_TITEL });
+    const rationaleAntwort = JSON.stringify({ rationale: [{ part: "Edelstahl-Trinkflasche", source: "Hauptkeyword aus Keyword-Analyse" }] });
+    const { genPrompts, prueferCallCount } = skriptProvider([copyOhneRationale, rationaleAntwort], [prueferAntwort()]);
+
+    const res = await generateSection("title", inputs);
+    expect(res.payload.text).toBe(GUTER_TITEL);
+    // Der Copy-Prompt trägt KEINE Begründungs-Pflicht mehr (Prosa unbelastet)
+    expect(genPrompts[0]).not.toContain("rationale");
+    // Die 2. Phase erklärt den bereits FERTIGEN Text, statt ihn neu zu würfeln
+    expect(genPrompts[1]).toContain("FERTIGER TEXT");
+    expect(genPrompts[1]).toContain(GUTER_TITEL);
+    expect(res.payload.rationale?.[0]?.source).toContain("Hauptkeyword");
+    // Prüfer lief nur auf der Copy, nicht auf der Begründung
     expect(prueferCallCount()).toBe(1);
   });
 
