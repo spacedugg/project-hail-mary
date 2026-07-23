@@ -27,7 +27,8 @@ import { amazonDomain, marktplatzFuerSprache, SPRACH_NAMEN } from "@/lib/text/sp
  */
 
 export type ListingSection = "title" | "bullets" | "highlights" | "backend" | "description" | "qa";
-export const SECTION_ORDER: ListingSection[] = ["title", "bullets", "highlights", "backend", "description", "qa"];
+/** Ketten-Reihenfolge (D195, Nutzer 23.07.): Titel → Item Highlights (stehen im Listing direkt unterm Titel) → Bullets → Beschreibung → Backend (dedupt gegen ALLES Sichtbare) → Q&A. */
+export const SECTION_ORDER: ListingSection[] = ["title", "highlights", "bullets", "description", "backend", "qa"];
 
 export type RecipeInputs = {
   brand: string;
@@ -186,6 +187,27 @@ const SYSTEM =
  * Regel-Register (D181: eine Quelle für Prompt, Gate und Prüfer) + optionaler
  * KORREKTUR-AUFTRAG mit den Findings des vorherigen Versuchs (D182).
  */
+/**
+ * Behebungs-Strategien je Regel (D195, Nutzer: „in Versuch 2 und 3 muss ein
+ * ANDERER Ansatz gefunden werden — nicht dreimal dasselbe"): Der Korrektur-
+ * Auftrag sagt nicht nur WAS verletzt ist, sondern WIE man es behebt —
+ * insbesondere „streichen statt anders erfinden" bei unbelegten Zahlen.
+ */
+const BEHEBUNGS_STRATEGIEN: Array<[RegExp, string]> = [
+  [/zahl-ohne-quelle$/, "Streiche die unbelegte Zahl-/Zeit-/Mengenangabe ERSATZLOS oder ersetze sie durch eine wörtlich belegte Angabe aus den Quellen — erfinde NIE eine andere Zahl als Ersatz."],
+  [/zahl-widerspruch$/, "Übernimm die Zahl EXAKT so, wie sie in der Quelle steht — Spezifikationen nie verändern."],
+  [/keyword-echo$/, "Flektiere das Keyword grammatisch (Groß-/Kleinschreibung, Bindestriche, Beugung) oder lass es an dieser Stelle weg — Wortstamm-Abdeckung genügt fürs Ranking."],
+  [/satz-dopplung$/, "Behalte die Aussage nur im zuerst genannten Bullet; gib dem anderen ein NEUES Kern-Thema aus Erkenntnissen, Kaufauslösern oder Conversion-Blockern."],
+  [/themen-dopplung$/, "Wähle für einen der beiden Bullets ein anderes Kern-Thema aus Erkenntnissen, Kaufauslösern oder Conversion-Blockern."],
+  [/^title\.budget$/, "Ergänze ein weiteres BELEGTES Attribut (Maß, Menge, Material, Eigenschaft) aus Produkt-Wahrheit oder Original-Listing — keine Füllwörter."],
+  [/wirkversprechen$/, "Formuliere nur Wirkaussagen, die wörtlich in Original-Listing, Produkt-Wahrheit oder Zusatz-Infos stehen — alles andere streichen."],
+];
+
+function behebungFuer(rule: string): string | null {
+  for (const [muster, strategie] of BEHEBUNGS_STRATEGIEN) if (muster.test(rule)) return strategie;
+  return null;
+}
+
 export function sectionPrompt(section: ListingSection, inputs: RecipeInputs, korrektur: ValidationIssue[] = [], vorherigerEntwurf?: string | null): string {
   const parts = [basePrompt(section, inputs)];
   const gesetze = regelnAlsPromptBlock(section);
@@ -199,7 +221,10 @@ export function sectionPrompt(section: ListingSection, inputs: RecipeInputs, kor
       `KORREKTUR-AUFTRAG: Dein vorheriger Entwurf hat das Qualitäts-Gate NICHT bestanden.${
         vorherigerEntwurf ? `\nVORHERIGER ENTWURF:\n${vorherigerEntwurf}` : ""
       }\nVERLETZTE REGELN:\n${korrektur
-        .map((i) => `- [${i.rule}] ${i.message}`)
+        .map((i) => {
+          const behebung = behebungFuer(i.rule);
+          return `- [${i.rule}] ${i.message}${behebung ? `\n  → Behebung: ${behebung}` : ""}`;
+        })
         .join("\n")}\nKorrigiere MINIMAL-INVASIV: Behebe GENAU diese Verstöße und behalte alles Regelkonforme möglichst wörtlich bei.`,
     );
   return parts.join("\n\n");
@@ -449,9 +474,14 @@ function baueErgebnis(
       // Deterministische Byte-Durchsetzung NACH dem LLM (temoa-os-Muster);
       // Satzzeichen raus (Amazon ignoriert sie — verschwendete Bytes, Blog 07/2026)
       const text = trimToBytesByWord(String(parsed.backend ?? "").replace(/[,;.!?:„“‚’"']/g, " ").replace(/\s+/g, " ").trim(), RULES.backendKeywords.maxBytes);
+      // Dedup gegen ALLES Sichtbare (D195): Backend läuft als letzte sichtbare
+      // Sektion der Kette — Titel, Highlights, Bullets und Beschreibung sind
+      // dann freigegeben und zählen als belegter Platz.
       const visible = [
         typeof inputs.approved?.title === "string" ? inputs.approved.title : "",
+        typeof inputs.approved?.highlights === "string" ? inputs.approved.highlights : "",
         ...(Array.isArray(inputs.approved?.bullets) ? inputs.approved.bullets : []),
+        typeof inputs.approved?.description === "string" ? inputs.approved.description : "",
       ].join(" ");
       return { section, payload: { text, rationale: extractRationale(parsed, text) }, issues: validateBackendKeywords(text, visible, ctx), raw, provider: providerName, model };
     }

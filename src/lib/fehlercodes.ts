@@ -78,6 +78,11 @@ export const FEHLER_CODES: Record<string, FehlerInfo> = {
     bedeutung: "Die Keyword-Basis ist erkennbar in einer anderen Sprache als die eingestellte Content-Sprache dieses Produkts. Lokalisierter Content braucht Keywords vom Ziel-Marktplatz — Übersetzen reicht nicht, weil das Suchverhalten je Land anders ist.",
     loesung: "Eine Keyword-Analyse (Cerebro) vom Ziel-Marktplatz hochladen und die alte Basis löschen. Marktplatz und Content-Sprache sind beim Produkt fest (werden beim Anlegen bestimmt) — für einen anderen Marktplatz das Produkt neu anlegen.",
   },
+  "GEN-05": {
+    titel: "Sektion wartet in der geführten Kette",
+    bedeutung: "Die Content-Sektionen bauen aufeinander auf (Titel → Item Highlights → Bullets → Beschreibung → Backend → Q&A): Jede Sektion wird mit den FREIGEGEBENEN Vorgängern als Kontext generiert — so entstehen keine Wort-Dopplungen zwischen den Texten. Ein Vorgänger dieser Sektion ist noch nicht freigegeben.",
+    loesung: "Den genannten Vorgänger im Content-Reiter prüfen und freigeben — die Freigabe generiert die nächste Sektion automatisch.",
+  },
   "IMP-01": {
     titel: "Listing-Import fehlgeschlagen",
     bedeutung: "Weder der Web-Abruf noch der Produkt-Crawler konnten das Amazon-Listing laden (Detail-Meldung oben — z. B. Blockade, Zeitlimit, unbekannte ASIN).",

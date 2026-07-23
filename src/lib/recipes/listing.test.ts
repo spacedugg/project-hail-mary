@@ -88,8 +88,8 @@ describe("listing recipes (mock)", () => {
       ...inputs,
       reviewInsights: {
         sources: [], stats: { reviewsTotal: 50, ratingAvg: 4.2 },
-        painPoints: [{ label: "Dichtung undicht", quotes: [] }],
-        buyingTriggers: [{ label: "hält wirklich kalt", quotes: [] }],
+        painPoints: [{ label: "Dichtung undicht", frequencyPct: null, mentionCount: null, quotes: [] }],
+        buyingTriggers: [{ label: "hält wirklich kalt", frequencyPct: null, mentionCount: null, quotes: [] }],
         languageToBorrow: [], languageToAvoid: [],
         kernThese: "Käufer lieben die Isolierung, fürchten aber Undichtigkeit.",
         insightCards: [{ titel: "Dichtheit ist die Kauf-Hürde", beschreibung: "Viele zögern wegen Berichten über undichte Deckel.", relevanz: 5, quellen: [], bildIdeen: [], belegAspekte: [] }],
