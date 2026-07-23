@@ -8,8 +8,7 @@
  */
 
 import type { ProductFacts } from "@/db/schema";
-import { generateForRecipe } from "@/lib/llm/registry";
-import { parseLlmJson } from "@/lib/llm/json";
+import { llmJsonLauf } from "@/lib/llm/qmLauf";
 
 export async function extractFactsFromListing(
   listing: {
@@ -37,30 +36,33 @@ export async function extractFactsFromListing(
     .join("\n");
   if (text.trim().length < 40) return null;
 
-  const res = await generateForRecipe("facts.extract", {
+  // QM-Lauf (D182/D183): mindestens die geforderten Schlüssel müssen da sein
+  // (alle Felder LEER ist ein gültiges Ergebnis — nichts erfinden).
+  const raw = await llmJsonLauf<Partial<Record<keyof ProductFacts, unknown>>>({
+    recipeKey: "facts.extract",
     system:
       "Du extrahierst Produkt-Fakten aus einem Amazon-Listing. NUR belegte Fakten aus dem Text — nichts erfinden, " +
       "keine Werbesprache. Begriffe WORTWÖRTLICH übernehmen — NIE übersetzen oder eindeutschen " +
       "(steht im Listing ‚Drops', heißt es ‚Drops', nicht ‚Tropfen'; D149). Antworte NUR mit JSON.",
-    messages: [
-      {
-        role: "user",
-        content:
-          `Listing-Text:\n${text}\n\n` +
-          'Extrahiere als JSON: {"productType": string (Gattungsbegriff mit der WÖRTLICHEN Produktbezeichnung aus dem Listing, z. B. "Trinkflasche"; ' +
-          'bei fremdsprachigen Bezeichnungen die Original-Bezeichnung behalten), ' +
-          '"dimensions": string (Maße/Menge/Volumen, wie im Text), ' +
-          '"materials": string[] (ehrlich, inkl. Hybride), ' +
-          '"usps": string[] (max. 5 konkrete, belegte Produktvorteile — keine Floskeln), ' +
-          '"targetAudience": string (für wen laut Text: Nutzungskontext/Zielgruppe), ' +
-          '"certifications": string[] (NUR explizit genannte Siegel/Normen)}. ' +
-          "Felder ohne Beleg im Text: leer lassen (\"\" bzw. []).",
-      },
-    ],
+    prompt:
+      `Listing-Text:\n${text}\n\n` +
+      'Extrahiere als JSON: {"productType": string (Gattungsbegriff mit der WÖRTLICHEN Produktbezeichnung aus dem Listing, z. B. "Trinkflasche"; ' +
+      'bei fremdsprachigen Bezeichnungen die Original-Bezeichnung behalten), ' +
+      '"dimensions": string (Maße/Menge/Volumen, wie im Text), ' +
+      '"materials": string[] (ehrlich, inkl. Hybride), ' +
+      '"usps": string[] (max. 5 konkrete, belegte Produktvorteile — keine Floskeln), ' +
+      '"targetAudience": string (für wen laut Text: Nutzungskontext/Zielgruppe), ' +
+      '"certifications": string[] (NUR explizit genannte Siegel/Normen)}. ' +
+      "Felder ohne Beleg im Text: leer lassen (\"\" bzw. []).",
     maxTokens: 1200,
     temperature: 0,
+    kontrakt: (p) => {
+      const erwartete = ["productType", "dimensions", "materials", "usps", "targetAudience", "certifications"];
+      return erwartete.some((k) => k in p)
+        ? { wert: p as Partial<Record<keyof ProductFacts, unknown>> }
+        : { verstoesse: [`Die Antwort enthält keinen der geforderten Schlüssel (${erwartete.join(", ")}) — liefere exakt das geforderte JSON-Format, unbelegte Felder leer.`] };
+    },
   });
-  const raw = parseLlmJson<Partial<Record<keyof ProductFacts, unknown>>>(res.text);
 
   const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
   const arr = (v: unknown) =>

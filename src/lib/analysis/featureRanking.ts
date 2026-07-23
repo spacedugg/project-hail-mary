@@ -1,5 +1,5 @@
-import { generateForRecipe, resolveRecipe } from "@/lib/llm/registry";
-import { parseLlmJson } from "@/lib/llm/json";
+import { resolveRecipe } from "@/lib/llm/registry";
+import { llmJsonLauf } from "@/lib/llm/qmLauf";
 import { filtereEinzelnennungen, findeAspekt, type RoheAspekte } from "@/lib/reviews/verdichtung";
 import { pruefeBildIdeen } from "@/lib/analysis/bildideen";
 import type { FeatureRankingPayload, InsightCard } from "@/db/schema";
@@ -215,17 +215,21 @@ export async function rankeFeatures(input: {
     };
   }
 
-  const res = await generateForRecipe("listing.feature-ranking", {
+  // QM-Lauf (D182/D183): unbelegte Feature-Karten werden mit Korrektur-Auftrag
+  // automatisch neu angefordert statt manuell „erneut starten".
+  const { cards, verworfen } = await llmJsonLauf<ReturnType<typeof normalisiereFeatureKarten>>({
+    recipeKey: "listing.feature-ranking",
     system: SYSTEM,
-    messages: [{ role: "user", content: prompt(input.quellen, input.aspekte, input.sprache ?? "de") }],
+    prompt: prompt(input.quellen, input.aspekte, input.sprache ?? "de"),
     maxTokens: 6000,
     temperature: 0,
+    kontrakt: (raw) => {
+      const r = normalisiereFeatureKarten(raw, input.quellen, input.aspekte, input.reviewsGesamt);
+      return r.cards.length === 0
+        ? { verstoesse: ["Kein Feature hatte einen verifizierten Listing-Beleg — zitiere jeden Beleg WORTWÖRTLICH aus den mitgelieferten Quelltexten (Titel/Bullets/Attribute/Bilder), nichts paraphrasieren."] }
+        : { wert: r };
+    },
   });
-  const raw = parseLlmJson<Record<string, unknown>>(res.text);
-  const { cards, verworfen } = normalisiereFeatureKarten(raw, input.quellen, input.aspekte, input.reviewsGesamt);
-  if (cards.length === 0) {
-    throw new Error("Das Feature-Ranking lieferte kein Feature mit verifiziertem Listing-Beleg — bitte erneut starten.");
-  }
 
   const entfernteBildIdeen: FeatureRankingPayload["entfernteBildIdeen"] = [];
   for (const card of cards) {

@@ -1,5 +1,5 @@
-import { generateForRecipe, resolveRecipe } from "@/lib/llm/registry";
-import { parseLlmJson } from "@/lib/llm/json";
+import { resolveRecipe } from "@/lib/llm/registry";
+import { llmJsonLauf } from "@/lib/llm/qmLauf";
 
 /**
  * Keyword-Relevanz-Filter (D87): irrelevante Keywords fliegen beim Import
@@ -203,20 +203,20 @@ export async function erkenneMarkenKeywords(
   // Batches, damit auch große Listen (500+) durchlaufen
   for (let i = 0; i < offen.length; i += 250) {
     const batch = offen.slice(i, i + 250);
-    const res = await generateForRecipe("keywords.brands", {
+    // QM-Lauf (D182/D183): das marken-Array ist Pflicht — sonst Korrektur-Versuch.
+    const parsed = await llmJsonLauf<{ marken: Array<{ keyword?: string; marke?: string }> }>({
+      recipeKey: "keywords.brands",
       system:
         "Du erkennst Marken-Suchbegriffe in Amazon-Keyword-Listen (DE). Ein Marken-Keyword enthält einen Marken-/Herstellernamen " +
         "(z. B. ‚nuk schnuller', ‚wmf topf'). KEINE Marken sind Gattungsbegriffe, Materialien, Maße. Antworte NUR mit JSON.",
-      messages: [
-        {
-          role: "user",
-          content: `Produkt: ${ctx.produktName}\nKeywords:\n${batch.join("\n")}\n\nGib die Marken-Keywords zurück:\n{"marken": [{"keyword": "exakt wie in der Liste", "marke": "erkannter Markenname"}]}`,
-        },
-      ],
+      prompt: `Produkt: ${ctx.produktName}\nKeywords:\n${batch.join("\n")}\n\nGib die Marken-Keywords zurück:\n{"marken": [{"keyword": "exakt wie in der Liste", "marke": "erkannter Markenname"}]}`,
       maxTokens: 4000,
       temperature: 0,
+      kontrakt: (p) =>
+        Array.isArray(p.marken)
+          ? { wert: { marken: p.marken as Array<{ keyword?: string; marke?: string }> } }
+          : { verstoesse: ["Feld „marken“ fehlt oder ist kein Array — auch ohne Marken-Treffer ein leeres Array liefern."] },
     });
-    const parsed = parseLlmJson<{ marken?: Array<{ keyword?: string; marke?: string }> }>(res.text);
     const imBatch = new Set(batch.map((k) => k.toLowerCase()));
     for (const m of parsed.marken ?? []) {
       const kw = String(m.keyword ?? "").toLowerCase().trim();

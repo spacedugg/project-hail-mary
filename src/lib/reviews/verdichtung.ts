@@ -1,5 +1,5 @@
-import { generateForRecipe, resolveRecipe } from "@/lib/llm/registry";
-import { parseLlmJson } from "@/lib/llm/json";
+import { resolveRecipe } from "@/lib/llm/registry";
+import { llmJsonLauf } from "@/lib/llm/qmLauf";
 import type { BelegAspekt, InsightCard, ReviewInsightsPayload } from "@/db/schema";
 
 /**
@@ -266,17 +266,24 @@ export async function verdichteInsights(
     };
   }
 
-  const res = await generateForRecipe("reviews.verdichtung", {
+  // QM-Lauf (D182/D183): kaputtes JSON oder komplett unbelegte Karten werden
+  // mit Korrektur-Auftrag automatisch wiederholt — kein manuelles „bitte
+  // erneut starten" mehr; erst nach 3 Versuchen harter Fehler.
+  const { cards, verworfen, kernTheseRoh } = await llmJsonLauf<
+    ReturnType<typeof normalisiereInsightCards> & { kernTheseRoh: string }
+  >({
+    recipeKey: "reviews.verdichtung",
     system: SYSTEM,
-    messages: [{ role: "user", content: prompt(aspekte, opts.sprache ?? "de") }],
+    prompt: prompt(aspekte, opts.sprache ?? "de"),
     maxTokens: 6000,
     temperature: 0,
+    kontrakt: (raw) => {
+      const r = normalisiereInsightCards(raw, aspekte, opts.quellen);
+      return r.cards.length === 0
+        ? { verstoesse: ["Keine Erkenntnis-Karte hatte einen gültigen Roh-Themen-Beleg — referenziere in den Beleg-Aspekten AUSSCHLIESSLICH exakte Labels aus der gelisteten Roh-Themen-Liste, nichts erfinden."] }
+        : { wert: { ...r, kernTheseRoh: String((raw as { kernThese?: unknown }).kernThese ?? "").trim() } };
+    },
   });
-  const raw = parseLlmJson<Record<string, unknown>>(res.text);
-  const { cards, verworfen } = normalisiereInsightCards(raw, aspekte, opts.quellen);
-  if (cards.length === 0) {
-    throw new Error("Die Verdichtung lieferte keine belegbare Erkenntnis (alle Karten ohne gültigen Roh-Themen-Beleg) — bitte erneut starten.");
-  }
 
   // Wahrheits-Filter für Bild-Ideen (D134): erfundene Autoritäts-Belege/Siegel
   // fliegen deterministisch raus, wenn die Produkt-Wahrheit sie nicht deckt.
@@ -290,6 +297,6 @@ export async function verdichteInsights(
     }
   }
 
-  const kernThese = String((raw as { kernThese?: unknown }).kernThese ?? "").trim() || null;
+  const kernThese = kernTheseRoh || null;
   return { cards, kernThese, verworfen, entfernteBildIdeen, hinweise: gate.hinweise };
 }

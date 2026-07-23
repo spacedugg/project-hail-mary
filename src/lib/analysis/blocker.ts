@@ -1,5 +1,5 @@
-import { generateForRecipe, resolveRecipe } from "@/lib/llm/registry";
-import { parseLlmJson } from "@/lib/llm/json";
+import { resolveRecipe } from "@/lib/llm/registry";
+import { llmJsonLauf } from "@/lib/llm/qmLauf";
 import { filtereEinzelnennungen, findeAspekt, type RoheAspekte } from "@/lib/reviews/verdichtung";
 import { featureRelevanz, quellTexte, type FeatureQuellen } from "@/lib/analysis/featureRanking";
 import type { ConversionBlockerPayload, InsightCard } from "@/db/schema";
@@ -148,17 +148,22 @@ export async function findeBlocker(input: {
     };
   }
 
-  const res = await generateForRecipe("listing.blocker", {
+  // QM-Lauf (D182/D183): Blocker ohne echten Beleg-Aspekt werden automatisch
+  // mit Korrektur-Auftrag neu angefordert statt manuell „erneut starten".
+  // WICHTIG: 0 Blocker bei 0 Verworfenen ist ein GÜLTIGES Ergebnis (gutes Listing).
+  const { cards, verworfen } = await llmJsonLauf<ReturnType<typeof normalisiereBlockerKarten>>({
+    recipeKey: "listing.blocker",
     system: SYSTEM,
-    messages: [{ role: "user", content: prompt(input.quellen, input.aspekte, input.sprache ?? "de") }],
+    prompt: prompt(input.quellen, input.aspekte, input.sprache ?? "de"),
     maxTokens: 6000,
     temperature: 0,
+    kontrakt: (raw) => {
+      const r = normalisiereBlockerKarten(raw, input.aspekte, quellenTags);
+      return r.cards.length === 0 && r.verworfen > 0
+        ? { verstoesse: ["Jeder gelieferte Blocker referenzierte einen nicht existierenden Kunden-Aspekt — verwende AUSSCHLIESSLICH exakte Aspekt-Labels aus der Liste; ohne echten Aspekt-Beleg keinen Blocker behaupten."] }
+        : { wert: r };
+    },
   });
-  const raw = parseLlmJson<Record<string, unknown>>(res.text);
-  const { cards, verworfen } = normalisiereBlockerKarten(raw, input.aspekte, quellenTags);
-  if (cards.length === 0 && verworfen > 0) {
-    throw new Error("Der Blocker-Lauf lieferte keinen Blocker mit echtem Kunden-Aspekt — bitte erneut starten.");
-  }
   if (cards.length === 0) {
     hinweise.push("Kein Blocker gefunden: Die gewichtigen Kunden-Themen sind im Listing beantwortet — ein gutes Zeichen, kein Fehler.");
   }

@@ -1,5 +1,6 @@
 import { OsShell } from "@/components/shell";
 import { RECHENWERK, BERICHTE, KOMBI_KENNZAHLEN } from "@/lib/rechenwerk";
+import { DATENFLUSS } from "@/lib/datenfluss/register";
 import { BerichteSuche, KpiSuche } from "@/components/register-suche";
 import { RULES } from "@/lib/validation/rules";
 import { eq } from "drizzle-orm";
@@ -54,6 +55,45 @@ export default async function RechenwerkPage() {
           <p className="mt-2 text-[11px] text-muted">
             Listing-Inhalte, Bilder und Bewertungen brauchen KEINEN Bericht — die holt das Tool per Scrape, die ASIN reicht.
           </p>
+        </section>
+
+        {/* Datenfluss-Register (D180/D186): jede Input-Kette deklariert und testgesichert */}
+        <section className="mt-3 card p-4">
+          <div className="flex items-center gap-2.5">
+            <span className="icon-chip chip-violet"><IconCheck /></span>
+            <div>
+              <h2 className="text-sm font-semibold">Datenfluss — was mit jedem Datenpunkt passiert</h2>
+              <p className="text-xs text-muted">Quelle → Speicher → Analysen (mit Code-Ort) → Verwendung → Anzeige. Testgesichert: jeder Code-Ort existiert, keine Kette unvollständig.</p>
+            </div>
+          </div>
+          <div className="mt-3 space-y-4">
+            {DATENFLUSS.map((d) => (
+              <details key={d.id} className="rounded-xl bg-background p-3">
+                <summary className="cursor-pointer text-sm font-medium">{d.name}</summary>
+                <div className="mt-2 space-y-2 text-xs">
+                  <p><b>Quelle:</b> {d.quelle} · <b>Speicher:</b> <code className="text-[11px]">{d.speicher}</code></p>
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-hair text-left text-[11px] uppercase text-neutral-500">
+                        <th className="py-1 pr-3">Analyse</th><th className="pr-3">Outcome</th><th>Code-Ort</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {d.analysen.map((a) => (
+                        <tr key={a.modul + a.name} className="border-b border-hair align-top last:border-0">
+                          <td className="py-1 pr-3 font-medium">{a.name}</td>
+                          <td className="pr-3">{a.outcome}</td>
+                          <td><code className="text-[11px]">{a.modul}</code></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p><b>Verwendung:</b> {d.verwendung.join(" · ")}</p>
+                  <p><b>Anzeige:</b> {d.anzeige.join(" · ")}</p>
+                </div>
+              </details>
+            ))}
+          </div>
         </section>
 
         {/* Kombinierte Kennzahlen: entstehen erst aus mehreren Quellen */}
