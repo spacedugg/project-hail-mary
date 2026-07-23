@@ -260,6 +260,7 @@ const BEHEBUNGS_STRATEGIEN: Array<[RegExp, string]> = [
   [/themen-dopplung$/, "Wähle für einen der beiden Bullets ein anderes Kern-Thema aus Erkenntnissen, Kaufauslösern oder Conversion-Blockern."],
   [/^title\.budget$/, "Ergänze ein weiteres BELEGTES Attribut (Maß, Menge, Material, Eigenschaft) aus Produkt-Wahrheit oder Original-Listing — keine Füllwörter."],
   [/wirkversprechen$/, "Formuliere nur Wirkaussagen, die wörtlich in Original-Listing, Produkt-Wahrheit oder Zusatz-Infos stehen — alles andere streichen."],
+  [/titel-dopplung$/, "Ersetze jedes Titel-Echo durch einen NEUEN belegten Fakt (Wirkstoff, Herkunft, Anwendungsdauer, Zertifikat) — die Highlights stehen direkt neben dem Titel und ergänzen ihn."],
 ];
 
 function behebungFuer(rule: string): string | null {
@@ -324,7 +325,8 @@ JSON: {"bullets": ["...", "...", "...", "...", "..."], "rationale": [{"part": "<
 AUFGABE: Schreibe die Amazon "Item Highlights" (neue Sektion).
 REGELN (Ausschöpfungs-Prinzip 07/2026):
 - HART: max ${RULES.itemHighlights.maxChars} Zeichen GESAMT; Ziel ${RULES.itemHighlights.targetMinChars}–${RULES.itemHighlights.maxChars} — Budget ausnutzen, sorgfältig zählen.
-- Die 2–3 kaufentscheidendsten Fakten, kompakt, konkret, keine Wiederholung des Titels.
+- NULL TITEL-DOPPLUNG (wird maschinell geprüft, D197): Titel und Highlights stehen im Listing DIREKT nebeneinander — kein Wort, kein Fakt, keine Zahl aus dem Titel darf wieder auftauchen.${typeof inputs.approved?.title === "string" ? `\n- FREIGEGEBENER TITEL (NICHTS hieraus wiederholen): "${inputs.approved.title}"` : ""}
+- Stattdessen die 2–3 kaufentscheidendsten ZUSÄTZLICHEN Fakten: Wirkstoffe/Materialien, Herkunft/Entwicklung, Anwendungsdauer/-art, Zertifikate — kompakt und konkret aus den belegten Quellen.
 - BEGRÜNDUNG: woraus sich jeder Fakt ableitet.
 JSON: {"highlights": "...", "rationale": [{"part": "...", "source": "..."}]}`;
     case "backend":
@@ -625,6 +627,8 @@ export async function generateSection(
     primaryKeywords: inputs.keywords.primary,
     // ALLE Keywords für den Keyword-Echo-Check (D181)
     alleKeywords: Object.values(inputs.keywords).flat(),
+    // Freigegebener Titel für den Titel-Dopplungs-Check der Highlights (D197)
+    freigegebenerTitel: typeof inputs.approved?.title === "string" ? inputs.approved.title : undefined,
     // Erkannte Fremdmarken (Relevanz-Filter) — das Gate flaggt jedes Vorkommen (D97)
     competitorBrands: inputs.competitorBrands ?? [],
     zahlenQuellen,

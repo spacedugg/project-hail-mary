@@ -6,6 +6,7 @@ import {
   validateBackendKeywords,
   validateDescription,
   validateListing,
+  validateItemHighlights,
 } from "./gate";
 
 const VALID_BULLET = (head: string, body: string) => `${head}: ${body}`;
@@ -280,5 +281,32 @@ describe("Keyword-Echo auch in Beschreibung & Highlights (Scheibe 2)", () => {
   it("grammatisch integriert passiert die Beschreibung", () => {
     const issues = validateDescription(goodDescription, [], { alleKeywords: ["outdoor flasche", "edelstahl trinkflasche"] });
     expect(issues.map((i) => i.rule)).not.toContain("description.keyword-echo");
+  });
+});
+
+describe("Titel-Dopplungs-Check der Item Highlights (D197)", () => {
+  const titel = "Tierliebhaber Ulmenrinde-Drops für Hunde gegen Sodbrennen, 350 g mit Moor";
+
+  it("massives Titel-Echo (der Live-Fall: Moor, Sodbrennen, Drops, 350 g doppelt) = FEHLER", () => {
+    const issues = validateItemHighlights(
+      "Vom Tierarzt entwickelte Drops gegen Sodbrennen und Grasfressen. Mit Moor, Fenchel und Heilerde. 350 g.",
+      { freigegebenerTitel: titel },
+    );
+    const treffer = issues.filter((i) => i.rule === "highlights.titel-dopplung");
+    expect(treffer).toHaveLength(1);
+    expect(treffer[0].severity).toBe("error");
+  });
+
+  it("echte Zusatz-Informationen passieren (Gold-Standard-Muster)", () => {
+    const issues = validateItemHighlights(
+      "Bei Magenübersäuerung und Grasfressen, mit Heilerde und Fenchel, tierärztlich entwickelt, drei bis vier Wochen Anwendung",
+      { freigegebenerTitel: titel },
+    );
+    expect(issues.filter((i) => i.rule === "highlights.titel-dopplung" && i.severity === "error")).toEqual([]);
+  });
+
+  it("ohne freigegebenen Titel bleibt der Check ehrlich passiv", () => {
+    const issues = validateItemHighlights("Mit Moor und Drops gegen Sodbrennen. 350 g.", {});
+    expect(issues.filter((i) => i.rule === "highlights.titel-dopplung")).toEqual([]);
   });
 });

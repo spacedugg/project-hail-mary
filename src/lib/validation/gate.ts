@@ -13,6 +13,8 @@ type Ctx = {
   primaryKeywords?: string[]; // 3–4, aus Analyse
   /** ALLE Keywords (alle Tiers) — Basis des Keyword-Echo-Checks (D181/D184). */
   alleKeywords?: string[];
+  /** Freigegebener Titel (D197) — Basis des Titel-Dopplungs-Checks der Item Highlights. */
+  freigegebenerTitel?: string;
   competitorBrands?: string[]; // Blacklist
   /**
    * Zahlen-Herkunfts-Check (D114): Quelltext, aus dem JEDE Zahl im
@@ -169,6 +171,38 @@ export function pruefeKeywordEcho(text: string, keywords: string[], rulePrefix: 
     }
   }
   return issues;
+}
+
+// ── Titel-Dopplungs-Check (D197, Nutzer-Befund 23.07.) ───────────────────────
+// Titel und Item Highlights stehen im Listing direkt nebeneinander — jede
+// Wiederholung ist verschwendeter Platz. Deterministisch: Inhaltswort-Stämme
+// und Zahlen des Titels dürfen in den Highlights nicht wieder auftauchen.
+// Kalibrierung am Gold-Standard: 1–2 Wortstämme = Warnung (Kategorie-Begriffe
+// überlappen manchmal zwangsläufig), ≥3 Stämme ODER eine wiederholte ZAHL = Fehler.
+
+function inhaltsStaemme(s: string): Set<string> {
+  return new Set(
+    s
+      .split(/[\s\-–—/,.|·&+()]+/)
+      .filter((w) => w && !FUNKTIONSWOERTER.has(w.toLowerCase()))
+      .map(normalizeToken)
+      .filter((t) => t.length >= 4 || /^\d+$/.test(t)),
+  );
+}
+
+export function pruefeTitelDopplung(text: string, titel: string, rulePrefix: string): ValidationIssue[] {
+  if (!titel.trim()) return [];
+  const titelStaemme = inhaltsStaemme(titel);
+  const doppelt = [...inhaltsStaemme(text)].filter((s) => titelStaemme.has(s));
+  const zahlen = doppelt.filter((s) => /^\d/.test(s));
+  const woerter = doppelt.filter((s) => !/^\d/.test(s));
+  if (zahlen.length > 0 || woerter.length >= 3)
+    return [issue(`${rulePrefix}.titel-dopplung`, "error",
+      `Wiederholt den Titel (${[...woerter, ...zahlen].join(", ")}) — Titel und Highlights stehen direkt nebeneinander: NUR neue Informationen, keine Dopplung.`)];
+  if (woerter.length > 0)
+    return [issue(`${rulePrefix}.titel-dopplung`, "warning",
+      `Wortstamm-Überlappung mit dem Titel (${woerter.join(", ")}) — nur ok, wenn unvermeidbarer Kategorie-Begriff.`)];
+  return [];
 }
 
 // ── Cross-Bullet-Satzdopplung (D181) ─────────────────────────────────────────
@@ -427,6 +461,7 @@ export function validateItemHighlights(text: string, ctx: Ctx = {}): ValidationI
   if (!t) return [issue("highlights.empty", "error", "Item Highlights fehlen.")];
   issues.push(...pruefeZahlenTreue(t, ctx.zahlenQuellen ?? "", "highlights"));
   issues.push(...pruefeKeywordEcho(t, ctx.alleKeywords ?? [], "highlights"));
+  issues.push(...pruefeTitelDopplung(t, ctx.freigegebenerTitel ?? "", "highlights"));
   const chars = charLength(t);
   if (chars > RULES.itemHighlights.maxChars)
     issues.push(issue("highlights.max-length", "error", `${chars} Zeichen > ${RULES.itemHighlights.maxChars}.`));
