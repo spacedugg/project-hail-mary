@@ -204,6 +204,21 @@ export const contentVersions = sqliteTable("content_versions", {
   syncedAt: integer("synced_at", { mode: "timestamp" }),
 });
 
+/**
+ * QM-Blockier-Log (D182/D193): Jeder harte QM-Block ist ein Bau-Auftrag —
+ * hier persistent, damit auswertbar ist, WELCHE Regel wie oft scheitert
+ * (Anzeige: „Daten & Formeln"). Die Server-Konsole allein war flüchtig.
+ */
+export const qmBlocks = sqliteTable("qm_blocks", {
+  id: text("id").primaryKey(),
+  productId: text("product_id").references(() => products.id, { onDelete: "cascade" }),
+  /** z. B. "listing.title" — Pipeline-Bereich des Blocks. */
+  bereich: text("bereich").notNull(),
+  findings: text("findings", { mode: "json" }).$type<ValidationIssue[]>().notNull(),
+  versuche: integer("versuche").notNull(),
+  createdAt: ts("created_at").notNull(),
+});
+
 export type ValidationIssue = {
   rule: string; // z.B. "title.max-length", "bullets.usp-duplicate"
   severity: "error" | "warning";

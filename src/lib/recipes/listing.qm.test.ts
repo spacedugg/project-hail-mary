@@ -125,17 +125,21 @@ describe("QM-Schleife (D182/D183)", () => {
     expect(prueferCallCount()).toBe(2);
   });
 
-  it("unvollständiges Prüfprotokoll gilt als ungeprüft = Fehler (kein stilles Loch im Gate)", async () => {
-    // Prüfer lässt alle Regeln bis auf eine aus → fehlende Verdikte = Errors → Block nach 3 Versuchen
+  it("unvollständiges Prüfprotokoll wird beim PRÜFER nachgefordert — nie als Autor-Finding (D193)", async () => {
+    // Prüfer lässt Regeln aus → 3 Nachforderungen beim Prüfer → harter Prüfer-Fehler,
+    // KEIN QmBlock (der Autor kann ein Prüfer-Versäumnis nicht beheben).
     const halbesProtokoll = JSON.stringify({ verdikte: [{ regel: "title.lesbarkeit", bestanden: true, beleg: "ok" }] });
-    skriptProvider([gueltig, gueltig, gueltig], [halbesProtokoll, halbesProtokoll, halbesProtokoll]);
+    const { genPrompts, prueferCallCount } = skriptProvider([gueltig], [halbesProtokoll, halbesProtokoll, halbesProtokoll]);
 
     try {
       await generateSection("title", inputs);
-      expect.unreachable("QM-Gate hätte blocken müssen");
+      expect.unreachable("Prüfer-Ausfall hätte hart scheitern müssen");
     } catch (e) {
-      expect(e).toBeInstanceOf(QmBlockFehler);
-      expect((e as QmBlockFehler).issues.some((i) => i.message.includes("nicht beurteilt"))).toBe(true);
+      expect(e).not.toBeInstanceOf(QmBlockFehler);
+      expect(String((e as Error).message)).toContain("unbeurteilt");
     }
+    // Der Autor wurde NICHT erneut generiert — das Problem lag beim Prüfer
+    expect(genPrompts).toHaveLength(1);
+    expect(prueferCallCount()).toBe(3);
   });
 });

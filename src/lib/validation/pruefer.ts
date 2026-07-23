@@ -4,14 +4,14 @@ import { pruefRegelnFuerSektion, type Regel, type RegelSektion } from "./registe
 import type { ValidationIssue } from "@/db/schema";
 
 /**
- * LLM-Prüfer (D182, Nutzer-Entscheid „Immer LLM-Prüfer"): eine zweite,
+ * LLM-Prüfer (D182, Nutzer-Entscheid „Immer LLM-Prüfer“): eine zweite,
  * unabhängige Instanz beurteilt jeden Entwurf gegen die llm-prüfbaren Regeln
  * des Registers — Prüfprotokoll je Regel (bestanden/verletzt + Textbeleg).
  * Der Prüfer ist Torwächter, nicht Autor: er liefert Verdikte, nie Text.
  *
  * Mock-Modus (kein API-Key / Tests): ehrlich KEINE Prüfung statt erfundener
  * Verdikte — deterministische Checks bleiben aktiv, das Ergebnis trägt dann
- * nur deterministische Evidenz. Ein Mock, der „bestanden" behauptet, wäre
+ * nur deterministische Evidenz. Ein Mock, der „bestanden“ behauptet, wäre
  * genau die Fassade, die D182 verbietet.
  */
 
@@ -20,7 +20,11 @@ const PRUEFER_RECIPE = "listing.pruefer";
 const PRUEFER_SYSTEM =
   "Du bist unbestechlicher Qualitäts-Prüfer für Amazon-Listing-Texte (DE). " +
   "Du beurteilst NUR die genannten Regeln am vorgelegten Text — du schreibst nie um, du bewertest. " +
-  "Im Zweifel gilt eine Regel als VERLETZT (strenge Auslegung). " +
+  // Kalibrierung (D193, Live-Befund: schwafelnde Grenzfall-Verdikte wie „grenzwertig,
+  // aber im Zweifel bestanden“ wurden als Verstoß gewertet und blockierten endlos):
+  "Ein Verdikt „verletzt“ braucht einen KONKRETEN, wörtlich zitierbaren Beleg aus dem Text. " +
+  "Grenzfälle ohne klaren Beleg gelten als BESTANDEN — wenn dein Beleg Wörter wie „grenzwertig“, „akzeptabel“ oder „im Zweifel“ bräuchte, ist das Verdikt „bestanden“. " +
+  "Der Beleg ist EIN kurzer Satz (max. 200 Zeichen) mit dem Zitat — kein Aufsatz, keine Abwägung. " +
   "Antworte AUSSCHLIESSLICH mit dem geforderten JSON, ohne Markdown-Zäune, ohne Vorwort.";
 
 type Verdikt = { regel: string; bestanden: boolean; beleg: string };
@@ -37,25 +41,31 @@ ${kontext}
 PRÜFE GENAU DIESE REGELN — für JEDE Regel-ID genau ein Verdikt:
 ${regeln.map((r) => `- [${r.id}] ${r.text}`).join("\n")}
 
-JSON: {"verdikte": [{"regel": "<Regel-ID>", "bestanden": true/false, "beleg": "<konkretes Zitat/Begründung aus dem Text>"}]}`;
+JSON: {"verdikte": [{"regel": "<Regel-ID>", "bestanden": true/false, "beleg": "<EIN kurzer Satz mit wörtlichem Zitat des Verstoßes — max. 200 Zeichen>"}]}`;
 }
 
-/** Verdikte → ValidationIssues (nur Verletzungen; Severity aus dem Register). */
+/** Verdikte → ValidationIssues (nur Verletzungen; Severity aus dem Register; Beleg hart gekappt). */
 export function verdikteZuIssues(verdikte: Verdikt[], regeln: Regel[]): ValidationIssue[] {
   const byId = new Map(regeln.map((r) => [r.id, r]));
   const issues: ValidationIssue[] = [];
   for (const v of verdikte) {
     const regel = byId.get(v.regel);
     if (!regel || v.bestanden) continue;
-    issues.push({ rule: regel.id, severity: regel.severity, message: v.beleg || regel.text, evidence: "llm" });
+    const beleg = (v.beleg || regel.text).slice(0, 280);
+    issues.push({ rule: regel.id, severity: regel.severity, message: beleg, evidence: "llm" });
   }
-  // Prüf-Vollständigkeit: eine unbeurteilte Regel gilt als ungeprüft = Fehler
-  // (stilles Auslassen wäre ein Loch im Gate).
-  const beurteilt = new Set(verdikte.map((v) => v.regel));
-  for (const r of regeln)
-    if (!beurteilt.has(r.id))
-      issues.push({ rule: r.id, severity: "error", message: `Prüfer hat Regel ${r.id} nicht beurteilt — Prüfprotokoll unvollständig.`, evidence: "llm" });
   return issues;
+}
+
+/**
+ * Prüf-Vollständigkeit: unbeurteilte Regeln sind ein PRÜFER-Problem, kein
+ * Autor-Problem (D193 — vorher eskalierten sie als Autor-Findings in die
+ * Regenerier-Schleife, die der Autor nie beheben konnte). Der Aufrufer
+ * fordert beim Prüfer nach.
+ */
+export function fehlendeVerdikte(verdikte: Verdikt[], regeln: Regel[]): string[] {
+  const beurteilt = new Set(verdikte.map((v) => v.regel));
+  return regeln.filter((r) => !beurteilt.has(r.id)).map((r) => r.id);
 }
 
 /**
@@ -69,10 +79,14 @@ export async function pruefeMitLlm(sektion: RegelSektion, text: string, kontext:
   const { provider } = resolveRecipe(PRUEFER_RECIPE);
   if (provider.name === "mock") return []; // ehrlich ungeprüft statt erfundener Verdikte
 
-  const prompt = prueferPrompt(sektion, text, regeln, kontext);
+  const basisPrompt = prueferPrompt(sektion, text, regeln, kontext);
   let letzterFehler: unknown;
-  for (let versuch = 0; versuch < 2; versuch++) {
+  let fehlend: string[] = [];
+  for (let versuch = 0; versuch < 3; versuch++) {
     try {
+      const prompt = fehlend.length
+        ? `${basisPrompt}\n\nNACHTRAG: Dein voriges Protokoll ließ diese Regel-IDs UNBEURTEILT: ${fehlend.join(", ")} — liefere jetzt für JEDE oben gelistete Regel-ID genau ein Verdikt.`
+        : basisPrompt;
       const res = await generateForRecipe(PRUEFER_RECIPE, {
         system: PRUEFER_SYSTEM,
         messages: [{ role: "user", content: prompt }],
@@ -84,6 +98,11 @@ export async function pruefeMitLlm(sektion: RegelSektion, text: string, kontext:
       const verdikte = (parsed.verdikte as Array<{ regel?: unknown; bestanden?: unknown; beleg?: unknown }>)
         .map((v) => ({ regel: String(v.regel ?? ""), bestanden: v.bestanden === true, beleg: String(v.beleg ?? "").trim() }))
         .filter((v) => v.regel);
+      fehlend = fehlendeVerdikte(verdikte, regeln);
+      if (fehlend.length > 0) {
+        letzterFehler = new Error(`Prüfprotokoll unvollständig (unbeurteilt: ${fehlend.join(", ")}).`);
+        continue; // beim PRÜFER nachfordern — nie als Autor-Finding eskalieren (D193)
+      }
       return verdikteZuIssues(verdikte, regeln);
     } catch (e) {
       letzterFehler = e;
