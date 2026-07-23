@@ -560,6 +560,15 @@ async function generiereSektionKern(
     listingIst: snapshot ? { title: snapshot.title, bullets: snapshot.bullets } : null,
     zusatzKontext: product.zusatzKontext,
     sprache: product.contentSprache,
+    // Conversion-Blocker in die Content-Prompts (D194, Nutzer 23.07.):
+    // unbeantwortete Kunden-Themen sind Pflicht-Input der Text-Erstellung.
+    conversionBlocker: await (async () => {
+      const blocker = await db.query.conversionBlockers.findFirst({
+        where: eq(schema.conversionBlockers.productId, productId),
+        orderBy: desc(schema.conversionBlockers.createdAt),
+      });
+      return blocker?.payload.cards.map((c) => ({ titel: c.titel, beschreibung: c.beschreibung })) ?? null;
+    })(),
   };
 
   // Fehler (API, Zeitbudget, kaputtes JSON) als Banner, nie als Fehlerseite (D81).

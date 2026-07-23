@@ -59,7 +59,7 @@ export const REGELN: Regel[] = [
     art: "llm",
     severity: "error",
     text:
-      "Keine unbelegten Gesundheits- oder Wirkversprechen („heilt“, „reduziert [Symptom]“, „stärkt das Immunsystem“, „gegen [Beschwerde]“ als Wirkzusage). Zulässig sind Zweckangaben nur, wenn sie wörtlich aus den Quellen dieses Prompts stammen.",
+      "Keine UNBELEGTEN Gesundheits- oder Wirkversprechen. BELEGT heißt: Die Aussage steht sinngemäß im Original-Listing, der Produkt-Wahrheit oder den Zusatz-Infos (steht dort „gegen Sodbrennen“, ist „gegen Sodbrennen“ zulässig — Nutzer-Klarstellung 23.07./D194). Verboten sind NEU ERFUNDENE Heil-/Wirkzusagen ohne Quelle („heilt“, „stärkt das Immunsystem“, „klinisch bewiesen“).",
   },
   // ── Titel ──────────────────────────────────────────────────────────────────
   {
@@ -83,9 +83,12 @@ export const REGELN: Regel[] = [
     id: "bullets.headline-benefit",
     sektionen: ["bullets"],
     art: "llm",
-    severity: "error",
+    // Best Practice mit Toleranz (Nutzer 23.07./D194): Anatomie ist Richtschnur,
+    // kein Dogma — der Gold-Standard nutzt auch Wirkstoff-/Marken-Headlines
+    // („ULMENRINDE & NATURMOOR – GEPRÜFTE WIRKSTOFFKOMBINATION“).
+    severity: "warning",
     text:
-      "Jede VERSALIEN-Headline ist eine kurze BENEFIT-Aussage, NIE ein Feature-Name oder eine Mengenangabe („BLEIBT JAHRELANG SCHARF“, nicht „GEHÄRTETER EDELSTAHL“ oder „350 G MIT 160 DROPS“).",
+      "Best Practice: Die VERSALIEN-Headline trägt einen KAUFGRUND — ideal als Benefit-Aussage („BLEIBT JAHRELANG SCHARF“); eine begründete Abweichung (Wirkstoff-Kombination, Marken-Versprechen) ist zulässig, eine reine Mengenangabe („350 G MIT 160 DROPS“) nicht.",
   },
   {
     id: "bullets.headline-echo",
@@ -99,9 +102,11 @@ export const REGELN: Regel[] = [
     id: "bullets.ein-thema",
     sektionen: ["bullets"],
     art: "llm",
-    severity: "error",
+    // Best Practice mit Toleranz (D194): der Gold-Standard bündelt z. B.
+    // Dosierung + Packungsgröße + Konsistenz sinnvoll im Anwendungs-Bullet.
+    severity: "warning",
     text:
-      "EIN Bullet = EIN Thema: Jeder Satz eines Bullets belegt die Kernaussage seiner Headline. Fachfremde Fakten (z. B. Packungsgröße im Wirkungs-Bullet) gehören in einen anderen Bullet oder fallen weg.",
+      "Best Practice: EIN Bullet = EIN Thema — jeder Satz stützt die Kernaussage der Headline; sinnvoll zusammengehörende Details (Dosierung + Packungsgröße im Anwendungs-Bullet) sind ok, zusammenhanglose Fakten nicht.",
   },
   {
     id: "bullets.themen-dopplung",
@@ -109,7 +114,7 @@ export const REGELN: Regel[] = [
     art: "llm",
     severity: "error",
     text:
-      "Kein Bullet wiederholt Aussagen, Zutaten-Aufzählungen oder Fakten eines anderen Bullets — jede USP, jede Zutat-Nennung als Beleg und jede Mengenangabe genau EINMAL über alle fünf Bullets.",
+      "Kein Bullet wiederholt einen anderen INHALTLICH — dieselbe Aussage, derselbe Fakt oder dasselbe Kern-Thema dürfen nicht in zwei Bullets stehen (jede USP, jede Mengenangabe genau EINMAL). Wort-Wiederholungen allein sind KEIN Verstoß (Nutzer-Klarstellung 23.07./D194).",
   },
   {
     id: "bullets.slot-abdeckung",

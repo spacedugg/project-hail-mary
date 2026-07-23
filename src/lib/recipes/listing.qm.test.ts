@@ -39,9 +39,9 @@ const gueltig = JSON.stringify({
   rationale: [{ part: "Edelstahl-Trinkflasche", source: "Hauptkeyword aus Keyword-Analyse" }],
 });
 
-/** Prüfprotokoll: alle Titel-Regeln bestanden — außer den explizit verletzten. */
-function prueferAntwort(verletzt: Record<string, string> = {}): string {
-  const verdikte = pruefRegelnFuerSektion("title").map((r) => ({
+/** Prüfprotokoll: alle Regeln der Sektion bestanden — außer den explizit verletzten. */
+function prueferAntwort(verletzt: Record<string, string> = {}, sektion: "title" | "bullets" = "title"): string {
+  const verdikte = pruefRegelnFuerSektion(sektion).map((r) => ({
     regel: r.id,
     bestanden: !(r.id in verletzt),
     beleg: verletzt[r.id] ?? "regelkonform",
@@ -141,5 +141,49 @@ describe("QM-Schleife (D182/D183)", () => {
     // Der Autor wurde NICHT erneut generiert — das Problem lag beim Prüfer
     expect(genPrompts).toHaveLength(1);
     expect(prueferCallCount()).toBe(3);
+  });
+});
+
+describe("Bullet-weise Korrektur (D194)", () => {
+  it("regelkonforme Bullets werden gesperrt und vom Code erzwungen übernommen — kein Neuwürfeln", async () => {
+    const gut = (h: string, body: string) => `${h}: ${body}`;
+    const ersteBullets = [
+      gut("HÄLT DEN MAGEN RUHIG", "Heilerde und Fenchel beruhigen den Magen im Alltag zuverlässig und sanft."),
+      "kaputte zeile ohne headline und ohne doppelpunkt",
+      gut("EINFACHE ANWENDUNG IM ALLTAG", "Einfach als Snack reichen oder unters Futter mischen, ganz ohne Aufwand."),
+      gut("GUTE AKZEPTANZ BEIM HUND", "Der Kräuterduft sorgt für gute Akzeptanz auch bei wählerischen Tieren."),
+      gut("EHRLICHER LIEFERUMFANG", "Eine Dose reicht für mehrere Wochen, Erwartungen werden ehrlich benannt."),
+    ];
+    const reparierterBullet = gut("SCHNELLE HILFE IM ALLTAG", "Wirkt zuverlässig und wird gern genommen, ganz ohne künstliche Zusätze.");
+    // Versuch 2: das Modell „würfelt" ALLE fünf neu — der Code muss 1, 3, 4, 5 zurückzwingen
+    const gewuerfelt = [
+      gut("KOMPLETT NEU GEWÜRFELT EINS", "Dieser Inhalt darf nicht übernommen werden, Bullet eins war freigegeben."),
+      reparierterBullet,
+      gut("KOMPLETT NEU GEWÜRFELT DREI", "Dieser Inhalt darf nicht übernommen werden, Bullet drei war freigegeben."),
+      gut("KOMPLETT NEU GEWÜRFELT VIER", "Dieser Inhalt darf nicht übernommen werden, Bullet vier war freigegeben."),
+      gut("KOMPLETT NEU GEWÜRFELT FÜNF", "Dieser Inhalt darf nicht übernommen werden, Bullet fünf war freigegeben."),
+    ];
+    const rationale = [{ part: "Slots", source: "Test" }];
+    const { genPrompts, prueferCallCount } = skriptProvider(
+      [JSON.stringify({ bullets: ersteBullets, rationale }), JSON.stringify({ bullets: gewuerfelt, rationale })],
+      [prueferAntwort({}, "bullets")],
+    );
+    // Env-Override für die Bullets-Recipes auf den Skript-Provider
+    process.env.RECIPE_MODEL_LISTING_BULLETS = "skript:test-modell";
+    try {
+      const res = await generateSection("bullets", inputs);
+      // Gesperrte Bullets wörtlich erhalten, nur Bullet 2 ist neu
+      expect(res.payload.items![0]).toBe(ersteBullets[0]);
+      expect(res.payload.items![1]).toBe(reparierterBullet);
+      expect(res.payload.items![2]).toBe(ersteBullets[2]);
+      expect(res.payload.items![3]).toBe(ersteBullets[3]);
+      expect(res.payload.items![4]).toBe(ersteBullets[4]);
+      // Der Korrektur-Auftrag markiert Sperren und Baustelle
+      expect(genPrompts[1]).toContain("FREIGEGEBEN — wörtlich unverändert übernehmen");
+      expect(genPrompts[1]).toContain("NEU SCHREIBEN");
+      expect(prueferCallCount()).toBe(1);
+    } finally {
+      delete process.env.RECIPE_MODEL_LISTING_BULLETS;
+    }
   });
 });

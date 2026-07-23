@@ -190,4 +190,5 @@ export const RECIPE_INPUT_HERKUNFT: Record<keyof RecipeInputs, string> = {
   listingIst: "listing-import",
   zusatzKontext: "zusatz-infos",
   sprache: "stammdaten",
+  conversionBlocker: "reviews",
 };
