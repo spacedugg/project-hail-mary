@@ -225,7 +225,8 @@ export async function extractInsights(
       maxTokens: 16000,
       temperature: 0,
       kontrakt: (parsed) => {
-        const erwartete = ["painPoints", "buyingTriggers", "languageToBorrow", "languageToAvoid", "stats"];
+        // Exakt die Schlüssel des Prompt-Schemas (stats rechnet der Code selbst)
+        const erwartete = ["painPoints", "buyingTriggers", "languageToBorrow", "languageToAvoid"];
         return erwartete.some((k) => k in parsed)
           ? { wert: normalisiereInsights(parsed) }
           : { verstoesse: [`Die Antwort enthält keines der geforderten Felder (${erwartete.join(", ")}) — liefere exakt das geforderte JSON-Format.`] };
