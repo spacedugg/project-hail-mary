@@ -1,4 +1,6 @@
 import { parseAttributes, parseImportantInfo, type ProductSnapshot } from "./apifyProduct";
+import { amazonSprachParam } from "@/lib/text/sprache";
+import type { Marketplace } from "@/db/schema";
 
 /**
  * Apify-Produkt-Crawler (junglee/amazon-crawler, D84 — Nutzer lieferte das
@@ -65,7 +67,10 @@ export async function scrapeProductViaCrawler(
   const actor = process.env.APIFY_CRAWLER_ACTOR ?? DEFAULT_ACTOR;
   // Zeit-Budget: Vercel-Function max. 60 s — nie höher defaulten (D78)
   const timeoutSec = opts.timeoutSec ?? 50;
-  const url = `https://www.amazon.${domain}/dp/${asin.toUpperCase()}`;
+  // Sprach-Pinning (D191): ohne ?language= liefert Amazon je nach Proxy-Land
+  // die maschinenübersetzte Ansicht („furry nose" statt „Fellnase").
+  const sprachParam = amazonSprachParam(domain as Marketplace);
+  const url = `https://www.amazon.${domain}/dp/${asin.toUpperCase()}${sprachParam ? `?language=${sprachParam}` : ""}`;
 
   // Input-Schema exakt nach dem vom Nutzer gelieferten Actor-JSON —
   // Marktplatz steckt in der URL, Proxy wählt der Actor passend (AUTO).

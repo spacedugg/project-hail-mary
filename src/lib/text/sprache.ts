@@ -54,6 +54,25 @@ export function amazonDomain(mp: Marketplace): string {
   }
 }
 
+/**
+ * Sprach-Pinning für Produktseiten-URLs (D191, Nutzer-Befund 23.07.):
+ * Amazon liefert je nach Client-Signal die MASCHINENÜBERSETZTE Sprachansicht
+ * (amazon.de → englische Ansicht mit Artefakten wie „furry nose" für
+ * „Fellnase"). Der ?language=-Parameter pinnt die Original-Sprache des
+ * Marktplatzes — ohne ihn auditiert das Tool eine Übersetzung statt des Listings.
+ */
+export function amazonSprachParam(mp: Marketplace): string | null {
+  switch (mp) {
+    case "de": return "de_DE";
+    case "uk": return "en_GB";
+    case "us": return "en_US";
+    case "fr": return "fr_FR";
+    case "it": return "it_IT";
+    case "es": return "es_ES";
+    default: return null;
+  }
+}
+
 // ── Heuristik: Signal-Wörter (Funktionswörter, die in Keyword-Listen und
 // Fließtext vorkommen) + charakteristische Zeichen + typische Endungen ──
 

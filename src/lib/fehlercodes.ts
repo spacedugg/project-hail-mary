@@ -88,6 +88,11 @@ export const FEHLER_CODES: Record<string, FehlerInfo> = {
     bedeutung: "Für den Listing-Import braucht das Produkt eine ASIN — es ist keine hinterlegt.",
     loesung: "In den Produkt-Stammdaten die ASIN eintragen, dann importieren.",
   },
+  "IMP-03": {
+    titel: "Scrape lieferte die falsche Sprachansicht",
+    bedeutung: "Amazon hat statt des Original-Listings die maschinenübersetzte Sprachansicht ausgeliefert (erkennbar an Übersetzungs-Artefakten wie „furry nose“ für „Fellnase“). Der Import wurde NICHT gespeichert — sonst würden Listing-Kontrolle, Fakten-Extraktion und Content-Generierung eine Übersetzung statt des echten Listings bewerten.",
+    loesung: "Erneut importieren — der Scraper pinnt die Marktplatz-Sprache jetzt per URL-Parameter. Kommt der Fehler wiederholt, den Import-Weg wechseln (Env LISTING_IMPORT_PROVIDER) und mit Code IMP-03 melden.",
+  },
   "CSV-01": {
     titel: "CSV-Import fehlgeschlagen",
     bedeutung: "Die hochgeladene Datei konnte nicht als Listing-CSV gelesen werden (Detail-Meldung oben).",
