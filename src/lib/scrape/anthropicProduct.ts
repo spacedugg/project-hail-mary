@@ -1,5 +1,7 @@
 import { resolveRecipe } from "@/lib/llm/registry";
 import { parseLlmJson } from "@/lib/llm/json";
+import { amazonSprachParam } from "@/lib/text/sprache";
+import type { Marketplace } from "@/db/schema";
 import type { ProductSnapshot } from "./apifyProduct";
 
 /**
@@ -107,7 +109,10 @@ export async function scrapeProductViaAnthropic(
   opts: { timeoutSec?: number } = {},
 ): Promise<ProductSnapshot> {
   const { provider, model } = resolveRecipe("listing.scrape");
-  const url = `https://www.amazon.${domain}/dp/${asin.toUpperCase()}`;
+  // Sprach-Pinning (D191): ohne ?language= liefert Amazon je nach Client die
+  // maschinenübersetzte Ansicht — dann auditiert das Tool eine Übersetzung.
+  const sprachParam = amazonSprachParam(domain as Marketplace);
+  const url = `https://www.amazon.${domain}/dp/${asin.toUpperCase()}${sprachParam ? `?language=${sprachParam}` : ""}`;
 
   if (provider.name === "mock") {
     // Dev ohne Key: klar gekennzeichneter Mock, damit der Flow testbar bleibt

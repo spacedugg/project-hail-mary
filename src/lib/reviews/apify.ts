@@ -114,6 +114,7 @@ export async function scrapeReviews(
   }
 
   const reviews: RawReview[] = [];
+  const fehlerNotes: string[] = [];
   const notes: string[] = [];
   const jeAsinKlasse = new Map<string, number[]>(); // asin → [n1★ … n5★]
   results.forEach((r, i) => {
@@ -128,9 +129,39 @@ export async function scrapeReviews(
         r.reason instanceof Error && (r.reason.name === "TimeoutError" || r.reason.message === "Zeitlimit")
           ? "ins Zeitlimit gelaufen"
           : `fehlgeschlagen (${r.reason instanceof Error ? r.reason.message : String(r.reason)})`;
-      notes.push(`${asin} ${star}★-Lauf ${why} — diese Klasse fehlt in der Datenbasis.`);
+      fehlerNotes.push(`${asin} ${star}★-Lauf ${why} — diese Klasse fehlt in der Datenbasis.`);
     }
   });
+
+  // Auto-Wiederholung (D182 + D129, Nutzer-Befund REV-03 23.07.): Läufe, die
+  // FEHLERFREI aber komplett LEER zurückkommen, sind fast immer eine
+  // kurzzeitige Scraper-Blockierung, nicht „keine Reviews". Genau EINE
+  // Wiederholungsrunde für maximal 2 komplett leere ASINs (= 1 Batch ≈ 75 s,
+  // bleibt im 300-s-Etappen-Budget D118) — statt den Nutzer klicken zu lassen.
+  const fehlgeschlageneAsins = new Set(laeufe.filter((_, i) => results[i].status === "rejected").map((l) => l.asin));
+  const leereAsins = [...jeAsinKlasse.entries()]
+    .filter(([asin, z]) => z.every((n) => n === 0) && !fehlgeschlageneAsins.has(asin))
+    .map(([asin]) => asin);
+  const retryAsins = leereAsins.slice(0, 2);
+  if (leereAsins.length > 2)
+    notes.push(`△ ${leereAsins.length} ASINs kamen komplett leer zurück — automatisch wiederholt wurden nur ${retryAsins.join(", ")} (Zeit-Budget); die übrigen später erneut scrapen.`);
+  if (retryAsins.length > 0) {
+    await new Promise((r) => setTimeout(r, 5_000)); // kurze Pause entschärft Drosselung
+    const retryLaeufe = retryAsins.flatMap((asin) => STAR_FILTERS.map((filter, i) => ({ asin, filter, star: i + 1 })));
+    const retryResults = await Promise.allSettled(retryLaeufe.map((l) => runStarClass(apiKey, l.asin, l.filter, l.star, domain)));
+    retryResults.forEach((r, i) => {
+      const { asin, star } = retryLaeufe[i];
+      if (r.status === "fulfilled" && r.value.length > 0) {
+        reviews.push(...r.value);
+        const zaehler = jeAsinKlasse.get(asin) ?? [0, 0, 0, 0, 0];
+        zaehler[star - 1] = r.value.length;
+        jeAsinKlasse.set(asin, zaehler);
+      }
+    });
+    const erholt = retryAsins.filter((a) => (jeAsinKlasse.get(a) ?? []).some((n) => n > 0));
+    if (erholt.length > 0)
+      notes.push(`Erstlauf kam leer zurück (kurzzeitige Scraper-Blockierung) — die automatische Wiederholung hat Rezensionen geholt für: ${erholt.join(", ")}.`);
+  }
 
   // Ehrliche Aufschlüsselung je ASIN (D102): jeder Lauf holt die bis zu 100
   // aktuellsten GESCHRIEBENEN Rezensionen seiner Klasse. Weniger als 100
@@ -145,12 +176,16 @@ export async function scrapeReviews(
       notes.push(`△ ${asin}: 0 Rezensionen über alle Klassen — ASIN auf amazon.${domain} prüfen (existiert sie dort?) oder später erneut scrapen.`);
     }
   }
+  notes.unshift(...fehlerNotes);
 
   if (reviews.length === 0) {
+    // Ehrliche Diagnose statt Pauschal-Meldung (Nutzer-Befund REV-03): „Läufe
+    // fehlgeschlagen" und „Läufe liefen, kamen aber leer zurück" sind
+    // verschiedene Ursachen mit verschiedenen nächsten Schritten.
     throw new Error(
-      notes.length > 0
-        ? `Alle Sterne-Klassen-Läufe sind fehlgeschlagen: ${notes[0]}`
-        : "Scrape lieferte keine verwertbaren Reviews (evtl. keine Bewertungen vorhanden).",
+      fehlerNotes.length > 0
+        ? `Alle Sterne-Klassen-Läufe sind fehlgeschlagen: ${fehlerNotes[0]}`
+        : `Der Scraper lief fehlerfrei, bekam aber auch nach automatischer Wiederholung 0 geschriebene Rezensionen (${valid.join(", ")}). Mögliche Ursachen: die ASIN existiert nicht auf amazon.${domain}, hat nur Sterne-Bewertungen ohne Text — oder der Scraper wird gerade blockiert, dann hilft ein erneuter Versuch in einigen Minuten.`,
     );
   }
   return { reviews, notes };

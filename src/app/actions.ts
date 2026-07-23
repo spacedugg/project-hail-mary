@@ -1598,13 +1598,20 @@ async function importListingKern(db: Awaited<ReturnType<typeof getDb>>, product:
   const productId = product.id;
   if (!product.asin) throw new GenFehler("Produkt hat keine ASIN — Import nicht möglich.", "IMP-02");
 
-  // Redundanz-Guard (D81): erfolgreicher Import jünger als 24 h → kein Doppel-Import
+  // Redundanz-Guard (D81): erfolgreicher Import jünger als 24 h → kein Doppel-Import.
+  // AUSNAHME (D191): Ein sprachfalscher Snapshot (Amazon-Maschinenübersetzung,
+  // vor dem Sprach-Wächter gespeichert) ist KEIN gültiger Stand — er darf den
+  // korrigierenden Neu-Import nicht 24 h blockieren.
   const lastSnap = await db.query.listingSnapshots.findFirst({
     where: eq(schema.listingSnapshots.productId, productId),
     orderBy: desc(schema.listingSnapshots.createdAt),
   });
   if (lastSnap && ["apify", "anthropic", "crawler"].includes(lastSnap.source) && Date.now() - lastSnap.createdAt.getTime() < 24 * 60 * 60 * 1000) {
-    return "Das Listing wurde in den letzten 24 h bereits geladen — Stand ist aktuell.";
+    const { erkenneSprache, marktplatzSprache } = await import("@/lib/text/sprache");
+    const erwartet = marktplatzSprache(product.marketplace);
+    const erkannt = erkenneSprache([lastSnap.title ?? "", ...(lastSnap.bullets ?? []), lastSnap.description ?? ""]).sprache;
+    const sprachFalsch = Boolean(erwartet && erkannt && erkannt !== erwartet);
+    if (!sprachFalsch) return "Das Listing wurde in den letzten 24 h bereits geladen — Stand ist aktuell.";
   }
 
   // Standard-Weg ist die Anthropic-API (D83); scheitert sie (Bot-Block),
@@ -1641,6 +1648,24 @@ async function importListingKern(db: Awaited<ReturnType<typeof getDb>>, product:
     }
   } catch (e) {
     throw new GenFehler(`Listing-Import: ${e instanceof Error ? e.message : String(e)}`, "IMP-01");
+  }
+
+  // Sprach-Wächter (D191, Nutzer-Befund 23.07.): Amazon liefert je nach
+  // Client-Signal die MASCHINENÜBERSETZTE Sprachansicht („furry nose" statt
+  // „Fellnase"). Ein fremdsprachiger Snapshot würde alle Folge-Analysen
+  // vergiften (Listing-Kontrolle bewertete die Übersetzung mit 0/100) —
+  // Abweisung an der Grenze statt stillem Speichern (D183). Die Erkennung
+  // urteilt nur bei sicherem Widerspruch (erkenneSprache bleibt sonst passiv).
+  {
+    const { erkenneSprache, marktplatzSprache, SPRACH_NAMEN } = await import("@/lib/text/sprache");
+    const erwartet = marktplatzSprache(product.marketplace);
+    const erkannt = erkenneSprache([snap!.title ?? "", ...(snap!.bullets ?? []), snap!.description ?? ""]).sprache;
+    if (erwartet && erkannt && erkannt !== erwartet) {
+      throw new GenFehler(
+        `Der Scrape lieferte die ${SPRACH_NAMEN[erkannt]}-Sprachansicht von amazon.${product.marketplace} statt des ${SPRACH_NAMEN[erwartet]}-Originals (Amazon-Maschinenübersetzung). Der Import wurde NICHT gespeichert — alle Analysen würden sonst eine Übersetzung bewerten. Bitte erneut importieren; der Scraper pinnt die Sprache jetzt explizit.`,
+        "IMP-03",
+      );
+    }
   }
   const snapId = id();
   await db.insert(schema.listingSnapshots).values({

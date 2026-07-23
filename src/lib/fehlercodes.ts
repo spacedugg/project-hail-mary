@@ -58,6 +58,11 @@ export const FEHLER_CODES: Record<string, FehlerInfo> = {
     bedeutung: "Die Generierung der Sektion ist abgebrochen (API-Fehler, Zeitbudget oder unlesbare Antwort). Es wurde KEINE neue Version gespeichert.",
     loesung: "Erneut generieren. Schlägt es wiederholt fehl, Detail-Meldung prüfen — bestehende Versionen bleiben unberührt.",
   },
+  "QM-01": {
+    titel: "QM-Gate hat den Entwurf zurückgehalten",
+    bedeutung: "Kein Absturz — das Qualitätsmanagement hat funktioniert: Die Generierung lief, aber das Ergebnis verletzte auch nach automatischen Korrektur-Versuchen Regeln aus dem Regel-Register. Regelverletzende Entwürfe werden nie angezeigt (D182); die Detail-Meldung oben ist das Prüfprotokoll mit den konkreten Verstößen.",
+    loesung: "Erneut generieren — jeder Anlauf startet frisch. Blockt derselbe Verstoß wiederholt, fehlt meist ein Input (z. B. Produkt-Wahrheit oder Zusatz-Infos ergänzen, damit belegte Fakten das Budget füllen) — oder es ist ein Bau-Auftrag: Prüfprotokoll mit Code QM-01 melden.",
+  },
   "GEN-02": {
     titel: "Content gesperrt — Bewertungs-Analyse fehlt",
     bedeutung: "Die Bewertungs-Analyse ist die Grundlage guter Texte: Sie liefert Kundensprache, Pain Points und Kaufauslöser. Ohne sie ist die Generierung bewusst gesperrt.",
@@ -82,6 +87,11 @@ export const FEHLER_CODES: Record<string, FehlerInfo> = {
     titel: "Produkt ohne ASIN",
     bedeutung: "Für den Listing-Import braucht das Produkt eine ASIN — es ist keine hinterlegt.",
     loesung: "In den Produkt-Stammdaten die ASIN eintragen, dann importieren.",
+  },
+  "IMP-03": {
+    titel: "Scrape lieferte die falsche Sprachansicht",
+    bedeutung: "Amazon hat statt des Original-Listings die maschinenübersetzte Sprachansicht ausgeliefert (erkennbar an Übersetzungs-Artefakten wie „furry nose“ für „Fellnase“). Der Import wurde NICHT gespeichert — sonst würden Listing-Kontrolle, Fakten-Extraktion und Content-Generierung eine Übersetzung statt des echten Listings bewerten.",
+    loesung: "Erneut importieren — der Scraper pinnt die Marktplatz-Sprache jetzt per URL-Parameter. Kommt der Fehler wiederholt, den Import-Weg wechseln (Env LISTING_IMPORT_PROVIDER) und mit Code IMP-03 melden.",
   },
   "CSV-01": {
     titel: "CSV-Import fehlgeschlagen",

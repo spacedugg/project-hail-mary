@@ -344,16 +344,33 @@ export default async function ProductPage({
             {(() => {
               const audit = (sovUpload?.parsed as { audit?: import("@/lib/sov/audit").SovAudit })?.audit;
               if (!audit) return null;
+              // Fremdmarken-Kennzeichnung (Nutzer-Befund 23.07., „mammaly", D190):
+              // Eine Umsatzlücke auf einem Marken-Keyword ist REAL, darf aber nie
+              // in den Listing-Text (Amazon-Policy) — sie ist ein Werbe-Hebel (PPC).
+              // Ohne Kennzeichnung widersprechen sich Audit-Box und Aussortierten-Liste.
+              const ausgeschlossen = new Map(
+                kws.filter((k) => k.ausgeschlossen).map((k) => [k.keyword.toLowerCase().trim(), k.ausschlussGrund ?? ""] as const),
+              );
               return (
                 <div className="mt-3 rounded-xl border border-hair p-3">
                   <h3 className="text-xs font-semibold">SOV-Audit — {audit.quickWins.length} Quick Wins · {audit.topDemandGaps.length} Top-Umsatzlücken</h3>
                   <ul className="mt-2 space-y-0.5">
-                    {audit.topDemandGaps.slice(0, 5).map((g) => (
-                      <li key={g.keyword} className="flex items-baseline justify-between gap-2 text-xs">
-                        <span>{g.keyword}</span>
-                        <span className="flex-none tabular-nums text-muted">{g.sv ? `${fmt(g.sv)} SV` : ""}</span>
-                      </li>
-                    ))}
+                    {audit.topDemandGaps.slice(0, 5).map((g) => {
+                      const grund = ausgeschlossen.get(g.keyword.toLowerCase().trim());
+                      return (
+                        <li key={g.keyword} className="flex items-baseline justify-between gap-2 text-xs">
+                          <span>
+                            {g.keyword}
+                            {grund !== undefined && (
+                              <span className="ml-1.5 rounded-full bg-[rgb(217_119_6/0.12)] px-1.5 py-0.5 text-[10px] text-warn">
+                                {grund.toLowerCase().startsWith("marke") ? `${grund} — nur Werbung (PPC), nie Listing-Text` : `aussortiert: ${grund}`}
+                              </span>
+                            )}
+                          </span>
+                          <span className="flex-none tabular-nums text-muted">{g.sv ? `${fmt(g.sv)} SV` : ""}</span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               );
@@ -365,7 +382,8 @@ export default async function ProductPage({
                 <div key={tier} className="mt-3">
                   <div className="text-[10px] uppercase tracking-wide text-neutral-400">{tier} · {inTier.length}</div>
                   <div className="mt-1 flex flex-wrap gap-1">
-                    {inTier.slice(0, 16).map((k) => (
+                    {/* ALLE aktiven Chips sichtbar + abwählbar (Nutzer 23.07., D190) — kein „+N"-Abschneiden: Kuratieren braucht die volle Liste. */}
+                    {inTier.map((k) => (
                       <form key={k.id} action={toggleKeywordRelevanz} className="inline-flex">
                         <input type="hidden" name="keywordId" value={k.id} />
                         <input type="hidden" name="productId" value={product.id} />
@@ -376,7 +394,6 @@ export default async function ProductPage({
                         </span>
                       </form>
                     ))}
-                    {inTier.length > 16 && <span className="text-[10px] text-neutral-400">… +{inTier.length - 16}</span>}
                   </div>
                 </div>
               );

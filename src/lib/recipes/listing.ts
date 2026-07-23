@@ -163,16 +163,21 @@ const SYSTEM =
  * Regel-Register (D181: eine Quelle für Prompt, Gate und Prüfer) + optionaler
  * KORREKTUR-AUFTRAG mit den Findings des vorherigen Versuchs (D182).
  */
-export function sectionPrompt(section: ListingSection, inputs: RecipeInputs, korrektur: ValidationIssue[] = []): string {
+export function sectionPrompt(section: ListingSection, inputs: RecipeInputs, korrektur: ValidationIssue[] = [], vorherigerEntwurf?: string | null): string {
   const parts = [basePrompt(section, inputs)];
   const gesetze = regelnAlsPromptBlock(section);
   if (gesetze)
     parts.push(`GESETZE (Regel-Register — werden maschinell geprüft, jeder Verstoß erzwingt Regenerierung):\n${gesetze}`);
   if (korrektur.length)
+    // Korrektur statt Neuwurf (D190): Der vorherige Entwurf steht im Auftrag —
+    // ein kompletter Neuwurf würfelt bei jedem Versuch NEUE Verstöße, gezielte
+    // Korrektur konvergiert.
     parts.push(
-      `KORREKTUR-AUFTRAG: Dein vorheriger Entwurf hat das Qualitäts-Gate NICHT bestanden. Verletzte Regeln:\n${korrektur
+      `KORREKTUR-AUFTRAG: Dein vorheriger Entwurf hat das Qualitäts-Gate NICHT bestanden.${
+        vorherigerEntwurf ? `\nVORHERIGER ENTWURF:\n${vorherigerEntwurf}` : ""
+      }\nVERLETZTE REGELN:\n${korrektur
         .map((i) => `- [${i.rule}] ${i.message}`)
-        .join("\n")}\nErzeuge eine NEUE Version, die GENAU diese Verstöße behebt und alle übrigen Regeln weiter einhält.`,
+        .join("\n")}\nKorrigiere MINIMAL-INVASIV: Behebe GENAU diese Verstöße und behalte alles Regelkonforme möglichst wörtlich bei.`,
     );
   return parts.join("\n\n");
 }
@@ -186,8 +191,9 @@ function basePrompt(section: ListingSection, inputs: RecipeInputs): string {
 
 AUFGABE: Schreibe den Amazon-Produkttitel.
 REGELN (knowledge/content/title.md, Amazon-Neuerung 07/2026):
-- HART: ${RULES.title.targetMinChars}–${RULES.title.maxChars} Zeichen — das 75er-Budget bestmöglich ausnutzen, NIE überschreiten. Zähle sorgfältig.
-- Hauptkeyword „${kw.primary[0] ?? ""}" MUSS vorkommen. PRIMARY-Keywords (je max. 1×): ${kw.primary.join(", ")}
+- HART: ${RULES.title.targetMinChars}–${RULES.title.maxChars} Zeichen — PFLICHTBAND, unter ${RULES.title.targetMinChars} ist verschenkter Platz und wird abgewiesen. Zähle sorgfältig.
+- HAUPTKEYWORD „${kw.primary[0] ?? ""}" MUSS abgedeckt sein — WORTSTAMM-Abdeckung zählt: Flexion und Komposita sind erlaubt und erwünscht („Ulmenrinde-Drops für Hunde" deckt „ulmenrinde für hunde"). NIE eine Suchphrase wörtlich einkleben, wenn sie ungrammatisch ist — Amazon matcht Wortstämme, geklebte Phrasen bringen NULL Ranking-Vorteil.
+- Weitere PRIMARY-Keywords (${kw.primary.slice(1).join(", ") || "keine"}): nur einbauen, was grammatisch natürlich passt — Vollständigkeit ist KEINE Pflicht, Lesbarkeit gewinnt immer. Kein Wortstamm mehrfach.
 - Zahlen als Ziffern. Keine Werbephrasen, keine Emojis, keine Versalien-Wörter außer Marke/Norm.
 - BEGRÜNDUNG: Erkläre jeden Titelbestandteil — woraus er sich ableitet (Keyword-Analyse, USP, Produkt-Wahrheit, Marke) und warum er das Budget verdient.
 JSON: {"title": "...", "rationale": [{"part": "<Bestandteil>", "source": "<Herleitung, z. B. 'Hauptkeyword aus Keyword-Analyse' oder 'USP #1: hält 24 h kalt'>"}]}`;
@@ -479,6 +485,7 @@ export async function generateSection(
   // ist deterministisch — Wiederholen änderte nichts, daher genau 1 Versuch.
   const maxVersuche = provider.name === "mock" ? 1 : MAX_VERSUCHE;
   let findings: ValidationIssue[] = [];
+  let letzterEntwurf: string | null = null;
 
   for (let versuch = 1; versuch <= maxVersuche; versuch++) {
     let parsed: Record<string, unknown>;
@@ -489,7 +496,7 @@ export async function generateSection(
     } else {
       const res = await generateForRecipe(recipeKey, {
         system: SYSTEM,
-        messages: [{ role: "user", content: sectionPrompt(section, inputs, findings) }],
+        messages: [{ role: "user", content: sectionPrompt(section, inputs, findings, letzterEntwurf) }],
         // 16000 statt 3000 (D106): Sonnet-5 denkt automatisch (adaptive thinking)
         // und max_tokens deckelt Denken + Antwort GEMEINSAM. Mit 3000 fraß die
         // Denkphase bei komplexen Prompts (Bullets seit D98) das ganze Budget —
@@ -531,6 +538,7 @@ export async function generateSection(
 
     if (nurErrors(issues).length === 0) return { ...result, issues };
     findings = nurErrors(issues);
+    letzterEntwurf = textFuerPruefer(result);
   }
 
   // Hart blockieren (D182): kein Entwurf mit Regelverstößen wird sichtbar.
