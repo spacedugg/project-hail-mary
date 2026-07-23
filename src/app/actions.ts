@@ -1598,13 +1598,20 @@ async function importListingKern(db: Awaited<ReturnType<typeof getDb>>, product:
   const productId = product.id;
   if (!product.asin) throw new GenFehler("Produkt hat keine ASIN — Import nicht möglich.", "IMP-02");
 
-  // Redundanz-Guard (D81): erfolgreicher Import jünger als 24 h → kein Doppel-Import
+  // Redundanz-Guard (D81): erfolgreicher Import jünger als 24 h → kein Doppel-Import.
+  // AUSNAHME (D191): Ein sprachfalscher Snapshot (Amazon-Maschinenübersetzung,
+  // vor dem Sprach-Wächter gespeichert) ist KEIN gültiger Stand — er darf den
+  // korrigierenden Neu-Import nicht 24 h blockieren.
   const lastSnap = await db.query.listingSnapshots.findFirst({
     where: eq(schema.listingSnapshots.productId, productId),
     orderBy: desc(schema.listingSnapshots.createdAt),
   });
   if (lastSnap && ["apify", "anthropic", "crawler"].includes(lastSnap.source) && Date.now() - lastSnap.createdAt.getTime() < 24 * 60 * 60 * 1000) {
-    return "Das Listing wurde in den letzten 24 h bereits geladen — Stand ist aktuell.";
+    const { erkenneSprache, marktplatzSprache } = await import("@/lib/text/sprache");
+    const erwartet = marktplatzSprache(product.marketplace);
+    const erkannt = erkenneSprache([lastSnap.title ?? "", ...(lastSnap.bullets ?? []), lastSnap.description ?? ""]).sprache;
+    const sprachFalsch = Boolean(erwartet && erkannt && erkannt !== erwartet);
+    if (!sprachFalsch) return "Das Listing wurde in den letzten 24 h bereits geladen — Stand ist aktuell.";
   }
 
   // Standard-Weg ist die Anthropic-API (D83); scheitert sie (Bot-Block),
