@@ -2,7 +2,7 @@ import { generateForRecipe, resolveRecipe } from "@/lib/llm/registry";
 import { parseLlmJson } from "@/lib/llm/json";
 import { trimToBytesByWord, trimToBytesBySentence } from "@/lib/text/bytes";
 import { fixeWhitespace, fixeWhitespaceListe, fixeTitelLaenge } from "@/lib/text/fixers";
-import { keywordStammAbgedeckt } from "@/lib/validation/gate";
+import { keywordStammAbgedeckt, entferneUnbelegteZahlSaetze } from "@/lib/validation/gate";
 import { pruefeKontrakt } from "@/lib/llm/contracts";
 import { regelnAlsPromptBlock } from "@/lib/validation/register";
 import { pruefeMitLlm } from "@/lib/validation/pruefer";
@@ -260,6 +260,7 @@ const BEHEBUNGS_STRATEGIEN: Array<[RegExp, string]> = [
   [/themen-dopplung$/, "Wähle für einen der beiden Bullets ein anderes Kern-Thema aus Erkenntnissen, Kaufauslösern oder Conversion-Blockern."],
   [/^title\.budget$/, "Ergänze ein weiteres BELEGTES Attribut (Maß, Menge, Material, Eigenschaft) aus Produkt-Wahrheit oder Original-Listing — keine Füllwörter."],
   [/wirkversprechen$/, "Formuliere nur Wirkaussagen, die wörtlich in Original-Listing, Produkt-Wahrheit oder Zusatz-Infos stehen — alles andere streichen."],
+  [/titel-dopplung$/, "Ersetze jedes Titel-Echo durch einen NEUEN belegten Fakt (Wirkstoff, Herkunft, Anwendungsdauer, Zertifikat) — die Highlights stehen direkt neben dem Titel und ergänzen ihn."],
 ];
 
 function behebungFuer(rule: string): string | null {
@@ -324,7 +325,8 @@ JSON: {"bullets": ["...", "...", "...", "...", "..."], "rationale": [{"part": "<
 AUFGABE: Schreibe die Amazon "Item Highlights" (neue Sektion).
 REGELN (Ausschöpfungs-Prinzip 07/2026):
 - HART: max ${RULES.itemHighlights.maxChars} Zeichen GESAMT; Ziel ${RULES.itemHighlights.targetMinChars}–${RULES.itemHighlights.maxChars} — Budget ausnutzen, sorgfältig zählen.
-- Die 2–3 kaufentscheidendsten Fakten, kompakt, konkret, keine Wiederholung des Titels.
+- NULL TITEL-DOPPLUNG (wird maschinell geprüft, D197): Titel und Highlights stehen im Listing DIREKT nebeneinander — kein Wort, kein Fakt, keine Zahl aus dem Titel darf wieder auftauchen.${typeof inputs.approved?.title === "string" ? `\n- FREIGEGEBENER TITEL (NICHTS hieraus wiederholen): "${inputs.approved.title}"` : ""}
+- Stattdessen die 2–3 kaufentscheidendsten ZUSÄTZLICHEN Fakten: Wirkstoffe/Materialien, Herkunft/Entwicklung, Anwendungsdauer/-art, Zertifikate — kompakt und konkret aus den belegten Quellen.
 - BEGRÜNDUNG: woraus sich jeder Fakt ableitet.
 JSON: {"highlights": "...", "rationale": [{"part": "...", "source": "..."}]}`;
     case "backend":
@@ -515,7 +517,8 @@ function baueErgebnis(
       return { section, payload: { text, rationale: extractRationale(parsed, text) }, issues: validateTitle(text, ctx), raw, provider: providerName, model };
     }
     case "highlights": {
-      const text = fixeWhitespace(String(parsed.highlights ?? ""));
+      // Fakten-Fixer (D198): erfundene Zahl-Sätze streichen, bevor das Gate prüft
+      const text = entferneUnbelegteZahlSaetze(fixeWhitespace(String(parsed.highlights ?? "")), ctx?.zahlenQuellen ?? "").text;
       return { section, payload: { text, rationale: extractRationale(parsed, text) }, issues: validateItemHighlights(text, ctx), raw, provider: providerName, model };
     }
     case "qa": {
@@ -526,7 +529,10 @@ function baueErgebnis(
       return { section, payload: { pairs, rationale: extractRationale(parsed, joined) }, issues: validateQa(pairs, ctx), raw, provider: providerName, model };
     }
     case "bullets": {
-      const items = Array.isArray(parsed.bullets) ? fixeWhitespaceListe(parsed.bullets.map(String)) : [];
+      // Fakten-Fixer je Bullet (D198): erfundene Zahl-Sätze streichen, bevor das Gate prüft
+      const items = Array.isArray(parsed.bullets)
+        ? fixeWhitespaceListe(parsed.bullets.map(String)).map((b) => entferneUnbelegteZahlSaetze(b, ctx?.zahlenQuellen ?? "").text)
+        : [];
       return { section, payload: { items, rationale: extractRationale(parsed, items.join(" ")) }, issues: validateBullets(items, ctx), raw, provider: providerName, model };
     }
     case "backend": {
@@ -545,7 +551,9 @@ function baueErgebnis(
       return { section, payload: { text, rationale: extractRationale(parsed, text) }, issues: validateBackendKeywords(text, visible, ctx), raw, provider: providerName, model };
     }
     case "description": {
-      const text = trimToBytesBySentence(fixeWhitespace(String(parsed.description ?? "")), RULES.description.maxBytes);
+      // Fakten-Fixer (D198) VOR dem Byte-Trim: erfundene Zahl-Sätze streichen
+      const gefixt = entferneUnbelegteZahlSaetze(fixeWhitespace(String(parsed.description ?? "")), ctx?.zahlenQuellen ?? "").text;
+      const text = trimToBytesBySentence(gefixt, RULES.description.maxBytes);
       const bullets = Array.isArray(inputs.approved?.bullets) ? (inputs.approved.bullets as string[]) : [];
       return { section, payload: { text, rationale: extractRationale(parsed, text) }, issues: validateDescription(text, bullets, ctx), raw, provider: providerName, model };
     }
@@ -625,6 +633,8 @@ export async function generateSection(
     primaryKeywords: inputs.keywords.primary,
     // ALLE Keywords für den Keyword-Echo-Check (D181)
     alleKeywords: Object.values(inputs.keywords).flat(),
+    // Freigegebener Titel für den Titel-Dopplungs-Check der Highlights (D197)
+    freigegebenerTitel: typeof inputs.approved?.title === "string" ? inputs.approved.title : undefined,
     // Erkannte Fremdmarken (Relevanz-Filter) — das Gate flaggt jedes Vorkommen (D97)
     competitorBrands: inputs.competitorBrands ?? [],
     zahlenQuellen,

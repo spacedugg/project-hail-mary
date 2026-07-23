@@ -13,6 +13,8 @@ type Ctx = {
   primaryKeywords?: string[]; // 3–4, aus Analyse
   /** ALLE Keywords (alle Tiers) — Basis des Keyword-Echo-Checks (D181/D184). */
   alleKeywords?: string[];
+  /** Freigegebener Titel (D197) — Basis des Titel-Dopplungs-Checks der Item Highlights. */
+  freigegebenerTitel?: string;
   competitorBrands?: string[]; // Blacklist
   /**
    * Zahlen-Herkunfts-Check (D114): Quelltext, aus dem JEDE Zahl im
@@ -65,11 +67,18 @@ function zahlClaims(text: string): Array<{ zahl: string; kontext: string[]; roh:
   return claims;
 }
 
-export function pruefeZahlenTreue(text: string, quellen: string, rulePrefix: string): ValidationIssue[] {
+/**
+ * Kern-Detektor (D198): liefert die unbelegten/widersprüchlichen Zahl-Claims
+ * eines Textes. EINE Quelle für den Gate-Check UND den deterministischen
+ * Fakten-Fixer — beide fassen exakt dieselben Claims.
+ */
+export type ZahlBefund = { roh: string; art: "ohne-quelle" | "widerspruch"; umfeld: string[] };
+
+export function unbelegteZahlen(text: string, quellen: string): ZahlBefund[] {
   if (!quellen.trim()) return []; // ohne Quellen ehrlich passiv
-  const issues: ValidationIssue[] = [];
   const q = quellen.toLowerCase().replace(/,(?=\d)/g, ".");
   const qZahlen = new Set((q.match(/\d+(?:\.\d+)?/g) ?? []).map(normZahl));
+  const befunde: ZahlBefund[] = [];
 
   for (const c of zahlClaims(text)) {
     const zahlBekannt = qZahlen.has(c.zahl);
@@ -86,18 +95,55 @@ export function pruefeZahlenTreue(text: string, quellen: string, rulePrefix: str
         }
       }
       if (!kontextTrifftZahl && umfeldZahlen.size > 0) {
-        issues.push(issue(`${rulePrefix}.zahl-widerspruch`, "error",
-          `Zahlen-Widerspruch: Text sagt „${c.roh}", die Quellen nennen dort ${[...umfeldZahlen].slice(0, 3).join("/")} — Spezifikationen NIE verändern.`));
+        befunde.push({ roh: c.roh, art: "widerspruch", umfeld: [...umfeldZahlen] });
         continue;
       }
       if (kontextTrifftZahl) continue;
     }
-    if (!zahlBekannt) {
-      issues.push(issue(`${rulePrefix}.zahl-ohne-quelle`, "error",
-        `Zahl ohne Quelle: „${c.roh}" kommt in keiner Daten-Quelle vor (Produkt-Wahrheit, Listing, Zusatz-Infos, Keywords) — nichts erfinden.`));
-    }
+    if (!zahlBekannt) befunde.push({ roh: c.roh, art: "ohne-quelle", umfeld: [] });
   }
-  return issues;
+  return befunde;
+}
+
+export function pruefeZahlenTreue(text: string, quellen: string, rulePrefix: string): ValidationIssue[] {
+  return unbelegteZahlen(text, quellen).map((b) =>
+    b.art === "widerspruch"
+      ? issue(`${rulePrefix}.zahl-widerspruch`, "error",
+          `Zahlen-Widerspruch: Text sagt „${b.roh}", die Quellen nennen dort ${b.umfeld.slice(0, 3).join("/")} — Spezifikationen NIE verändern.`)
+      : issue(`${rulePrefix}.zahl-ohne-quelle`, "error",
+          `Zahl ohne Quelle: „${b.roh}" kommt in keiner Daten-Quelle vor (Produkt-Wahrheit, Listing, Zusatz-Infos, Keywords) — nichts erfinden.`),
+  );
+}
+
+/**
+ * Deterministischer Fakten-Fixer (D198, Nutzer-Befund 23.07.: „sieben
+ * Bestandteile"/„einer Woche" blockten 3× in Folge): Sätze mit erfundener oder
+ * widersprüchlicher Zahl werden GESTRICHEN — Zahlen entscheidet der Code, nicht
+ * das LLM (D184). Ein Zähl-/Fakten-Fehler geht damit nie mehr als Korrektur-
+ * Auftrag ans Modell zurück. Nur Body-Sätze werden entfernt (Headline bleibt),
+ * und nie wird der ganze Text geleert — bleibt kein sauberer Satz übrig,
+ * übernimmt die Regenerierung.
+ */
+export function entferneUnbelegteZahlSaetze(text: string, quellen: string): { text: string; entfernt: string[] } {
+  if (!quellen.trim() || unbelegteZahlen(text, quellen).length === 0) return { text, entfernt: [] };
+  const doppel = text.indexOf(":");
+  const kopf = doppel >= 0 ? text.slice(0, doppel + 1) : "";
+  const body = (doppel >= 0 ? text.slice(doppel + 1) : text).trim();
+  // Zahl steckt in der Headline (vor dem Doppelpunkt) → nicht satzweise fixbar
+  if (kopf && unbelegteZahlen(kopf, quellen).length > 0) return { text, entfernt: [] };
+  const saetze = body.match(/[^.!?]+[.!?]+(\s|$)/g);
+  if (!saetze || saetze.length < 2) return { text, entfernt: [] }; // nicht satzweise trennbar → Regenerierung
+  const entfernt: string[] = [];
+  const behalten = saetze.filter((s) => {
+    if (unbelegteZahlen(s, quellen).length > 0) {
+      entfernt.push(s.trim());
+      return false;
+    }
+    return true;
+  });
+  if (entfernt.length === 0 || behalten.length === 0) return { text, entfernt: [] };
+  const neu = `${kopf ? `${kopf} ` : ""}${behalten.join(" ")}`.replace(/\s+/g, " ").trim();
+  return { text: neu, entfernt };
 }
 
 function issue(
@@ -169,6 +215,38 @@ export function pruefeKeywordEcho(text: string, keywords: string[], rulePrefix: 
     }
   }
   return issues;
+}
+
+// ── Titel-Dopplungs-Check (D197, Nutzer-Befund 23.07.) ───────────────────────
+// Titel und Item Highlights stehen im Listing direkt nebeneinander — jede
+// Wiederholung ist verschwendeter Platz. Deterministisch: Inhaltswort-Stämme
+// und Zahlen des Titels dürfen in den Highlights nicht wieder auftauchen.
+// Kalibrierung am Gold-Standard: 1–2 Wortstämme = Warnung (Kategorie-Begriffe
+// überlappen manchmal zwangsläufig), ≥3 Stämme ODER eine wiederholte ZAHL = Fehler.
+
+function inhaltsStaemme(s: string): Set<string> {
+  return new Set(
+    s
+      .split(/[\s\-–—/,.|·&+()]+/)
+      .filter((w) => w && !FUNKTIONSWOERTER.has(w.toLowerCase()))
+      .map(normalizeToken)
+      .filter((t) => t.length >= 4 || /^\d+$/.test(t)),
+  );
+}
+
+export function pruefeTitelDopplung(text: string, titel: string, rulePrefix: string): ValidationIssue[] {
+  if (!titel.trim()) return [];
+  const titelStaemme = inhaltsStaemme(titel);
+  const doppelt = [...inhaltsStaemme(text)].filter((s) => titelStaemme.has(s));
+  const zahlen = doppelt.filter((s) => /^\d/.test(s));
+  const woerter = doppelt.filter((s) => !/^\d/.test(s));
+  if (zahlen.length > 0 || woerter.length >= 3)
+    return [issue(`${rulePrefix}.titel-dopplung`, "error",
+      `Wiederholt den Titel (${[...woerter, ...zahlen].join(", ")}) — Titel und Highlights stehen direkt nebeneinander: NUR neue Informationen, keine Dopplung.`)];
+  if (woerter.length > 0)
+    return [issue(`${rulePrefix}.titel-dopplung`, "warning",
+      `Wortstamm-Überlappung mit dem Titel (${woerter.join(", ")}) — nur ok, wenn unvermeidbarer Kategorie-Begriff.`)];
+  return [];
 }
 
 // ── Cross-Bullet-Satzdopplung (D181) ─────────────────────────────────────────
@@ -427,6 +505,7 @@ export function validateItemHighlights(text: string, ctx: Ctx = {}): ValidationI
   if (!t) return [issue("highlights.empty", "error", "Item Highlights fehlen.")];
   issues.push(...pruefeZahlenTreue(t, ctx.zahlenQuellen ?? "", "highlights"));
   issues.push(...pruefeKeywordEcho(t, ctx.alleKeywords ?? [], "highlights"));
+  issues.push(...pruefeTitelDopplung(t, ctx.freigegebenerTitel ?? "", "highlights"));
   const chars = charLength(t);
   if (chars > RULES.itemHighlights.maxChars)
     issues.push(issue("highlights.max-length", "error", `${chars} Zeichen > ${RULES.itemHighlights.maxChars}.`));

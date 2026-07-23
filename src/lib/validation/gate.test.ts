@@ -6,6 +6,9 @@ import {
   validateBackendKeywords,
   validateDescription,
   validateListing,
+  validateItemHighlights,
+  entferneUnbelegteZahlSaetze,
+  pruefeZahlenTreue,
 } from "./gate";
 
 const VALID_BULLET = (head: string, body: string) => `${head}: ${body}`;
@@ -280,5 +283,59 @@ describe("Keyword-Echo auch in Beschreibung & Highlights (Scheibe 2)", () => {
   it("grammatisch integriert passiert die Beschreibung", () => {
     const issues = validateDescription(goodDescription, [], { alleKeywords: ["outdoor flasche", "edelstahl trinkflasche"] });
     expect(issues.map((i) => i.rule)).not.toContain("description.keyword-echo");
+  });
+});
+
+describe("Titel-Dopplungs-Check der Item Highlights (D197)", () => {
+  const titel = "Tierliebhaber Ulmenrinde-Drops für Hunde gegen Sodbrennen, 350 g mit Moor";
+
+  it("massives Titel-Echo (der Live-Fall: Moor, Sodbrennen, Drops, 350 g doppelt) = FEHLER", () => {
+    const issues = validateItemHighlights(
+      "Vom Tierarzt entwickelte Drops gegen Sodbrennen und Grasfressen. Mit Moor, Fenchel und Heilerde. 350 g.",
+      { freigegebenerTitel: titel },
+    );
+    const treffer = issues.filter((i) => i.rule === "highlights.titel-dopplung");
+    expect(treffer).toHaveLength(1);
+    expect(treffer[0].severity).toBe("error");
+  });
+
+  it("echte Zusatz-Informationen passieren (Gold-Standard-Muster)", () => {
+    const issues = validateItemHighlights(
+      "Bei Magenübersäuerung und Grasfressen, mit Heilerde und Fenchel, tierärztlich entwickelt, drei bis vier Wochen Anwendung",
+      { freigegebenerTitel: titel },
+    );
+    expect(issues.filter((i) => i.rule === "highlights.titel-dopplung" && i.severity === "error")).toEqual([]);
+  });
+
+  it("ohne freigegebenen Titel bleibt der Check ehrlich passiv", () => {
+    const issues = validateItemHighlights("Mit Moor und Drops gegen Sodbrennen. 350 g.", {});
+    expect(issues.filter((i) => i.rule === "highlights.titel-dopplung")).toEqual([]);
+  });
+});
+
+describe("Fakten-Fixer: erfundene Zahl-Sätze streichen (D198)", () => {
+  const quellen = "Ulmenrinde Heilerde Moor Fenchel Anis 350 g 160 Drops 2 Drops pro 5 kg";
+
+  it("streicht den Satz mit erfundener Zahl, behält belegte Sätze (der Live-Fall)", () => {
+    const bullet = "BERUHIGT DEN MAGEN: Aus sieben natürlichen Bestandteilen zusammengesetzt. Mit Ulmenrinde und Heilerde bei Magenbeschwerden.";
+    const { text, entfernt } = entferneUnbelegteZahlSaetze(bullet, quellen);
+    expect(entfernt.length).toBe(1);
+    expect(text).not.toMatch(/sieben/);
+    expect(text).toContain("Ulmenrinde und Heilerde");
+    // Ergebnis ist jetzt zahlen-sauber
+    expect(pruefeZahlenTreue(text, quellen, "bullets").filter((i) => i.rule.startsWith("bullets.zahl"))).toEqual([]);
+  });
+
+  it("belegte Zahlen bleiben unangetastet", () => {
+    const bullet = "DOSIERUNG: 2 Drops pro 5 kg Körpergewicht täglich. Die 350 g Dose reicht lange.";
+    const { entfernt } = entferneUnbelegteZahlSaetze(bullet, quellen);
+    expect(entfernt).toEqual([]);
+  });
+
+  it("leert nie den ganzen Text — bleibt kein sauberer Satz, Regenerierung übernimmt", () => {
+    const bullet = "TITEL: Nach einer Woche kein Grasfressen mehr.";
+    const { text, entfernt } = entferneUnbelegteZahlSaetze(bullet, quellen);
+    expect(text).toBe(bullet);
+    expect(entfernt).toEqual([]);
   });
 });

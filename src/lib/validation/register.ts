@@ -78,6 +78,15 @@ export const REGELN: Regel[] = [
     text:
       "Reihenfolge (Best Practice D174): Marke → Hauptkeyword/Produkttyp → wichtigste Key Features → Größe/Menge → Material → Kundennutzen — gekürzt auf das 75er-Budget.",
   },
+  // ── Item Highlights ────────────────────────────────────────────────────────
+  {
+    id: "highlights.keine-titel-dopplung",
+    sektionen: ["highlights"],
+    art: "llm",
+    severity: "error",
+    text:
+      "Item Highlights stehen im Listing DIREKT neben dem Titel und ergänzen ihn um NEUE Informationen — kein Wort, kein Fakt und keine Zahl aus dem Titel darf wiederholt werden (auch nicht sinngleich umformuliert). Dopplung = verschwendeter Premium-Platz.",
+  },
   // ── Bullets ────────────────────────────────────────────────────────────────
   {
     id: "bullets.headline-benefit",
