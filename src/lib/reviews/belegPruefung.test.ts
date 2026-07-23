@@ -68,3 +68,24 @@ describe("verifiziereZitate", () => {
     expect(aspekte).toHaveLength(1);
   });
 });
+
+describe("Herkunfts-Attribution (D196)", () => {
+  it("zählt eigene vs. Wettbewerbs-Fundstellen je Aspekt deterministisch aus den Review-ASINs", () => {
+    const reviews = [
+      { rating: 2, title: "", body: "die tablette ist viel zu gross zum schlucken", asin: "B0KONKURRENZ" },
+      { rating: 1, title: "", body: "zu gross zum schlucken, mein hund verweigert sie", asin: "B0KONKURRENZ" },
+      { rating: 5, title: "", body: "die drops werden problemlos gefressen", asin: "B0EIGENE0001" },
+    ];
+    const { aspekte } = verifiziereZitate(
+      [
+        { label: "zu groß zum Schlucken", frequencyPct: null, mentionCount: null, quotes: ["viel zu gross zum schlucken", "zu gross zum schlucken, mein hund"] },
+        { label: "werden problemlos gefressen", frequencyPct: null, mentionCount: null, quotes: ["drops werden problemlos gefressen"] },
+      ],
+      reviews,
+      "painPoint",
+      "B0EIGENE0001",
+    );
+    expect(aspekte[0].herkunft).toEqual({ eigene: 0, fremde: 2, jeAsin: { B0KONKURRENZ: 2 } });
+    expect(aspekte[1].herkunft).toEqual({ eigene: 1, fremde: 0, jeAsin: { B0EIGENE0001: 1 } });
+  });
+});

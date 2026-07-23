@@ -142,6 +142,8 @@ export const RECIPE_MODELS: Record<string, { provider: string; model: string }> 
   "listing.blocker": { provider: "anthropic", model: "claude-opus-4-8" },
   // QM-Prüfer (D182): unabhängige zweite Instanz, prüft jede Content-Sektion
   "listing.pruefer": { provider: "anthropic", model: "claude-opus-4-8" },
+  // Übertragbarkeits-Prüfung (D196): Wettbewerbs-Aspekte vs. unsere Produkt-Wahrheit
+  "reviews.uebertragbarkeit": { provider: "anthropic", model: "claude-opus-4-8" },
 };
 
 export function resolveRecipe(recipeKey: string): { provider: LlmProvider; model: string } {

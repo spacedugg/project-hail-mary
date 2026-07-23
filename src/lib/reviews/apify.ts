@@ -228,6 +228,8 @@ export async function extractInsights(
   reviews: RawReview[],
   sources: string[],
   dataBasis: string,
+  /** Eigene Produkt-ASIN (D196) — Herkunfts-Attribution eigene vs. Wettbewerbs-Fundstellen. */
+  eigeneAsin?: string,
 ): Promise<{ payload: ReviewInsightsPayload; confidence: string }> {
   const { provider } = resolveRecipe("reviews.pain-points");
   const stats = {
@@ -271,8 +273,8 @@ export async function extractInsights(
     // Beleg-Prüfung (D152): Verbatim-Gate + Beleg-Pflicht + Sentiment-Signal —
     // deterministisch, VOR dem Speichern; Entferntes wird ausgewiesen.
     const { verifiziereZitate } = await import("./belegPruefung");
-    const pp = verifiziereZitate(core.painPoints, reviews, "painPoint");
-    const bt = verifiziereZitate(core.buyingTriggers, reviews, "buyingTrigger");
+    const pp = verifiziereZitate(core.painPoints, reviews, "painPoint", eigeneAsin);
+    const bt = verifiziereZitate(core.buyingTriggers, reviews, "buyingTrigger", eigeneAsin);
     core = { ...core, painPoints: pp.aspekte, buyingTriggers: bt.aspekte };
     qualitaetsNotizen = [...pp.notizen, ...bt.notizen];
 

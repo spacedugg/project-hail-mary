@@ -1369,7 +1369,27 @@ async function auswertungKern(
       scrape.reviews,
       scrape.asins.map((a) => `amazon.${amazonDomain(scrapeMarkt)}/dp/${a}`),
       dataBasis,
+      product.asin ?? undefined,
     );
+    // Übertragbarkeits-Prüfung (D196): wettbewerbs-dominante Aspekte werden
+    // gegen UNSERE Produkt-Wahrheit + Listing beurteilt — erst damit werden
+    // Wettbewerbs-Findings strategisch nutzbar (Lücken) statt weggeworfen.
+    try {
+      const snapshotFuerTransfer = await db.query.listingSnapshots.findFirst({
+        where: eq(schema.listingSnapshots.productId, productId),
+        orderBy: desc(schema.listingSnapshots.createdAt),
+      });
+      const { pruefeUebertragbarkeit } = await import("@/lib/reviews/uebertragbarkeit");
+      res.payload = await pruefeUebertragbarkeit(res.payload, {
+        produktName: product.name,
+        facts: product.facts,
+        listingTitel: snapshotFuerTransfer?.title ?? null,
+        listingBullets: snapshotFuerTransfer?.bullets ?? null,
+      });
+    } catch (transferFehler) {
+      // Nicht-blockierend: ohne Urteil gelten Wettbewerbs-Aspekte als „unbekannt"
+      console.error("[TRANSFER-CHECK] übersprungen:", transferFehler instanceof Error ? transferFehler.message : transferFehler);
+    }
     await db.insert(schema.reviewInsights).values({
       id: id(), productId, scrapeId: scrape.id, dataBasis, confidence: res.confidence, payload: res.payload,
     });

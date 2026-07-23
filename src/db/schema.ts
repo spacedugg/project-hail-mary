@@ -363,6 +363,28 @@ export const reviewInsights = sqliteTable("review_insights", {
   createdAt: ts("created_at").notNull(),
 });
 
+/**
+ * Herkunfts-Attribution + Übertragbarkeit je Roh-Aspekt (D196, Nutzer 23.07.):
+ * Wettbewerbs-Reviews sind der wertvollste Rohstoff — aber nur mit Herkunft
+ * und Übertragbarkeits-Urteil gegen UNSERE Produkt-Wahrheit nutzbar.
+ * Die Zählwerte stammen deterministisch aus der Beleg-Prüfung (der Code kennt
+ * die ASIN jedes verifizierten Zitats); das Urteil aus der Transfer-Prüfung.
+ */
+export type AspektHerkunft = {
+  /** Verifizierte Fundstellen aus Reviews der EIGENEN ASIN. */
+  eigene: number;
+  /** Verifizierte Fundstellen aus Wettbewerbs-Reviews. */
+  fremde: number;
+  /** Aufschlüsselung je ASIN (deterministisch gezählt). */
+  jeAsin: Record<string, number>;
+};
+
+export type AspektUebertragbarkeit = {
+  urteil: "ja" | "nein" | "unbekannt";
+  /** Ein Satz: warum (Spezifikations-Vergleich gegen unsere Produkt-Wahrheit). */
+  grund: string;
+};
+
 export type ReviewInsightsPayload = {
   sources: string[];
   stats: { reviewsTotal: number; ratingAvg: number | null };
@@ -371,12 +393,16 @@ export type ReviewInsightsPayload = {
     frequencyPct: number | null;
     mentionCount: number | null;
     quotes: string[];
+    herkunft?: AspektHerkunft;
+    uebertragbarkeit?: AspektUebertragbarkeit;
   }>;
   buyingTriggers: Array<{
     label: string;
     frequencyPct: number | null;
     mentionCount: number | null;
     quotes: string[];
+    herkunft?: AspektHerkunft;
+    uebertragbarkeit?: AspektUebertragbarkeit;
   }>;
   languageToBorrow: string[];
   languageToAvoid: string[];

@@ -88,6 +88,41 @@ const VOICE_DEFAULT =
   "Nüchtern-deutsch, Premium. Kurze Sätze, aktive Verben, konkrete Zahlen. " +
   "Keine englischen Marketing-Floskeln, keine unbelegten Superlative — statt 'hochwertig' das konkrete Material/die Zahl nennen.";
 
+/**
+ * Ein-Seiten-Zuordnung (D196, Nutzer 23.07.: „wenn ein Thema auf beiden Seiten
+ * steht, können wir damit nicht arbeiten"): Themen, die als Pain Point UND
+ * Kaufauslöser auftreten (über die Erkenntnis-Karten verknüpft), werden per
+ * code-gezähltem Mehrheits-Entscheid EINER Arbeits-Seite zugeschlagen — die
+ * Minderheits-Seite fällt aus den Prompt-Listen. Gleichstand → negativ
+ * (konservativ: einen Einwand zu adressieren schadet nie, unbelegtes Loben schon).
+ */
+export function einseitigeAspekte(ri: ReviewInsightsPayload): {
+  painPoints: ReviewInsightsPayload["painPoints"];
+  buyingTriggers: ReviewInsightsPayload["buyingTriggers"];
+} {
+  const minderheit = new Set<string>();
+  for (const card of ri.insightCards ?? []) {
+    const neg = card.belegAspekte.filter((b) => b.typ === "painPoint");
+    const pos = card.belegAspekte.filter((b) => b.typ === "buyingTrigger");
+    if (neg.length === 0 || pos.length === 0) continue; // kein geteiltes Thema
+    const nNeg = neg.reduce((s, b) => s + (b.mentionCount ?? 0), 0);
+    const nPos = pos.reduce((s, b) => s + (b.mentionCount ?? 0), 0);
+    for (const b of nPos > nNeg ? neg : pos) minderheit.add(`${b.typ}:${b.label}`);
+  }
+  return {
+    painPoints: ri.painPoints.filter((a) => !minderheit.has(`painPoint:${a.label}`)),
+    buyingTriggers: ri.buyingTriggers.filter((a) => !minderheit.has(`buyingTrigger:${a.label}`)),
+  };
+}
+
+/** Herkunfts-Klasse eines Aspekts aus den code-gezählten Fundstellen (D196). */
+function herkunftsKlasse(a: { herkunft?: { eigene: number; fremde: number } }): "eigen" | "wettbewerb" | "kategorie" | "unbekannt" {
+  if (!a.herkunft) return "unbekannt";
+  if (a.herkunft.fremde > a.herkunft.eigene) return "wettbewerb";
+  if (a.herkunft.eigene > a.herkunft.fremde) return "eigen";
+  return "kategorie";
+}
+
 function contextBlock(inputs: RecipeInputs): string {
   const f = inputs.facts;
   const ri = inputs.reviewInsights;
@@ -146,10 +181,34 @@ function contextBlock(inputs: RecipeInputs): string {
     );
   }
   if (ri) {
-    const pp = ri.painPoints.slice(0, 5).map((p) => `${p.label}${p.frequencyPct ? ` (${p.frequencyPct}%)` : ""}`);
-    const bt = ri.buyingTriggers.slice(0, 5).map((t) => t.label);
-    if (pp.length) lines.push(`PAIN POINTS AUS ECHTEN REVIEWS (häufigster zuerst — adressiere ihn prominent): ${pp.join(" | ")}`);
-    if (bt.length) lines.push(`KAUFAUSLÖSER: ${bt.join(" | ")}`);
+    // Ein-Seiten-Zuordnung (D196): geteilte Themen erscheinen nur auf ihrer Mehrheits-Seite
+    const seiten = einseitigeAspekte(ri);
+    const mitAttribution = [...seiten.painPoints, ...seiten.buyingTriggers].some((a) => a.herkunft);
+    if (mitAttribution) {
+      // Strategische Blöcke (D196): Herkunft × Übertragbarkeit steuert die Verwendung
+      const fmt = (a: (typeof seiten.painPoints)[number]) =>
+        `${a.label} (eigene ${a.herkunft?.eigene ?? 0}× · Wettbewerb ${a.herkunft?.fremde ?? 0}×${a.uebertragbarkeit ? ` · ${a.uebertragbarkeit.grund}` : ""})`;
+      const eigeneBT = seiten.buyingTriggers.filter((a) => herkunftsKlasse(a) !== "wettbewerb").slice(0, 5);
+      const wbBTJa = seiten.buyingTriggers.filter((a) => herkunftsKlasse(a) === "wettbewerb" && a.uebertragbarkeit?.urteil === "ja").slice(0, 5);
+      const wbBTUnklar = seiten.buyingTriggers.filter((a) => herkunftsKlasse(a) === "wettbewerb" && a.uebertragbarkeit?.urteil !== "ja" && a.uebertragbarkeit?.urteil !== "nein").slice(0, 4);
+      const ppRelevant = seiten.painPoints.filter((a) => !(herkunftsKlasse(a) === "wettbewerb" && a.uebertragbarkeit?.urteil === "nein")).slice(0, 5);
+      const angriffsLuecken = seiten.painPoints.filter((a) => herkunftsKlasse(a) === "wettbewerb" && a.uebertragbarkeit?.urteil === "nein").slice(0, 4);
+      if (eigeneBT.length) lines.push(`KAUFAUSLÖSER EIGENER KUNDEN (Kern-Content — prominent abbilden): ${eigeneBT.map(fmt).join(" | ")}`);
+      if (wbBTJa.length)
+        lines.push(`ÜBERTRAGBARE WETTBEWERBS-KAUFAUSLÖSER (FEHLENDER KERN-CONTENT: gilt laut Produkt-Wahrheit auch für uns, war bisher nicht abgebildet — abbilden, ausschließlich mit UNSEREN belegten Eigenschaften formuliert): ${wbBTJa.map(fmt).join(" | ")}`);
+      if (wbBTUnklar.length)
+        lines.push(`WETTBEWERBS-KAUFAUSLÖSER MIT UNKLARER ÜBERTRAGBARKEIT (nur aufgreifen, wo Produkt-Wahrheit/Listing es ausdrücklich deckt — sonst weglassen): ${wbBTUnklar.map(fmt).join(" | ")}`);
+      if (ppRelevant.length)
+        lines.push(`PAIN POINTS (eigene + übertragbare — adressieren bzw. ehrlich rahmen, häufigster zuerst): ${ppRelevant.map(fmt).join(" | ")}`);
+      if (angriffsLuecken.length)
+        lines.push(`ANGRIFFS-LÜCKEN (Wettbewerbs-Probleme, die UNS laut Produkt-Wahrheit NICHT treffen — als Stärke besetzen, ausschließlich mit belegten eigenen Eigenschaften): ${angriffsLuecken.map(fmt).join(" | ")}`);
+    } else {
+      // Alt-Daten ohne Herkunfts-Attribution: bisherige flache Listen
+      const pp = seiten.painPoints.slice(0, 5).map((p) => `${p.label}${p.frequencyPct ? ` (${p.frequencyPct}%)` : ""}`);
+      const bt = seiten.buyingTriggers.slice(0, 5).map((t) => t.label);
+      if (pp.length) lines.push(`PAIN POINTS AUS ECHTEN REVIEWS (häufigster zuerst — adressiere ihn prominent): ${pp.join(" | ")}`);
+      if (bt.length) lines.push(`KAUFAUSLÖSER: ${bt.join(" | ")}`);
+    }
     if (ri.languageToBorrow.length) lines.push(`KUNDENSPRACHE (nah dran formulieren): ${ri.languageToBorrow.slice(0, 6).join(" | ")}`);
     if (ri.languageToAvoid.length) lines.push(`SPRACHE VERMEIDEN: ${ri.languageToAvoid.slice(0, 6).join(" | ")}`);
     // Quintessenz der Analyse (D194, Nutzer-Befund: lag im Payload, wurde aber
