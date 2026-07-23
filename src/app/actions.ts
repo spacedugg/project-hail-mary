@@ -634,6 +634,19 @@ async function generiereSektionKern(
       });
       return blocker?.payload.cards.map((c) => ({ titel: c.titel, beschreibung: c.beschreibung })) ?? null;
     })(),
+    // Übertragbare Wettbewerber-Informationen (D199): nur ja/unbekannt (nein
+    // wurde im Analyse-Modul bereits verworfen) fließen als Kandidaten ein.
+    wettbewerbsInfos: await (async () => {
+      const gaps = await db.query.competitorInfoGaps.findFirst({
+        where: eq(schema.competitorInfoGaps.productId, productId),
+        orderBy: desc(schema.competitorInfoGaps.createdAt),
+      });
+      return (
+        gaps?.payload.gaps
+          .filter((g) => g.urteil === "ja" || g.urteil === "unbekannt")
+          .map((g) => ({ info: g.info, urteil: g.urteil as "ja" | "unbekannt", grund: g.grund })) ?? null
+      );
+    })(),
   };
 
   // Fehler (API, Zeitbudget, kaputtes JSON) als Banner, nie als Fehlerseite (D81).
@@ -1166,7 +1179,7 @@ export type PipelineErgebnis = { ok: boolean; hinweis?: string; fehler?: string;
 
 export async function runPipelineStufe(
   productId: string,
-  stufe: "listing" | "scrape" | "auswertung" | "verdichtung" | "blocker" | "features" | "audit" | "content",
+  stufe: "listing" | "scrape" | "auswertung" | "wettbewerb-texte" | "verdichtung" | "blocker" | "features" | "audit" | "content",
   extra?: { asins?: string[]; section?: string; force?: boolean; ohneAnalyseBestaetigt?: boolean },
 ): Promise<PipelineErgebnis> {
   const db = await getDb();
@@ -1183,6 +1196,8 @@ export async function runPipelineStufe(
       }
       case "auswertung":
         return { ok: true, hinweis: (await auswertungKern(db, product)) ?? undefined };
+      case "wettbewerb-texte":
+        return { ok: true, hinweis: (await wettbewerbsTexteKern(db, product)) ?? undefined };
       case "verdichtung": {
         const insight = await db.query.reviewInsights.findFirst({
           where: eq(schema.reviewInsights.productId, productId),
@@ -1332,6 +1347,113 @@ async function scrapeKern(
   }
 
   await db.insert(schema.reviewScrapes).values({ id: id(), productId, source, asins, reviews, starCounts, perAsin, notes, amazonTotals });
+
+  // Wettbewerber-LISTINGS scrapen (D199, Nutzer 23.07.): Nicht nur die Reviews
+  // der Vergleichs-ASINs, auch deren Listing-TEXTE sind Rohstoff. Nicht-
+  // blockierend: scheitert es, bleibt der Review-Scrape gültig. Nur echte
+  // Wettbewerber (nicht die eigene ASIN), nur wenn nicht schon frisch vorhanden.
+  if (source === "apify") {
+    const eigene = (product.asin ?? "").toUpperCase();
+    const competitors = [...new Set(asins.map((a) => a.toUpperCase()))].filter((a) => a && a !== eigene).slice(0, 6);
+    if (competitors.length > 0) {
+      try {
+        await scrapeWettbewerberListings(db, product, competitors, force);
+      } catch (e) {
+        console.error("[WB-LISTINGS] Scrape übersprungen:", e instanceof Error ? e.message : e);
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Wettbewerber-Listings scrapen (D199): dieselbe Scrape-Maschinerie wie der
+ * eigene Import, je Competitor-ASIN ein Snapshot in competitor_listings.
+ * Nicht-blockierend; 24-h-Redundanz-Guard je ASIN (force übergeht ihn).
+ */
+async function scrapeWettbewerberListings(
+  db: Awaited<ReturnType<typeof getDb>>,
+  product: NonNullable<Awaited<ReturnType<Awaited<ReturnType<typeof getDb>>["query"]["products"]["findFirst"]>>>,
+  competitors: string[],
+  force: boolean,
+): Promise<void> {
+  const marktPasst = marktplatzSprache(product.marketplace) === product.contentSprache;
+  const scrapeMarkt = marktPasst ? product.marketplace : marktplatzFuerSprache(product.contentSprache);
+  const { scrapeProductViaAnthropic } = await import("@/lib/scrape/anthropicProduct");
+  const { scrapeProductViaCrawler } = await import("@/lib/scrape/crawler");
+  for (const asin of competitors) {
+    const vorhanden = await db.query.competitorListings.findFirst({
+      where: and(eq(schema.competitorListings.productId, product.id), eq(schema.competitorListings.asin, asin)),
+      orderBy: desc(schema.competitorListings.createdAt),
+    });
+    if (!force && vorhanden && Date.now() - vorhanden.createdAt.getTime() < 24 * 60 * 60 * 1000) continue;
+    let snap: import("@/lib/scrape/apifyProduct").ProductSnapshot | null = null;
+    let src = "anthropic";
+    try {
+      snap = await scrapeProductViaAnthropic(asin, scrapeMarkt, { timeoutSec: 20 });
+    } catch {
+      try {
+        snap = await scrapeProductViaCrawler(asin, scrapeMarkt, { timeoutSec: 15 });
+        src = "crawler";
+      } catch {
+        continue; // dieser Competitor bleibt aus, der Rest läuft weiter
+      }
+    }
+    if (!snap) continue;
+    await db.insert(schema.competitorListings).values({
+      id: id(), productId: product.id, asin, source: src,
+      title: snap.title, bullets: snap.bullets, description: snap.description, attributes: snap.attributes,
+    });
+  }
+}
+
+/**
+ * Wettbewerber-Listing-Abgleich (D199): gescrapte Konkurrenz-Listings gegen
+ * unser Listing spiegeln → fehlende, übertragbare Informationen. Optional &
+ * nicht-blockierend: ohne Competitor-Listings ehrlich „kein Abgleich".
+ */
+async function wettbewerbsTexteKern(
+  db: Awaited<ReturnType<typeof getDb>>,
+  product: NonNullable<Awaited<ReturnType<Awaited<ReturnType<typeof getDb>>["query"]["products"]["findFirst"]>>>,
+): Promise<string | null> {
+  const productId = product.id;
+  const listings = await db.query.competitorListings.findMany({
+    where: eq(schema.competitorListings.productId, productId),
+    orderBy: desc(schema.competitorListings.createdAt),
+  });
+  // Je ASIN nur der jüngste Snapshot
+  const jeAsin = new Map<string, (typeof listings)[number]>();
+  for (const l of listings) if (!jeAsin.has(l.asin)) jeAsin.set(l.asin, l);
+  if (jeAsin.size === 0) return "Kein Wettbewerber-Listing vorhanden — für den Abgleich am Analyse-Start Vergleichs-ASINs eintragen.";
+
+  const snapshot = await db.query.listingSnapshots.findFirst({
+    where: eq(schema.listingSnapshots.productId, productId),
+    orderBy: desc(schema.listingSnapshots.createdAt),
+  });
+
+  // Redundanz-Guard: neuestes Wettbewerber-Listing älter als letzter Abgleich → aktuell
+  const last = await db.query.competitorInfoGaps.findFirst({
+    where: eq(schema.competitorInfoGaps.productId, productId),
+    orderBy: desc(schema.competitorInfoGaps.createdAt),
+  });
+  const neuestesListing = Math.max(...[...jeAsin.values()].map((l) => l.createdAt.getTime()));
+  if (last && neuestesListing <= last.createdAt.getTime()) {
+    return "Die Wettbewerber-Listings sind seit dem letzten Abgleich unverändert.";
+  }
+
+  try {
+    const { analysiereWettbewerbsTexte } = await import("@/lib/analysis/wettbewerbsTexte");
+    const payload = await analysiereWettbewerbsTexte({
+      produktName: product.name,
+      facts: product.facts,
+      eigenesListing: { title: snapshot?.title ?? null, bullets: snapshot?.bullets ?? null, description: snapshot?.description ?? null },
+      wettbewerber: [...jeAsin.values()].map((l) => ({ asin: l.asin, title: l.title, bullets: l.bullets, description: l.description, attributes: l.attributes })),
+    });
+    const dataBasis = [...jeAsin.keys()].map((a) => `Wettbewerber-Listing ${a}`);
+    await db.insert(schema.competitorInfoGaps).values({ id: id(), productId, payload, dataBasis });
+  } catch (e) {
+    throw new GenFehler(`Wettbewerber-Abgleich: ${e instanceof Error ? e.message : String(e)}`, "WB-01");
+  }
   return null;
 }
 

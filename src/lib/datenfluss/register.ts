@@ -105,6 +105,20 @@ export const DATENFLUSS: Datenpunkt[] = [
     anzeige: ["Bewertungen-Reiter (Analyse-Dashboard)", "Analyse-Reiter (vier Bereiche, D178)"],
   },
   {
+    id: "wettbewerber-listings",
+    name: "Wettbewerber-Listings (Texte der Vergleichs-ASINs)",
+    quelle: "Optionale Vergleichs-ASINs am Analyse-Start (D199) — werden beim Review-Scrape zusätzlich als Listing gescrapt",
+    speicher: "competitor_listings → competitor_info_gaps",
+    analysen: [
+      { name: "Listing-Scrape je Wettbewerber", modul: "src/lib/scrape/anthropicProduct.ts", outcome: "Titel, Bullets, Beschreibung, Attribute der Konkurrenz-ASINs" },
+      { name: "Wettbewerber-Abgleich", modul: "src/lib/analysis/wettbewerbsTexte.ts", outcome: "Infos, die die Konkurrenz nennt und unser Listing NICHT — mit Übertragbarkeits-Urteil ja/nein/unbekannt gegen unsere Produkt-Wahrheit (nein = verworfen)" },
+    ],
+    verwendung: [
+      "Content-Prompts: ÜBERTRAGBARE WETTBEWERBER-INFORMATIONEN — fehlende Themen mit EIGENEN belegten Angaben besetzen, nie fremde Specs übernehmen (D199)",
+    ],
+    anzeige: ["Analyse-Reiter (übertragbare Informationslücken)"],
+  },
+  {
     id: "stammdaten",
     name: "Produkt-Stammdaten (Marke, Marktplatz, Content-Sprache, Preis, Produktname)",
     quelle: "Pflichtfelder beim Anlegen (D162); Marktplatz + Sprache danach FEST (D169); Preis beim Cerebro-Upload (D165); Marke editierbar mit Auto-Speichern",
@@ -192,4 +206,5 @@ export const RECIPE_INPUT_HERKUNFT: Record<keyof RecipeInputs, string> = {
   zusatzKontext: "zusatz-infos",
   sprache: "stammdaten",
   conversionBlocker: "reviews",
+  wettbewerbsInfos: "wettbewerber-listings",
 };

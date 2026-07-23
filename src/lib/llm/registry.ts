@@ -144,6 +144,8 @@ export const RECIPE_MODELS: Record<string, { provider: string; model: string }> 
   "listing.pruefer": { provider: "anthropic", model: "claude-opus-4-8" },
   // Übertragbarkeits-Prüfung (D196): Wettbewerbs-Aspekte vs. unsere Produkt-Wahrheit
   "reviews.uebertragbarkeit": { provider: "anthropic", model: "claude-opus-4-8" },
+  // Wettbewerber-Listing-Abgleich (D199): fehlende, übertragbare Informationen
+  "reviews.wettbewerb-texte": { provider: "anthropic", model: "claude-opus-4-8" },
 };
 
 export function resolveRecipe(recipeKey: string): { provider: LlmProvider; model: string } {

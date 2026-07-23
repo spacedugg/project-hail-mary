@@ -171,3 +171,19 @@ describe("Ein-Seiten-Zuordnung + strategische Blöcke (D196)", () => {
     expect(prompt).not.toContain("hübsche Geschenkbox");
   });
 });
+
+describe("Übertragbare Wettbewerber-Informationen im Prompt (D199)", () => {
+  it("ja + unbekannt fließen in den Content-Prompt; 'prüfen' markiert die unklaren", () => {
+    const prompt = sectionPrompt("bullets", {
+      ...inputs,
+      wettbewerbsInfos: [
+        { info: "tierärztlich entwickelt", urteil: "ja", grund: "Produkt-Wahrheit deckt es" },
+        { info: "angenehmer Geruch", urteil: "unbekannt", grund: "keine Angabe" },
+      ],
+    });
+    expect(prompt).toContain("ÜBERTRAGBARE WETTBEWERBER-INFORMATIONEN");
+    expect(prompt).toContain("tierärztlich entwickelt");
+    expect(prompt).toContain("angenehmer Geruch (prüfen)");
+    expect(prompt).toContain("NUR mit UNSEREN belegten Angaben");
+  });
+});
