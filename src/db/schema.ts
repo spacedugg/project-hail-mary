@@ -385,6 +385,52 @@ export type AspektUebertragbarkeit = {
   grund: string;
 };
 
+/**
+ * Wettbewerber-Listing-Texte (D199, Nutzer 23.07.): Nicht nur Reviews der
+ * Vergleichs-ASINs, auch deren LISTINGS (Titel/Bullets/Beschreibung/Attribute)
+ * sind Rohstoff — dort steht, welche Informationen die Konkurrenz abbildet und
+ * wir (noch) nicht. Gescrapt beim Review-Scrape, wenn Competitor-ASINs vorliegen.
+ */
+export const competitorListings = sqliteTable("competitor_listings", {
+  id: text("id").primaryKey(),
+  productId: text("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  asin: text("asin").notNull(),
+  source: text("source").notNull(), // anthropic | crawler | apify | mock
+  title: text("title"),
+  bullets: text("bullets", { mode: "json" }).$type<string[]>(),
+  description: text("description"),
+  attributes: text("attributes", { mode: "json" }).$type<Record<string, string> | null>(),
+  createdAt: ts("created_at").notNull(),
+});
+
+/**
+ * Übertragbare Wettbewerbs-Informationen (D199): Aus dem Abgleich der
+ * Wettbewerber-Listings mit UNSEREM Listing — Informationen, die die Konkurrenz
+ * nennt und wir nicht, mit Übertragbarkeits-Urteil gegen unsere Produkt-Wahrheit.
+ * urteil „ja" = aufnehmbar (Spezifikation deckt es) · „nein" = widerspricht
+ * unseren Angaben (nie aufnehmen) · „unbekannt" = kein Beleg für Widerspruch
+ * ODER Deckung — tendenziell aufnehmbar, aber als PRÜFEN markiert.
+ */
+export const competitorInfoGaps = sqliteTable("competitor_info_gaps", {
+  id: text("id").primaryKey(),
+  productId: text("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  payload: text("payload", { mode: "json" }).$type<CompetitorGapPayload>().notNull(),
+  dataBasis: text("data_basis", { mode: "json" }).$type<string[]>().notNull(),
+  createdAt: ts("created_at").notNull(),
+});
+
+export type CompetitorInfoGap = {
+  /** Die Information, die die Konkurrenz nennt und uns fehlt. */
+  info: string;
+  /** Welche Wettbewerber-ASIN(s) sie nennen. */
+  quellen: string[];
+  urteil: "ja" | "nein" | "unbekannt";
+  /** Spezifikations-Bezug: warum übertragbar / warum nicht / warum unklar. */
+  grund: string;
+};
+
+export type CompetitorGapPayload = { gaps: CompetitorInfoGap[] };
+
 export type ReviewInsightsPayload = {
   sources: string[];
   stats: { reviewsTotal: number; ratingAvg: number | null };

@@ -69,6 +69,12 @@ export type RecipeInputs = {
    * die neuen Texte MÜSSEN sie adressieren, sonst bleibt die Conversion-Lücke.
    */
   conversionBlocker?: Array<{ titel: string; beschreibung: string }> | null;
+  /**
+   * Übertragbare Wettbewerber-Informationen (D199): Infos, die die Konkurrenz
+   * nennt und uns fehlen, geprüft übertragbar gegen unsere Produkt-Wahrheit.
+   * urteil „ja" = aufnehmbar · „unbekannt" = Kandidat, nur wo belegt.
+   */
+  wettbewerbsInfos?: Array<{ info: string; urteil: "ja" | "unbekannt"; grund: string }> | null;
 };
 
 export type TitleRationale = Array<{ part: string; source: string; verified: boolean }>;
@@ -227,6 +233,13 @@ function contextBlock(inputs: RecipeInputs): string {
       `CONVERSION-BLOCKER (Kunden-Themen, die das bisherige Listing NICHT beantwortet — die neuen Texte MÜSSEN sie adressieren, D167):\n${inputs.conversionBlocker
         .slice(0, 5)
         .map((b) => `- ${b.titel}: ${b.beschreibung.slice(0, 160)}`)
+        .join("\n")}`,
+    );
+  if (inputs.wettbewerbsInfos?.length)
+    lines.push(
+      `ÜBERTRAGBARE WETTBEWERBER-INFORMATIONEN (D199 — Infos, die die Konkurrenz abbildet und unser Listing NICHT; gegen unsere Produkt-Wahrheit geprüft. Aufnehmen, wo sie zum Produkt passen — aber NUR mit UNSEREN belegten Angaben formulieren, NIE fremde Zahlen/Specs übernehmen. „prüfen" = nur nutzen, wenn die Produkt-Wahrheit es stützt):\n${inputs.wettbewerbsInfos
+        .slice(0, 8)
+        .map((w) => `- ${w.info}${w.urteil === "unbekannt" ? " (prüfen)" : ""} — ${w.grund}`)
         .join("\n")}`,
     );
   const approved = inputs.approved ?? {};

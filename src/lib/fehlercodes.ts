@@ -83,6 +83,11 @@ export const FEHLER_CODES: Record<string, FehlerInfo> = {
     bedeutung: "Die Content-Sektionen bauen aufeinander auf (Titel → Item Highlights → Bullets → Beschreibung → Backend → Q&A): Jede Sektion wird mit den FREIGEGEBENEN Vorgängern als Kontext generiert — so entstehen keine Wort-Dopplungen zwischen den Texten. Ein Vorgänger dieser Sektion ist noch nicht freigegeben.",
     loesung: "Den genannten Vorgänger im Content-Reiter prüfen und freigeben — die Freigabe generiert die nächste Sektion automatisch.",
   },
+  "WB-01": {
+    titel: "Wettbewerber-Abgleich fehlgeschlagen",
+    bedeutung: "Der Abgleich der Wettbewerber-Listings mit dem eigenen Listing ist abgebrochen (Detail-Meldung oben). Nicht kritisch: Er ergänzt nur übertragbare Zusatz-Informationen; Scrape und Analyse bleiben unversehrt.",
+    loesung: "Lauf erneut anstoßen (Analyse-Reiter). Bleibt es hängen, ohne Wettbewerber-Abgleich weiterarbeiten — der Content entsteht auch ohne ihn.",
+  },
   "IMP-01": {
     titel: "Listing-Import fehlgeschlagen",
     bedeutung: "Weder der Web-Abruf noch der Produkt-Crawler konnten das Amazon-Listing laden (Detail-Meldung oben — z. B. Blockade, Zeitlimit, unbekannte ASIN).",

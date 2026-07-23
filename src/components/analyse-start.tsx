@@ -23,7 +23,7 @@ const SEKTIONEN = [
 ] as const;
 
 type Etappe = {
-  stufe: "listing" | "scrape" | "auswertung" | "verdichtung" | "blocker" | "features" | "audit" | "content";
+  stufe: "listing" | "scrape" | "auswertung" | "wettbewerb-texte" | "verdichtung" | "blocker" | "features" | "audit" | "content";
   section?: string;
   label: string;
   status: "offen" | "laeuft" | "fertig" | "fehler";
@@ -105,6 +105,7 @@ export function AnalyseStart({
       { stufe: "listing", label: "Amazon Listing laden (Texte, Bilder, Bildanalyse)", status: "offen", hart: true },
       { stufe: "scrape", label: `Reviews scrapen (${liste.length} ASIN${liste.length === 1 ? "" : "s"})`, status: "offen", hart: !ohneAnalyse },
       { stufe: "auswertung", label: "Reviews auswerten (Pain Points, Kaufauslöser)", status: "offen", hart: !ohneAnalyse },
+      { stufe: "wettbewerb-texte", label: "Wettbewerber-Listings abgleichen (fehlende Infos)", status: "offen", hart: false },
       { stufe: "verdichtung", label: "Erkenntnisse verdichten", status: "offen", hart: false },
       { stufe: "blocker", label: "Conversion-Blocker finden", status: "offen", hart: false },
       { stufe: "features", label: "Produkt-Features ranken", status: "offen", hart: false },
