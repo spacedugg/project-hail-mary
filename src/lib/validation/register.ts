@@ -61,6 +61,18 @@ export const REGELN: Regel[] = [
     text:
       "Keine UNBELEGTEN Gesundheits- oder Wirkversprechen. BELEGT heißt: Die Aussage steht sinngemäß im Original-Listing, der Produkt-Wahrheit oder den Zusatz-Infos (steht dort „gegen Sodbrennen“, ist „gegen Sodbrennen“ zulässig — Nutzer-Klarstellung 23.07./D194). Verboten sind NEU ERFUNDENE Heil-/Wirkzusagen ohne Quelle („heilt“, „stärkt das Immunsystem“, „klinisch bewiesen“).",
   },
+  {
+    // Produkt-Fokus (D200, Screenshot-Befund: Bullet 2 „Wir weisen beide Werte
+    // getrennt aus…“, Bullet 3 „Ein Foto … finden Sie in unseren Produktbildern“).
+    // Diese Meta-Aussagen verschenken Premium-Platz: kein Nutzen, kein Keyword,
+    // kein Produkt-Fakt. Der Prüfer blockt sie → Neu-Generierung mit Produktnutzen.
+    id: "sprache.produkt-fokus",
+    sektionen: ["bullets", "highlights", "description"],
+    art: "llm",
+    severity: "error",
+    text:
+      "Jeder Satz spricht über das PRODUKT und seinen konkreten Nutzen für den Kunden — NICHT über das Listing selbst, die Kennzeichnung/Auszeichnung, die Produktbilder, den Schreib-/Prüfprozess oder den Anbieter-Standpunkt. VERLETZT sind Meta-Aussagen wie „wir weisen … aus“, „ein Foto … finden Sie in unseren Produktbildern“, „diese Transparenz ist uns wichtig(er als …)“, „wir stellen … dar“ — sie liefern keinen Produktnutzen. Erlaubt bleibt die belegte Produkt-Eigenschaft selbst (z. B. „610 mg indischer Flohsamen pro Kapsel“ als Fakt mit Nutzen).",
+  },
   // ── Titel ──────────────────────────────────────────────────────────────────
   {
     id: "title.lesbarkeit",
@@ -92,12 +104,15 @@ export const REGELN: Regel[] = [
     id: "bullets.headline-benefit",
     sektionen: ["bullets"],
     art: "llm",
-    // Best Practice mit Toleranz (Nutzer 23.07./D194): Anatomie ist Richtschnur,
-    // kein Dogma — der Gold-Standard nutzt auch Wirkstoff-/Marken-Headlines
-    // („ULMENRINDE & NATURMOOR – GEPRÜFTE WIRKSTOFFKOMBINATION“).
-    severity: "warning",
+    // Toleranz bleibt im REGELTEXT (D194): Wirkstoff-/Marken-Headlines sind
+    // erlaubt — der Prüfer flaggt nur die reine Mengenangabe. Severity von
+    // „warning“ → „error“ (Nutzer 23.07./D200, Screenshot-Befund „PRO KAPSEL
+    // 610 MG“): eine reine Mengenangabe-Headline blockt jetzt und wird neu
+    // geschrieben, statt nur als △ durchgewinkt zu werden. Der Prüfer ist per
+    // D193 auf „im Zweifel bestanden“ kalibriert → Loop-Risiko gering.
+    severity: "error",
     text:
-      "Best Practice: Die VERSALIEN-Headline trägt einen KAUFGRUND — ideal als Benefit-Aussage („BLEIBT JAHRELANG SCHARF“); eine begründete Abweichung (Wirkstoff-Kombination, Marken-Versprechen) ist zulässig, eine reine Mengenangabe („350 G MIT 160 DROPS“) nicht.",
+      "Die VERSALIEN-Headline trägt einen KAUFGRUND — ideal als Benefit-Aussage („BLEIBT JAHRELANG SCHARF“); eine begründete Abweichung (Wirkstoff-Kombination, Marken-Versprechen) ist zulässig. VERLETZT ist NUR eine reine Mengen-/Spec-Angabe ohne Kaufgrund („350 G MIT 160 DROPS“, „PRO KAPSEL 610 MG“) — Zahlen/Dosierung allein sind kein Kaufgrund. Im Zweifel (Wirkstoff, Marke, Nutzen erkennbar) gilt BESTANDEN.",
   },
   {
     id: "bullets.headline-echo",
