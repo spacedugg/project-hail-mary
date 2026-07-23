@@ -355,6 +355,53 @@ export async function approveContent(formData: FormData) {
   if (!version) return;
   if (version.validation && !version.validation.passed) return;
   await db.update(schema.contentVersions).set({ status: "approved" }).where(eq(schema.contentVersions.id, versionId));
+
+  // Geführte Kette (D195): Die Freigabe ist der Taktgeber — direkt danach wird
+  // die NÄCHSTE Sektion generiert (Titel → Bullets → Highlights → Backend →
+  // Beschreibung → Q&A). Kontext sind ausschließlich Freigaben; so entstehen
+  // keine Wort-Dopplungen zwischen parallel gewürfelten Sektionen mehr.
+  const sektionVonDbType: Record<string, ListingSection> = {
+    title: "title", bullets: "bullets", item_highlights: "highlights",
+    backend_keywords: "backend", description: "description", qa: "qa",
+  };
+  const aktuelle = sektionVonDbType[version.type];
+  const naechste = SEKTIONS_REIHENFOLGE[SEKTIONS_REIHENFOLGE.indexOf(aktuelle) + 1];
+  if (naechste) {
+    const schonFreigegeben = await db.query.contentVersions.findFirst({
+      where: and(
+        eq(schema.contentVersions.productId, productId),
+        eq(schema.contentVersions.type, naechste === "backend" ? "backend_keywords" : naechste === "highlights" ? "item_highlights" : naechste),
+        eq(schema.contentVersions.status, "approved"),
+      ),
+    });
+    if (!schonFreigegeben) {
+      try {
+        // ohneAnalyseBestaetigt=true: die Grundlagen-Entscheidung fiel beim
+        // Start der Kette (Titel) — sie gilt für alle Folge-Sektionen.
+        await generiereSektionKern(db, productId, naechste, true);
+      } catch (e) {
+        const code = e instanceof GenFehler ? e.code : "GEN-01";
+        redirect(`/produkte/${productId}?fehler=${encodeURIComponent(e instanceof Error ? e.message : String(e))}&code=${code}`);
+      }
+    }
+  }
+  revalidatePath(`/produkte/${productId}`);
+}
+
+/**
+ * Geführte Kette neu aufsetzen (D195): ALLE Freigaben dieses Produkts werden
+ * zurückgezogen (Versionen bleiben als Historie erhalten) — die Kette startet
+ * wieder beim Titel. Einzel-Regenerierung nach Abschluss gibt es bewusst
+ * nicht: die Sektionen bauen aufeinander auf.
+ */
+export async function resetContentChain(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  if (!productId) return;
+  const db = await getDb();
+  await db
+    .update(schema.contentVersions)
+    .set({ status: "draft" })
+    .where(and(eq(schema.contentVersions.productId, productId), eq(schema.contentVersions.status, "approved")));
   revalidatePath(`/produkte/${productId}`);
 }
 
@@ -471,8 +518,8 @@ export async function generateContent(formData: FormData) {
   revalidatePath(`/produkte/${productId}`);
 }
 
-/** Batch-Reihenfolge = Abhängigkeits-Reihenfolge: freigegebener Titel/Bullets fließen in spätere Sektionen. */
-const SEKTIONS_REIHENFOLGE: ListingSection[] = ["title", "bullets", "highlights", "backend", "description", "qa"];
+/** Ketten-Reihenfolge (D195): Titel → Highlights → Bullets → Beschreibung → Backend → Q&A — Freigaben fließen als Kontext in jede Folge-Sektion. */
+const SEKTIONS_REIHENFOLGE: ListingSection[] = ["title", "highlights", "bullets", "description", "backend", "qa"];
 const SEKTIONS_LABEL: Record<string, string> = {
   title: "Titel", bullets: "Bullet Points", highlights: "Item Highlights",
   backend: "Backend-Keywords", description: "Beschreibung", qa: "Q&A",
@@ -532,7 +579,20 @@ async function generiereSektionKern(
     where: eq(schema.contentVersions.productId, productId),
     orderBy: desc(schema.contentVersions.createdAt),
   });
-  const latest = (t: string) => versions.find((v) => v.type === t)?.payload as Record<string, unknown> | undefined;
+  const freigegeben = (t: string) => versions.find((v) => v.type === t && v.status === "approved")?.payload as Record<string, unknown> | undefined;
+
+  // Geführte Kette (D195, Nutzer 23.07.): Die Sektionen bauen aufeinander auf
+  // (Wort-Dopplung Titel↔Highlights entsteht, wenn parallel statt sequenziell
+  // generiert wird). Eine Sektion wird erst generiert, wenn ALLE Vorgänger
+  // FREIGEGEBEN sind — die Freigabe ist der Taktgeber der Kette.
+  const dbTypeFuer = (s: ListingSection) => (s === "backend" ? "backend_keywords" : s === "highlights" ? "item_highlights" : s);
+  for (const vorgaenger of SEKTIONS_REIHENFOLGE.slice(0, SEKTIONS_REIHENFOLGE.indexOf(section))) {
+    if (!versions.some((v) => v.type === dbTypeFuer(vorgaenger) && v.status === "approved"))
+      throw new GenFehler(
+        `Die Texte bauen aufeinander auf (geführte Kette): Erst „${SEKTIONS_LABEL[vorgaenger]}" freigeben — danach wird ${SEKTIONS_LABEL[section] ?? section} automatisch generiert.`,
+        "GEN-05",
+      );
+  }
 
   // Marken-Kontext (D149/D159): Produkt-Marke (Pflichtfeld) schlägt alles;
   // Werkbank-Name nie als Marke, Eigenmarke nie auf der Blacklist
@@ -552,9 +612,14 @@ async function generiereSektionKern(
     },
     reviewInsights: insights?.payload ?? null,
     voiceTone: brand?.voiceTone,
+    // Kontext NUR aus FREIGEGEBENEN Sektionen (D195): die Kette garantiert,
+    // dass alle Vorgänger freigegeben sind — Entwürfe sind kein verlässlicher
+    // Dedup-Kontext (Wort-Dopplung Titel↔Highlights, Nutzer-Befund 23.07.).
     approved: {
-      title: latest("title")?.text as string | undefined,
-      bullets: latest("bullets")?.items as string[] | undefined,
+      title: freigegeben("title")?.text as string | undefined,
+      bullets: freigegeben("bullets")?.items as string[] | undefined,
+      highlights: freigegeben("item_highlights")?.text as string | undefined,
+      description: freigegeben("description")?.text as string | undefined,
     },
     competitorBrands: mk.fremdmarken,
     listingIst: snapshot ? { title: snapshot.title, bullets: snapshot.bullets } : null,
@@ -1140,6 +1205,18 @@ export async function runPipelineStufe(
         const section = String(extra?.section ?? "");
         const gueltig = ["title", "bullets", "description", "backend", "highlights", "qa"];
         if (!gueltig.includes(section)) return { ok: false, fehler: `Unbekannte Sektion: ${section}`, code: "GEN-01" };
+        // Geführte Kette (D195): Der Ein-Klick-Lauf generiert nur, was in der
+        // Kette dran ist — Sektionen mit nicht freigegebenen Vorgängern werden
+        // als Hinweis übersprungen (kein Fehler): die Freigabe im Content-
+        // Reiter generiert sie automatisch, sobald sie dran sind.
+        const dbT = (s: ListingSection) => (s === "backend" ? "backend_keywords" : s === "highlights" ? "item_highlights" : s);
+        const vorhandene = await db.query.contentVersions.findMany({ where: eq(schema.contentVersions.productId, productId) });
+        const offenerVorgaenger = SEKTIONS_REIHENFOLGE
+          .slice(0, SEKTIONS_REIHENFOLGE.indexOf(section as ListingSection))
+          .find((s) => !vorhandene.some((v) => v.type === dbT(s) && v.status === "approved"));
+        if (offenerVorgaenger) {
+          return { ok: true, hinweis: `${SEKTIONS_LABEL[section]} wartet in der Kette auf die Freigabe von „${SEKTIONS_LABEL[offenerVorgaenger]}" — Freigabe im Content-Reiter generiert automatisch weiter.` };
+        }
         // GEN-02-Gate gilt auch hier (Review-Fix): ohne Analyse nur mit
         // ausdrücklicher Bestätigung aus der Start-Maske, nie automatisch.
         await generiereSektionKern(db, productId, section as ListingSection, extra?.ohneAnalyseBestaetigt === true);

@@ -322,8 +322,14 @@ export function validateBullets(bullets: string[], ctx: Ctx = {}): ValidationIss
     issues.push(...findCompetitorBrands(t, ctx, "bullets"));
   });
 
-  issues.push(...pruefeZahlenTreue(bullets.join("\n"), ctx.zahlenQuellen ?? "", "bullets"));
-  issues.push(...pruefeKeywordEcho(bullets.join("\n"), ctx.alleKeywords ?? [], "bullets"));
+  // Bullet-genaue Zuordnung (D195): Zahlen- und Echo-Befunde tragen die
+  // Bullet-Nummer — sonst kann die bullet-weise Korrektur (D194) nicht
+  // sperren und die ganze Liste würde neu gewürfelt.
+  bullets.forEach((b, i) => {
+    const n = i + 1;
+    issues.push(...pruefeZahlenTreue(b, ctx.zahlenQuellen ?? "", "bullets").map((x) => ({ ...x, message: `Bullet ${n}: ${x.message}` })));
+    issues.push(...pruefeKeywordEcho(b, ctx.alleKeywords ?? [], "bullets").map((x) => ({ ...x, message: `Bullet ${n}: ${x.message}` })));
+  });
   issues.push(...pruefeBulletDopplung(bullets));
 
   // USP-Einmaligkeit über alle Bullets (Cross-Content-Regel — Kern des USP-Problems)

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { saveKeywords, deriveKeywordsFromSov, generateContent, deleteProductAction, uploadCerebro, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarke } from "@/app/actions";
+import { saveKeywords, deriveKeywordsFromSov, generateContent, deleteProductAction, uploadCerebro, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, resetContentChain, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarke } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
@@ -32,12 +32,13 @@ export const dynamic = "force-dynamic";
 // 300 s ist das Maximum des Vercel-Plans; der LLM-Abbruch liegt bei 270 s.
 export const maxDuration = 300;
 
+/** Ketten-Reihenfolge (D195): Freigabe einer Sektion generiert automatisch die nächste. */
 const SECTIONS = [
   { key: "title", label: "Titel" },
-  { key: "bullets", label: "Bullet Points" },
   { key: "highlights", label: "Item Highlights" },
-  { key: "backend", label: "Backend-Keywords" },
+  { key: "bullets", label: "Bullet Points" },
   { key: "description", label: "Beschreibung" },
+  { key: "backend", label: "Backend-Keywords" },
   { key: "qa", label: "Q&A" },
 ] as const;
 
@@ -647,13 +648,29 @@ export default async function ProductPage({
               <SubmitButton className="mt-2 btn-dark text-xs">Zusatz-Infos speichern</SubmitButton>
             </form>
           </details>
-          {/* EIN Weg je Sektion (D172): der Lauf hat generiert — hier steht das
-              Ergebnis, je Sektion genau EIN Neu-generieren */}
+          {/* Geführte Kette (D195): Sektion generieren → bearbeiten/freigeben →
+              die Freigabe generiert automatisch die nächste. Nach der Freigabe
+              gibt es bewusst KEINE Einzel-Regenerierung mehr (die Sektionen
+              bauen aufeinander auf) — nur Neu-aufsetzen für alle. */}
           <GenerierSperre>
+          {SECTIONS.some(({ key }) => {
+            const t = key === "backend" ? "backend_keywords" : key === "highlights" ? "item_highlights" : key;
+            return latestOf(t)?.status === "approved";
+          }) && (
+            <form action={resetContentChain} className="mt-3">
+              <input type="hidden" name="productId" value={product.id} />
+              <SubmitButton className="btn-ghost text-xs">Alle Texte neu aufsetzen — Freigaben zurückziehen, Kette startet beim Titel</SubmitButton>
+            </form>
+          )}
           <div className="mt-4 space-y-3">
-            {SECTIONS.map(({ key, label }) => {
+            {SECTIONS.map(({ key, label }, sektionsIndex) => {
               const dbType = key === "backend" ? "backend_keywords" : key === "highlights" ? "item_highlights" : key;
               const v = latestOf(dbType);
+              // Ketten-Status: alle Vorgänger freigegeben?
+              const wartetAuf = SECTIONS.slice(0, sektionsIndex).find(({ key: vk }) => {
+                const vt = vk === "backend" ? "backend_keywords" : vk === "highlights" ? "item_highlights" : vk;
+                return latestOf(vt)?.status !== "approved";
+              });
               const payload = v?.payload as { text?: string; items?: string[]; pairs?: Array<{ q: string; a: string }>; rationale?: Array<{ part: string; source: string; verified: boolean }> } | undefined;
               return (
                 <div key={key} className="rounded-xl border border-hair p-3">
@@ -666,18 +683,27 @@ export default async function ProductPage({
                         : <span className="ml-1 pill pill-neutral">Entwurf</span>)}
                     </h3>
                     <div className="flex flex-none items-center gap-1.5">
-                      {v && v.status === "draft" && (v.validation?.passed ?? true) && (
-                        <form action={approveContent}>
-                          <input type="hidden" name="productId" value={product.id} />
-                          <input type="hidden" name="versionId" value={v.id} />
-                          <SubmitButton className="btn-ghost px-3 py-1 text-xs !text-good">✓ Freigeben</SubmitButton>
-                        </form>
+                      {/* Geführte Kette (D195): Warten auf Vorgänger → Hinweis statt Knopf;
+                          Entwurf → Freigeben (löst die nächste Sektion aus) + Neu generieren;
+                          freigegeben → keine Einzel-Regenerierung mehr (nur manuell bearbeiten). */}
+                      {wartetAuf ? (
+                        <span className="pill pill-neutral">wartet auf Freigabe: {wartetAuf.label}</span>
+                      ) : v?.status === "approved" ? null : (
+                        <>
+                          {v && v.status === "draft" && (v.validation?.passed ?? true) && (
+                            <form action={approveContent}>
+                              <input type="hidden" name="productId" value={product.id} />
+                              <input type="hidden" name="versionId" value={v.id} />
+                              <SubmitButton className="btn-ghost px-3 py-1 text-xs !text-good" pendingLabel={key === "qa" ? "Gibt frei…" : "Gibt frei & generiert die nächste Sektion…"} progress>✓ Freigeben</SubmitButton>
+                            </form>
+                          )}
+                          <form action={generateContent}>
+                            <input type="hidden" name="productId" value={product.id} />
+                            <input type="hidden" name="section" value={key} />
+                            <GenerierButton>{v ? "Neu generieren" : "Generieren"}</GenerierButton>
+                          </form>
+                        </>
                       )}
-                      <form action={generateContent}>
-                        <input type="hidden" name="productId" value={product.id} />
-                        <input type="hidden" name="section" value={key} />
-                        <GenerierButton>{v ? "Neu generieren" : "Generieren"}</GenerierButton>
-                      </form>
                     </div>
                   </div>
                   {/* Kopierbare Einzel-Felder (D175): Klick kopiert; Zeichen-Hinweis
