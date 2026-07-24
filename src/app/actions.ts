@@ -668,16 +668,25 @@ async function generiereSektionKern(
       } catch (logFehler) {
         console.error("[QM-BLOCK-LOG] Speichern fehlgeschlagen", logFehler);
       }
-      // Banner-Deckel (D193, Nutzer-Befund: Protokoll sprengte den Bildschirm):
-      // die ersten 6 Verstöße + Verweis, das volle Protokoll liegt im QM-Log.
-      const kopf = e.issues.slice(0, 6).map((i) => `[${i.rule}] ${i.message}`).join(" · ");
-      const rest = e.issues.length > 6 ? ` … +${e.issues.length - 6} weitere Verstöße.` : "";
-      throw new GenFehler(
-        `QM-Gate (${SEKTIONS_LABEL[section] ?? section}): Ergebnis nach ${e.versuche} Versuch(en) nicht regelkonform — nichts gespeichert. Verstöße: ${kopf}${rest} Vollständiges Protokoll: QM-Log unter „Daten & Formeln".`,
-        "QM-01",
-      );
+      // Graceful Degradation (D202, Nutzer 24.07.: „das darf nicht mehr auftreten"):
+      // Statt einer leeren Wand wird der beste Entwurf gespeichert und ANGEZEIGT —
+      // aber als „Entwurf mit offenen Punkten" (validation.passed=false unten →
+      // die UI zeigt die roten Verstöße und bietet KEINE Freigabe an, D182-Geist:
+      // nichts wird fälschlich als sauber ausgegeben). Kam kein Entwurf zustande
+      // (nur kaputtes JSON/Schema), bleibt der harte QM-01-Block.
+      if (e.bestesErgebnis) {
+        result = e.bestesErgebnis;
+      } else {
+        const kopf = e.issues.slice(0, 6).map((i) => `[${i.rule}] ${i.message}`).join(" · ");
+        const rest = e.issues.length > 6 ? ` … +${e.issues.length - 6} weitere Verstöße.` : "";
+        throw new GenFehler(
+          `QM-Gate (${SEKTIONS_LABEL[section] ?? section}): nach ${e.versuche} Versuch(en) kein anzeigbarer Entwurf entstanden. Verstöße: ${kopf}${rest} Vollständiges Protokoll: QM-Log unter „Daten & Formeln".`,
+          "QM-01",
+        );
+      }
+    } else {
+      throw new GenFehler(`Text-Generierung (${SEKTIONS_LABEL[section] ?? section}): ${e instanceof Error ? e.message : String(e)}`, "GEN-01");
     }
-    throw new GenFehler(`Text-Generierung (${SEKTIONS_LABEL[section] ?? section}): ${e instanceof Error ? e.message : String(e)}`, "GEN-01");
   }
 
   const dbType = section === "backend" ? "backend_keywords" : section === "highlights" ? "item_highlights" : section;
