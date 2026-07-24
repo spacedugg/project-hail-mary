@@ -157,7 +157,7 @@ export const DATENFLUSS: Datenpunkt[] = [
       "Freigegebene Sektionen fließen als Kontext in spätere Sektionen (Titel → Bullets → Backend-Dedup)",
       "Flatfile-/Copy-Paste-Übergabe an Seller Central (D175)",
     ],
-    anzeige: ["Content-Reiter (kopierbare Einzel-Felder, Zeichen-Hinweise, Begründung)", "QM-Bericht als Banner bei Block (QM-01)"],
+    anzeige: ["Content-Reiter (kopierbare Einzel-Felder, Zeichen-Hinweise, Begründung)", "Bei QM-Block (D202): bester Entwurf als markierter „Entwurf mit offenen Punkten“ (nicht freigabefähig, rote Findings); nur ohne jeden Entwurf harter QM-01-Banner"],
   },
   {
     id: "berichte",
