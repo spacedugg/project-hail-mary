@@ -146,6 +146,29 @@ describe("QM-Schleife (D182/D183)", () => {
     expect(prueferCallCount()).toBe(2);
   });
 
+  it("Block trägt den besten Entwurf mit — die App zeigt ihn markiert statt einer leeren Wand (D202)", async () => {
+    const beleg = "Rohe Suchphrase eingeklebt.";
+    const verletzt = { "sprache.keyword-natuerlich": beleg };
+    const { prueferCallCount } = skriptProvider(
+      [gueltig, gueltig, gueltig],
+      [prueferAntwort(verletzt), prueferAntwort(verletzt), prueferAntwort(verletzt)],
+    );
+
+    try {
+      await generateSection("title", inputs);
+      expect.unreachable("QM-Gate hätte blocken müssen");
+    } catch (e) {
+      expect(e).toBeInstanceOf(QmBlockFehler);
+      const block = e as QmBlockFehler;
+      expect(block.versuche).toBe(3);
+      // Bester Entwurf ist mitgegeben (gate-konformer Titel) — inkl. der offenen Findings,
+      // damit die App ihn als „Entwurf mit offenen Punkten" anzeigen kann.
+      expect(block.bestesErgebnis?.payload.text).toBe(GUTER_TITEL);
+      expect(block.bestesErgebnis?.issues.some((i) => i.rule === "sprache.keyword-natuerlich")).toBe(true);
+    }
+    expect(prueferCallCount()).toBe(3);
+  });
+
   it("unvollständiges Prüfprotokoll wird beim PRÜFER nachgefordert — nie als Autor-Finding (D193)", async () => {
     // Prüfer lässt Regeln aus → 3 Nachforderungen beim Prüfer → harter Prüfer-Fehler,
     // KEIN QmBlock (der Autor kann ein Prüfer-Versäumnis nicht beheben).

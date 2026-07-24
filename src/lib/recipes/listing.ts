@@ -270,7 +270,12 @@ const BEHEBUNGS_STRATEGIEN: Array<[RegExp, string]> = [
   [/zahl-widerspruch$/, "Übernimm die Zahl EXAKT so, wie sie in der Quelle steht — Spezifikationen nie verändern."],
   [/keyword-echo$/, "Flektiere das Keyword grammatisch (Groß-/Kleinschreibung, Bindestriche, Beugung) oder lass es an dieser Stelle weg — Wortstamm-Abdeckung genügt fürs Ranking."],
   [/satz-dopplung$/, "Behalte die Aussage nur im zuerst genannten Bullet; gib dem anderen ein NEUES Kern-Thema aus Erkenntnissen, Kaufauslösern oder Conversion-Blockern."],
-  [/themen-dopplung$/, "Wähle für einen der beiden Bullets ein anderes Kern-Thema aus Erkenntnissen, Kaufauslösern oder Conversion-Blockern."],
+  [/keyword-synonyme$/, "Die beanstandeten Begriffe bezeichnen DASSELBE Ding (z. B. „Psyllium Husk“ = „Flohsamenschalen“). Nenne es im gesamten Listing nur EINMAL — optional als „Flohsamenschalen (Psyllium Husk)“ — und STREICHE jede weitere Nennung als eigenständige Zutat/Material/Fakt. Führe niemals dasselbe unter zwei Namen als zwei Dinge. Der frei gewordene Platz nimmt einen ANDEREN belegten Fakt auf."],
+  [/keyword-natuerlich$/, "Flektiere die Suchphrase grammatisch in einen echten Satz (Groß-/Kleinschreibung, Bindestriche, Beugung) statt sie roh einzukleben — oder lass sie an dieser Stelle weg; Wortstamm-Abdeckung genügt fürs Ranking."],
+  [/themen-dopplung$/, "Behalte das Thema NUR im zuerst genannten Bullet. Gib dem anderen einen KOMPLETT anderen, bisher ungenutzten Aspekt — wähle aus: Reinheit/Material, Herkunft/Herstellung, Einnahme/Anwendung, Lieferumfang/Menge, Eignung/Zielgruppe, Zertifikat, vegan/frei-von. Dieselbe Aussage, Wirkung oder Mengenangabe (auch als Tages- statt Kapselwert) darf NICHT in zwei Bullets stehen."],
+  [/produkt-fokus$/, "Ersetze jede Meta-Aussage über das Listing/die Kennzeichnung/die Produktbilder durch eine belegte PRODUKT-Eigenschaft mit Kundennutzen. Nicht „wir weisen … aus“, sondern der Fakt selbst plus wofür er gut ist."],
+  [/headline-benefit$/, "Formuliere die VERSALIEN-Headline als Kaufgrund/Benefit (oder Wirkstoff-/Marken-Versprechen) statt als nackte Menge/Dosierung — die Zahl gehört in den Belegsatz danach, nicht in die Headline."],
+  [/headline-echo$/, "Der erste Satz nach dem Doppelpunkt darf die Headline nicht wiederholen — liefere dort sofort den Feature-Beleg für die Headline-Aussage."],
   [/^title\.budget$/, "Ergänze ein weiteres BELEGTES Attribut (Maß, Menge, Material, Eigenschaft) aus Produkt-Wahrheit oder Original-Listing — keine Füllwörter."],
   [/wirkversprechen$/, "Formuliere nur Wirkaussagen, die wörtlich in Original-Listing, Produkt-Wahrheit oder Zusatz-Infos stehen — alles andere streichen."],
   [/titel-dopplung$/, "Ersetze jedes Titel-Echo durch einen NEUEN belegten Fakt (Wirkstoff, Herkunft, Anwendungsdauer, Zertifikat) — die Highlights stehen direkt neben dem Titel und ergänzen ihn."],
@@ -308,17 +313,23 @@ const COPY_SCHEMA: Record<ListingSection, string> = {
   qa: `{"pairs": [{"q": "...", "a": "..."}]}`,
 };
 
-export function sectionPrompt(section: ListingSection, inputs: RecipeInputs, korrektur: ValidationIssue[] = [], vorherigerEntwurf?: string | null): string {
+export function sectionPrompt(
+  section: ListingSection,
+  inputs: RecipeInputs,
+  korrektur: ValidationIssue[] = [],
+  vorherigerEntwurf?: string | null,
+  lauf: { versuch: number; maxVersuche: number } = { versuch: 1, maxVersuche: 1 },
+): string {
   const parts = [basePrompt(section, inputs)];
   const gesetze = regelnAlsPromptBlock(section);
   if (gesetze)
     parts.push(`GESETZE (Regel-Register — werden maschinell geprüft, jeder Verstoß erzwingt Regenerierung):\n${gesetze}`);
-  if (korrektur.length)
+  if (korrektur.length) {
     // Korrektur statt Neuwurf (D190): Der vorherige Entwurf steht im Auftrag —
     // ein kompletter Neuwurf würfelt bei jedem Versuch NEUE Verstöße, gezielte
     // Korrektur konvergiert.
     parts.push(
-      `KORREKTUR-AUFTRAG: Dein vorheriger Entwurf hat das Qualitäts-Gate NICHT bestanden.${
+      `KORREKTUR-AUFTRAG (Versuch ${lauf.versuch} von ${lauf.maxVersuche}): Dein vorheriger Entwurf hat das Qualitäts-Gate NICHT bestanden.${
         vorherigerEntwurf ? `\nVORHERIGER ENTWURF:\n${vorherigerEntwurf}` : ""
       }\nVERLETZTE REGELN:\n${korrektur
         .map((i) => {
@@ -327,6 +338,17 @@ export function sectionPrompt(section: ListingSection, inputs: RecipeInputs, kor
         })
         .join("\n")}\nKorrigiere MINIMAL-INVASIV: Behebe GENAU diese Verstöße und behalte alles Regelkonforme möglichst wörtlich bei.`,
     );
+    // Eskalation über die Versuche (D195, Nutzer: „in Versuch 2 und 3 ein
+    // ANDERER Ansatz"): Wiederholt sich derselbe Verstoß, hilft kein leicht
+    // variierter Neuwurf — der Auftrag verlangt einen strukturell anderen Ansatz,
+    // im letzten Versuch das Weglassen statt der erneuten Dopplung.
+    const istLetzter = lauf.versuch >= lauf.maxVersuche;
+    parts.push(
+      istLetzter
+        ? `LETZTER VERSUCH — die bisherigen Anläufe haben denselben Verstoß reproduziert. Variiere NICHT den alten Entwurf, sondern wähle für die beanstandeten Stellen einen STRUKTURELL anderen Ansatz: anderes Kern-Thema, andere Reihenfolge. Wenn sich ein Aspekt nicht eigenständig unterbringen lässt, LASS IHN WEG — ein schlichteres, aber eigenständiges Bullet ist besser als eine erneute Dopplung oder ein Synonym als zweites Ding. Dies ist der letzte Versuch, danach wird nichts angezeigt.`
+        : `ANDERER ANSATZ (D195): Wiederhole NICHT den vorigen Entwurf leicht umformuliert — dieselbe Formulierung erzeugt denselben Verstoß. Wähle für die beanstandeten Stellen ein anderes Kern-Thema bzw. eine andere Struktur.`,
+    );
+  }
   // Copy-Phase (D200): NUR die Text-Felder, KEINE Begründung — die Prosa soll
   // ohne Selbst-Rechtfertigung entstehen. Antworte exakt mit diesem JSON.
   parts.push(`AUSGABE: Antworte AUSSCHLIESSLICH mit diesem JSON — exakt diese Felder, KEINE Begründung, KEIN weiteres Feld, kein Markdown:\n${COPY_SCHEMA[section]}`);
@@ -524,19 +546,26 @@ function extractRationale(parsed: Record<string, unknown>, text: string): TitleR
 // ── QM-Schleife & öffentliche API (D182: hartes Gate, D183: Kontrakt-Grenze) ─
 
 /**
- * Hart-Block (D182, Nutzer-Entscheid 23.07.): Bleiben nach allen Versuchen
- * Error-Findings, wird KEIN Entwurf sichtbar — dieser Fehler trägt den
- * vollständigen Prüfbericht. Jeder Block ist zugleich ein Bau-Auftrag
- * (neuer Fixer/Check/Input-Pflicht) und wird deshalb strukturiert geloggt.
+ * QM-Urteil „nicht bestanden" (D182): Bleiben nach allen Versuchen Error-Findings,
+ * ist das Ergebnis NICHT freigabefähig — die Bibliothek signalisiert das durch
+ * diesen Fehler mit vollständigem Prüfbericht. Jeder Block ist zugleich ein
+ * Bau-Auftrag (neuer Fixer/Check/Input-Pflicht) und wird strukturiert geloggt.
+ *
+ * `bestesErgebnis` (D202, Nutzer 24.07.): der beste der Versuche (wenigste
+ * Error-Findings) wird MITGEGEBEN, damit die App-Schicht entscheiden kann, ihn
+ * als klar markierten „Entwurf mit offenen Punkten" anzuzeigen statt einer
+ * leeren Wand. `null`, wenn kein einziger Versuch bis zu einem Entwurf kam
+ * (nur kaputtes JSON/Schema) — dann gibt es nichts zu zeigen.
  */
 export class QmBlockFehler extends Error {
   constructor(
     public section: ListingSection,
     public issues: ValidationIssue[],
     public versuche: number,
+    public bestesErgebnis: SectionResult | null = null,
   ) {
     super(
-      `QM-Gate: ${issues.length} Regelverstoß/-verstöße nach ${versuche} Versuch(en) nicht behebbar — Ergebnis wird nicht angezeigt. ` +
+      `QM-Gate: ${issues.length} Regelverstoß/-verstöße nach ${versuche} Versuch(en) nicht behebbar — nicht freigabefähig. ` +
         issues.slice(0, 5).map((i) => `[${i.rule}] ${i.message}`).join(" · "),
     );
   }
@@ -735,6 +764,9 @@ export async function generateSection(
   let letzterEntwurf: string | null = null;
   /** Regelkonforme Bullets aus dem Vorversuch — der Code erzwingt ihre wörtliche Übernahme (D184/D194). */
   let gesperrteBullets: Map<number, string> | null = null;
+  /** Bester Versuch (wenigste Error-Findings) für die markierte Anzeige bei Block (D202). */
+  let bestesErgebnis: SectionResult | null = null;
+  let besteFehlerzahl = Infinity;
 
   for (let versuch = 1; versuch <= maxVersuche; versuch++) {
     let parsed: Record<string, unknown>;
@@ -745,7 +777,7 @@ export async function generateSection(
     } else {
       const res = await generateForRecipe(recipeKey, {
         system: SYSTEM,
-        messages: [{ role: "user", content: sectionPrompt(section, inputs, findings, letzterEntwurf) }],
+        messages: [{ role: "user", content: sectionPrompt(section, inputs, findings, letzterEntwurf, { versuch, maxVersuche }) }],
         // 16000 statt 3000 (D106): Sonnet-5 denkt automatisch (adaptive thinking)
         // und max_tokens deckelt Denken + Antwort GEMEINSAM. Mit 3000 fraß die
         // Denkphase bei komplexen Prompts (Bullets seit D98) das ganze Budget —
@@ -798,6 +830,12 @@ export async function generateSection(
 
     if (nurErrors(issues).length === 0) return await ergaenzeRationale({ ...result, issues }, inputs);
     findings = nurErrors(issues);
+    // Besten Entwurf merken (D202): der Versuch mit den wenigsten Error-Findings
+    // wird bei einem Block als markierter Entwurf angezeigt, statt nichts zu zeigen.
+    if (findings.length < besteFehlerzahl) {
+      besteFehlerzahl = findings.length;
+      bestesErgebnis = { ...result, issues };
+    }
     letzterEntwurf = textFuerPruefer(result);
 
     // Bullet-weise Korrektur (D194): regelkonforme Bullets sperren, im
@@ -813,8 +851,9 @@ export async function generateSection(
     }
   }
 
-  // Hart blockieren (D182): kein Entwurf mit Regelverstößen wird sichtbar.
-  // Log = Bau-Auftrag: welcher Check/Fixer/Input fehlt, damit das nie mehr blockt?
+  // QM-Urteil „nicht bestanden" (D182): Log = Bau-Auftrag (welcher Check/Fixer/
+  // Input fehlt?). Der beste Entwurf wird mitgegeben — die App zeigt ihn markiert
+  // an, statt nichts zu zeigen (D202), oder blockt hart, wenn kein Entwurf entstand.
   console.error(`[QM-BLOCK] listing.${section}`, JSON.stringify({ versuche: maxVersuche, findings }));
-  throw new QmBlockFehler(section, findings, maxVersuche);
+  throw new QmBlockFehler(section, findings, maxVersuche, bestesErgebnis);
 }
