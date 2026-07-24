@@ -706,6 +706,14 @@ export default async function ProductPage({
                       )}
                     </div>
                   </div>
+                  {/* Graceful Degradation (D202): ein Entwurf mit passed=false hat
+                      das QM-Gate nach allen Versuchen NICHT bestanden — klar markiert,
+                      nicht freigabefähig, die offenen Punkte stehen rot unten. */}
+                  {v?.status === "draft" && v.validation && v.validation.passed === false && (
+                    <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">
+                      ⚠︎ QM-Gate nach mehreren Versuchen <b>nicht bestanden</b>. Dieser Entwurf wird angezeigt, ist aber <b>nicht freigabefähig</b> — behebe die rot markierten Punkte unten (Bearbeiten) oder generiere neu.
+                    </p>
+                  )}
                   {/* Kopierbare Einzel-Felder (D175): Klick kopiert; Zeichen-Hinweis
                       neutral, rot NUR über dem harten Amazon-Maximum */}
                   {payload?.text && (
