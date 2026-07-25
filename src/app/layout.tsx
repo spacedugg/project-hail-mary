@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { DemoBanner } from "@/components/shell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,7 +31,9 @@ export default function RootLayout({
           gescrollt wird nur die Inhaltsfläche neben der Sidebar (bzw. dieser
           Wrapper auf Seiten ohne Sidebar wie /login). */}
       <body className="flex h-dvh flex-col overflow-hidden">
-        <DemoBanner />
+        {/* Der Demo-Banner hängt bewusst in (app)/layout, nicht hier: Die
+            öffentliche Kunden-Freigabeseite (/freigabe/[token]) darf keine
+            internen Hinweise auf fehlende Schlüssel zeigen. */}
         <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
       </body>
     </html>

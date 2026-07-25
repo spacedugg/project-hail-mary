@@ -10,6 +10,7 @@ import {
   IconBerichte,
   IconFlatfile,
   IconHandlungen,
+  IconCms,
   IconSettings,
   IconLogout,
   IconSparkle,
@@ -82,6 +83,7 @@ async function ProfileFooter() {
 const BRAND_NAV = (brandId: string) => [
   { href: `/marke/${brandId}`, label: "Cockpit", icon: <IconCockpit />, exact: true },
   { href: `/marke/${brandId}/katalog`, label: "Katalog", icon: <IconKatalog />, alsoMatch: "/produkte/" },
+  { href: `/marke/${brandId}/publish`, label: "Content-Verwaltung", icon: <IconCms /> },
   { href: `/marke/${brandId}/sichtbarkeit`, label: "Sichtbarkeit & Markt", icon: <IconSichtbarkeit /> },
   { href: `/marke/${brandId}/advertising`, label: "Advertising / PPC", icon: <IconAds /> },
   { href: `/marke/${brandId}/berichte`, label: "Berichte & Daten", icon: <IconBerichte /> },

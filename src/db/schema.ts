@@ -69,6 +69,13 @@ export const brands = sqliteTable("brands", {
    * ohne Markenbetreuung (D68) — taucht nie als Kundenmarke auf.
    */
   kind: text("kind").$type<"brand" | "workbench">().notNull().default("brand"),
+  /**
+   * Content-Verwaltung (E-Feature): Wenn true, blockiert das Publish-Gate, bis der
+   * Kunde jeden Kern-Platz freigegeben hat. Die Zustimmung hängt an der Version.
+   */
+  publishNurMitKundenfreigabe: integer("publish_nur_mit_kundenfreigabe", { mode: "boolean" })
+    .notNull()
+    .default(false),
   createdAt: ts("created_at").notNull(),
 });
 
@@ -130,6 +137,10 @@ export const products = sqliteTable(
      * Marktplatz dieser Sprache.
      */
     contentSprache: text("content_sprache").$type<ContentSprache>().notNull().default("de"),
+    /** Publish-Schlüssel (E-Feature): Verkäufer-SKU. Fehlt sie, springt die ASIN als Notbehelf ein. */
+    sku: text("sku"),
+    /** Amazon-Produkttyp-Token (z. B. DRINKING_CUP) — Pflicht für Publish, keine Freitext-Beschreibung. */
+    amazonProductType: text("amazon_product_type"),
     createdAt: ts("created_at").notNull(),
   },
   (t) => [uniqueIndex("products_brand_asin_mp").on(t.brandId, t.asin, t.marketplace)],
@@ -201,6 +212,12 @@ export const contentVersions = sqliteTable("content_versions", {
   generatedBy: text("generated_by"),
   createdAt: ts("created_at").notNull(),
   approvedAt: integer("approved_at", { mode: "timestamp" }),
+  /** Wer intern freigegeben hat (E-Feature Freigabe-Kette). */
+  approvedBy: text("approved_by"),
+  /** Wann diese Version an den Kunden geschickt/markiert wurde (E-Feature). */
+  sentToClientAt: integer("sent_to_client_at", { mode: "timestamp" }),
+  /** Über welchen Freigabe-Link sie beim Kunden liegt (E-Feature). */
+  sentShareId: text("sent_share_id"),
   syncedAt: integer("synced_at", { mode: "timestamp" }),
 });
 
@@ -589,5 +606,190 @@ export const flatfileTemplates = sqliteTable("flatfile_templates", {
   sheetName: text("sheet_name"),
   headerRows: text("header_rows", { mode: "json" }).$type<string[][]>().notNull(),
   fieldNames: text("field_names", { mode: "json" }).$type<string[]>().notNull(),
+  createdAt: ts("created_at").notNull(),
+});
+
+/* ============================================================================
+ * Content-Verwaltung (E-Feature, D-CMS): Content-Pieces, Publish-Protokoll,
+ * Soll/Ist-Checks, Alerts, Kunden-Ansprechpartner, Freigabe-Links, Feedback.
+ * Getrennt von der Content-ERSTELLUNG (contentVersions/Werkstatt): hier wird
+ * freigegeben, veröffentlicht und überwacht — „die Freigabe ist die Grenze".
+ * ==========================================================================*/
+
+/**
+ * Woher ein Piece stammt. `ist_uebernommen` ist bewusst eine EIGENE Quelle und
+ * nicht bloß „import": Ein aus dem Live-Listing übernommener Stand ist der
+ * AUSGANGSZUSTAND, kein von uns erarbeitetes Soll. Die Bibliothek und die
+ * Accuracy weisen das aus — sonst meldet das Tool 100 % Übereinstimmung dafür,
+ * dass wir nichts verändert haben.
+ */
+export type PieceQuelle = "optimizer" | "import" | "manuell" | "ist_uebernommen";
+export type PieceStatus = "entwurf" | "intern_frei" | "kunde_frei" | "live";
+
+export const contentPieces = sqliteTable(
+  "content_pieces",
+  {
+    id: text("id").primaryKey(),
+    brandId: text("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    marketplace: text("marketplace").$type<Marketplace>().notNull().default("de"),
+    /** Slot-Schlüssel aus lib/amazon/attributes.ts (title, bullets, main_image, aplus_basic …). */
+    slot: text("slot").notNull(),
+    /** Einzelwert (Text-Slots) bzw. Asset-URL (Bild-Slots). */
+    wert: text("wert"),
+    /** Mehrteilige Slots (Bullets, Q&A) und A+-Modul-Listen. */
+    werte: text("werte", { mode: "json" }).$type<unknown>(),
+    quelle: text("quelle").$type<PieceQuelle>().notNull().default("manuell"),
+    status: text("status").$type<PieceStatus>().notNull().default("entwurf"),
+    notiz: text("notiz"),
+    createdAt: ts("created_at").notNull(),
+    updatedAt: ts("updated_at").notNull(),
+  },
+  (t) => [uniqueIndex("content_pieces_product_slot_mp").on(t.productId, t.slot, t.marketplace)],
+);
+
+/** Publish-Protokoll: was ging wann auf welchem Weg raus (der „Ist ausgeliefert"-Anker). */
+export const contentPublications = sqliteTable("content_publications", {
+  id: text("id").primaryKey(),
+  brandId: text("brand_id")
+    .notNull()
+    .references(() => brands.id, { onDelete: "cascade" }),
+  productId: text("product_id").references(() => products.id, { onDelete: "cascade" }),
+  weg: text("weg").$type<"flatfile" | "sp_api">().notNull(),
+  /** Erzeugter Payload (JSON-Patch) bzw. Zusammenfassung der Flat-File-Zeilen. */
+  payload: text("payload", { mode: "json" }).$type<unknown>(),
+  slots: text("slots", { mode: "json" }).$type<string[]>().notNull(),
+  /**
+   * „erzeugt" = Datei/Payload gebaut · „eingereicht" = an Amazon übergeben ·
+   * „bestaetigt" = im Soll/Ist-Abgleich live gesehen. ACCEPTED von Amazon ist
+   * KEIN Beweis für live (Kontrakt §3.4) — deshalb der dritte Zustand.
+   */
+  status: text("status").$type<"erzeugt" | "eingereicht" | "bestaetigt" | "fehler">().notNull().default("erzeugt"),
+  hinweise: text("hinweise", { mode: "json" }).$type<string[]>(),
+  createdBy: text("created_by"),
+  createdAt: ts("created_at").notNull(),
+});
+
+/** Ein Soll/Ist-Lauf je Produkt — Ergebnis von lib/cms/accuracy.ts. */
+export const contentChecks = sqliteTable("content_checks", {
+  id: text("id").primaryKey(),
+  brandId: text("brand_id")
+    .notNull()
+    .references(() => brands.id, { onDelete: "cascade" }),
+  productId: text("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  /** Auf welchem Listing-Snapshot der Abgleich lief (Nachvollziehbarkeit). */
+  snapshotId: text("snapshot_id").references(() => listingSnapshots.id, { onDelete: "set null" }),
+  ergebnis: text("ergebnis", { mode: "json" }).$type<unknown>().notNull(),
+  /** null = nicht messbar (kein Ist-Stand) — bewusst NICHT 0 oder 100. */
+  accuracyPct: integer("accuracy_pct"),
+  createdAt: ts("created_at").notNull(),
+});
+
+export type AlertStatus = "offen" | "bestaetigt" | "erledigt";
+
+export const contentAlerts = sqliteTable("content_alerts", {
+  id: text("id").primaryKey(),
+  brandId: text("brand_id")
+    .notNull()
+    .references(() => brands.id, { onDelete: "cascade" }),
+  productId: text("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  art: text("art").notNull(), // text_ueberschrieben | hauptbild_weg | listing_leer | nie_live | regel_geaendert
+  slot: text("slot"),
+  schwere: text("schwere").$type<"hoch" | "mittel">().notNull().default("mittel"),
+  nachricht: text("nachricht").notNull(),
+  status: text("status").$type<AlertStatus>().notNull().default("offen"),
+  createdAt: ts("created_at").notNull(),
+  erledigtAt: integer("erledigt_at", { mode: "timestamp" }),
+});
+
+/**
+ * Ansprechpartner auf Kundenseite (Vorstufe zu Mandanten & Rollen, Stufe 3).
+ * Heute ohne eigenes Login: Zugang läuft über zeitlich begrenzte Freigabe-Links.
+ * `passwordHash` ist vorbereitet, damit daraus später ein echtes Kundenkonto wird,
+ * ohne Datenumzug.
+ */
+export const clientContacts = sqliteTable(
+  "client_contacts",
+  {
+    id: text("id").primaryKey(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    rolle: text("rolle"), // z.B. "Marketing", "Geschäftsführung"
+    passwordHash: text("password_hash"),
+    createdAt: ts("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("client_contacts_client_email").on(t.clientId, t.email)],
+);
+
+/**
+ * Freigabe-Link: tokengeschützte Kunden-Sicht auf Content-Pieces einer Marke.
+ * Bewusst ohne Login — der Kunde soll Feedback geben können, nicht ein Konto
+ * verwalten. Ablauf + Widerruf sind Pflicht, sonst ist es ein Dauerleck.
+ */
+export const contentShares = sqliteTable(
+  "content_shares",
+  {
+    id: text("id").primaryKey(),
+    brandId: text("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    token: text("token").notNull(),
+    contactId: text("contact_id").references(() => clientContacts.id, { onDelete: "set null" }),
+    label: text("label").notNull(),
+    /** null = alle Produkte der Marke. */
+    productIds: text("product_ids", { mode: "json" }).$type<string[] | null>(),
+    /** Darf der Kunde freigeben — oder nur kommentieren? */
+    darfFreigeben: integer("darf_freigeben", { mode: "boolean" }).notNull().default(true),
+    expiresAt: integer("expires_at", { mode: "timestamp" }),
+    revokedAt: integer("revoked_at", { mode: "timestamp" }),
+    createdBy: text("created_by"),
+    createdAt: ts("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("content_shares_token").on(t.token)],
+);
+
+export type FeedbackArt = "kommentar" | "freigabe" | "aenderung";
+export type FeedbackStatus = "offen" | "erledigt";
+
+/**
+ * Feedback am Content-Piece — von Team ODER Kunde, an derselben Stelle.
+ * Anker ist (Produkt, Slot) plus optional die konkrete Version: So bleibt
+ * nachvollziehbar, auf welchen Stand sich eine Kundenaussage bezog, auch wenn
+ * danach neu generiert wurde.
+ */
+export const contentFeedback = sqliteTable("content_feedback", {
+  id: text("id").primaryKey(),
+  brandId: text("brand_id")
+    .notNull()
+    .references(() => brands.id, { onDelete: "cascade" }),
+  productId: text("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  slot: text("slot").notNull(),
+  /** Position innerhalb eines mehrteiligen Slots (Bullet 3 = 2). */
+  ankerIndex: integer("anker_index"),
+  contentVersionId: text("content_version_id").references(() => contentVersions.id, { onDelete: "set null" }),
+  pieceId: text("piece_id").references(() => contentPieces.id, { onDelete: "set null" }),
+  autorTyp: text("autor_typ").$type<"team" | "kunde">().notNull(),
+  autorName: text("autor_name").notNull(),
+  autorUserId: text("autor_user_id").references(() => users.id, { onDelete: "set null" }),
+  autorContactId: text("autor_contact_id").references(() => clientContacts.id, { onDelete: "set null" }),
+  shareId: text("share_id").references(() => contentShares.id, { onDelete: "set null" }),
+  art: text("art").$type<FeedbackArt>().notNull().default("kommentar"),
+  nachricht: text("nachricht").notNull(),
+  status: text("status").$type<FeedbackStatus>().notNull().default("offen"),
+  erledigtVon: text("erledigt_von"),
+  erledigtAt: integer("erledigt_at", { mode: "timestamp" }),
   createdAt: ts("created_at").notNull(),
 });
