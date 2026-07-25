@@ -128,6 +128,47 @@ export const FEHLER_CODES: Record<string, FehlerInfo> = {
     bedeutung: "Die Sicherheitsabfrage wurde nicht exakt beantwortet — es wurde nichts gelöscht.",
     loesung: "Zum Bestätigen exakt LÖSCHEN in das Feld tippen.",
   },
+  "CMS-01": {
+    titel: "Content-Piece nicht gespeichert",
+    bedeutung:
+      "Der Eintrag in die Content-Bibliothek ist fehlgeschlagen — meist, weil der gewählte Platz unbekannt ist, das Produkt nicht existiert oder gar kein Inhalt eingegeben wurde.",
+    loesung: "Platz und Produkt prüfen, Inhalt eintragen und erneut speichern. Mehrteilige Plätze (Bullets, Q&A): eine Zeile je Eintrag.",
+  },
+  "CMS-02": {
+    titel: "Kunden-Zugang nicht angelegt",
+    bedeutung:
+      "Ansprechpartner oder Freigabe-Link konnten nicht erzeugt werden — meist fehlt ein Pflichtfeld oder die E-Mail ist beim Kunden schon hinterlegt.",
+    loesung: "Angaben vervollständigen. Existiert der Ansprechpartner bereits, den vorhandenen Eintrag im Link auswählen.",
+  },
+  "CMS-03": {
+    titel: "Feedback nicht gespeichert",
+    bedeutung: "Die Rückmeldung war leer oder der Freigabe-Link ist nicht mehr gültig (abgelaufen oder widerrufen).",
+    loesung: "Text eingeben und erneut senden. Bei einem abgelaufenen Link einen neuen Freigabe-Link erzeugen.",
+  },
+  "CMS-04": {
+    titel: "Amazon-Produkttyp ist kein gültiger Token",
+    bedeutung:
+      'Eingetragen wurde eine Beschreibung (z. B. „Doppelwandige Thermogläser"). Amazons Listings-API verlangt einen Token wie DRINKING_CUP oder HOME_BED_AND_BATH — eine Beschreibung wird sicher abgelehnt.',
+    loesung:
+      "Den Token aus der Vorschlagsliste wählen. Steht der passende Typ nicht drin: In Seller Central die Kategorievorlage generieren — dort steht der Typ im Feld feed_product_type.",
+  },
+  "CMS-05": {
+    titel: "Onboarding: keine gültige ASIN",
+    bedeutung: "In der Liste war keine erkennbare Amazon-ASIN. Eine ASIN hat genau 10 Zeichen und beginnt meist mit B0.",
+    loesung: "ASINs je Zeile oder durch Komma getrennt einfügen — z. B. aus der Amazon-Markenseite oder Seller Central kopiert.",
+  },
+  "REG-01": {
+    titel: "Regeländerung nicht übernommen",
+    bedeutung:
+      "Der neue Grenzwert war keine sinnvolle Zahl, oder es fehlte die Quelle. Ohne Herkunftsangabe wird keine Regel gespeichert — sonst weiß später niemand, warum eine Grenze so ist.",
+    loesung: "Zahl größer als 0 eintragen und die Quelle angeben (z. B. die Amazon-Ankündigung mit Datum).",
+  },
+  "REG-02": {
+    titel: "Suche nach Amazon-Änderungen fehlgeschlagen",
+    bedeutung:
+      "Der Regel-Wächter konnte die Websuche nicht abschließen (Zeitlimit, API-Fehler oder unlesbare Antwort). Es wurde NICHTS am Regelstand verändert.",
+    loesung: "Erneut versuchen. Bleibt es dabei, die Detail-Meldung prüfen — der Wächter braucht den Anthropic-Schlüssel mit Websuche.",
+  },
   "ALG-00": {
     titel: "Unerwarteter Fehler",
     bedeutung: "Ein Fehler ohne eigenen Code — die Detail-Meldung oben ist die beste Information, die das Tool hat.",

@@ -214,7 +214,10 @@ export default async function ProductPage({
           basisHref={`/produkte/${product.id}`}
           tabs={[...TABS]}
           aktiv={tab}
-          extra={[{ href: `/produkte/${product.id}/briefs`, label: "Briefings" }]}
+          extra={[
+            { href: `/produkte/${product.id}/content`, label: "Content-Verwaltung" },
+            { href: `/produkte/${product.id}/briefs`, label: "Briefings" },
+          ]}
         />
       )}
 

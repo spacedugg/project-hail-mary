@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { generateSection, QmBlockFehler, type ListingSection, type RecipeInputs } from "@/lib/recipes/listing";
 import type { ContentSprache, Marketplace, ProductFacts } from "@/db/schema";
@@ -1982,6 +1982,51 @@ export async function importListingFromAmazon(formData: FormData) {
   }
   revalidatePath(`/produkte/${productId}`);
   if (hinweis) redirect(`/produkte/${productId}?hinweis=${encodeURIComponent(hinweis)}`);
+}
+
+/**
+ * Content-Verwaltung (E-Feature): programmatischer Einzel-Import für den
+ * Sammel-Import beim Kunden-Onboarding. Delegiert an den bestehenden, weiter
+ * entwickelten PHM-Import (`importListingFromAmazon`) und übersetzt dessen
+ * Redirect-Ergebnis in ein {ok,name,meldung}-Resultat für den Fortschrittslauf.
+ * Der bestehende Einzelweg (Formular → Redirect) bleibt unverändert.
+ */
+export async function importiereProdukt(
+  productId: string,
+): Promise<{ ok: boolean; name: string; meldung: string }> {
+  const db = await getDb();
+  const vorher = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  const fd = new FormData();
+  fd.set("productId", productId);
+  try {
+    await importListingFromAmazon(fd);
+  } catch (e) {
+    const digest = (e as { digest?: string })?.digest ?? "";
+    if (typeof digest === "string" && digest.startsWith("NEXT_REDIRECT")) {
+      const ziel = decodeURIComponent(digest);
+      // Fehler-Redirect (?fehler=…) = echter Fehler; hinweis-Redirect = Erfolg mit Hinweis (fällt durch).
+      if (ziel.includes("fehler=")) {
+        return { ok: false, name: vorher?.name ?? productId, meldung: ziel.split("fehler=")[1].split("&")[0].slice(0, 120) };
+      }
+    } else {
+      return { ok: false, name: vorher?.name ?? productId, meldung: e instanceof Error ? e.message : String(e) };
+    }
+  }
+  const nachher = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  return { ok: true, name: nachher?.name ?? productId, meldung: "Listing geladen" };
+}
+
+/** Welche Produkte einer Marke haben noch keinen Snapshot? Für den Sammel-Import. */
+export async function produkteOhneSnapshot(
+  brandId: string,
+): Promise<Array<{ id: string; name: string; asin: string | null }>> {
+  const db = await getDb();
+  const produkte = await db.query.products.findMany({ where: eq(schema.products.brandId, brandId) });
+  const pids = produkte.map((p) => p.id);
+  if (!pids.length) return [];
+  const snaps = await db.query.listingSnapshots.findMany({ where: inArray(schema.listingSnapshots.productId, pids) });
+  const mitSnap = new Set(snaps.map((s) => s.productId));
+  return produkte.filter((p) => p.asin && !mitSnap.has(p.id)).map((p) => ({ id: p.id, name: p.name, asin: p.asin }));
 }
 
 export async function uploadListingCsv(formData: FormData) {

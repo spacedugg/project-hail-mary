@@ -1,21 +1,43 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
-import { getDb, schema } from "@/db/client";
-import { createProduct, deleteProductAction } from "@/app/actions";
+import { notFound } from "next/navigation";
+import { ladeMarkenCms, ladeOffeneFreigaben, KERN_SLOTS } from "@/lib/cms/laden";
+import { publishBereit } from "@/lib/amazon/publishGate";
+import { createProduct, deleteProductAction, produkteOhneSnapshot } from "@/app/actions";
+import { onboardingProdukteAnlegen } from "@/app/cms-actions";
+import { OnboardingImport } from "@/components/onboarding-import";
 import { LoeschButton } from "@/components/loesch-button";
 import { SubmitButton } from "@/components/submit-button";
+import { FehlerPopup } from "@/components/fehler-popup";
+import { fehlerInfo } from "@/lib/fehlercodes";
 
 export const dynamic = "force-dynamic";
 
-/** Katalog dieser Marke — Einstieg in die Produkt-Details. */
-export default async function BrandKatalog({ params }: { params: Promise<{ brandId: string }> }) {
+/**
+ * Katalog — die Produkt-Zentrale der Marke. Jede Zeile ist ein Produkt mit
+ * seinem Content-Zustand (Soll/Live/Abgesichert/Publish/Wartet); ein Klick öffnet
+ * alles zum Produkt. Die Content-ERSTELLUNG (Werkstatt) bleibt im Produkt; hier
+ * ist der Einstieg + der Content-Verwaltungs-Überblick (E-Feature).
+ */
+export default async function BrandKatalog({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ brandId: string }>;
+  searchParams: Promise<{ fehler?: string; code?: string; hinweis?: string }>;
+}) {
   const { brandId } = await params;
-  const db = await getDb();
-  const products = await db.query.products.findMany({ where: eq(schema.products.brandId, brandId) });
+  const { fehler, code, hinweis } = await searchParams;
+  const cms = await ladeMarkenCms(brandId);
+  if (!cms) notFound();
+  const freigaben = await ladeOffeneFreigaben(brandId);
+  const ohneSnapshot = await produkteOhneSnapshot(brandId);
   const input = "input-base";
 
   return (
     <main className="w-full p-8">
+      {fehler && <FehlerPopup message={fehler} {...fehlerInfo(code)} />}
+      {hinweis && <p className="mt-4 rounded-xl bg-[var(--primary-soft)] px-3 py-2 text-sm text-primary-strong">ℹ {hinweis}</p>}
+
       <h1 className="page-title">Katalog</h1>
       <p className="page-sub">Produkte dieser Marke. Die meisten ASINs existieren schon — anlegen, dann Daten anbinden.</p>
 
@@ -46,28 +68,128 @@ export default async function BrandKatalog({ params }: { params: Promise<{ brand
         </SubmitButton>
       </form>
 
-      <ul className="mt-6 card divide-y divide-hair overflow-hidden">
-        {products.length === 0 && <li className="p-4 text-sm text-neutral-400">Noch keine Produkte.</li>}
-        {products.map((p) => (
-          <li key={p.id} className="flex items-center">
-            <Link href={`/produkte/${p.id}`} className="flex flex-1 items-center justify-between p-4 hover:bg-background">
-              <div>
-                <div className="text-sm font-medium">{p.name}</div>
-                {p.asin && <div className="font-mono text-xs text-neutral-500">{p.asin} · amazon.{p.marketplace}</div>}
-              </div>
-              <span className="text-xs text-primary-strong">öffnen →</span>
-            </Link>
-            <div className="pr-3">
-              <LoeschButton
-                action={deleteProductAction}
-                felder={{ productId: p.id }}
-                frage={`„${p.name}" mit allen Daten endgültig löschen?`}
-                title="Produkt löschen"
-              />
-            </div>
-          </li>
-        ))}
-      </ul>
+      <details className="mt-3 rounded-xl border border-hair p-3.5">
+        <summary className="cursor-pointer text-sm font-semibold">
+          Kunden-Onboarding: ganzen Katalog auf einmal
+        </summary>
+        <p className="mt-2 text-xs text-muted">
+          Zum Start der Zusammenarbeit: alle ASINs des Kunden einfügen (eine je Zeile oder durch Komma getrennt).
+          Das Tool legt die Produkte an; danach ziehst du unten alle Live-Listings in einem Zug. Es entsteht nur der
+          <b> Status quo</b> — kein Archiv alter Content-Stände.
+        </p>
+        <form action={onboardingProdukteAnlegen} className="mt-2 grid gap-2">
+          <input type="hidden" name="brandId" value={brandId} />
+          <textarea name="asins" rows={3} className="input-base font-mono text-sm" placeholder="B0B1WQQHMH&#10;B0CXY12ABC, B0DEF34GHI …" />
+          <SubmitButton className="btn-dark w-fit text-xs">Produkte anlegen</SubmitButton>
+        </form>
+      </details>
+
+      {ohneSnapshot.length > 0 && (
+        <div className="mt-3">
+          <OnboardingImport produkte={ohneSnapshot} />
+        </div>
+      )}
+
+      {cms.produkte.length === 0 ? (
+        <p className="mt-6 card p-5 text-sm text-muted">
+          Noch kein Produkt. Lege eines mit ASIN an — danach holt sich das Tool das Listing selbst.
+        </p>
+      ) : (
+        <div className="mt-5 card overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-hair text-left text-[11px] uppercase tracking-wide text-muted">
+                <th className="py-2.5 pl-5 pr-3">Produkt</th>
+                <th className="py-2.5 pr-3" title="Freigegebene Kern-Plätze: Titel, Bullets, Beschreibung, Backend-Keywords, Hauptbild">Soll</th>
+                <th className="py-2.5 pr-3" title="Anteil unseres Solls, der live auf Amazon steht">Live</th>
+                <th className="py-2.5 pr-3">Abgesichert</th>
+                <th className="py-2.5 pr-3">Publish</th>
+                <th className="py-2.5 pr-3">Wartet</th>
+                <th className="py-2.5 pr-5"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {cms.produkte.map((p) => {
+                const wartet = freigaben.filter((f) => f.productId === p.id).length;
+                const bereit = publishBereit(p.publishIssues);
+                return (
+                  <tr key={p.id} className="border-b border-hair/60 last:border-0">
+                    <td className="py-3 pl-5 pr-3">
+                      <Link href={`/produkte/${p.id}`} className="font-medium hover:underline">{p.name}</Link>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted">
+                        {p.asin ? <span className="font-mono">{p.asin}</span> : <span className="text-warn">ohne ASIN</span>}
+                        <span>{p.marketplace.toUpperCase()}</span>
+                        {p.skuIstNotbehelf && <span className="pill pill-warn">SKU fehlt</span>}
+                        {!p.productType && <span className="pill pill-warn">Produkttyp fehlt</span>}
+                        {p.sollAusIst > 0 && <span className="pill pill-neutral">{p.sollAusIst}× nur Ausgangs-Stand</span>}
+                      </div>
+                    </td>
+                    <td className="py-3 pr-3 tabular-nums">
+                      <span className={p.kernFreigegeben === 5 ? "text-good" : p.kernFreigegeben === 0 ? "text-muted" : ""}>
+                        {p.kernFreigegeben}/5
+                      </span>
+                    </td>
+                    <td className="py-3 pr-3 tabular-nums">
+                      {p.abgleich.accuracyPct === null ? (
+                        <span className="text-muted" title="Kein gecrawlter Live-Stand">–</span>
+                      ) : (
+                        <span className={p.abgleich.accuracyPct >= 95 ? "text-good" : "text-bad"}>{p.abgleich.accuracyPct} %</span>
+                      )}
+                    </td>
+                    <td className="py-3 pr-3 tabular-nums">
+                      {(() => {
+                        const kern = p.slots.filter((s) => KERN_SLOTS.includes(s.slot) && s.werte.length > 0);
+                        const ok = kern.filter((s) => s.freigabe.abgesichert).length;
+                        if (!kern.length) return <span className="text-muted">—</span>;
+                        return (
+                          <span
+                            className={ok === kern.length ? "text-good" : "text-muted"}
+                            title="Vom Kunden freigegebene Kern-Plätze"
+                          >
+                            {ok}/{kern.length}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="py-3 pr-3">
+                      <span className={bereit ? "pill pill-good" : "pill pill-bad"}>{bereit ? "bereit" : "blockiert"}</span>
+                    </td>
+                    <td className="py-3 pr-3">
+                      <div className="flex flex-wrap gap-1.5">
+                        {wartet > 0 && (
+                          <Link href={`/marke/${brandId}/publish`} className="pill pill-warn">{wartet}× Freigabe</Link>
+                        )}
+                        {p.feedbackOffen > 0 && (
+                          <Link href={`/produkte/${p.id}/content`} className="pill pill-neutral">{p.feedbackOffen}× Feedback</Link>
+                        )}
+                        {wartet === 0 && p.feedbackOffen === 0 && <span className="text-xs text-muted">—</span>}
+                      </div>
+                    </td>
+                    <td className="py-3 pr-5 text-right">
+                      <div className="flex items-center justify-end gap-3">
+                        <Link href={`/produkte/${p.id}`} className="text-xs text-primary-strong hover:underline">öffnen →</Link>
+                        <LoeschButton
+                          action={deleteProductAction}
+                          felder={{ productId: p.id }}
+                          frage={`„${p.name}" aus dem Katalog löschen? Content, Bewertungen und Alerts gehen weg — das Amazon-Listing bleibt.`}
+                          title="Produkt löschen"
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <p className="mt-4 text-xs text-muted">
+        <b>Soll</b> = wie viele der fünf Kern-Plätze freigegeben sind (Titel, Bullets, Beschreibung, Backend-Keywords, Hauptbild).{" "}
+        <b>Live</b> = wie viel davon auf Amazon steht — keine Qualitätsnote.{" "}
+        Markenweite Aufgaben stehen unter{" "}
+        <Link href={`/marke/${brandId}/publish`} className="underline">Content-Verwaltung</Link>.
+      </p>
     </main>
   );
 }

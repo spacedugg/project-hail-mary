@@ -30,6 +30,15 @@ export default async function BrandCockpit({ params }: { params: Promise<{ brand
     : [];
   const uploads = await db.query.reportUploads.findMany({ where: eq(schema.reportUploads.brandId, brandId) });
   const brandActions = await db.query.actions.findMany({ where: eq(schema.actions.brandId, brandId) });
+
+  // Content-Accuracy fürs Cockpit — dieselbe Rechnung wie im CMS, keine zweite Quelle.
+  const { ladeMarkenCms, ladeLiveScores } = await import("@/lib/cms/laden");
+  const cms = await ladeMarkenCms(brandId);
+  const cmsAccuracy = cms?.accuracyPct ?? null;
+  const liveSchnitt = (await ladeLiveScores(brandId)).schnitt;
+  const offeneContentAlerts = (
+    await db.query.contentAlerts.findMany({ where: eq(schema.contentAlerts.brandId, brandId) })
+  ).filter((a) => a.status === "offen").length;
   const brand = await db.query.brands.findFirst({ where: eq(schema.brands.id, brandId) });
 
   // Ampel-Schwelle: Account-Marge (Hand) → sonst Ø Break-even-ACoS der Produkt-Kalkulationen
@@ -95,6 +104,40 @@ export default async function BrandCockpit({ params }: { params: Promise<{ brand
             {threshold !== null && ` · Break-even ${fmt1(threshold)} %`}
           </p>
         </div>
+      </div>
+
+      {/* Retail-Readiness: Content-Accuracy als Kachel fürs Cockpit (Bauplan CMS).
+          Steht bewusst VOR den Umsatz-Kacheln und unabhängig von Berichts-Perioden —
+          sie ist auch dann aussagekräftig, wenn noch kein Bericht hochgeladen ist. */}
+      <div className="stagger mt-5 grid gap-3 sm:grid-cols-2">
+        <Link href={`${base}/publish/alerts`} className="card group flex items-center justify-between gap-3 p-5">
+          <div>
+            <div className="stat-label">Retail-Readiness · Live-Qualität</div>
+            <div className={`stat-value ${liveSchnitt === null ? "" : liveSchnitt >= 80 ? "text-good" : "text-bad"}`}>
+              {liveSchnitt === null ? "–" : `${liveSchnitt}/100`}
+            </div>
+            <div className="mt-0.5 text-xs text-muted">
+              {liveSchnitt === null
+                ? "Nicht messbar — noch kein gecrawlter Live-Stand"
+                : `Qualität des Live-Stands · retail-ready ab 80${cmsAccuracy !== null ? ` · ${cmsAccuracy} % unseres Solls live` : ""}`}
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-primary-strong transition group-hover:gap-2">
+            öffnen <IconArrowRight className="h-3.5 w-3.5" />
+          </span>
+        </Link>
+        <Link href={`${base}/publish/alerts`} className="card group flex items-center justify-between gap-3 p-5">
+          <div>
+            <div className="stat-label">Offene Content-Alerts</div>
+            <div className={`stat-value ${offeneContentAlerts > 0 ? "text-bad" : "text-good"}`}>{offeneContentAlerts}</div>
+            <div className="mt-0.5 text-xs text-muted">
+              {offeneContentAlerts > 0 ? "Hauptbild weg, Text überschrieben, Listing leer" : "Keine Abweichung zum freigegebenen Stand"}
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-primary-strong transition group-hover:gap-2">
+            öffnen <IconArrowRight className="h-3.5 w-3.5" />
+          </span>
+        </Link>
       </div>
 
       {curr ? (
