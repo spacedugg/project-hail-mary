@@ -1,4 +1,4 @@
-import type { ReviewInsightsPayload } from "@/db/schema";
+import type { ReviewInsightsPayload, AspektHerkunft, AspektUebertragbarkeit } from "@/db/schema";
 
 /**
  * Insights-Normalisierung (D103, „LLM generiert, Code erzwingt"):
@@ -27,18 +27,52 @@ const num = (v: unknown): number | null => {
 const strings = (v: unknown): string[] =>
   arr(v).map((s) => String(s ?? "").trim()).filter(Boolean);
 
+/**
+ * Herkunfts-Zählung (eigene/fremde Fundstellen, D196) render-sicher übernehmen.
+ * MUSS die Verdichtung überleben (D206) — sonst greift bei der Text-Generierung
+ * nie der strategische Herkunfts/Übertragbarkeits-Block (contextBlock).
+ */
+function normHerkunft(v: unknown): AspektHerkunft | undefined {
+  if (!v || typeof v !== "object") return undefined;
+  const h = v as Record<string, unknown>;
+  const eigene = num(h.eigene);
+  const fremde = num(h.fremde);
+  if (eigene === null && fremde === null) return undefined;
+  const jeAsin: Record<string, number> = {};
+  if (h.jeAsin && typeof h.jeAsin === "object")
+    for (const [k, val] of Object.entries(h.jeAsin as Record<string, unknown>)) {
+      const n = num(val);
+      if (n !== null) jeAsin[k] = n;
+    }
+  return { eigene: eigene ?? 0, fremde: fremde ?? 0, jeAsin };
+}
+
+/** Übertragbarkeits-Urteil (ja/nein/unbekannt) render-sicher übernehmen (D206). */
+function normUebertragbarkeit(v: unknown): AspektUebertragbarkeit | undefined {
+  if (!v || typeof v !== "object") return undefined;
+  const u = v as Record<string, unknown>;
+  const urteil = u.urteil === "ja" || u.urteil === "nein" || u.urteil === "unbekannt" ? u.urteil : null;
+  if (!urteil) return undefined;
+  return { urteil, grund: String(u.grund ?? "").trim() };
+}
+
 function findings(v: unknown): Kern["painPoints"] {
   return arr(v)
     .map((x) => {
       const f = (x ?? {}) as Record<string, unknown>;
       const label = String(f.label ?? f.title ?? "").trim();
       if (!label) return null;
+      const herkunft = normHerkunft(f.herkunft);
+      const uebertragbarkeit = normUebertragbarkeit(f.uebertragbarkeit);
       return {
         label,
         frequencyPct: num(f.frequencyPct ?? f.frequency_pct),
         mentionCount: num(f.mentionCount ?? f.mention_count),
         // bis zu 15 Fundstellen je Aspekt (D170) — Basis des echten Zählwerts
         quotes: strings(f.quotes).slice(0, 15),
+        // Herkunft + Übertragbarkeit durch die Verdichtung retten (D206)
+        ...(herkunft ? { herkunft } : {}),
+        ...(uebertragbarkeit ? { uebertragbarkeit } : {}),
       };
     })
     .filter((f): f is NonNullable<typeof f> => f !== null);

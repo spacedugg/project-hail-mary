@@ -17,7 +17,7 @@
 - **Auch mit A+ pflegen:** A+ ersetzt die Beschreibung visuell auf der Produktseite, aber die Beschreibung bleibt relevant (mobile Ansichten, Indexierung). A+-Text wird NICHT vom Suchalgorithmus indexiert (Blog 07) — Keywords gehören hierher, nicht ins A+.
 - **Struktur:** Positionierung/Story → Nutzenargumente mit Belegen (Maße, Material, Normen) → Einwandbehandlung (Haltbarkeit, Kompatibilität, Pflege) → weicher CTA.
 - **TERTIARY-Keywords** (temoa-os Tiering) organisch einweben — kein Stuffing.
-- **AEO-tauglich (Blog 74; Stand 05/2026: Rufus wurde durch „Alexa for Shopping" ersetzt):** vollständige Sätze, typische Kundenfragen explizit beantworten (Q&A-Denke), maschinenlesbar klare Fakten — die Beschreibung ist die Textfläche, aus der KI-Assistenten zitieren. AEO-Checkliste: vollständige Attribute, Bullets als Antworten auf echte Käuferfragen, natürliche Sprache, saubere strukturierte Daten, Reviews/Q&A als KI-Datenquelle.
+- **AEO-tauglich (Blog 74; Stand 05/2026: Rufus wurde durch „Alexa for Shopping" ersetzt):** durchgehende Aussagesätze, die typische Kundenfragen IMPLIZIT als klaren Fakt beantworten — NICHT das „Frage? Antwort."-Muster und KEINE Frage-Sätze (das ist die Q&A-Sektion, nicht die Beschreibung). Die Beschreibung ist zusammenhängende Marketing-Prosa, aus der KI-Assistenten Fakten zitieren; sie entsteht datenbasiert aus Produkt-Wahrheit, USPs, Pain Points und Keywords. AEO-Checkliste: vollständige Attribute als Aussagen, natürliche Sprache, saubere Fakten, keine interrogativen Sätze im Beschreibungstext (deterministisch geprüft: `description.frage`).
 - Brand-Voice: nüchtern-deutsch, aktive Verben, konkrete Zahlen, keine englischen Marketing-Floskeln.
 
 ## VALIDATION

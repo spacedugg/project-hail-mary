@@ -42,7 +42,7 @@ const goodBullets = [
 ];
 
 const goodDescription =
-  "Die AquaNova Edelstahl-Trinkflasche begleitet dich durch den Tag — vom Frühstück bis zum Training. Ihre doppelwandige Vakuum-Isolierung sorgt für konstante Temperatur, während der auslaufsichere Verschluss Tasche und Laptop schützt. Wie reinige ich die Flasche? Deckel in die Spülmaschine, Flasche mit der beiliegenden Bürste. Passt sie in Autohalterungen? Ja, mit 7,3 cm Durchmesser in alle gängigen Halter.";
+  "Die AquaNova Edelstahl-Trinkflasche begleitet dich durch den Tag — vom Frühstück bis zum Training. Ihre doppelwandige Vakuum-Isolierung sorgt für konstante Temperatur, während der auslaufsichere Verschluss Tasche und Laptop schützt. Zur Reinigung wandert der Deckel in die Spülmaschine, die Flasche säubert die beiliegende Bürste. Mit 7,3 cm Durchmesser passt sie in alle gängigen Autohalter.";
 
 const goodBackend = "thermosflasche isolierflasche sportflasche fahrrad wandern camping outdoor edelstahlflasche kohlensäure geeignet metallflasche trinkflaschen thermo iso";
 
@@ -130,6 +130,28 @@ describe("validateBullets", () => {
   it("USP in zwei Bullets ist ERROR (Cross-Content-USP-Regel)", () => {
     const dup = [...goodBullets.slice(0, 4), VALID_BULLET("NOCHMAL AUSLAUFSICHER", "Wirklich garantiert auslaufsicher, wie schon gesagt wurde in diesem Listing hier oben.")];
     expect(validateBullets(dup, ctx).map((i) => i.rule)).toContain("bullets.usp-duplicate");
+  });
+  it("Tausenderpunkt zählt NICHT als Satzende (D203, Live-Fall 3.660)", () => {
+    const bullet = [
+      VALID_BULLET("VIEL BALLASTSTOFF", "3.660 mg Flohsamen pro Portion liefern kräftige Ballaststoffe. Ideal für Erwachsene mit hohem Bedarf. Jede Kapsel enthält 610 mg."),
+      ...goodBullets.slice(1),
+    ];
+    expect(validateBullets(bullet, ctx).map((i) => i.rule)).not.toContain("bullets.sentences");
+  });
+  it("Abkürzungen (z. B., ca.) zählen NICHT als Satzende (D203)", () => {
+    const bullet = [
+      VALID_BULLET("PRAKTISCH DOSIERBAR", "Geeignet z. B. für Sport und Büro, ca. 160 Portionen pro Dose. Die Einnahme gelingt einfach mit Wasser."),
+      ...goodBullets.slice(1),
+    ];
+    // 2 echte Sätze trotz drei Punkten (z. B., ca.) → keine Warnung
+    expect(validateBullets(bullet, ctx).map((i) => i.rule)).not.toContain("bullets.sentences");
+  });
+  it("mehr als 3 echte Sätze ist WARNUNG (Gegenprobe)", () => {
+    const bullet = [
+      VALID_BULLET("VIER SAETZE", "Erster Satz hier. Zweiter Satz hier. Dritter Satz hier. Vierter Satz hier."),
+      ...goodBullets.slice(1),
+    ];
+    expect(validateBullets(bullet, ctx).map((i) => i.rule)).toContain("bullets.sentences");
   });
 });
 
@@ -283,6 +305,16 @@ describe("Keyword-Echo auch in Beschreibung & Highlights (Scheibe 2)", () => {
   it("grammatisch integriert passiert die Beschreibung", () => {
     const issues = validateDescription(goodDescription, [], { alleKeywords: ["outdoor flasche", "edelstahl trinkflasche"] });
     expect(issues.map((i) => i.rule)).not.toContain("description.keyword-echo");
+  });
+});
+
+describe("Beschreibung: keine Frage-Sätze (D203, Live-Fall 0/10)", () => {
+  it("Frage-Satz in der Beschreibung ist ERROR", () => {
+    const mitFrage = "Die Flasche hält lange kalt. Wie reinige ich sie? Einfach in die Spülmaschine.";
+    expect(validateDescription(mitFrage, [], {}).map((i) => i.rule)).toContain("description.frage");
+  });
+  it("reine Aussage-Beschreibung passiert", () => {
+    expect(validateDescription(goodDescription, [], {}).map((i) => i.rule)).not.toContain("description.frage");
   });
 });
 

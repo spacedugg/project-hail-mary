@@ -45,6 +45,29 @@ describe("normalisiereInsights", () => {
     expect(p.painPoints[0].quotes).toHaveLength(15); // Basis des echten Zählwerts (D170)
     expect(p.painPoints[0].quotes[0]).toBe("zitat 1");
   });
+
+  it("behält herkunft + uebertragbarkeit durch die Verdichtung (D206) — sonst kein Strategie-Block im Text", () => {
+    const p = normalisiereInsights({
+      buyingTriggers: [
+        {
+          label: "leiser Betrieb",
+          mentionCount: 7,
+          herkunft: { eigene: 1, fremde: 6, jeAsin: { B01: 6, B02: 1 } },
+          uebertragbarkeit: { urteil: "ja", grund: "Unsere Specs decken den geringen Geräuschpegel." },
+        },
+      ],
+    });
+    expect(p.buyingTriggers[0].herkunft).toEqual({ eigene: 1, fremde: 6, jeAsin: { B01: 6, B02: 1 } });
+    expect(p.buyingTriggers[0].uebertragbarkeit).toEqual({ urteil: "ja", grund: "Unsere Specs decken den geringen Geräuschpegel." });
+  });
+
+  it("verwirft kaputtes uebertragbarkeit-urteil, statt es durchzureichen (Code erzwingt)", () => {
+    const p = normalisiereInsights({
+      painPoints: [{ label: "x", uebertragbarkeit: { urteil: "vielleicht" }, herkunft: {} }],
+    });
+    expect(p.painPoints[0].uebertragbarkeit).toBeUndefined();
+    expect(p.painPoints[0].herkunft).toBeUndefined(); // leere Herkunft (kein eigene/fremde) → weg
+  });
 });
 
 describe("normalisierePayload (Lese-Schutz fürs Dashboard)", () => {

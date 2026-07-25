@@ -32,6 +32,23 @@ const inputs: RecipeInputs = {
 };
 
 describe("listing recipes (mock)", () => {
+  it("Backend-Keywords werden VOR der Beschreibung generiert (D204)", () => {
+    expect(SECTION_ORDER.indexOf("backend")).toBeLessThan(SECTION_ORDER.indexOf("description"));
+  });
+  it("Feature-Ranking fließt in den Bullet-Prompt (D205)", () => {
+    const mitFeatures: RecipeInputs = {
+      ...inputs,
+      featureRanking: [
+        { titel: "Auslaufsicher bei Kohlensäure", beschreibung: "Dichtet auch Sprudel sicher ab.", relevanz: 5, kundenEcho: true },
+        { titel: "Pulverbeschichtete Oberfläche", beschreibung: "Griffig, ohne Fingerabdrücke.", relevanz: 1, kundenEcho: false },
+      ],
+    };
+    const prompt = sectionPrompt("bullets", mitFeatures);
+    expect(prompt).toContain("FEATURE-RANKING");
+    expect(prompt).toContain("Auslaufsicher bei Kohlensäure");
+    // Feature ohne Kunden-Echo landet im nachrangigen Block, nicht im Kern
+    expect(prompt).toContain("OHNE KUNDEN-ECHO");
+  });
   it("alle Sektionen liefern Payloads", async () => {
     for (const section of SECTION_ORDER) {
       const res = await generateSection(section, inputs);

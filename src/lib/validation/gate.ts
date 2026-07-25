@@ -154,6 +154,36 @@ function issue(
   return { rule, severity, message, evidence: "deterministic" };
 }
 
+/** Gängige deutsche Abkürzungen — ein Punkt danach ist kein Satzende (D203). */
+const ABKUERZUNGEN = new Set([
+  "z", "b", "ca", "bzw", "inkl", "exkl", "usw", "u", "a", "o", "ä", "ggf",
+  "evtl", "max", "min", "vgl", "etc", "nr", "abs", "d", "h", "sog", "bspw",
+  "tel", "str", "mind", "ehem", "geb", "ggfs", "zzgl", "i", "e", "v",
+]);
+
+/**
+ * Sätze zählen (D203). Ein Satzzeichen ist nur ein Satzende, wenn danach ein
+ * Leerzeichen/Textende folgt UND (beim Punkt) das Wort davor keine Abkürzung
+ * ist und ein neuer Satz beginnt (Großbuchstabe/Zitatzeichen). Punkt mitten in
+ * einer Zahl (3.660) oder nach „z. B."/„ca." zählt nicht.
+ */
+function zaehleSaetze(text: string): number {
+  let count = 0;
+  const re = /([.!?]+)(\s+|$)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m[1].includes(".") && !m[1].includes("!") && !m[1].includes("?")) {
+      const wortDavor = (text.slice(0, m.index).match(/([A-Za-zÄÖÜäöüß]+)$/)?.[1] ?? "").toLowerCase();
+      if (ABKUERZUNGEN.has(wortDavor)) continue;
+      const danach = text.slice(re.lastIndex);
+      // Satzanfang = Großbuchstabe/Ziffer/Zitat; sonst (Kleinbuchstabe) kein neuer Satz
+      if (danach && !/^[A-ZÄÖÜ0-9„“"'(»]/.test(danach)) continue;
+    }
+    count++;
+  }
+  return count;
+}
+
 // ── Keyword-Echo-Check (D181, Ulmenrinde-Befund D180) ────────────────────────
 // Rohe, kleingeschriebene Suchphrasen mitten im Text („die kot und grasfresser
 // drops hund riechen") sind das deterministisch fassbare Ende des Keyword-
@@ -387,7 +417,7 @@ export function validateBullets(bullets: string[], ctx: Ctx = {}): ValidationIss
     if (headStamm.length >= 3 && headStamm.slice(0, 3).every((w, k) => bodyStamm[k] === w))
       issues.push(issue("bullets.headline-echo-wortgleich", "error", `Bullet ${n}: Der erste Satz wiederholt die Headline wörtlich — er muss stattdessen den Feature-Beleg liefern.`));
 
-    const sentences = (t.split(":").slice(1).join(":").match(/[.!?]+/g) ?? []).length;
+    const sentences = zaehleSaetze(t.split(":").slice(1).join(":"));
     if (sentences > RULES.bullets.maxSentences)
       issues.push(issue("bullets.sentences", "warning", `Bullet ${n}: ${sentences} Sätze (max. ${RULES.bullets.maxSentences}).`));
 
@@ -477,6 +507,11 @@ export function validateDescription(description: string, bullets: string[] = [],
   if (!t) return [issue("description.empty", "error", "Beschreibung fehlt.")];
   issues.push(...pruefeZahlenTreue(t, ctx.zahlenQuellen ?? "", "description"));
   issues.push(...pruefeKeywordEcho(t, ctx.alleKeywords ?? [], "description"));
+
+  // Keine Frage-Sätze in der Beschreibung (D203): Fragen gehören in die
+  // Q&A-Sektion; hier lieferten sie zuletzt unbeantwortete Frage-Fragmente.
+  if (t.includes("?"))
+    issues.push(issue("description.frage", "error", "Beschreibung enthält Frage-Sätze (?) — hier nur Aussagesätze; Fragen gehören in die Q&A-Sektion."));
 
   const bytes = byteLength(t);
   if (bytes > RULES.description.maxBytes)

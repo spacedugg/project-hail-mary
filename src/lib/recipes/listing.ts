@@ -27,8 +27,8 @@ import { amazonDomain, marktplatzFuerSprache, SPRACH_NAMEN } from "@/lib/text/sp
  */
 
 export type ListingSection = "title" | "bullets" | "highlights" | "backend" | "description" | "qa";
-/** Ketten-Reihenfolge (D195, Nutzer 23.07.): Titel → Item Highlights (stehen im Listing direkt unterm Titel) → Bullets → Beschreibung → Backend (dedupt gegen ALLES Sichtbare) → Q&A. */
-export const SECTION_ORDER: ListingSection[] = ["title", "highlights", "bullets", "description", "backend", "qa"];
+/** Ketten-Reihenfolge (D195; Backend VOR Beschreibung ab D204, Nutzer 25.07.): Titel → Item Highlights → Bullets → Backend-Keywords → Beschreibung → Q&A. Backend dedupt damit gegen Titel/Highlights/Bullets (die Beschreibung existiert zu dem Zeitpunkt noch nicht); die Beschreibung erhält das freigegebene Backend als Vorgänger-Kontext. */
+export const SECTION_ORDER: ListingSection[] = ["title", "highlights", "bullets", "backend", "description", "qa"];
 
 export type RecipeInputs = {
   brand: string;
@@ -75,6 +75,13 @@ export type RecipeInputs = {
    * urteil „ja" = aufnehmbar · „unbekannt" = Kandidat, nur wo belegt.
    */
   wettbewerbsInfos?: Array<{ info: string; urteil: "ja" | "unbekannt"; grund: string }> | null;
+  /**
+   * Feature-Ranking (D141/D146; verdrahtet D205): die Features DES LISTINGS nach
+   * Kunden-Relevanz (Kunden-Echo aus Reviews, absteigend sortiert). Steuert,
+   * welche belegten Features als Nutzen prominent in Bullets/Beschreibung landen;
+   * Features ohne Kunden-Echo sind nachrangig (Prüf-Kandidaten, nichts erfinden).
+   */
+  featureRanking?: Array<{ titel: string; beschreibung: string; relevanz: number; kundenEcho: boolean }> | null;
 };
 
 export type TitleRationale = Array<{ part: string; source: string; verified: boolean }>;
@@ -226,6 +233,20 @@ function contextBlock(inputs: RecipeInputs): string {
           .slice(0, 6)
           .map((c) => `- ${c.titel}: ${c.beschreibung.slice(0, 160)}`)
           .join("\n")}`,
+      );
+  }
+  if (inputs.featureRanking?.length) {
+    const mitEcho = inputs.featureRanking.filter((x) => x.kundenEcho).slice(0, 6);
+    const ohneEcho = inputs.featureRanking.filter((x) => !x.kundenEcho).slice(0, 4);
+    if (mitEcho.length)
+      lines.push(
+        `FEATURE-RANKING (belegte Listing-Features nach Kunden-Relevanz, wichtigste zuerst — diese Features als Nutzen PROMINENT in Bullets/Beschreibung abbilden, das oberste zieht am stärksten):\n${mitEcho
+          .map((x) => `- ${x.titel}: ${x.beschreibung.slice(0, 160)}`)
+          .join("\n")}`,
+      );
+    if (ohneEcho.length)
+      lines.push(
+        `FEATURES OHNE KUNDEN-ECHO (im Listing vorhanden, aber in den Reviews nicht erwähnt — nachrangig, nur aufnehmen wenn Budget bleibt; nichts dazuerfinden): ${ohneEcho.map((x) => x.titel).join(" | ")}`,
       );
   }
   if (inputs.conversionBlocker?.length)
@@ -423,10 +444,10 @@ REGELN (knowledge/content/backend-keywords.md + Blog 07/2026):
     case "description":
       return `${ctx}
 
-AUFGABE: Produktbeschreibung.
+AUFGABE: Produktbeschreibung als zusammenhängender Marketing-Fließtext (2–4 Absätze) — KEIN Frage-Antwort-Schema, kein Aufzählungs-Ersatz.
 REGELN (knowledge/content/description.md):
-- Max ${RULES.description.maxBytes} Bytes. Struktur: Positionierung → Nutzenargumente mit Belegen → Einwandbehandlung → weicher CTA.
-- AEO-tauglich: typische Kundenfragen explizit beantworten (vollständige Sätze).
+- Max ${RULES.description.maxBytes} Bytes. Aufbau in fließenden Absätzen: (1) Positionierung/Einstieg — für wen und wofür; (2) Nutzenargumente, jeweils mit BELEG aus der Produkt-Wahrheit (Maß, Material, Norm, Zertifikat); (3) Einwandbehandlung (Haltbarkeit, Anwendung, Eignung) als Aussage; (4) weicher Abschluss.
+- NUR AUSSAGESÄTZE. Streng verboten: Frage-Sätze, das „Frage? Antwort."-Muster und rhetorische Fragen (kein „?"). AEO-Nutzen entsteht dadurch, dass jeder Satz eine typische Kundenfrage IMPLIZIT beantwortet — als klarer Fakt, NICHT indem die Frage gestellt wird. Beispiel: statt „Wie nehme ich die Kapseln ein? Mit viel Wasser." schreibe „Zur Einnahme genügt eine Kapsel mit reichlich Wasser."
 - BUDGET AUSNUTZEN: möglichst nah an ${RULES.description.maxBytes} Bytes (nie darüber) — maximale Datengrundlage für den Algorithmus, ohne Füllphrasen.
 - Bullets NICHT wörtlich wiederholen. TERTIARY-Keywords organisch: ${kw.tertiary.join(", ")}
 - PRODUKT-FOKUS (wird blockierend geprüft): über das Produkt und seinen Nutzen schreiben — NICHT über das Listing, die Kennzeichnung/Auszeichnung oder die Produktbilder („diese Transparenz ist uns wichtiger als …“, „ein Foto finden Sie in den Produktbildern“ sind verboten).`;
@@ -507,7 +528,7 @@ function templateDraft(section: ListingSection, inputs: RecipeInputs): Record<st
       // kleingeschriebene Phrasen scheiterten (zu Recht) am Keyword-Echo-Check.
       const tertiaer = kw.tertiary.slice(0, 5).map((k) => k.charAt(0).toUpperCase() + k.slice(1));
       return {
-        description: `${inputs.brand} ${inputs.productName}: entwickelt für ${f.targetAudience ?? "anspruchsvolle Nutzer"}. ${(f.usps ?? []).join(". ")}. Wie wird es angewendet? Einfach und ohne Vorkenntnisse.${tertiaer.length ? ` Relevante Eigenschaften: ${tertiaer.join(", ")}.` : ""} Alle Details oben im Überblick.`,
+        description: `${inputs.brand} ${inputs.productName}: entwickelt für ${f.targetAudience ?? "anspruchsvolle Nutzer"}. ${(f.usps ?? []).join(". ")}. Die Anwendung ist einfach und ohne Vorkenntnisse möglich.${tertiaer.length ? ` Relevante Eigenschaften: ${tertiaer.join(", ")}.` : ""} Alle Details oben im Überblick.`,
         rationale: [{ part: "Aufbau", source: "Positionierung → Nutzen → Q&A-Denke (Template)" }],
       };
     }
@@ -624,9 +645,10 @@ function baueErgebnis(
       // Deterministische Byte-Durchsetzung NACH dem LLM (temoa-os-Muster);
       // Satzzeichen raus (Amazon ignoriert sie — verschwendete Bytes, Blog 07/2026)
       const text = trimToBytesByWord(String(parsed.backend ?? "").replace(/[,;.!?:„“‚’"']/g, " ").replace(/\s+/g, " ").trim(), RULES.backendKeywords.maxBytes);
-      // Dedup gegen ALLES Sichtbare (D195): Backend läuft als letzte sichtbare
-      // Sektion der Kette — Titel, Highlights, Bullets und Beschreibung sind
-      // dann freigegeben und zählen als belegter Platz.
+      // Dedup gegen den sichtbaren Platz (D195; Reihenfolge D204): Backend läuft
+      // VOR der Beschreibung — Titel, Highlights und Bullets sind freigegeben und
+      // zählen als belegter Platz. Die Beschreibung existiert hier noch nicht
+      // (approved.description ist leer) und wird bewusst nicht abgewartet.
       const visible = [
         typeof inputs.approved?.title === "string" ? inputs.approved.title : "",
         typeof inputs.approved?.highlights === "string" ? inputs.approved.highlights : "",

@@ -32,13 +32,13 @@ export const dynamic = "force-dynamic";
 // 300 s ist das Maximum des Vercel-Plans; der LLM-Abbruch liegt bei 270 s.
 export const maxDuration = 300;
 
-/** Ketten-Reihenfolge (D195): Freigabe einer Sektion generiert automatisch die nächste. */
+/** Ketten-Reihenfolge (D195; Backend vor Beschreibung ab D204): Freigabe einer Sektion generiert automatisch die nächste. */
 const SECTIONS = [
   { key: "title", label: "Titel" },
   { key: "highlights", label: "Item Highlights" },
   { key: "bullets", label: "Bullet Points" },
-  { key: "description", label: "Beschreibung" },
   { key: "backend", label: "Backend-Keywords" },
+  { key: "description", label: "Beschreibung" },
   { key: "qa", label: "Q&A" },
 ] as const;
 

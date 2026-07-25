@@ -356,9 +356,9 @@ export async function approveContent(formData: FormData) {
   if (version.validation && !version.validation.passed) return;
   await db.update(schema.contentVersions).set({ status: "approved" }).where(eq(schema.contentVersions.id, versionId));
 
-  // Geführte Kette (D195): Die Freigabe ist der Taktgeber — direkt danach wird
-  // die NÄCHSTE Sektion generiert (Titel → Bullets → Highlights → Backend →
-  // Beschreibung → Q&A). Kontext sind ausschließlich Freigaben; so entstehen
+  // Geführte Kette (D195; Reihenfolge D204): Die Freigabe ist der Taktgeber —
+  // direkt danach wird die NÄCHSTE Sektion generiert (Titel → Highlights →
+  // Bullets → Backend → Beschreibung → Q&A). Kontext sind ausschließlich Freigaben; so entstehen
   // keine Wort-Dopplungen zwischen parallel gewürfelten Sektionen mehr.
   const sektionVonDbType: Record<string, ListingSection> = {
     title: "title", bullets: "bullets", item_highlights: "highlights",
@@ -518,8 +518,8 @@ export async function generateContent(formData: FormData) {
   revalidatePath(`/produkte/${productId}`);
 }
 
-/** Ketten-Reihenfolge (D195): Titel → Highlights → Bullets → Beschreibung → Backend → Q&A — Freigaben fließen als Kontext in jede Folge-Sektion. */
-const SEKTIONS_REIHENFOLGE: ListingSection[] = ["title", "highlights", "bullets", "description", "backend", "qa"];
+/** Ketten-Reihenfolge (D195; Backend vor Beschreibung ab D204): Titel → Highlights → Bullets → Backend → Beschreibung → Q&A — Freigaben fließen als Kontext in jede Folge-Sektion. */
+const SEKTIONS_REIHENFOLGE: ListingSection[] = ["title", "highlights", "bullets", "backend", "description", "qa"];
 const SEKTIONS_LABEL: Record<string, string> = {
   title: "Titel", bullets: "Bullet Points", highlights: "Item Highlights",
   backend: "Backend-Keywords", description: "Beschreibung", qa: "Q&A",
@@ -633,6 +633,22 @@ async function generiereSektionKern(
         orderBy: desc(schema.conversionBlockers.createdAt),
       });
       return blocker?.payload.cards.map((c) => ({ titel: c.titel, beschreibung: c.beschreibung })) ?? null;
+    })(),
+    // Feature-Ranking (D205): die belegten Listing-Features nach Kunden-Relevanz
+    // fließen in die Text-Generierung — bisher nur in der UI, jetzt Content-Input.
+    featureRanking: await (async () => {
+      const fr = await db.query.featureRankings.findFirst({
+        where: eq(schema.featureRankings.productId, productId),
+        orderBy: desc(schema.featureRankings.createdAt),
+      });
+      return (
+        fr?.payload.cards.map((c) => ({
+          titel: c.titel,
+          beschreibung: c.beschreibung,
+          relevanz: c.relevanz,
+          kundenEcho: c.belegAspekte.length > 0,
+        })) ?? null
+      );
     })(),
     // Übertragbare Wettbewerber-Informationen (D199): nur ja/unbekannt (nein
     // wurde im Analyse-Modul bereits verworfen) fließen als Kandidaten ein.

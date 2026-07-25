@@ -207,4 +207,5 @@ export const RECIPE_INPUT_HERKUNFT: Record<keyof RecipeInputs, string> = {
   sprache: "stammdaten",
   conversionBlocker: "reviews",
   wettbewerbsInfos: "wettbewerber-listings",
+  featureRanking: "reviews",
 };
