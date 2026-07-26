@@ -1,6 +1,7 @@
 import { resolveRecipe } from "@/lib/llm/registry";
 import { parseLlmJson } from "@/lib/llm/json";
 import { BILD_TYPEN, BILD_TYP_KRITERIUM, BILD_TYP_LABELS, istBildTyp, type BildTyp } from "./bildTypen";
+import { bildContentBlocks, visionCall, visionUrls } from "./bildVision";
 
 /**
  * Bild-Auslese + Bild-Audit (D158, Nutzer-Vorgabe 22.07.): Galeriebilder
@@ -48,27 +49,10 @@ export function normalisiereBildAuslese(raw: unknown, anzahlBilder: number): Bil
   return { bilder, befunde: strs(o.befunde).slice(0, 12) };
 }
 
-const SYSTEM =
-  "Du liest Amazon-Listing-Bilder aus. NUR beschreiben und wortwörtlich abtippen, was sichtbar ist — nichts deuten, " +
-  "nichts ergänzen, keine Geschmacksurteile. Antworte AUSSCHLIESSLICH mit validem JSON.";
-
-const MAX_BILDER = 9;
-
-export async function leseBilderAus(imageUrls: string[], sprache = "de"): Promise<BildAusleseErgebnis | null> {
-  const urls = imageUrls.filter((u) => u.startsWith("https://")).slice(0, MAX_BILDER);
-  if (urls.length === 0) return null;
-  const { provider, model } = resolveRecipe("listing.bild-auslese");
-  if (provider.name !== "anthropic" || !process.env.ANTHROPIC_API_KEY) return null; // kein Mock — ehrlich „nicht ausgelesen"
-
-  type Block = { type: string; [k: string]: unknown };
-  const content: Block[] = urls.flatMap((url, i) => [
-    { type: "text", text: `BILD ${i + 1}${i === 0 ? " (HAUPTBILD)" : ""}:` },
-    { type: "image", source: { type: "url", url } },
-  ]);
+/** Aufgaben-Text (nach den Bildern, nicht gecacht): beschreiben + Typ zuordnen, KEIN Urteil. */
+function ausleseAufgabe(anzahl: number, sprache: string): string {
   const typListe = BILD_TYPEN.map((t) => `"${t}" (${BILD_TYP_LABELS[t]}): ${BILD_TYP_KRITERIUM[t]}`).join("\n");
-  content.push({
-    type: "text",
-    text: `AUFGABE: Lies die ${urls.length} Listing-Bilder oben aus (Antwort-Sprache "${sprache}").
+  return `AUFGABE: Lies die ${anzahl} Listing-Bilder oben aus (Antwort-Sprache "${sprache}").
 Je Bild:
 · typ = GENAU EINER dieser Bildtypen (Klassifikation, kein Urteil):
 ${typListe}
@@ -77,18 +61,18 @@ ${typListe}
 · claims = im Bild behauptete Produkt-Aussagen (nur was da steht/gezeigt wird)
 KEINE Urteile, KEINE Regel- oder Verstoß-Bewertungen, KEINE Stil-Kommentare — nur beschreiben, abtippen und den Typ zuordnen.
 JSON-Schema:
-{"bilder":[{"slot":1,"typ":"main_image","textImBild":["..."],"inhalt":"...","claims":["..."]}]}`,
-  });
+{"bilder":[{"slot":1,"typ":"main_image","textImBild":["..."],"inhalt":"...","claims":["..."]}]}`;
+}
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({ model, max_tokens: 8000, system: SYSTEM, messages: [{ role: "user", content }] }),
-    signal: AbortSignal.timeout(120_000),
-  });
-  if (!res.ok) throw new Error(`Bildanalyse: Anthropic ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  const data = (await res.json()) as { content: Array<{ type: string; text?: string }> };
-  const text = data.content.filter((b) => b.type === "text").map((b) => b.text ?? "").join("");
+export async function leseBilderAus(imageUrls: string[], sprache = "de"): Promise<BildAusleseErgebnis | null> {
+  const urls = visionUrls(imageUrls);
+  if (urls.length === 0) return null;
+  const { provider, model } = resolveRecipe("listing.bild-auslese");
+  if (provider.name !== "anthropic" || !process.env.ANTHROPIC_API_KEY) return null; // kein Mock — ehrlich „nicht ausgelesen"
+
+  // Gemeinsamer Bild-Prefix (gecacht) + Aufgaben-Text danach; der Audit-Call
+  // nutzt denselben Prefix und liest ihn aus dem Cache.
+  const text = await visionCall({ model, blocks: bildContentBlocks(urls), aufgabe: ausleseAufgabe(urls.length, sprache) });
   return normalisiereBildAuslese(parseLlmJson(text), urls.length);
 }
 

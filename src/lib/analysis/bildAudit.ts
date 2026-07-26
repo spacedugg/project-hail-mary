@@ -1,5 +1,6 @@
 import { resolveRecipe } from "@/lib/llm/registry";
 import { parseLlmJson } from "@/lib/llm/json";
+import { bildContentBlocks, visionCall, visionUrls } from "./bildVision";
 
 /**
  * Bild-Audit (D211) — 4-Faktoren-Einschätzung der BESTEHENDEN Listing-Bilder.
@@ -97,12 +98,6 @@ export function schwaechstesBildProFaktor(audit: BildAuditErgebnis): Partial<Rec
   return out;
 }
 
-const SYSTEM =
-  "Du bist Senior-Amazon-Bild-Art-Director und bewertest Listing-Bilder ehrlich und kundentauglich. " +
-  "Du bewertest NUR anhand des sichtbaren Bildes — nichts erfinden. Antworte AUSSCHLIESSLICH mit validem JSON.";
-
-const MAX_BILDER = 9;
-
 function buildPrompt(anzahl: number, sprache: string, ausleseText?: string): string {
   const dims = AUDIT_DIMENSIONEN.map((d) => `"${d}" (${AUDIT_LABELS[d]}): ${AUDIT_KRITERIUM[d]}`).join("\n");
   return `AUFGABE: Bewerte die ${anzahl} Listing-Bilder oben (Antwort-Sprache "${sprache}").
@@ -117,26 +112,12 @@ JSON-Schema:
 }
 
 export async function auditBilder(imageUrls: string[], sprache = "de", ausleseText?: string): Promise<BildAuditErgebnis | null> {
-  const urls = imageUrls.filter((u) => u.startsWith("https://")).slice(0, MAX_BILDER);
+  const urls = visionUrls(imageUrls);
   if (urls.length === 0) return null;
   const { provider, model } = resolveRecipe("listing.bild-audit");
   if (provider.name !== "anthropic" || !process.env.ANTHROPIC_API_KEY) return null; // kein Mock — ehrlich „nicht bewertet"
 
-  type Block = { type: string; [k: string]: unknown };
-  const content: Block[] = urls.flatMap((url, i) => [
-    { type: "text", text: `BILD ${i + 1}${i === 0 ? " (HAUPTBILD)" : ""}:` },
-    { type: "image", source: { type: "url", url } },
-  ]);
-  content.push({ type: "text", text: buildPrompt(urls.length, sprache, ausleseText) });
-
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({ model, max_tokens: 8000, system: SYSTEM, messages: [{ role: "user", content }] }),
-    signal: AbortSignal.timeout(120_000),
-  });
-  if (!res.ok) throw new Error(`Bild-Audit: Anthropic ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  const data = (await res.json()) as { content: Array<{ type: string; text?: string }> };
-  const text = data.content.filter((b) => b.type === "text").map((b) => b.text ?? "").join("");
+  // Identischer Bild-Prefix wie die Auslese → wird aus dem Cache gelesen statt neu übertragen.
+  const text = await visionCall({ model, blocks: bildContentBlocks(urls), aufgabe: buildPrompt(urls.length, sprache, ausleseText) });
   return normalisiereBildAudit(parseLlmJson(text), urls.length);
 }
