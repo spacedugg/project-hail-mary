@@ -1942,14 +1942,29 @@ async function importListingKern(db: Awaited<ReturnType<typeof getDb>>, product:
     raw: snap!.raw,
   });
 
-  // Bild-Auslese (D158): automatisch, kein Extra-Schritt —
-  // scheitert sie, bleibt der Import gültig (null = ehrlich „nicht ausgelesen")
+  // Bild-Auslese (D158) + Bild-Audit (D211): automatisch beim Import, KEIN
+  // Extra-Schritt und kein Knopf — es kommen einfach mehr Analyse-Daten heraus.
+  // Scheitert es, bleibt der Import gültig (null = ehrlich „nicht ausgelesen/bewertet").
   try {
-    const { leseBilderAus } = await import("@/lib/analysis/bildAuslese");
+    const { leseBilderAus, bilderAlsText } = await import("@/lib/analysis/bildAuslese");
     const auslese = await leseBilderAus(snap!.imageUrls, product.contentSprache);
     if (auslese) {
+      // 4-Faktoren-Audit der bestehenden Bilder — je Bild in bilderText gemergt.
+      let bilder = auslese.bilder;
+      try {
+        const { auditBilder } = await import("@/lib/analysis/bildAudit");
+        const audit = await auditBilder(snap!.imageUrls, product.contentSprache, bilderAlsText(auslese.bilder));
+        if (audit) {
+          bilder = auslese.bilder.map((b) => {
+            const a = audit.bilder.find((x) => x.slot === b.slot);
+            return a ? { ...b, faktoren: a.faktoren } : b;
+          });
+        }
+      } catch {
+        // Audit ist Zusatz-Analyse, kein Blocker für den Import
+      }
       await db.update(schema.listingSnapshots)
-        .set({ bilderText: auslese.bilder, bildBefunde: auslese.befunde })
+        .set({ bilderText: bilder, bildBefunde: auslese.befunde })
         .where(eq(schema.listingSnapshots.id, snapId));
     }
   } catch {
