@@ -176,9 +176,14 @@ export function AnalyseStart({
       className="mt-4 space-y-4"
     >
       <div>
-        <h3 className="text-sm font-semibold">Reviews</h3>
+        <h3 className="text-sm font-semibold">Vergleichs-ASINs</h3>
+        <p className="mt-0.5 text-xs text-muted">
+          Deine Produkt-ASIN ist vorbelegt. Trag hier zusätzlich die ASINs direkter Wettbewerber ein — genau
+          diese Eintragung meint die Analyse-Checkliste. Sie fließen in die Bewertungs-Analyse <b>und</b> in den
+          Wettbewerber-Listing-Abgleich („fehlende Infos"). Ohne Zusatz-ASIN läuft der Abgleich nicht.
+        </p>
         <div className="mt-2">
-          <AsinChips name="asins" mainAsin={mainAsin} placeholder="Weitere ASIN eingeben …" />
+          <AsinChips name="asins" mainAsin={mainAsin} placeholder="Wettbewerber-ASIN eingeben …" />
         </div>
       </div>
       {!nurAnalyse && (
