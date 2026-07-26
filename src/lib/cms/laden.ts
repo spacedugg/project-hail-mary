@@ -47,6 +47,10 @@ export type CmsProdukt = {
   id: string;
   name: string;
   asin: string | null;
+  /** Aktueller Listing-Titel (live gecrawlt, sonst unser Soll-Titel) — null, wenn noch nichts geladen. */
+  liveTitle: string | null;
+  /** Hauptbild fürs Katalog-Thumbnail (live gecrawlt, sonst freigegebenes Soll-Bild) — null = keins da. */
+  bildUrl: string | null;
   marketplace: Marketplace;
   /** Amazon-Produkttyp-Token (nicht die menschliche Beschreibung aus den Fakten). */
   productType: string | null;
@@ -261,6 +265,9 @@ export async function ladeMarkenCms(brandId: string): Promise<MarkenCms | null> 
       id: p.id,
       name: p.name,
       asin: p.asin,
+      // Live-Stand hat Vorrang (das steht wirklich auf Amazon); sonst unser Soll.
+      liveTitle: snapshot?.title?.trim() || soll.title || null,
+      bildUrl: snapshot?.imageUrls?.[0] || soll.mainImageUrl || null,
       marketplace: p.marketplace,
       productType: p.amazonProductType?.trim() || null,
       produktartText: p.facts.productType ?? null,

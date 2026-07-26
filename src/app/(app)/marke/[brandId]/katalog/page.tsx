@@ -112,16 +112,33 @@ export default async function BrandKatalog({
               {cms.produkte.map((p) => {
                 const wartet = freigaben.filter((f) => f.productId === p.id).length;
                 const bereit = publishBereit(p.publishIssues);
+                const titel = p.liveTitle ?? (p.name && p.name !== p.asin ? p.name : null);
                 return (
-                  <tr key={p.id} className="border-b border-hair/60 last:border-0">
+                  // Ganze Zeile klickbar (D…): der Titel-Link spannt per ::after über die
+                  // Zeile (tr = relative). Aktionen rechts liegen mit z-10 darüber.
+                  <tr key={p.id} className="group relative border-b border-hair/60 transition-colors last:border-0 hover:bg-[var(--primary-soft)]">
                     <td className="py-3 pl-5 pr-3">
-                      <Link href={`/produkte/${p.id}`} className="font-medium hover:underline">{p.name}</Link>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted">
-                        {p.asin ? <span className="font-mono">{p.asin}</span> : <span className="text-warn">ohne ASIN</span>}
-                        <span>{p.marketplace.toUpperCase()}</span>
-                        {p.skuIstNotbehelf && <span className="pill pill-warn">SKU fehlt</span>}
-                        {!p.productType && <span className="pill pill-warn">Produkttyp fehlt</span>}
-                        {p.sollAusIst > 0 && <span className="pill pill-neutral">{p.sollAusIst}× nur Ausgangs-Stand</span>}
+                      <div className="flex items-center gap-3">
+                        {p.bildUrl ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={p.bildUrl} alt="" className="h-11 w-11 flex-none rounded-lg border border-hair bg-white object-contain" />
+                        ) : (
+                          <div className="grid h-11 w-11 flex-none place-items-center rounded-lg border border-hair bg-neutral-100 text-xs text-muted dark:bg-neutral-800">–</div>
+                        )}
+                        <div className="min-w-0">
+                          <Link href={`/produkte/${p.id}`} className="font-mono text-[13px] font-medium after:absolute after:inset-0 group-hover:underline">
+                            {p.asin ?? <span className="font-sans text-warn">ohne ASIN</span>}
+                          </Link>
+                          <div className="mt-0.5 truncate text-[12px] text-muted">
+                            {titel ?? <span className="italic">Titel folgt nach Listing-Import</span>}
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted">
+                            <span>{p.marketplace.toUpperCase()}</span>
+                            {p.skuIstNotbehelf && <span className="pill pill-warn">SKU fehlt</span>}
+                            {!p.productType && <span className="pill pill-warn">Produkttyp fehlt</span>}
+                            {p.sollAusIst > 0 && <span className="pill pill-neutral">{p.sollAusIst}× nur Ausgangs-Stand</span>}
+                          </div>
+                        </div>
                       </div>
                     </td>
                     <td className="py-3 pr-3 tabular-nums">
@@ -155,7 +172,7 @@ export default async function BrandKatalog({
                       <span className={bereit ? "pill pill-good" : "pill pill-bad"}>{bereit ? "bereit" : "blockiert"}</span>
                     </td>
                     <td className="py-3 pr-3">
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="relative z-10 flex w-fit flex-wrap gap-1.5">
                         {wartet > 0 && (
                           <Link href={`/marke/${brandId}/publish`} className="pill pill-warn">{wartet}× Freigabe</Link>
                         )}
@@ -166,8 +183,7 @@ export default async function BrandKatalog({
                       </div>
                     </td>
                     <td className="py-3 pr-5 text-right">
-                      <div className="flex items-center justify-end gap-3">
-                        <Link href={`/produkte/${p.id}`} className="text-xs text-primary-strong hover:underline">öffnen →</Link>
+                      <div className="relative z-10 flex items-center justify-end">
                         <LoeschButton
                           action={deleteProductAction}
                           felder={{ productId: p.id }}
