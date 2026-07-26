@@ -3,11 +3,13 @@ import { bilderAlsText, leseBilderAus, normalisiereBildAuslese } from "./bildAus
 
 /** D158: Bild-Auslese — Struktur erzwungen, nichts Erfundenes. */
 describe("normalisiereBildAuslese", () => {
-  it("übernimmt gültige Slots, klemmt und dedupliziert", () => {
+  it("übernimmt gültige Slots, erzwingt das Typ-Enum, klemmt und dedupliziert", () => {
     const res = normalisiereBildAuslese(
       {
         bilder: [
-          { slot: 1, textImBild: ["STOPPT GRASFRESSEN", ""], inhalt: " Produktdose auf Weiß ", claims: ["hilft bei Sodbrennen"] },
+          { slot: 1, typ: "MAIN_IMAGE", textImBild: ["STOPPT GRASFRESSEN", ""], inhalt: " Produktdose auf Weiß ", claims: ["hilft bei Sodbrennen"] },
+          { slot: 2, typ: "lifestyle_in_use", textImBild: [], inhalt: "Hund auf Wiese", claims: [] },
+          { slot: 3, typ: "phantasie-typ", textImBild: [], inhalt: "unklarer Typ", claims: [] },
           { slot: 1, textImBild: [], inhalt: "Duplikat", claims: [] },
           { slot: 99, inhalt: "gibt es nicht", textImBild: [], claims: [] },
           { slot: "kaputt", inhalt: "x" },
@@ -15,9 +17,21 @@ describe("normalisiereBildAuslese", () => {
       },
       7,
     );
-    expect(res.bilder).toHaveLength(1);
-    expect(res.bilder[0]).toEqual({ slot: 1, textImBild: ["STOPPT GRASFRESSEN"], inhalt: "Produktdose auf Weiß", claims: ["hilft bei Sodbrennen"] });
+    expect(res.bilder).toHaveLength(3);
+    // Groß-/Kleinschreibung normalisiert, Enum durchgesetzt
+    expect(res.bilder[0]).toEqual({ slot: 1, typ: "main_image", textImBild: ["STOPPT GRASFRESSEN"], inhalt: "Produktdose auf Weiß", claims: ["hilft bei Sodbrennen"] });
+    expect(res.bilder[1].typ).toBe("lifestyle_in_use");
+    expect(res.bilder[2].typ).toBeNull(); // ungültiger Typ auf Slot>1 → ehrlich null, nichts geraten (D209)
     expect(res.befunde).toEqual([]); // Regel-Urteile abgeschafft (D165)
+  });
+
+  it("Slot 1 ist auf Amazon garantiert das Hauptbild → main_image auch ohne/mit ungültigem Label", () => {
+    const res = normalisiereBildAuslese(
+      { bilder: [{ slot: 1, textImBild: [], inhalt: "Freisteller", claims: [] }, { slot: 4, typ: "quatsch", textImBild: [], inhalt: "y", claims: [] }] },
+      7,
+    );
+    expect(res.bilder[0].typ).toBe("main_image");
+    expect(res.bilder[1].typ).toBeNull(); // Slot > 1 wird NICHT geraten
   });
 
   it("kaputte Antwort → leer, nichts geraten", () => {
@@ -30,6 +44,11 @@ describe("bilderAlsText — Quelle Bilder für Ranking/Wahrheits-Filter", () => 
     const t = bilderAlsText([{ slot: 2, textImBild: ["2 TROPFEN / 5 KG"], inhalt: "Dosierungs-Infografik", claims: ["einfache Dosierung"] }]);
     expect(t).toBe("Bild 2: Dosierungs-Infografik — Text im Bild: 2 TROPFEN / 5 KG — Claims: einfache Dosierung");
     expect(bilderAlsText(null)).toBe("");
+  });
+
+  it("nimmt den Bildtyp als Label mit auf, wenn vorhanden (D209)", () => {
+    const t = bilderAlsText([{ slot: 1, typ: "main_image", textImBild: [], inhalt: "Freisteller auf Weiß", claims: [] }]);
+    expect(t).toBe("Bild 1 [Main Image]: Freisteller auf Weiß");
   });
 });
 
