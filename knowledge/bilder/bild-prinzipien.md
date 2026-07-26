@@ -6,15 +6,18 @@
 > Es gibt darin **keine Negativbeispiele** — die Referenzen sind der Kalibrier-Anker,
 > nicht Prüfobjekte.
 >
-> **Zweck & Abgrenzung (Nutzer-Entscheidung, verbindlich).**
-> - Dieses Wissen dient **zwei** Zwecken: (a) den erkannten **Bildinhalt eines bestehenden
->   Listings als Daten-Input** in die Text-Erstellung zu geben (wie Bullets/Titel), und
->   (b) der **Briefing-Erstellung** eine Grundlage zu geben, was ein gutes Listing-Bild
->   ausmacht.
-> - **Wir erstellen KEIN Qualitäts-/Eye-catcher-Audit eines zu optimierenden Listings.**
->   Für bestehende Bilder gilt: **erkennen (Daten), nicht bewerten.** Die
->   Bewertungs-Dimensionen unten sind **Briefing-Wissen**, keine Audit-Achsen für
->   Fremd-Listings.
+> **Zweck & Abgrenzung (Nutzer-Entscheidung, verbindlich — revidiert D211).**
+> - Dieses Wissen dient **drei** Zwecken: (a) den erkannten **Bildinhalt eines bestehenden
+>   Listings als Daten-Input** in die Text-Erstellung zu geben (wie Bullets/Titel), (b) eine
+>   **4-Faktoren-Einschätzung der bestehenden Bilder** zu liefern (Achse C — Design & Image
+>   Quality / Perceived Value / Message Strength / Message Clarity, je mit „was wir sehen /
+>   warum / wie besser"), damit vor der Optimierung sichtbar ist, welche Bilder am schwächsten
+>   sind und weshalb, und (c) der **Briefing-Erstellung** die Grundlage zu geben, was ein gutes
+>   Listing-Bild ausmacht.
+> - Die 4-Faktoren-Analyse läuft **automatisch als Schritt von „Listing laden"** — kein
+>   Extra-Schritt, kein Knopf, keine eigene UI; sie liefert einfach zusätzliche Analyse-Daten.
+> - **KEINE separate Eye-catcher-Analyse eines Fremd-Listings** (das ginge zu weit). Achse B
+>   (Eye-catcher) bleibt reines **Briefing-Wissen**.
 > - Keine Mindestmengen, keine „jeder Typ muss vorkommen"-Regel. Labels sind Verständnis,
 >   kein Gate (vgl. D165/D209).
 
@@ -68,11 +71,13 @@ gegen den weißen Hintergrund kontrastiert, ist selbst ein Eye-catcher-Element (
 
 ---
 
-## Achse C — Merkmale guter Bilder (Briefing-Wissen, kein Fremd-Audit)
+## Achse C — Die vier Bewertungs-Dimensionen (Fremd-Audit UND Briefing-Wissen)
 
-Vier Dimensionen, an denen sich Bildqualität festmachen lässt — hier als **Zielbild fürs
-Briefing**, nicht als Bewertung bestehender Listings. Handwerk und Botschaft sind bewusst
-getrennt:
+Vier Dimensionen, an denen sich Bildqualität festmachen lässt. Sie dienen **doppelt**:
+(1) als **4-Faktoren-Einschätzung der bestehenden Listing-Bilder** (je Bild ein Score 0–5
+plus „was wir sehen / warum / wie besser") — automatisch beim Listing-Import, damit die
+schwächsten Bilder/Faktoren sichtbar werden; und (2) als **Zielbild fürs Briefing**.
+Handwerk und Botschaft sind bewusst getrennt:
 
 - **Design & Image Quality** — Komposition, Hierarchie, Ausrichtung, konsistentes Farbschema,
   Studio-Licht. Nicht überladen (Elemente konkurrieren nicht um Aufmerksamkeit).
@@ -109,9 +114,13 @@ allein Spreu von Weizen.
 
 ## Anschluss an das Tool (Datenfluss)
 
-- **Bestehendes Listing:** `bildAuslese` (D158) erkennt je Bild Text-im-Bild, Claims, Inhalt
-  und **Typ** (D209). Dieser erkannte **Inhalt ist Daten-Input** für die Text-Erstellung —
-  wie Bullets/Titel, über die Quelle „Bilder" (Datenfluss-Register, D133/D205). Kein Dead End.
+- **Bestehendes Listing (automatisch beim Import, ein Schritt von „Listing laden"):**
+  `bildAuslese` (D158) erkennt je Bild Text-im-Bild, Claims, Inhalt und **Typ** (D209); der
+  Bild-Audit (Achse C) ergänzt je Bild die **4 Faktoren + Warum**. Beides ist reine
+  Analyse-Daten-Ausgabe — kein Knopf, keine eigene UI.
+- **Daten-Input:** der erkannte **Bildinhalt ist Input** für die Text-Erstellung — wie
+  Bullets/Titel, über die Quelle „Bilder" (Datenfluss-Register, D133/D205). Kein Dead End.
 - **Briefing:** dieses Wissen (Achsen A–C + Prinzipien) ist die Grundlage, auf der Briefings
-  entstehen — zusammen mit dem erkannten Ist-Bildinhalt des Listings.
-- **Ausdrücklich nicht:** kein Qualitäts-/Eye-catcher-Audit bestehender Fremd-Bilder.
+  entstehen — zusammen mit dem erkannten Ist-Bildinhalt und der 4-Faktoren-Einschätzung.
+- **Ausdrücklich nicht:** keine separate Eye-catcher-Analyse bestehender Fremd-Bilder
+  (Achse B ist Briefing-Wissen).
