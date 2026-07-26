@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assessableDims, bildDimension, enforceDeepAudit, istDeutsch, pruefeAuditBehauptungen, type DeepAuditInput } from "./deepAudit";
+import { assessableDims, enforceDeepAudit, istDeutsch, pruefeAuditBehauptungen, type DeepAuditInput } from "./deepAudit";
 import type { DeepAuditPayload, ReviewInsightsPayload } from "@/db/schema";
 
 const ri: ReviewInsightsPayload = {
@@ -27,29 +27,30 @@ const base: DeepAuditInput = {
 };
 
 describe("assessableDims — der Code bestimmt, was bewertbar ist", () => {
-  it("nur Dimensionen mit Daten; aplus nie", () => {
+  it("nur schätzbare Dimensionen (D214): title/bullets/description/reviews", () => {
     const dims = assessableDims(base);
-    expect([...dims].sort()).toEqual(["bullets", "images", "reviews", "title"]);
+    expect([...dims].sort()).toEqual(["bullets", "reviews", "title"]); // base ohne description
   });
 
-  it("Beschreibung/Backend/Preis kommen mit Daten dazu", () => {
+  it("Beschreibung kommt mit Daten dazu; backend/images/aplus/price NIE (nicht aus Scrape schätzbar, D214)", () => {
     const dims = assessableDims({ ...base, description: "Lange Beschreibung", backendKeywords: "kw1 kw2", priceEur: 29.9 });
     expect(dims.has("description")).toBe(true);
-    expect(dims.has("backend")).toBe(true);
-    expect(dims.has("price")).toBe(true);
+    expect(dims.has("backend")).toBe(false);
+    expect(dims.has("images")).toBe(false);
+    expect(dims.has("price")).toBe(false);
     expect(dims.has("aplus")).toBe(false);
   });
 });
 
 describe("enforceDeepAudit — LLM generiert, Code erzwingt", () => {
-  it("verwirft Scores für nicht bewertbare Dimensionen (kein Fassaden-Score)", () => {
-    const dims = assessableDims(base); // ohne description/price/aplus
+  it("erzeugt keine nicht-schätzbaren Dimensionen (D214: aplus/price/backend/images fliegen ganz raus)", () => {
+    const dims = assessableDims(base);
     const out = enforceDeepAudit(
       {
         derived: { usps: ["hält 24h kalt"], zielgruppe: "Pendler", positionierung: "Arbeitstier" },
         dimensions: [
           { key: "title", label: "x", score10: 7, aktuell: "ok", probleme: [], empfehlung: "" },
-          // LLM behauptet eine Bewertung für A+ und Preis — muss rausfliegen:
+          // LLM behauptet Bewertungen für A+/Preis — die dürfen gar nicht erst erscheinen:
           { key: "aplus", label: "x", score10: 9, aktuell: "erfunden", probleme: [], empfehlung: "" },
           { key: "price", label: "x", score10: 2, aktuell: "erfunden", probleme: [], empfehlung: "" },
         ],
@@ -57,20 +58,21 @@ describe("enforceDeepAudit — LLM generiert, Code erzwingt", () => {
       },
       dims,
     );
-    const byKey = Object.fromEntries(out.dimensions.map((d) => [d.key, d]));
-    expect(byKey.title.score10).toBe(7);
-    expect(byKey.aplus.score10).toBeNull();
-    expect(byKey.price.score10).toBeNull();
-    expect(byKey.aplus.aktuell).toContain("noch");
+    const keys = out.dimensions.map((d) => d.key);
+    expect(keys).not.toContain("aplus");
+    expect(keys).not.toContain("price");
+    expect(keys).not.toContain("images");
+    expect(keys).not.toContain("backend");
+    expect(out.dimensions.find((d) => d.key === "title")!.score10).toBe(7);
   });
 
-  it("klemmt Scores auf 0–10 und liefert immer alle 8 Dimensionen in fester Reihenfolge", () => {
+  it("klemmt Scores auf 0–10 und liefert die vier schätzbaren Dimensionen in fester Reihenfolge", () => {
     const out = enforceDeepAudit(
       { dimensions: [{ key: "title", label: "x", score10: 42, aktuell: "", probleme: [], empfehlung: "" }] },
       assessableDims(base),
     );
-    expect(out.dimensions).toHaveLength(8);
-    expect(out.dimensions.map((d) => d.key)).toEqual(["title", "bullets", "description", "backend", "images", "aplus", "reviews", "price"]);
+    expect(out.dimensions).toHaveLength(4);
+    expect(out.dimensions.map((d) => d.key)).toEqual(["title", "bullets", "description", "reviews"]);
     expect(out.dimensions[0].score10).toBe(10);
   });
 
@@ -134,26 +136,6 @@ describe("enforceDeepAudit — LLM generiert, Code erzwingt", () => {
     expect(out.dimensions.find((d) => d.key === "title")!.probleme).toEqual([]);
     const out2 = pruefeAuditBehauptungen(payload, { ...base, title: "Trinkflasche 1L Glas" });
     expect(out2.dimensions.find((d) => d.key === "title")!.probleme).toHaveLength(1);
-  });
-
-  it("bildDimension (D126/D208): ≥7 = Slot-Minimum erfüllt, mehr nie Abzug, ehrliche Grenzen", () => {
-    const sieben = bildDimension(7);
-    expect(sieben.score10).toBe(10);
-    expect(sieben.probleme).toEqual([]);
-    const neun = bildDimension(9); // MEHR als 7 → weiterhin 10, kein Abzug
-    expect(neun.score10).toBe(10);
-    expect(neun.probleme).toEqual([]);
-    const fuenf = bildDimension(5);
-    expect(fuenf.score10).toBeLessThan(10);
-    expect(fuenf.probleme[0]).toContain("5 von 7");
-    // D208: Slot-Zählung ist eine Vollständigkeits-Prüfung, KEINE Qualitätsnote.
-    expect(sieben.aktuell).toContain("KEINE Qualitätsnote");
-    // D208: nicht mehr behaupten, das Tool könne Bildinhalte nicht sehen (D158 liest sie aus).
-    expect(sieben.aktuell).not.toMatch(/nicht (sehen|erfass)/i);
-    expect(sieben.aktuell).toContain("liest das Tool bereits aus");
-    // D208: „fehlt" nur unter Video-Vorbehalt — ein Video kann einen Slot ersetzen.
-    expect(fuenf.probleme[0]).toContain("Produktvideo");
-    expect(fuenf.empfehlung).toContain("Produktvideo");
   });
 
   it("begrenzt Listen (USPs ≤ 6, topActions ≤ 5, Probleme ≤ 4)", () => {

@@ -53,13 +53,9 @@ export function ListingKontrolle({
     );
   };
 
-  const textSektionen: Array<{ key: "title" | "bullets" | "description" | "backend"; live: boolean }> = [
-    { key: "title", live: true },
-    { key: "bullets", live: true },
-    { key: "description", live: true },
-    { key: "backend", live: false },
-  ];
-  const labelFuer: Record<string, string> = { title: "Titel", bullets: "Bullet Points", description: "Beschreibung", backend: "Backend-Keywords" };
+  // D214: nur was der Scrape wirklich hergibt — Backend ist von außen unsichtbar, raus.
+  const textSektionen: Array<"title" | "bullets" | "description"> = ["title", "bullets", "description"];
+  const labelFuer: Record<string, string> = { title: "Titel", bullets: "Bullet Points", description: "Beschreibung" };
 
   return (
     <div className="mt-4 space-y-4">
@@ -104,18 +100,17 @@ export function ListingKontrolle({
       {/* Sektionen im Detail (D126): Richtlinien-Score + KI-Befund + Live-Abgleich */}
       <div>
         <p className="text-xs text-muted">
-          Basis: Titel {quelleText(quellen.title)} · Bullets {quelleText(quellen.bullets)} · Beschreibung {quelleText(quellen.description)} ·
-          Backend {quelleText(quellen.backendKeywords)} — Entwürfe zählen nicht.
+          Basis: Titel {quelleText(quellen.title)} · Bullets {quelleText(quellen.bullets)} · Beschreibung {quelleText(quellen.description)} — Entwürfe zählen nicht.
         </p>
         <div className="stagger mt-2 grid gap-3 lg:grid-cols-2">
-          {textSektionen.map(({ key, live }) => {
+          {textSektionen.map((key) => {
             const det = detByKey[key];
             const ki = kiByKey[key];
             return (
               <div key={key} className="rounded-xl border border-hair p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold">{labelFuer[key]}</h3>
-                  {live ? liveBadge(key as "title" | "bullets" | "description", sektionSoll[key as "title" | "bullets" | "description"]) : <span className="pill pill-neutral" title="Backend-Keywords sind von außen nicht sichtbar — kein Live-Abgleich möglich.">live nicht sichtbar</span>}
+                  {liveBadge(key, sektionSoll[key])}
                 </div>
                 {det?.measured ? (
                   <div className="mt-2">
@@ -157,43 +152,32 @@ export function ListingKontrolle({
           })}
         </div>
 
-        {/* Weitere Dimensionen: Bilder, A+, Bewertungs-Basis, Preis */}
-        {deepAudit && (
-          <div className="stagger mt-3 grid gap-3 lg:grid-cols-2">
-            {(["images", "aplus", "reviews", "price"] as const).map((key) => {
-              const d = kiByKey[key];
-              if (!d) return null;
-              return (
-                <div key={key} className="rounded-xl border border-hair p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-sm font-medium">{d.label}</h3>
-                    {d.score10 !== null ? (
-                      <span className={`text-lg font-semibold tabular-nums ${d.score10 >= 8 ? "text-emerald-600" : d.score10 >= 5 ? "text-amber-600" : "text-red-600"}`}>
-                        {fmt1(d.score10)}<span className="text-xs font-normal text-neutral-400">/10</span>
-                      </span>
-                    ) : (
-                      <span className="pill pill-neutral">nicht bewertbar</span>
-                    )}
-                  </div>
-                  {d.score10 !== null && (
-                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-hair">
-                      <div className={`bar-fill h-full rounded-full ${d.score10 >= 8 ? "bg-emerald-500" : d.score10 >= 5 ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${d.score10 * 10}%` }} />
-                    </div>
-                  )}
-                  {d.aktuell && <p className="mt-2 text-xs text-neutral-600 dark:text-neutral-400">{d.aktuell}</p>}
-                  {d.probleme.length > 0 && (
-                    <ul className="mt-2 space-y-0.5">
-                      {d.probleme.map((p, i) => <li key={i} className="text-xs text-bad">✕ {p}</li>)}
-                    </ul>
-                  )}
-                  {d.empfehlung && <p className="mt-2 text-xs"><b>→</b> {d.empfehlung}</p>}
+        {/* Bewertungsbasis (D214): einzige zusätzliche schätzbare Scrape-Dimension, bewusst knapp gehalten. */}
+        {(() => {
+          const d = kiByKey["reviews"];
+          if (!d || (d.score10 === null && !d.aktuell)) return null;
+          return (
+            <div className="mt-3 rounded-xl border border-hair p-4">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-medium">{d.label}</h3>
+                {d.score10 !== null && (
+                  <span className={`text-lg font-semibold tabular-nums ${d.score10 >= 8 ? "text-emerald-600" : d.score10 >= 5 ? "text-amber-600" : "text-red-600"}`}>
+                    {fmt1(d.score10)}<span className="text-xs font-normal text-neutral-400">/10</span>
+                  </span>
+                )}
+              </div>
+              {d.score10 !== null && (
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-hair">
+                  <div className={`bar-fill h-full rounded-full ${d.score10 >= 8 ? "bg-emerald-500" : d.score10 >= 5 ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${d.score10 * 10}%` }} />
                 </div>
-              );
-            })}
-          </div>
-        )}
+              )}
+              {d.aktuell && <p className="mt-2 line-clamp-2 text-xs text-neutral-600 dark:text-neutral-400">{d.aktuell}</p>}
+              {d.empfehlung && <p className="mt-1.5 text-xs"><b>→</b> {d.empfehlung}</p>}
+            </div>
+          );
+        })()}
         {deepAudit && (
-          <p className="mt-2 text-[11px] text-muted">Datenbasis: {deepAudit.dataBasis.join(" · ")} · KI-Bewertung vom {deepAudit.createdAt.toLocaleDateString("de-DE")}</p>
+          <p className="mt-2 text-[11px] text-muted">KI-Bewertung vom {deepAudit.createdAt.toLocaleDateString("de-DE")}</p>
         )}
       </div>
     </div>
@@ -209,9 +193,12 @@ export function MassnahmenBlock({ analysis, deepAudit }: { analysis: Analysis; d
   );
   if (karten.length === 0) return null;
   return (
-    <section className="card border-l-4 border-l-[var(--primary)] p-5">
-      <h2 className="text-sm font-semibold text-primary-strong">Maßnahmen</h2>
-      <div className="mt-3 space-y-2">
+    <section className="card overflow-hidden p-0 ring-1 ring-[var(--primary)]/30">
+      <div className="flex items-center gap-2.5 bg-[var(--primary-soft)] px-5 py-3">
+        <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-[var(--primary)] text-xs font-bold text-white tabular-nums">{karten.length}</span>
+        <h2 className="text-sm font-bold text-primary-strong">Nächste Maßnahmen</h2>
+      </div>
+      <div className="space-y-2 p-5">
         {karten.map((k, i) => (
           <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={0} belegHinweis={i < (deepAudit?.payload.topActions.length ?? 0) ? "Tiefen-Audit" : "Regel-Messung"} />
         ))}

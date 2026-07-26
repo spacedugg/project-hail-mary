@@ -42,17 +42,22 @@ export const DIM_LABELS: Record<DeepAuditDimension["key"], string> = {
   price: "Preisstrategie",
 };
 
-/** Welche Dimensionen sind mit den vorliegenden Daten überhaupt bewertbar? Entscheidet der CODE. */
+/**
+ * Welche Dimensionen sind mit den vorliegenden Daten überhaupt bewertbar? Entscheidet der CODE.
+ *
+ * D214 (Nutzer 27.07.): NUR was ein Scrape wirklich hergibt. Nicht mehr bewertet:
+ * - backend  — Backend-Keywords sind von außen unsichtbar, nicht schätzbar.
+ * - images   — reine Slot-Zählung war keine Qualität (Bild-Audit läuft separat, D211).
+ * - aplus    — A+-Inhalt wird nicht erfasst, nicht schätzbar.
+ * - price    — Preisstrategie lässt sich nicht aus einem Scrape raten.
+ * Bleiben: title, bullets, description, reviews (Bewertungsbasis, echte Scrape-Zahlen).
+ */
 export function assessableDims(input: DeepAuditInput): Set<DeepAuditDimension["key"]> {
   const s = new Set<DeepAuditDimension["key"]>();
   if (input.title.trim()) s.add("title");
   if (input.bullets.some((b) => b.trim())) s.add("bullets");
   if (input.description.trim()) s.add("description");
-  if (input.backendKeywords.trim()) s.add("backend"); // im Original-Scrape unsichtbar — nur mit eigener Version
-  if (input.imageCount !== null) s.add("images");
   if (input.basics && (input.basics.reviewsTotal !== null || input.basics.ratingAvg !== null)) s.add("reviews");
-  if (input.priceEur !== null) s.add("price");
-  // aplus: im Tool (noch) nicht erfassbar → nie bewertbar, ehrlich ausgewiesen
   return s;
 }
 
@@ -135,7 +140,7 @@ export function enforceDeepAudit(
       empfehlung: str(d.empfehlung),
     });
   }
-  const order: DeepAuditDimension["key"][] = ["title", "bullets", "description", "backend", "images", "aplus", "reviews", "price"];
+  const order: DeepAuditDimension["key"][] = ["title", "bullets", "description", "reviews"];
   const dimensions: DeepAuditDimension[] = order.map(
     (key) =>
       byKey.get(key) ?? {
@@ -155,36 +160,6 @@ export function enforceDeepAudit(
     },
     dimensions,
     topActions: strs(raw.topActions, 5),
-  };
-}
-
-/**
- * Bild-Dimension rechnet der CODE, nicht die KI (D126, Nutzer-Regel 21.07.):
- * ≥ 7 Bilder = Slot-Minimum voll erfüllt (10/10) — MEHR Bilder sind tendenziell
- * gut, dafür gibt es NIE Abzüge.
- *
- * WICHTIG (D208, Nutzer-Befund 26.07.): Das ist eine reine SLOT-VOLLSTÄNDIGKEITS-
- * Prüfung, KEINE Qualitätsnote. Zwei ehrliche Grenzen, die der Text offenlegt:
- * 1. Bildinhalte (Text im Bild, Claims) liest das Tool BEREITS aus (D158,
- *    `bildAuslese`, Quelle „Bilder") — es bewertet sie nur noch nicht (Urteile
- *    brauchen ein kuratiertes Regelwerk, D165). Nicht mehr behaupten, das Tool
- *    „könne Bilder nicht sehen" — das stimmt seit D158 nicht.
- * 2. `imageCount` = Zahl der gescrapten Medien-URLs. Produktvideos werden noch
- *    NICHT getrennt erfasst; ein Video, das einen Bild-Slot ersetzt (6 Bilder +
- *    Video = vollständig), erkennt das Tool nicht als solches. Darum ist die
- *    „fehlt"-Aussage unterhalb von 7 ausdrücklich unter Video-Vorbehalt.
- */
-export function bildDimension(imageCount: number): DeepAuditDimension {
-  const voll = imageCount >= 7;
-  const score = voll ? 10 : Math.round((imageCount / 7) * 100) / 10;
-  const s = imageCount === 1 ? "" : "s";
-  return {
-    key: "images",
-    label: DIM_LABELS.images,
-    score10: score,
-    aktuell: `${imageCount} Medien-Slot${s} belegt (Slot-Minimum 7 = Hauptbild + 6).${voll ? " Minimum erfüllt — zusätzliche Bilder geben nie Abzug." : ""} Das ist eine reine Slot-Vollständigkeits-Prüfung, KEINE Qualitätsnote. Bildinhalte (Text im Bild, Claims) liest das Tool bereits aus (Quelle „Bilder"), bewertet sie aber noch nicht; ein Produktvideo, das einen Bild-Slot ersetzt, erkennt es noch nicht getrennt.`,
-    probleme: voll ? [] : [`Nur ${imageCount} von 7 Slots belegt — sofern kein Produktvideo einen Slot füllt, verschenkt jeder leere Slot Verkaufsfläche.`],
-    empfehlung: voll ? "" : "Leere Slots mit Nutzen-Bildern füllen: Anwendung, Maße/Größenvergleich, Lieferumfang, Detail-Aufnahmen — oder ein Produktvideo.",
   };
 }
 
@@ -264,8 +239,7 @@ export function pruefeAuditBehauptungen(payload: DeepAuditPayload, input: DeepAu
 
 export async function buildDeepAudit(input: DeepAuditInput): Promise<DeepAuditPayload> {
   const dims = assessableDims(input);
-  // Bilder bewertet der Code (bildDimension) — die KI bekommt sie gar nicht erst als Aufgabe.
-  const llmDims = new Set([...dims].filter((k) => k !== "images"));
+  const llmDims = dims; // alle bewertbaren Dimensionen bewertet das LLM (Bilder laufen separat, D211/D214)
   const { provider } = resolveRecipe("listing.deep-audit");
 
   let raw: Partial<DeepAuditPayload>;
@@ -301,10 +275,5 @@ export async function buildDeepAudit(input: DeepAuditInput): Promise<DeepAuditPa
           : { verstoesse: ["Das JSON braucht ein nicht-leeres dimensions-Array — ein Eintrag je angefragter Dimension mit key, score10, aktuell, probleme, empfehlung."] },
     });
   }
-  const payload = pruefeAuditBehauptungen(enforceDeepAudit(raw, llmDims), input);
-  // Bild-Dimension deterministisch einsetzen (der Code rechnet, nicht die KI)
-  if (dims.has("images") && input.imageCount !== null) {
-    payload.dimensions = payload.dimensions.map((d) => (d.key === "images" ? bildDimension(input.imageCount!) : d));
-  }
-  return payload;
+  return pruefeAuditBehauptungen(enforceDeepAudit(raw, llmDims), input);
 }
