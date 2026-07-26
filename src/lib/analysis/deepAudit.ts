@@ -160,21 +160,31 @@ export function enforceDeepAudit(
 
 /**
  * Bild-Dimension rechnet der CODE, nicht die KI (D126, Nutzer-Regel 21.07.):
- * ≥ 7 Bilder = Minimum voll erfüllt (10/10) — MEHR Bilder sind tendenziell
- * gut, dafür gibt es NIE Abzüge. Bildinhalte kann das Tool nicht sehen —
- * dafür gibt es weder Bewertung noch Fehler (ehrliche Grenze statt
- * KI-Spekulation über „unklare Bildinhalte").
+ * ≥ 7 Bilder = Slot-Minimum voll erfüllt (10/10) — MEHR Bilder sind tendenziell
+ * gut, dafür gibt es NIE Abzüge.
+ *
+ * WICHTIG (D208, Nutzer-Befund 26.07.): Das ist eine reine SLOT-VOLLSTÄNDIGKEITS-
+ * Prüfung, KEINE Qualitätsnote. Zwei ehrliche Grenzen, die der Text offenlegt:
+ * 1. Bildinhalte (Text im Bild, Claims) liest das Tool BEREITS aus (D158,
+ *    `bildAuslese`, Quelle „Bilder") — es bewertet sie nur noch nicht (Urteile
+ *    brauchen ein kuratiertes Regelwerk, D165). Nicht mehr behaupten, das Tool
+ *    „könne Bilder nicht sehen" — das stimmt seit D158 nicht.
+ * 2. `imageCount` = Zahl der gescrapten Medien-URLs. Produktvideos werden noch
+ *    NICHT getrennt erfasst; ein Video, das einen Bild-Slot ersetzt (6 Bilder +
+ *    Video = vollständig), erkennt das Tool nicht als solches. Darum ist die
+ *    „fehlt"-Aussage unterhalb von 7 ausdrücklich unter Video-Vorbehalt.
  */
 export function bildDimension(imageCount: number): DeepAuditDimension {
   const voll = imageCount >= 7;
   const score = voll ? 10 : Math.round((imageCount / 7) * 100) / 10;
+  const s = imageCount === 1 ? "" : "s";
   return {
     key: "images",
     label: DIM_LABELS.images,
     score10: score,
-    aktuell: `${imageCount} Bild-Slot${imageCount === 1 ? "" : "s"} belegt.${voll ? " Minimum von 7 erfüllt — zusätzliche Bilder sind tendenziell gut und geben nie Abzug." : ""} Bildinhalte kann das Tool (noch) nicht sehen — dafür gibt es weder Bewertung noch Abzug; das inhaltliche Bild-Audit folgt mit der Bild-Phase.`,
-    probleme: voll ? [] : [`Nur ${imageCount} von 7 Bild-Slots belegt — jeder leere Slot verschenkt Verkaufsfläche.`],
-    empfehlung: voll ? "" : "Leere Slots mit Nutzen-Bildern füllen: Anwendung, Maße/Größenvergleich, Lieferumfang, Detail-Aufnahmen.",
+    aktuell: `${imageCount} Medien-Slot${s} belegt (Slot-Minimum 7 = Hauptbild + 6).${voll ? " Minimum erfüllt — zusätzliche Bilder geben nie Abzug." : ""} Das ist eine reine Slot-Vollständigkeits-Prüfung, KEINE Qualitätsnote. Bildinhalte (Text im Bild, Claims) liest das Tool bereits aus (Quelle „Bilder"), bewertet sie aber noch nicht; ein Produktvideo, das einen Bild-Slot ersetzt, erkennt es noch nicht getrennt.`,
+    probleme: voll ? [] : [`Nur ${imageCount} von 7 Slots belegt — sofern kein Produktvideo einen Slot füllt, verschenkt jeder leere Slot Verkaufsfläche.`],
+    empfehlung: voll ? "" : "Leere Slots mit Nutzen-Bildern füllen: Anwendung, Maße/Größenvergleich, Lieferumfang, Detail-Aufnahmen — oder ein Produktvideo.",
   };
 }
 

@@ -136,7 +136,7 @@ describe("enforceDeepAudit — LLM generiert, Code erzwingt", () => {
     expect(out2.dimensions.find((d) => d.key === "title")!.probleme).toHaveLength(1);
   });
 
-  it("bildDimension (D126): ≥7 = voll erfüllt, mehr nie ein Abzug, Bildinhalte ohne Urteil", () => {
+  it("bildDimension (D126/D208): ≥7 = Slot-Minimum erfüllt, mehr nie Abzug, ehrliche Grenzen", () => {
     const sieben = bildDimension(7);
     expect(sieben.score10).toBe(10);
     expect(sieben.probleme).toEqual([]);
@@ -146,8 +146,14 @@ describe("enforceDeepAudit — LLM generiert, Code erzwingt", () => {
     const fuenf = bildDimension(5);
     expect(fuenf.score10).toBeLessThan(10);
     expect(fuenf.probleme[0]).toContain("5 von 7");
-    // Ehrliche Grenze: kein Urteil über Bildinhalte, kein Fehler daraus
-    expect(sieben.aktuell).toContain("weder Bewertung noch Abzug");
+    // D208: Slot-Zählung ist eine Vollständigkeits-Prüfung, KEINE Qualitätsnote.
+    expect(sieben.aktuell).toContain("KEINE Qualitätsnote");
+    // D208: nicht mehr behaupten, das Tool könne Bildinhalte nicht sehen (D158 liest sie aus).
+    expect(sieben.aktuell).not.toMatch(/nicht (sehen|erfass)/i);
+    expect(sieben.aktuell).toContain("liest das Tool bereits aus");
+    // D208: „fehlt" nur unter Video-Vorbehalt — ein Video kann einen Slot ersetzen.
+    expect(fuenf.probleme[0]).toContain("Produktvideo");
+    expect(fuenf.empfehlung).toContain("Produktvideo");
   });
 
   it("begrenzt Listen (USPs ≤ 6, topActions ≤ 5, Probleme ≤ 4)", () => {
