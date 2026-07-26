@@ -24,8 +24,7 @@ import { KopierFeld } from "@/components/kopier-feld";
 import { ListingKontrolle, MassnahmenBlock } from "@/components/listing-kontrolle";
 import { AnalyseHintergrund } from "@/components/analyse-hintergrund";
 import { analyzeListing, wirksamesListing } from "@/lib/analysis/listingAudit";
-import { BILD_TYP_LABELS, istBildTyp } from "@/lib/analysis/bildTypen";
-import { AUDIT_DIMENSIONEN, AUDIT_LABELS } from "@/lib/analysis/bildAudit";
+import { BildKacheln } from "@/components/bild-kacheln";
 import type { SovAudit } from "@/lib/sov/audit";
 
 export const dynamic = "force-dynamic";
@@ -275,54 +274,8 @@ export default async function ProductPage({
             </div>
           )}
           {snapshot?.imageUrls && snapshot.imageUrls.length > 0 && (
-            <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-7">
-              {Array.from({ length: 7 }, (_, i) => {
-                const url = snapshot.imageUrls?.[i];
-                const bild = snapshot.bilderText?.find((b) => b.slot === i + 1);
-                const typLabel = bild && istBildTyp(bild.typ) ? BILD_TYP_LABELS[bild.typ] : i === 0 ? "Hauptbild" : `Slot ${i + 1}`;
-                return (
-                  <div key={i} className="rounded-xl border border-hair p-1.5 text-center">
-                    {url ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={url} alt={`Slot ${i + 1}`} className="mx-auto h-16 w-full rounded object-contain" />
-                    ) : (
-                      <div className="flex h-16 items-center justify-center text-lg text-neutral-300">＋</div>
-                    )}
-                    <div className="mt-1 text-[9px] uppercase tracking-wide text-neutral-400">{typLabel}</div>
-                  </div>
-                );
-              })}
-            </div>
+            <BildKacheln imageUrls={snapshot.imageUrls} bilder={snapshot.bilderText ?? []} />
           )}
-          {snapshot?.bilderText && snapshot.bilderText.length > 0 && (() => {
-            const mitAudit = snapshot.bilderText.filter((b) => b.faktoren);
-            if (mitAudit.length === 0) {
-              return <p className="mt-2 text-[11px] text-muted">Bildanalyse: {snapshot.bilderText.length} Bilder erfasst (Inhalt & Typ). Das 4-Faktoren-Audit kommt mit einem Import bei aktivem KI-Schlüssel dazu.</p>;
-            }
-            return (
-              <div className="mt-2">
-                <p className="text-[11px] text-muted">Bild-Audit — 4 Faktoren je Bild (0–5), schwächster hervorgehoben:</p>
-                <div className="mt-1 space-y-1">
-                  {mitAudit.map((b) => {
-                    const werte = AUDIT_DIMENSIONEN.map((d) => ({ d, s: b.faktoren?.[d]?.score ?? null }));
-                    const min = werte
-                      .filter((w) => w.s !== null)
-                      .reduce<{ d: string; s: number } | null>((m, w) => (m === null || (w.s as number) < m.s ? { d: w.d, s: w.s as number } : m), null);
-                    return (
-                      <div key={b.slot} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
-                        <span className="font-medium">Slot {b.slot}{istBildTyp(b.typ) ? ` · ${BILD_TYP_LABELS[b.typ]}` : ""}:</span>
-                        {werte.map(({ d, s }) => (
-                          <span key={d} className={min && min.d === d ? "text-bad" : "text-muted"}>
-                            {AUDIT_LABELS[d as (typeof AUDIT_DIMENSIONEN)[number]]} {s === null ? "–" : s}
-                          </span>
-                        ))}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
           {snapshot && !snapshot.bilderText && (snapshot.imageUrls?.length ?? 0) > 0 && (
             <p className="mt-2 text-[11px] text-muted">Bildanalyse folgt automatisch beim nächsten Listing-Import.</p>
           )}
