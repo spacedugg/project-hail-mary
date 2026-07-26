@@ -70,7 +70,7 @@ export default async function BrandKatalog({
 
       <details className="mt-3 rounded-xl border border-hair p-3.5">
         <summary className="cursor-pointer text-sm font-semibold">
-          Kunden-Onboarding: ganzen Katalog auf einmal
+          Massenimport mit ASIN Liste
         </summary>
         <p className="mt-2 text-xs text-muted">
           Zum Start der Zusammenarbeit: alle ASINs des Kunden einfügen (eine je Zeile oder durch Komma getrennt).
