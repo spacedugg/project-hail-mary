@@ -5,7 +5,7 @@ import { publishBereit } from "@/lib/amazon/publishGate";
 import { createProduct, deleteProductAction, produkteOhneSnapshot } from "@/app/actions";
 import { onboardingProdukteAnlegen } from "@/app/cms-actions";
 import { OnboardingImport } from "@/components/onboarding-import";
-import { LoeschButton } from "@/components/loesch-button";
+import { KatalogZeile } from "@/components/katalog-zeile";
 import { SubmitButton } from "@/components/submit-button";
 import { FehlerPopup } from "@/components/fehler-popup";
 import { fehlerInfo } from "@/lib/fehlercodes";
@@ -110,89 +110,31 @@ export default async function BrandKatalog({
             </thead>
             <tbody>
               {cms.produkte.map((p) => {
-                const wartet = freigaben.filter((f) => f.productId === p.id).length;
-                const bereit = publishBereit(p.publishIssues);
-                const titel = p.liveTitle ?? (p.name && p.name !== p.asin ? p.name : null);
+                const titelVoll = p.liveTitle ?? (p.name && p.name !== p.asin ? p.name : null);
+                const woerter = titelVoll ? titelVoll.trim().split(/\s+/) : [];
+                const titelKurz = titelVoll ? woerter.slice(0, 5).join(" ") + (woerter.length > 5 ? " …" : "") : null;
+                const kern = p.slots.filter((s) => KERN_SLOTS.includes(s.slot) && s.werte.length > 0);
                 return (
-                  // Ganze Zeile klickbar (D…): der Titel-Link spannt per ::after über die
-                  // Zeile (tr = relative). Aktionen rechts liegen mit z-10 darüber.
-                  <tr key={p.id} className="group relative border-b border-hair/60 transition-colors last:border-0 hover:bg-[var(--primary-soft)]">
-                    <td className="py-3 pl-5 pr-3">
-                      <div className="flex items-center gap-3">
-                        {p.bildUrl ? (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img src={p.bildUrl} alt="" className="h-11 w-11 flex-none rounded-lg border border-hair bg-white object-contain" />
-                        ) : (
-                          <div className="grid h-11 w-11 flex-none place-items-center rounded-lg border border-hair bg-neutral-100 text-xs text-muted dark:bg-neutral-800">–</div>
-                        )}
-                        <div className="min-w-0">
-                          <Link href={`/produkte/${p.id}`} className="font-mono text-[13px] font-medium after:absolute after:inset-0 group-hover:underline">
-                            {p.asin ?? <span className="font-sans text-warn">ohne ASIN</span>}
-                          </Link>
-                          <div className="mt-0.5 truncate text-[12px] text-muted">
-                            {titel ?? <span className="italic">Titel folgt nach Listing-Import</span>}
-                          </div>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted">
-                            <span>{p.marketplace.toUpperCase()}</span>
-                            {p.skuIstNotbehelf && <span className="pill pill-warn">SKU fehlt</span>}
-                            {!p.productType && <span className="pill pill-warn">Produkttyp fehlt</span>}
-                            {p.sollAusIst > 0 && <span className="pill pill-neutral">{p.sollAusIst}× nur Ausgangs-Stand</span>}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3 pr-3 tabular-nums">
-                      <span className={p.kernFreigegeben === 5 ? "text-good" : p.kernFreigegeben === 0 ? "text-muted" : ""}>
-                        {p.kernFreigegeben}/5
-                      </span>
-                    </td>
-                    <td className="py-3 pr-3 tabular-nums">
-                      {p.abgleich.accuracyPct === null ? (
-                        <span className="text-muted" title="Kein gecrawlter Live-Stand">–</span>
-                      ) : (
-                        <span className={p.abgleich.accuracyPct >= 95 ? "text-good" : "text-bad"}>{p.abgleich.accuracyPct} %</span>
-                      )}
-                    </td>
-                    <td className="py-3 pr-3 tabular-nums">
-                      {(() => {
-                        const kern = p.slots.filter((s) => KERN_SLOTS.includes(s.slot) && s.werte.length > 0);
-                        const ok = kern.filter((s) => s.freigabe.abgesichert).length;
-                        if (!kern.length) return <span className="text-muted">—</span>;
-                        return (
-                          <span
-                            className={ok === kern.length ? "text-good" : "text-muted"}
-                            title="Vom Kunden freigegebene Kern-Plätze"
-                          >
-                            {ok}/{kern.length}
-                          </span>
-                        );
-                      })()}
-                    </td>
-                    <td className="py-3 pr-3">
-                      <span className={bereit ? "pill pill-good" : "pill pill-bad"}>{bereit ? "bereit" : "blockiert"}</span>
-                    </td>
-                    <td className="py-3 pr-3">
-                      <div className="relative z-10 flex w-fit flex-wrap gap-1.5">
-                        {wartet > 0 && (
-                          <Link href={`/marke/${brandId}/publish`} className="pill pill-warn">{wartet}× Freigabe</Link>
-                        )}
-                        {p.feedbackOffen > 0 && (
-                          <Link href={`/produkte/${p.id}/content`} className="pill pill-neutral">{p.feedbackOffen}× Feedback</Link>
-                        )}
-                        {wartet === 0 && p.feedbackOffen === 0 && <span className="text-xs text-muted">—</span>}
-                      </div>
-                    </td>
-                    <td className="py-3 pr-5 text-right">
-                      <div className="relative z-10 flex items-center justify-end">
-                        <LoeschButton
-                          action={deleteProductAction}
-                          felder={{ productId: p.id }}
-                          frage={`„${p.name}" aus dem Katalog löschen? Content, Bewertungen und Alerts gehen weg — das Amazon-Listing bleibt.`}
-                          title="Produkt löschen"
-                        />
-                      </div>
-                    </td>
-                  </tr>
+                  <KatalogZeile
+                    key={p.id}
+                    id={p.id}
+                    brandId={brandId}
+                    bildUrl={p.bildUrl}
+                    asin={p.asin}
+                    titelKurz={titelKurz}
+                    marketplace={p.marketplace}
+                    skuFehlt={p.skuIstNotbehelf}
+                    produkttypFehlt={!p.productType}
+                    sollAusIst={p.sollAusIst}
+                    kernFreigegeben={p.kernFreigegeben}
+                    accuracyPct={p.abgleich.accuracyPct}
+                    abgesichert={kern.length ? { ok: kern.filter((s) => s.freigabe.abgesichert).length, kern: kern.length } : null}
+                    bereit={publishBereit(p.publishIssues)}
+                    wartet={freigaben.filter((f) => f.productId === p.id).length}
+                    feedbackOffen={p.feedbackOffen}
+                    loeschFrage={`„${p.name}" aus dem Katalog löschen? Content, Bewertungen und Alerts gehen weg — das Amazon-Listing bleibt.`}
+                    deleteAction={deleteProductAction}
+                  />
                 );
               })}
             </tbody>
