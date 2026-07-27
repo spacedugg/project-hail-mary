@@ -148,6 +148,9 @@ export const RECIPE_MODELS: Record<string, { provider: string; model: string }> 
   "reviews.uebertragbarkeit": { provider: "anthropic", model: "claude-opus-4-8" },
   // Wettbewerber-Listing-Abgleich (D199): fehlende, übertragbare Informationen
   "reviews.wettbewerb-texte": { provider: "anthropic", model: "claude-opus-4-8" },
+  // Variations-Master (D221): Slot-Klassifikator (schlägt „sprachlich-neu" vor) + Regenerator (textet einen Slot je Achsenwert neu)
+  "variants.klassifikator": { provider: "anthropic", model: "claude-opus-4-8" },
+  "variants.regenerator": { provider: "anthropic", model: "claude-opus-4-8" },
 };
 
 export function resolveRecipe(recipeKey: string): { provider: LlmProvider; model: string } {

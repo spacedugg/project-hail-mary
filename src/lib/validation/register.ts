@@ -15,7 +15,7 @@ import type { ValidationIssue } from "@/db/schema";
  * Doppelprüfung deterministischer Regeln wäre verschenkte Tokens.
  */
 
-export type RegelSektion = "title" | "bullets" | "highlights" | "backend" | "description" | "qa";
+export type RegelSektion = "title" | "bullets" | "highlights" | "backend" | "description" | "qa" | "familie";
 
 export type Regel = {
   id: string;
@@ -147,6 +147,32 @@ export const REGELN: Regel[] = [
     severity: "warning",
     text:
       "Die fünf Bullets decken unterschiedliche Kauf-Fragen ab (Slot-Logik HOOK · PROBLEM→BENEFIT · TRUST · USAGE · CLOSE) — nicht vier Varianten desselben Themas.",
+  },
+  // ── Variations-Familie (D221) ────────────────────────────────────────────────
+  {
+    // Deterministisch erzwungen von pruefeLockedKonsistenz (master.ts), NICHT im
+    // per-Sektion-Prompt gerendert. Sektion „familie" ist orthogonal zu den
+    // Content-Sektionen und wird nur von der Familien-Ableitung geprüft.
+    id: "familie.locked-konsistent",
+    sektionen: ["familie"],
+    art: "deterministisch",
+    severity: "error",
+    text:
+      `Slots, die als "für alle Childs gleich" (locked) markiert sind, MÜSSEN in jedem Child einer Variations-Familie byte-identisch sein — geteilte Claims wie "zuckerfrei"/"vegan" gelten für alle Varianten oder für keine, nie nur für einzelne.`,
+  },
+  {
+    id: "familie.token-unaufgeloest",
+    sektionen: ["familie"],
+    art: "deterministisch",
+    severity: "error",
+    text: `Kein abgeleiteter Child-Content darf einen unaufgelösten Platzhalter ({{achse}}) enthalten — jeder Token muss durch einen echten Achsenwert ersetzt sein.`,
+  },
+  {
+    id: "familie.achsenwert-fehlt",
+    sektionen: ["familie"],
+    art: "deterministisch",
+    severity: "error",
+    text: `Jedes Child muss für JEDE Achse des variationTheme einen Wert tragen — ohne vollständige Achsenwerte kann kein sauberer Varianten-Content abgeleitet werden.`,
   },
 ];
 

@@ -8,6 +8,24 @@ import { generateSection, QmBlockFehler, type ListingSection, type RecipeInputs 
 import type { ContentSprache, Marketplace, ProductFacts } from "@/db/schema";
 import { amazonDomain, erkenneSprache, marktplatzFuerSprache, marktplatzSprache, SPRACH_NAMEN } from "@/lib/text/sprache";
 import { contentMarkenKontext } from "@/lib/text/marken";
+import {
+  gruppiereZuFamilieKern,
+  loeseFamilieAufKern,
+  type GruppierenInput,
+  type GruppierenErgebnis,
+} from "@/lib/variants/gruppieren";
+import { getSessionUser } from "@/lib/auth/session";
+import {
+  baueMasterEntwurfKern,
+  gibMasterFreiKern,
+  propagiereFamilieKern,
+  auditFamilieKonsistenzKern,
+  type MasterEntwurf,
+  type PropagierErgebnis,
+  type FamilieAuditKind,
+} from "@/lib/variants/masterActions";
+import { klassifiziereSlots, regeneriereSlot, istMockRecipe } from "@/lib/variants/masterLlm";
+import type { ContentMaster } from "@/lib/variants/master";
 
 const id = () => crypto.randomUUID();
 const slugify = (s: string) =>
@@ -108,6 +126,83 @@ export async function deleteProductAction(formData: FormData) {
   await db.delete(schema.products).where(eq(schema.products.id, productId));
   revalidatePath("/optimizer");
   redirect(brand?.kind === "workbench" ? "/optimizer" : `/marke/${product.brandId}/katalog`);
+}
+
+/**
+ * Variations-Familie manuell anlegen (D221) — dünner Wrapper über den getesteten
+ * Kern (`gruppiereZuFamilieKern`). Gibt das Ergebnis inkl. Kontrakt-Verstöße an die
+ * UI zurück (kein Redirect: Fehler sollen im Dialog sichtbar werden) und aktualisiert
+ * Katalog/Optimizer. Gilt für beide Modi (Portfolio & Werkbank teilen `products`).
+ */
+export async function gruppiereZuFamilie(input: GruppierenInput): Promise<GruppierenErgebnis> {
+  // Server-Actions sind eigene POST-Endpunkte — der Layout-Login-Guard schützt sie NICHT.
+  if (!(await getSessionUser())) return { ok: false, fehler: "Nicht angemeldet." };
+  const db = await getDb();
+  const res = await gruppiereZuFamilieKern(db, input);
+  if (res.ok) {
+    revalidatePath(`/marke/${input.brandId}/katalog`);
+    revalidatePath("/optimizer");
+  }
+  return res;
+}
+
+/** Variations-Familie auflösen (D221) — Childs zurück auf standalone, Container gelöscht. */
+export async function loeseFamilieAuf(parentId: string, brandId: string): Promise<{ ok: boolean; fehler?: string }> {
+  if (!(await getSessionUser())) return { ok: false, fehler: "Nicht angemeldet." };
+  const db = await getDb();
+  const res = await loeseFamilieAufKern(db, parentId);
+  if (res.ok) {
+    revalidatePath(`/marke/${brandId}/katalog`);
+    revalidatePath("/optimizer");
+  }
+  return res;
+}
+
+/**
+ * Content-Master-ENTWURF ableiten (D221/D222) — liest den freigegebenen Content des
+ * Base-Childs, zerlegt in Slots, holt den LLM-Klassifikations-Vorschlag. Persistiert
+ * NICHTS: die UI zeigt den Entwurf, der Nutzer bestätigt/overridet, dann Freigabe.
+ */
+export async function baueMasterEntwurf(parentId: string, baseChildId: string): Promise<MasterEntwurf> {
+  if (!(await getSessionUser())) return { ok: false, fehler: "Nicht angemeldet." };
+  const db = await getDb();
+  return baueMasterEntwurfKern(db, parentId, baseChildId, klassifiziereSlots);
+}
+
+/** Content-Master freigeben (D221) — Kontrakt prüfen und am Parent persistieren. */
+export async function gibMasterFrei(
+  parentId: string,
+  master: ContentMaster,
+): Promise<{ ok: boolean; fehler?: string }> {
+  if (!(await getSessionUser())) return { ok: false, fehler: "Nicht angemeldet." };
+  const db = await getDb();
+  const res = await gibMasterFreiKern(db, parentId, master);
+  if (res.ok) revalidatePath(`/produkte/${parentId}`);
+  return res;
+}
+
+/**
+ * Master auf alle Geschwister-Childs propagieren (D221) — Code-Tausch/locked-Kopie +
+ * LLM nur für sprachlich-neue Slots, dann Content-Gate je Child + Cross-Child-Gate.
+ * Ergebnisse landen als Entwürfe je Child.
+ */
+export async function propagiereFamilie(parentId: string): Promise<PropagierErgebnis> {
+  if (!(await getSessionUser())) return { ok: false, fehler: "Nicht angemeldet.", mock: false, kinder: [] };
+  const db = await getDb();
+  const res = await propagiereFamilieKern(db, parentId, regeneriereSlot, {
+    regeneratorMock: istMockRecipe("variants.regenerator"),
+  });
+  if (res.ok) revalidatePath(`/produkte/${parentId}`);
+  return res;
+}
+
+/** Familien-Konsistenz-Audit (D221): locked-Slots byte-identisch über alle Childs? */
+export async function auditFamilieKonsistenz(
+  parentId: string,
+): Promise<{ ok: boolean; fehler?: string; kinder: FamilieAuditKind[] }> {
+  if (!(await getSessionUser())) return { ok: false, fehler: "Nicht angemeldet.", kinder: [] };
+  const db = await getDb();
+  return auditFamilieKonsistenzKern(db, parentId);
 }
 
 /** Marktplatz & Content-Sprache je Produkt (D128) — Sprache unabhängig vom Marktplatz wählbar. */

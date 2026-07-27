@@ -1,4 +1,11 @@
-import { sqliteTable, text, integer, real, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+  sqliteTable,
+  text,
+  integer,
+  real,
+  uniqueIndex,
+  type AnySQLiteColumn,
+} from "drizzle-orm/sqlite-core";
 
 /**
  * Entity-Hierarchie (D16): Kunde → Marke → Marktplatz/Land → Produktgruppe → Produkt (ASIN).
@@ -84,6 +91,16 @@ export type Marketplace = "de" | "uk" | "fr" | "it" | "es" | "nl" | "us";
 /** Content-Sprache je Produkt (D128) — unabhängig vom Marktplatz wählbar. */
 export type ContentSprache = "de" | "en" | "fr" | "it" | "es";
 
+/**
+ * Variantenrolle innerhalb einer Amazon-Variations-Familie (Parent-Child, D221).
+ * - "standalone": Einzel-ASIN, keine Familie (Default → abwärtskompatibel).
+ * - "parent": nicht kaufbarer Container, gruppiert die Childs, trägt Theme + Content-Master.
+ * - "child": kaufbare Variante, verweist per parentProductId nach oben, trägt die Achsenwerte.
+ * Rolle statt eigener Tabelle: Amazons Parent IST selbst eine ASIN und die gesamte
+ * Content-Maschinerie läuft bereits auf `products`.
+ */
+export type VariantRole = "standalone" | "parent" | "child";
+
 export const productGroups = sqliteTable("product_groups", {
   id: text("id").primaryKey(),
   brandId: text("brand_id")
@@ -141,6 +158,40 @@ export const products = sqliteTable(
     sku: text("sku"),
     /** Amazon-Produkttyp-Token (z. B. DRINKING_CUP) — Pflicht für Publish, keine Freitext-Beschreibung. */
     amazonProductType: text("amazon_product_type"),
+    /**
+     * Variations-Familie (D221). Default "standalone" → alle Alt-Produkte bleiben unberührt.
+     * Gefüllt tool-intern (manuelles Gruppieren) oder später per Prefill (Scraper/SP-API).
+     */
+    variantRole: text("variant_role").$type<VariantRole>().notNull().default("standalone"),
+    /**
+     * Child → Parent (self-FK). Nur bei variantRole="child" gesetzt.
+     * Achtung: SQLite/libSQL erzwingt FKs nur mit `PRAGMA foreign_keys=ON` — hier appweit AUS
+     * (wie bei ALLEN FKs im Schema). Das `set null` greift also NICHT automatisch beim Löschen.
+     * Das Auflösen/Löschen einer Familie setzt `parentProductId` der Childs in der Action explizit
+     * zurück (D221). Die FK-Deklaration bleibt als Absichts-Doku + für späteres Enforcement.
+     */
+    parentProductId: text("parent_product_id").references((): AnySQLiteColumn => products.id, {
+      onDelete: "set null",
+    }),
+    /** Auf dem Parent: Variationsachsen (z. B. ["flavor"] oder ["size","color"]) — die Theme-Attribute. */
+    variationTheme: text("variation_theme", { mode: "json" }).$type<string[]>(),
+    /** Auf dem Child: Wert je Achse (z. B. { "flavor": "Kiwi" }) — steuert Token-Tausch & Ableitung. */
+    variantAxisValues: text("variant_axis_values", { mode: "json" }).$type<Record<string, string>>(),
+    /**
+     * Auf dem Parent (D221): true = vom Tool angelegter, nicht kaufbarer Container
+     * (beim Auflösen zu LÖSCHEN). false = designierte, real existierende Parent-ASIN
+     * (beim Auflösen nur auf standalone zurückzusetzen). Explizit, damit „Container?"
+     * NICHT aus asin==null geraten wird — ein echter Parent darf asin==null haben.
+     */
+    variantParentContainer: integer("variant_parent_container", { mode: "boolean" }).notNull().default(false),
+    /**
+     * Auf dem Parent: freigegebener Content-Master (D221) — das aus Child #1 abgeleitete,
+     * in getypte Slots (locked/token/regenerate) zerlegte Template, aus dem die Geschwister
+     * abgeleitet werden. Shape: siehe `ContentMaster` in src/lib/variants/master.ts.
+     */
+    contentMaster: text("content_master", { mode: "json" }).$type<
+      import("@/lib/variants/master").ContentMaster
+    >(),
     createdAt: ts("created_at").notNull(),
   },
   (t) => [uniqueIndex("products_brand_asin_mp").on(t.brandId, t.asin, t.marketplace)],

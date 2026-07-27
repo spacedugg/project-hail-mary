@@ -26,6 +26,8 @@ import { AnalyseHintergrund } from "@/components/analyse-hintergrund";
 import { analyzeListing, wirksamesListing } from "@/lib/analysis/listingAudit";
 import { BildKacheln } from "@/components/bild-kacheln";
 import type { SovAudit } from "@/lib/sov/audit";
+import { ladeFamilie } from "@/lib/variants/laden";
+import { FamilieManager } from "@/components/familie-manager";
 
 export const dynamic = "force-dynamic";
 // Apify-Scrapes & LLM-Generierung: sonnet-5 denkt adaptiv und braucht bei
@@ -94,6 +96,18 @@ export default async function ProductPage({
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, id) });
   if (!product) notFound();
+
+  // Parent (Variations-Familie, D221) ist kein normales Produkt — eigene Oberfläche
+  // (Master ableiten/freigeben/propagieren) statt der Content-Werkbank.
+  if (product.variantRole === "parent") {
+    const familie = await ladeFamilie(db, product.id);
+    if (!familie) notFound();
+    return (
+      <main className="w-full p-8">
+        <FamilieManager familie={familie} />
+      </main>
+    );
+  }
 
   // Unabhängige Queries parallel (Review-Fix): jeder Reiter-Wechsel zahlte
   // vorher 8+ serielle Roundtrips.

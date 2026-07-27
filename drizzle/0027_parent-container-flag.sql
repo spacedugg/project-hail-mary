@@ -1,0 +1,1 @@
+ALTER TABLE `products` ADD `variant_parent_container` integer DEFAULT false NOT NULL;

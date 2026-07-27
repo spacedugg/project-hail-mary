@@ -6,6 +6,9 @@ import { createProduct, deleteProductAction, produkteOhneSnapshot } from "@/app/
 import { onboardingProdukteAnlegen } from "@/app/cms-actions";
 import { OnboardingImport } from "@/components/onboarding-import";
 import { KatalogZeile } from "@/components/katalog-zeile";
+import { FamilieGruppieren } from "@/components/familie-gruppieren";
+import { getDb } from "@/db/client";
+import { ladeGruppierbar, ladeFamilienUebersicht } from "@/lib/variants/laden";
 import { SubmitButton } from "@/components/submit-button";
 import { FehlerPopup } from "@/components/fehler-popup";
 import { fehlerInfo } from "@/lib/fehlercodes";
@@ -31,6 +34,9 @@ export default async function BrandKatalog({
   if (!cms) notFound();
   const freigaben = await ladeOffeneFreigaben(brandId);
   const ohneSnapshot = await produkteOhneSnapshot(brandId);
+  const db = await getDb();
+  const gruppierbar = await ladeGruppierbar(db, brandId);
+  const familien = await ladeFamilienUebersicht(db, brandId);
   const input = "input-base";
 
   return (
@@ -82,6 +88,32 @@ export default async function BrandKatalog({
           <textarea name="asins" rows={3} className="input-base font-mono text-sm" placeholder="B0B1WQQHMH&#10;B0CXY12ABC, B0DEF34GHI …" />
           <SubmitButton className="btn-dark w-fit text-xs">Produkte anlegen</SubmitButton>
         </form>
+      </details>
+
+      <details className="mt-3 rounded-xl border border-hair p-3.5">
+        <summary className="cursor-pointer text-sm font-semibold">Variations-Familie (Parent-Child) anlegen</summary>
+        <p className="mt-2 text-xs text-muted">
+          Ähnliche Varianten (Geschmack, Größe, Farbe …) zu einer Familie zusammenfassen — danach wird Content für eine
+          Variante freigegeben und stilgleich auf die anderen übertragen.
+        </p>
+        <div className="mt-3">
+          <FamilieGruppieren brandId={brandId} produkte={gruppierbar} />
+        </div>
+        {familien.length > 0 && (
+          <div className="mt-4">
+            <p className="text-[11px] uppercase tracking-wide text-muted">Bestehende Familien</p>
+            <ul className="mt-1.5 grid gap-1">
+              {familien.map((f) => (
+                <li key={f.id} className="text-sm">
+                  <Link href={`/produkte/${f.id}`} className="underline">{f.name}</Link>
+                  <span className="text-muted">
+                    {" "}· {f.theme.join(", ") || "keine Achse"} · {f.kinderAnzahl} Varianten · {f.hatMaster ? "Master ✓" : "kein Master"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </details>
 
       {ohneSnapshot.length > 0 && (

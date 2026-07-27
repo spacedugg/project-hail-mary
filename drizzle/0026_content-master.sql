@@ -1,0 +1,1 @@
+ALTER TABLE `products` ADD `content_master` text;
