@@ -82,7 +82,7 @@ export function BildKacheln({ imageUrls, bilder }: { imageUrls: string[]; bilder
               )}
               {minFaktor && (minFaktor.wieBesser || minFaktor.warum) && (
                 <p className="mt-1.5 text-[10px] leading-snug text-neutral-600 dark:text-neutral-400">
-                  <span className="font-medium text-bad">Schwächster – {AUDIT_LABELS[min!.d]}:</span> {minFaktor.wieBesser || minFaktor.warum}
+                  <span className="font-semibold">{AUDIT_LABELS[min!.d]}:</span> {minFaktor.wieBesser || minFaktor.warum}
                 </p>
               )}
             </div>

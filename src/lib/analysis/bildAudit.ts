@@ -10,33 +10,32 @@ import { bildContentBlocks, visionCall, visionUrls } from "./bildVision";
  * besser"). Läuft als automatischer Schritt beim Listing-Import (kein Extra-Knopf,
  * keine eigene UI) — es kommen einfach mehr Analyse-Daten heraus.
  *
- * Abgrenzung (D210/D211): KEINE separate Eye-catcher-Analyse. Die vier Faktoren
- * stammen aus `knowledge/bilder/bild-prinzipien.md` (Achse C):
- *   design           — Komposition, Hierarchie, Ausrichtung, Farb-Kohärenz, nicht überladen
- *   perceivedValue   — wirkt hochwertig/Premium (Grafik, Typo, Material-Anmutung)
- *   messageStrength  — starke, belegte Kaufargumente/USPs klar transportiert
- *   messageClarity   — eine Kernaussage je Bild, lesbar auch als Handy-Thumbnail
+ * Abgrenzung (D210/D211): KEINE separate Eye-catcher-Analyse. Drei Faktoren
+ * (D217, Nutzer 27.07. — „Wahrgenommene Wertigkeit" entfernt, war nicht umsetzbar):
+ *   design   — Handwerk/Bildqualität: Komposition, Hierarchie, Schärfe/Licht, nicht überladen
+ *   message  — Botschaft: sind die richtigen, belegten Kaufargumente/USPs stark präsent
+ *   clarity  — Klarheit: eine klare Kernaussage, lesbar auch als Handy-Thumbnail
+ * Botschaft und Klarheit bleiben getrennt, weil sie zu unterschiedlichen Fixes führen
+ * (fehlendes Argument ergänzen vs. Text lesbarer machen).
  *
  * Architektur wie bildAuslese: „LLM liefert Bausteine, Code erzwingt." Ohne
  * API-Key → null (ehrlich „nicht bewertet"), NIE ein Mock (erfundene Noten wären
  * Gift für die Priorisierung).
  */
 
-export const AUDIT_DIMENSIONEN = ["design", "perceivedValue", "messageStrength", "messageClarity"] as const;
+export const AUDIT_DIMENSIONEN = ["design", "message", "clarity"] as const;
 export type AuditDimension = (typeof AUDIT_DIMENSIONEN)[number];
 
 export const AUDIT_LABELS: Record<AuditDimension, string> = {
-  design: "Design & Bildqualität",
-  perceivedValue: "Wahrgenommene Wertigkeit",
-  messageStrength: "Botschafts-Stärke",
-  messageClarity: "Botschafts-Klarheit",
+  design: "Design",
+  message: "Botschaft",
+  clarity: "Klarheit",
 };
 
 const AUDIT_KRITERIUM: Record<AuditDimension, string> = {
-  design: "Komposition, visuelle Hierarchie, Ausrichtung, konsistentes Farbschema, Studio-Licht; nicht überladen (Elemente konkurrieren nicht um Aufmerksamkeit). Tiefe/Überlagerung von Elementen zahlt positiv ein.",
-  perceivedValue: "Wirkt das Bild hochwertig/Premium — Grafik-Qualität, Typografie, Material-Anmutung? Stärkt es Vertrauen und Zahlungsbereitschaft?",
-  messageStrength: "Sind starke, belegte Kaufargumente/USPs klar transportiert?",
-  messageClarity: "Eine klare Kernaussage je Bild, gut lesbar auch als kleines Handy-Thumbnail (Schriftgröße, Kontrast, Gruppierung).",
+  design: "Handwerk/Bildqualität: Komposition, visuelle Hierarchie, Ausrichtung, konsistentes Farbschema, Schärfe & Licht; nicht überladen (Elemente konkurrieren nicht um Aufmerksamkeit). Tiefe/Überlagerung von Elementen zahlt positiv ein.",
+  message: "Botschaft: Sind die richtigen, belegten Kaufargumente/USPs stark und überzeugend präsent?",
+  clarity: "Klarheit: Eine klare Kernaussage je Bild, gut lesbar auch als kleines Handy-Thumbnail (Schriftgröße, Kontrast, Gruppierung).",
 };
 
 export type BildFaktor = {
@@ -103,12 +102,12 @@ function buildPrompt(anzahl: number, sprache: string, ausleseText?: string): str
   return `AUFGABE: Bewerte die ${anzahl} Listing-Bilder oben (Antwort-Sprache "${sprache}").
 ${ausleseText ? `\nKONTEXT — was auf den Bildern erkannt wurde:\n${ausleseText.slice(0, 4000)}\n` : ""}
 Je Bild und je Faktor: score (0–5, ehrlich, eine Nachkommastelle), wasWirSehen (1 Satz Beobachtung), warum (1 Satz: warum das für den Verkauf zählt), wieBesser (1 Satz konkreter Fix).
-Bewerte diese vier Faktoren:
+Bewerte diese drei Faktoren:
 ${dims}
 
-Trenne bewusst Handwerk/Anmutung (design, perceivedValue) von Botschaft (messageStrength, messageClarity).
+Trenne bewusst: design = Handwerk/Bildqualität, message = welche Kaufargumente da sind, clarity = wie klar/lesbar es rüberkommt.
 JSON-Schema:
-{"bilder":[{"slot":1,"faktoren":{"design":{"score":3,"wasWirSehen":"...","warum":"...","wieBesser":"..."},"perceivedValue":{...},"messageStrength":{...},"messageClarity":{...}}}]}`;
+{"bilder":[{"slot":1,"faktoren":{"design":{"score":3,"wasWirSehen":"...","warum":"...","wieBesser":"..."},"message":{...},"clarity":{...}}}]}`;
 }
 
 export async function auditBilder(imageUrls: string[], sprache = "de", ausleseText?: string): Promise<BildAuditErgebnis | null> {
