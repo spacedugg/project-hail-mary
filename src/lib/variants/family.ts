@@ -62,9 +62,13 @@ export function achsenSignatur(child: FamilieChildInput, theme: string[]): strin
   return JSON.stringify(theme.map((achse) => norm(child.axisValues?.[achse])));
 }
 
-/** Parent ist nicht kaufbar; nur Container. Child/Standalone sind kaufbar. */
-export function istKaufbar(role: VariantRole): boolean {
-  return role !== "parent";
+/**
+ * Kaufbarkeit (D221, Nutzer-Korrektur 27.07.): NUR ein synthetischer Container-Parent
+ * ist nicht kaufbar. Ein „Representative"-Parent (eine bestehende ASIN als Familienkopf)
+ * bleibt eine echte, kaufbare + bearbeitbare Variante — er ist Parent UND Child zugleich.
+ */
+export function istKaufbar(role: VariantRole, istContainer: boolean): boolean {
+  return !(role === "parent" && istContainer);
 }
 
 /**

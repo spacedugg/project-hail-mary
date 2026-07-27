@@ -97,9 +97,10 @@ export default async function ProductPage({
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, id) });
   if (!product) notFound();
 
-  // Parent (Variations-Familie, D221) ist kein normales Produkt — eigene Oberfläche
-  // (Master ableiten/freigeben/propagieren) statt der Content-Werkbank.
-  if (product.variantRole === "parent") {
+  // Variations-Familie (D221): Ein NICHT kaufbarer Container-Parent bekommt allein die
+  // Familien-Oberfläche. Ein Representative-Parent bleibt eine kaufbare Variante — er behält
+  // die volle Content-Werkbank UND bekommt das Familien-Panel oben aufgesetzt.
+  if (product.variantRole === "parent" && product.variantParentContainer) {
     const familie = await ladeFamilie(db, product.id);
     if (!familie) notFound();
     return (
@@ -108,6 +109,7 @@ export default async function ProductPage({
       </main>
     );
   }
+  const familiePanel = product.variantRole === "parent" ? await ladeFamilie(db, product.id) : null;
 
   // Unabhängige Queries parallel (Review-Fix): jeder Reiter-Wechsel zahlte
   // vorher 8+ serielle Roundtrips.
@@ -164,6 +166,12 @@ export default async function ProductPage({
   return (
     <main className="w-full p-8">
       <Link href={backHref} className="text-xs text-neutral-500 hover:underline">← {parentBrand?.kind === "workbench" ? "Listing Optimizer" : "Katalog"}</Link>
+      {/* Representative-Parent (D221): kaufbare Variante UND Familienkopf — Familien-Panel oben. */}
+      {familiePanel && (
+        <div className="mb-6 mt-4 rounded-2xl border border-hair bg-surface p-5">
+          <FamilieManager familie={familiePanel} />
+        </div>
+      )}
       {/* Produkt-Kopfkarte (D166): EINE immer sichtbare Übersicht über alle Reiter —
           Bild, Listing-Titel, ASIN, Stand, editierbare Steuergrößen, Reviews analysiert. */}
       {(() => {

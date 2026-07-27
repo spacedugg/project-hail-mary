@@ -13,7 +13,7 @@ import { LoeschButton } from "@/components/loesch-button";
  * Klick auf ein echtes `<a>`/`<button>` in der Zeile (ASIN-Link, Freigabe,
  * Feedback, Löschen) navigiert NICHT die Zeile — es wirkt das jeweilige Element.
  */
-export function KatalogZeile(props: {
+export type KatalogZeileProps = {
   id: string;
   brandId: string;
   bildUrl: string | null;
@@ -31,7 +31,15 @@ export function KatalogZeile(props: {
   feedbackOffen: number;
   loeschFrage: string;
   deleteAction: (fd: FormData) => void | Promise<void>;
-}) {
+  /** Variations-Familie (D221): Child-Zeile eingerückt darstellen. */
+  indent?: boolean;
+  /** Kopf-Zeile: Aufklapp-Pfeil + Umschalt-Callback (null = keine Childs). */
+  toggle?: { offen: boolean; onToggle: () => void } | null;
+  /** Kopf-Zeile: Anzahl Varianten (Hinweis neben dem Titel). */
+  varianten?: number;
+};
+
+export function KatalogZeile(props: KatalogZeileProps) {
   const router = useRouter();
   const onRowClick = (e: React.MouseEvent<HTMLTableRowElement>) => {
     // Klicks auf interaktive Elemente (Links/Buttons) machen ihr eigenes Ding.
@@ -44,8 +52,23 @@ export function KatalogZeile(props: {
       onClick={onRowClick}
       className="group cursor-pointer border-b border-hair/60 transition-colors last:border-0 hover:bg-[var(--primary-soft)]"
     >
-      <td className="py-3 pl-5 pr-3">
+      <td className={`py-3 pr-3 ${props.indent ? "pl-12" : "pl-5"}`}>
         <div className="flex items-center gap-3">
+          {props.toggle ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                props.toggle!.onToggle();
+              }}
+              aria-label={props.toggle.offen ? "Varianten einklappen" : "Varianten ausklappen"}
+              className="flex-none rounded p-0.5 text-muted hover:bg-hair/60"
+            >
+              <span className={`inline-block transition-transform ${props.toggle.offen ? "rotate-90" : ""}`}>▸</span>
+            </button>
+          ) : props.indent ? (
+            <span className="flex-none pl-1 text-muted">└</span>
+          ) : null}
           {props.bildUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src={props.bildUrl} alt="" className="h-11 w-11 flex-none rounded-lg border border-hair bg-white object-contain" />
@@ -65,6 +88,7 @@ export function KatalogZeile(props: {
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted">
               <span>{props.marketplace.toUpperCase()}</span>
+              {props.varianten != null && <span className="pill pill-neutral">Familie · {props.varianten} Varianten</span>}
               {props.skuFehlt && <span className="pill pill-warn">SKU fehlt</span>}
               {props.produkttypFehlt && <span className="pill pill-warn">Produkttyp fehlt</span>}
               {props.sollAusIst > 0 && <span className="pill pill-neutral">{props.sollAusIst}× nur Ausgangs-Stand</span>}

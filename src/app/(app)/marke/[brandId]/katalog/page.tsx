@@ -5,10 +5,11 @@ import { publishBereit } from "@/lib/amazon/publishGate";
 import { createProduct, deleteProductAction, produkteOhneSnapshot } from "@/app/actions";
 import { onboardingProdukteAnlegen } from "@/app/cms-actions";
 import { OnboardingImport } from "@/components/onboarding-import";
-import { KatalogZeile } from "@/components/katalog-zeile";
+import type { KatalogZeileProps } from "@/components/katalog-zeile";
+import { KatalogBaum, type BaumKnoten } from "@/components/katalog-baum";
 import { FamilieGruppieren } from "@/components/familie-gruppieren";
 import { getDb } from "@/db/client";
-import { ladeGruppierbar, ladeFamilienUebersicht } from "@/lib/variants/laden";
+import { ladeGruppierbar } from "@/lib/variants/laden";
 import { SubmitButton } from "@/components/submit-button";
 import { FehlerPopup } from "@/components/fehler-popup";
 import { fehlerInfo } from "@/lib/fehlercodes";
@@ -36,8 +37,49 @@ export default async function BrandKatalog({
   const ohneSnapshot = await produkteOhneSnapshot(brandId);
   const db = await getDb();
   const gruppierbar = await ladeGruppierbar(db, brandId);
-  const familien = await ladeFamilienUebersicht(db, brandId);
   const input = "input-base";
+
+  // Produktliste als Baum (D221): Standalone flach; Familien mit Parent als Kopf
+  // und Childs eingerückt. Container-Parents erscheinen als „ohne ASIN"-Kopf,
+  // Representative-Parents als kaufbarer Kopf.
+  const zeileProps = (p: (typeof cms.produkte)[number]): KatalogZeileProps => {
+    const titelVoll = p.liveTitle ?? (p.name && p.name !== p.asin ? p.name : null);
+    const woerter = titelVoll ? titelVoll.trim().split(/\s+/) : [];
+    const titelKurz = titelVoll ? woerter.slice(0, 5).join(" ") + (woerter.length > 5 ? " …" : "") : null;
+    const kern = p.slots.filter((s) => KERN_SLOTS.includes(s.slot) && s.werte.length > 0);
+    return {
+      id: p.id,
+      brandId,
+      bildUrl: p.bildUrl,
+      asin: p.asin,
+      titelKurz,
+      marketplace: p.marketplace,
+      skuFehlt: p.skuIstNotbehelf,
+      produkttypFehlt: !p.productType,
+      sollAusIst: p.sollAusIst,
+      kernFreigegeben: p.kernFreigegeben,
+      accuracyPct: p.abgleich.accuracyPct,
+      abgesichert: kern.length ? { ok: kern.filter((s) => s.freigabe.abgesichert).length, kern: kern.length } : null,
+      bereit: publishBereit(p.publishIssues),
+      wartet: freigaben.filter((f) => f.productId === p.id).length,
+      feedbackOffen: p.feedbackOffen,
+      loeschFrage: `„${p.name}" aus dem Katalog löschen? Content, Bewertungen und Alerts gehen weg — das Amazon-Listing bleibt.`,
+      deleteAction: deleteProductAction,
+    };
+  };
+  const parentIds = new Set(cms.produkte.filter((p) => p.variantRole === "parent").map((p) => p.id));
+  const kinderVon = (parentId: string) => cms.produkte.filter((p) => p.variantRole === "child" && p.parentProductId === parentId);
+  // Top-Level = alles außer korrekt eingehängten Childs. Ein „Waisen-Child" (Parent fehlt)
+  // erscheint so weiterhin oben — nie unsichtbar (kein Produkt darf aus dem Katalog verschwinden).
+  const eingehaengt = (p: (typeof cms.produkte)[number]) => p.variantRole === "child" && !!p.parentProductId && parentIds.has(p.parentProductId);
+  const baumKnoten: BaumKnoten[] = cms.produkte
+    .filter((p) => !eingehaengt(p))
+    .map((p) => {
+      const kinder = p.variantRole === "parent" ? kinderVon(p.id).map(zeileProps) : [];
+      // Representative-Kopf (kein Container) ist selbst eine Variante → +1.
+      const variantenAnzahl = kinder.length + (p.variantRole === "parent" && !p.variantParentContainer ? 1 : 0);
+      return { self: zeileProps(p), kinder, variantenAnzahl };
+    });
 
   return (
     <main className="w-full p-8">
@@ -99,21 +141,7 @@ export default async function BrandKatalog({
         <div className="mt-3">
           <FamilieGruppieren brandId={brandId} produkte={gruppierbar} />
         </div>
-        {familien.length > 0 && (
-          <div className="mt-4">
-            <p className="text-[11px] uppercase tracking-wide text-muted">Bestehende Familien</p>
-            <ul className="mt-1.5 grid gap-1">
-              {familien.map((f) => (
-                <li key={f.id} className="text-sm">
-                  <Link href={`/produkte/${f.id}`} className="underline">{f.name}</Link>
-                  <span className="text-muted">
-                    {" "}· {f.theme.join(", ") || "keine Achse"} · {f.kinderAnzahl} Varianten · {f.hatMaster ? "Master ✓" : "kein Master"}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <p className="mt-3 text-[11px] text-muted">Bestehende Familien erscheinen direkt unten in der Produktliste (Parent mit eingerückten Varianten).</p>
       </details>
 
       {ohneSnapshot.length > 0 && (
@@ -140,36 +168,7 @@ export default async function BrandKatalog({
                 <th className="py-2.5 pr-5"></th>
               </tr>
             </thead>
-            <tbody>
-              {cms.produkte.map((p) => {
-                const titelVoll = p.liveTitle ?? (p.name && p.name !== p.asin ? p.name : null);
-                const woerter = titelVoll ? titelVoll.trim().split(/\s+/) : [];
-                const titelKurz = titelVoll ? woerter.slice(0, 5).join(" ") + (woerter.length > 5 ? " …" : "") : null;
-                const kern = p.slots.filter((s) => KERN_SLOTS.includes(s.slot) && s.werte.length > 0);
-                return (
-                  <KatalogZeile
-                    key={p.id}
-                    id={p.id}
-                    brandId={brandId}
-                    bildUrl={p.bildUrl}
-                    asin={p.asin}
-                    titelKurz={titelKurz}
-                    marketplace={p.marketplace}
-                    skuFehlt={p.skuIstNotbehelf}
-                    produkttypFehlt={!p.productType}
-                    sollAusIst={p.sollAusIst}
-                    kernFreigegeben={p.kernFreigegeben}
-                    accuracyPct={p.abgleich.accuracyPct}
-                    abgesichert={kern.length ? { ok: kern.filter((s) => s.freigabe.abgesichert).length, kern: kern.length } : null}
-                    bereit={publishBereit(p.publishIssues)}
-                    wartet={freigaben.filter((f) => f.productId === p.id).length}
-                    feedbackOffen={p.feedbackOffen}
-                    loeschFrage={`„${p.name}" aus dem Katalog löschen? Content, Bewertungen und Alerts gehen weg — das Amazon-Listing bleibt.`}
-                    deleteAction={deleteProductAction}
-                  />
-                );
-              })}
-            </tbody>
+            <KatalogBaum knoten={baumKnoten} />
           </table>
         </div>
       )}

@@ -148,9 +148,10 @@ describe("achsenSignatur", () => {
 });
 
 describe("istKaufbar", () => {
-  it("Parent ist nicht kaufbar, Child/Standalone schon", () => {
-    expect(istKaufbar("parent")).toBe(false);
-    expect(istKaufbar("child")).toBe(true);
-    expect(istKaufbar("standalone")).toBe(true);
+  it("nur der Container-Parent ist nicht kaufbar; Representative-Parent/Child/Standalone schon", () => {
+    expect(istKaufbar("parent", true)).toBe(false); // synthetischer Container
+    expect(istKaufbar("parent", false)).toBe(true); // Representative bleibt kaufbar
+    expect(istKaufbar("child", false)).toBe(true);
+    expect(istKaufbar("standalone", false)).toBe(true);
   });
 });

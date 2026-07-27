@@ -6,13 +6,16 @@ import { pruefeFamilie, type FamilieVerstoss, type FamilieKontraktInput } from "
 /**
  * Manuelles Gruppieren geladener ASINs zu einer Variations-Familie (D221).
  *
- * Der Fundament-Pfad, unabhängig von jeder Quelle: geladene Produkte (standalone)
- * werden zu Parent + Childs verknüpft. Parent entsteht wahlweise als nicht-kaufbarer
- * Container (Default) oder aus einer bereits importierten Parent-ASIN (Nutzer-Wahl 27.07.).
- * Genau diese Felder befüllen später Scraper/SP-API vor — EIN Pfad, kein Doppelbau.
+ * Zwei Parent-Modi (Nutzer-Korrektur 27.07.):
+ *  - "container": Tool legt einen NICHT kaufbaren Container-Parent an (eigene Zeile, asin=null).
+ *  - "vorhanden": eine der ausgewählten ASINs wird zum Familienkopf ERKLÄRT, bleibt dabei aber
+ *    eine kaufbare + bearbeitbare Variante (Parent UND Child zugleich — wie Amazons Modell, wo
+ *    eine Geschmacksrichtung den Parent bildet und trotzdem als Child kaufbar ist). Sie darf
+ *    NIE aus dem System verschwinden.
  *
- * Kern-Funktion (testbar, nimmt `db`): validiert Envelope (D183) + Familien-Kontrakt
- * und schreibt in einer Transaktion — nie eine halb angelegte Familie.
+ * In BEIDEN Modi ist `children` die vollständige Variantenliste (inkl. des Representative);
+ * jede Variante trägt ihre Achsenwerte. Der Kern validiert über den Familien-Kontrakt (D183)
+ * und schreibt in einer Transaktion.
  */
 
 const uuid = () => crypto.randomUUID();
@@ -32,7 +35,6 @@ export type GruppierenErgebnis =
   | { ok: true; parentId: string }
   | { ok: false; fehler: string; verstoesse?: FamilieVerstoss[] };
 
-/** Envelope-Validierung (D183): FORM des Inputs prüfen, bevor irgendetwas dereferenziert wird. */
 function pruefeEnvelope(input: GruppierenInput): string | null {
   if (!input || typeof input !== "object") return "Ungültige Eingabe.";
   if (typeof input.brandId !== "string" || !input.brandId.trim()) return "brandId fehlt.";
@@ -46,6 +48,9 @@ function pruefeEnvelope(input: GruppierenInput): string | null {
     if (!c || typeof c.productId !== "string" || !c.productId.trim()) return `children[${i}].productId fehlt.`;
     if (!c.axisValues || typeof c.axisValues !== "object" || Array.isArray(c.axisValues)) return `children[${i}].axisValues muss ein Objekt sein.`;
   }
+  // Representative MUSS unter den Varianten sein (er ist auch Child).
+  if (p.modus === "vorhanden" && !input.children.some((c) => c.productId === p.productId))
+    return "Der als Parent gewählte Artikel muss auch als Variante ausgewählt sein (er ist Parent UND Child).";
   return null;
 }
 
@@ -54,16 +59,13 @@ export async function gruppiereZuFamilieKern(db: Db, input: GruppierenInput): Pr
   if (envelopeFehler) return { ok: false, fehler: envelopeFehler };
 
   const kinderIds = input.children.map((c) => c.productId);
-  if (kinderIds.length === 0) return { ok: false, fehler: "Keine Childs angegeben." };
-  if (new Set(kinderIds).size !== kinderIds.length) return { ok: false, fehler: "Ein Produkt ist doppelt als Child gelistet." };
+  if (kinderIds.length === 0) return { ok: false, fehler: "Keine Varianten angegeben." };
+  if (new Set(kinderIds).size !== kinderIds.length) return { ok: false, fehler: "Eine Variante ist doppelt gelistet." };
 
-  const alleIds = input.parent.modus === "vorhanden" ? [...kinderIds, input.parent.productId] : kinderIds;
-  const geladen = await db.query.products.findMany({ where: inArray(products.id, alleIds) });
+  const geladen = await db.query.products.findMany({ where: inArray(products.id, kinderIds) });
   const byId = new Map(geladen.map((p) => [p.id, p]));
 
-  // Existenz + Marke + Rolle je Child. Nur STANDALONE-Produkte dürfen gruppiert
-  // werden — ein bereits verknüpftes Child würde sonst kommentarlos umgehängt und
-  // ließe seine Alt-Familie verwaist zurück (Re-Grouping-Bug). Erst auflösen.
+  // Nur STANDALONE-Produkte gruppierbar — sonst würde eine Alt-Familie verwaisen.
   for (const c of input.children) {
     const prod = byId.get(c.productId);
     if (!prod) return { ok: false, fehler: `Produkt ${c.productId} nicht gefunden.` };
@@ -74,42 +76,27 @@ export async function gruppiereZuFamilieKern(db: Db, input: GruppierenInput): Pr
       return { ok: false, fehler: `Produkt ${c.productId} hat keine ASIN — kaufbare Varianten brauchen eine ASIN.` };
   }
 
-  // Eine Familie lebt in EINEM Marktplatz und trägt EINE Marke
   const marktplaetze = new Set(input.children.map((c) => byId.get(c.productId)!.marketplace));
-  if (marktplaetze.size > 1) return { ok: false, fehler: "Alle Childs müssen denselben Marktplatz haben." };
+  if (marktplaetze.size > 1) return { ok: false, fehler: "Alle Varianten müssen denselben Marktplatz haben." };
   const marketplace = [...marktplaetze][0];
   const marken = new Set(input.children.map((c) => (byId.get(c.productId)!.marke ?? "").trim()).filter(Boolean));
-  if (marken.size > 1) return { ok: false, fehler: "Alle Childs müssen dieselbe Marke haben." };
+  if (marken.size > 1) return { ok: false, fehler: "Alle Varianten müssen dieselbe Marke haben." };
+  const marke = [...marken][0] ?? null;
 
-  // Parent auflösen (Container später anlegen; vorhandenen jetzt prüfen)
-  let parentAsin: string | null = null;
-  let vorhandenerParentId: string | null = null;
-  if (input.parent.modus === "vorhanden") {
-    const vp = byId.get(input.parent.productId);
-    if (!vp) return { ok: false, fehler: "Parent-Produkt nicht gefunden." };
-    if (vp.brandId !== input.brandId) return { ok: false, fehler: "Parent gehört nicht zu dieser Marke." };
-    if (vp.marketplace !== marketplace) return { ok: false, fehler: "Parent hat einen anderen Marktplatz als die Childs." };
-    if (vp.variantRole !== "standalone") return { ok: false, fehler: "Der gewählte Parent ist bereits Teil einer Familie — erst auflösen." };
-    if (kinderIds.includes(vp.id)) return { ok: false, fehler: "Parent darf nicht zugleich ein Child sein." };
-    parentAsin = vp.asin ?? null;
-    vorhandenerParentId = vp.id;
-  }
-
-  // Familien-Kontrakt (D183) — dieselbe Grenze wie für Scraper/SP-API-Prefill
+  // Familien-Kontrakt (D183): alle Varianten (inkl. Representative). Kein separater
+  // parentAsin — der Representative IST eine der Varianten, keine Kollision.
   const kontrakt: FamilieKontraktInput = {
-    parentAsin,
     variationTheme: input.theme,
     children: input.children.map((c) => ({ asin: byId.get(c.productId)!.asin ?? "", axisValues: c.axisValues, productId: c.productId })),
   };
   const verstoesse = pruefeFamilie(kontrakt);
   if (verstoesse.length > 0) return { ok: false, fehler: "Familien-Kontrakt verletzt.", verstoesse };
 
-  const marke = [...marken][0] ?? null;
+  const axisFuer = (pid: string) => input.children.find((c) => c.productId === pid)!.axisValues;
 
   const parentId = await db.transaction(async (tx) => {
-    let pid: string;
     if (input.parent.modus === "container") {
-      pid = uuid();
+      const pid = uuid();
       await tx.insert(products).values({
         id: pid,
         brandId: input.brandId,
@@ -118,33 +105,34 @@ export async function gruppiereZuFamilieKern(db: Db, input: GruppierenInput): Pr
         asin: null, // nicht kaufbar; wird erst bei Publish/SP-API real
         marketplace,
         variantRole: "parent",
-        variantParentContainer: true, // vom Tool angelegt → beim Auflösen löschen
+        variantParentContainer: true,
         variationTheme: input.theme,
       });
-    } else {
-      pid = vorhandenerParentId!;
-      await tx
-        .update(products)
-        .set({ variantRole: "parent", variantParentContainer: false, variationTheme: input.theme, parentProductId: null, variantAxisValues: null })
-        .where(eq(products.id, pid));
+      for (const c of input.children)
+        await tx.update(products).set({ variantRole: "child", parentProductId: pid, variantAxisValues: c.axisValues }).where(eq(products.id, c.productId));
+      return pid;
     }
+
+    // "vorhanden": Representative wird Kopf UND bleibt kaufbare Variante.
+    const repId = input.parent.productId;
+    await tx
+      .update(products)
+      .set({ variantRole: "parent", variantParentContainer: false, variationTheme: input.theme, parentProductId: null, variantAxisValues: axisFuer(repId) })
+      .where(eq(products.id, repId));
     for (const c of input.children) {
-      await tx
-        .update(products)
-        .set({ variantRole: "child", parentProductId: pid, variantAxisValues: c.axisValues })
-        .where(eq(products.id, c.productId));
+      if (c.productId === repId) continue; // Representative ist der Kopf, kein eigener Child-Verweis
+      await tx.update(products).set({ variantRole: "child", parentProductId: repId, variantAxisValues: c.axisValues }).where(eq(products.id, c.productId));
     }
-    return pid;
+    return repId;
   });
 
   return { ok: true, parentId };
 }
 
 /**
- * Familie auflösen: alle Childs zurück auf standalone. Weil `PRAGMA foreign_keys`
- * aus ist (D221), setzt DIESE Funktion die Verweise explizit zurück. Ob der Parent
- * gelöscht (Tool-Container) oder nur zurückgesetzt wird (designierte ASIN), steht
- * EXPLIZIT in `variantParentContainer` — nicht aus asin==null geraten (Datenverlust-Fix).
+ * Familie auflösen: alle Varianten zurück auf standalone. Ein Tool-Container
+ * (variantParentContainer=true) wird gelöscht; ein Representative-Parent
+ * (=false) wird nur zurückgesetzt und bleibt als kaufbares Produkt erhalten.
  */
 export async function loeseFamilieAufKern(db: Db, parentId: string): Promise<{ ok: boolean; fehler?: string }> {
   const parent = await db.query.products.findFirst({ where: eq(products.id, parentId) });
@@ -154,17 +142,14 @@ export async function loeseFamilieAufKern(db: Db, parentId: string): Promise<{ o
 
   await db.transaction(async (tx) => {
     for (const k of kinder)
-      await tx
-        .update(products)
-        .set({ variantRole: "standalone", parentProductId: null, variantAxisValues: null })
-        .where(eq(products.id, k.id));
+      await tx.update(products).set({ variantRole: "standalone", parentProductId: null, variantAxisValues: null }).where(eq(products.id, k.id));
     if (parent.variantParentContainer) {
       await tx.delete(products).where(eq(products.id, parentId)); // Tool-Container entfernen
     } else {
       await tx
         .update(products)
-        .set({ variantRole: "standalone", variationTheme: null, contentMaster: null })
-        .where(eq(products.id, parentId));
+        .set({ variantRole: "standalone", variationTheme: null, contentMaster: null, variantAxisValues: null })
+        .where(eq(products.id, parentId)); // Representative bleibt erhalten
     }
   });
   return { ok: true };

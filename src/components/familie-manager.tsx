@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { baueMasterEntwurf, gibMasterFrei, propagiereFamilie, auditFamilieKonsistenz } from "@/app/actions";
+import { baueMasterEntwurf, gibMasterFrei, propagiereFamilie, auditFamilieKonsistenz, loeseFamilieAuf } from "@/app/actions";
 import type { FamilienDaten } from "@/lib/variants/laden";
 import type { MasterSlot, SlotKind } from "@/lib/variants/master";
 import type { PropagierKind, FamilieAuditKind } from "@/lib/variants/masterActions";
@@ -98,15 +98,36 @@ export function FamilieManager({ familie }: { familie: FamilienDaten }) {
     if (!res.ok) setMeldung(res.fehler ?? "Prüfung fehlgeschlagen.");
   }
 
+  async function aufloesen() {
+    const frage = `Familie „${familie.name}" auflösen? Die Varianten werden wieder zu Einzel-Produkten${
+      familie.istContainer ? " und der Parent-Container wird gelöscht" : " (der Parent bleibt als kaufbares Produkt erhalten)"
+    }. Freigegebener Content der Varianten bleibt erhalten.`;
+    if (!window.confirm(frage)) return;
+    setBusy("aufloesen");
+    const res = await loeseFamilieAuf(familie.parentId, familie.brandId);
+    setBusy(null);
+    if (res.ok) router.push(`/marke/${familie.brandId}/katalog`);
+    else setMeldung(res.fehler ?? "Auflösen fehlgeschlagen.");
+  }
+
   return (
     <div className="grid gap-5">
-      <div>
-        <p className="text-[11px] uppercase tracking-wide text-muted">Variations-Familie (Parent)</p>
-        <h1 className="page-title">{familie.name}</h1>
-        <p className="page-sub">
-          Achse(n): <b>{familie.theme.join(", ") || "—"}</b> · {familie.kinder.length} Varianten ·{" "}
-          {familie.hatMaster ? "Master freigegeben ✓" : "noch kein Master"}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-muted">Variations-Familie (Parent)</p>
+          <h1 className="page-title">{familie.name}</h1>
+          <p className="page-sub">
+            Achse(n): <b>{familie.theme.join(", ") || "—"}</b> · {familie.kinder.length} Varianten ·{" "}
+            {familie.hatMaster ? "Master freigegeben ✓" : "noch kein Master"}
+          </p>
+        </div>
+        <button
+          onClick={aufloesen}
+          disabled={busy !== null}
+          className="flex-none rounded-lg border border-hair px-2.5 py-1 text-xs text-bad hover:bg-bad/5 disabled:opacity-50"
+        >
+          {busy === "aufloesen" ? "Löse auf…" : "Familie auflösen"}
+        </button>
       </div>
 
       {/* Kinder */}
@@ -124,8 +145,9 @@ export function FamilieManager({ familie }: { familie: FamilienDaten }) {
             {familie.kinder.map((k) => (
               <tr key={k.id} className="border-b border-hair/60 last:border-0">
                 <td className="py-2 pl-4 pr-3">
-                  <Link href={`/produkte/${k.id}`} className="font-mono text-[13px] underline">{k.asin ?? "—"}</Link>{" "}
-                  <span className="text-muted">{k.name}</span>
+                  <Link href={`/produkte/${k.id}`} className="font-mono text-[13px] underline">{k.asin ?? "—"}</Link>
+                  {k.istKopf && <span className="ml-1.5 rounded bg-[var(--primary-soft)] px-1.5 py-0.5 text-[10px] text-primary-strong">Parent</span>}
+                  {k.titel && k.titel !== k.asin && <span className="block truncate text-[11px] text-muted">{k.titel}</span>}
                 </td>
                 <td className="py-2 pr-3 text-xs">{familie.theme.map((a) => `${a}: ${k.axisValues[a] ?? "—"}`).join(" · ")}</td>
                 <td className="py-2 pr-3 text-xs">{k.hatFreigegebenenContent ? <span className="text-good">freigegeben</span> : <span className="text-muted">offen</span>}</td>

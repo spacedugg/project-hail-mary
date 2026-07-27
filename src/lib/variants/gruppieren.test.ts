@@ -126,9 +126,10 @@ describe("gruppiereZuFamilieKern", () => {
     expect(res.ok).toBe(false);
   });
 
-  it("designierter vorhandener Parent: Auflösen setzt zurück statt zu löschen (kein Datenverlust)", async () => {
+  it("Representative-Parent bleibt kaufbare Variante (Parent UND Child) und wird beim Auflösen NICHT gelöscht", async () => {
     const { getDb, schema } = await import("../../db/client");
     const { gruppiereZuFamilieKern, loeseFamilieAufKern } = await import("./gruppieren");
+    const { ladeFamilie } = await import("./laden");
     const db = await getDb();
     const brandId = await seedMarke(db, schema, "vor");
     await db.insert(schema.products).values({ id: "vor-par", brandId, name: "Parent", asin: "B0VOR000", marke: "X", marketplace: "de" });
@@ -140,6 +141,8 @@ describe("gruppiereZuFamilieKern", () => {
       parent: { modus: "vorhanden", productId: "vor-par" },
       theme: ["flavor"],
       children: [
+        // Der Representative ist SELBST eine Variante mit Achsenwert.
+        { productId: "vor-par", axisValues: { flavor: "C" } },
         { productId: "vor-ch1", axisValues: { flavor: "A" } },
         { productId: "vor-ch2", axisValues: { flavor: "B" } },
       ],
@@ -147,15 +150,27 @@ describe("gruppiereZuFamilieKern", () => {
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.parentId).toBe("vor-par");
+
     const par = await db.query.products.findFirst({ where: eq(schema.products.id, "vor-par") });
     expect(par?.variantRole).toBe("parent");
-    expect(par?.variantParentContainer).toBe(false);
+    expect(par?.variantParentContainer).toBe(false); // kaufbarer Representative, kein Container
+    expect(par?.asin).toBe("B0VOR000"); // ASIN bleibt → weiter kaufbar/bearbeitbar
+    expect(par?.variantAxisValues).toEqual({ flavor: "C" }); // eigene Variante
+    const ch1 = await db.query.products.findFirst({ where: eq(schema.products.id, "vor-ch1") });
+    expect(ch1?.parentProductId).toBe("vor-par");
+
+    // ladeFamilie zeigt den Representative als Kopf-Kind (Parent UND Child)
+    const fam = await ladeFamilie(db, "vor-par");
+    expect(fam?.istContainer).toBe(false);
+    expect(fam?.kinder.length).toBe(3);
+    expect(fam?.kinder.find((k) => k.id === "vor-par")?.istKopf).toBe(true);
 
     await loeseFamilieAufKern(db, "vor-par");
     const parAfter = await db.query.products.findFirst({ where: eq(schema.products.id, "vor-par") });
-    expect(parAfter).toBeDefined(); // NICHT gelöscht — echtes Produkt
+    expect(parAfter).toBeDefined(); // NICHT gelöscht — echtes Produkt bleibt erhalten
     expect(parAfter?.variantRole).toBe("standalone");
     expect(parAfter?.variationTheme).toBeNull();
+    expect(parAfter?.variantAxisValues).toBeNull();
   });
 
   it("weist ein Child ohne ASIN mit klarer Meldung ab", async () => {

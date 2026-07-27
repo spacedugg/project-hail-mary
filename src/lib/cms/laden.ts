@@ -75,6 +75,10 @@ export type CmsProdukt = {
   snapshotAlter: Date | null;
   feedbackOffen: number;
   feedbackGesamt: number;
+  /** Variations-Familie (D221): Rolle + Kopf-Verweis + Container-Flag für den Katalog-Baum. */
+  variantRole: "standalone" | "parent" | "child";
+  parentProductId: string | null;
+  variantParentContainer: boolean;
 };
 
 export type MarkenCms = {
@@ -285,6 +289,9 @@ export async function ladeMarkenCms(brandId: string): Promise<MarkenCms | null> 
       snapshotAlter: snapshot?.createdAt ?? null,
       feedbackOffen: fb.filter((f) => f.status === "offen").length,
       feedbackGesamt: fb.length,
+      variantRole: p.variantRole,
+      parentProductId: p.parentProductId,
+      variantParentContainer: p.variantParentContainer,
     } satisfies CmsProdukt;
   });
 

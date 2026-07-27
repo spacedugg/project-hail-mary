@@ -123,6 +123,14 @@ export async function deleteProductAction(formData: FormData) {
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return;
   const brand = await db.query.brands.findFirst({ where: eq(schema.brands.id, product.brandId) });
+  // Löscht man einen Familien-Parent, dürfen die Childs nicht mit totem parentProductId
+  // zurückbleiben (FK ist nicht enforced, D221) — erst auf standalone zurücksetzen.
+  if (product.variantRole === "parent") {
+    await db
+      .update(schema.products)
+      .set({ variantRole: "standalone", parentProductId: null, variantAxisValues: null })
+      .where(eq(schema.products.parentProductId, productId));
+  }
   await db.delete(schema.products).where(eq(schema.products.id, productId));
   revalidatePath("/optimizer");
   redirect(brand?.kind === "workbench" ? "/optimizer" : `/marke/${product.brandId}/katalog`);

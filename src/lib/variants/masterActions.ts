@@ -108,7 +108,9 @@ export async function baueMasterEntwurfKern(
   if (!Array.isArray(theme) || theme.length === 0) return { ok: false, fehler: "Parent hat kein variationTheme." };
 
   const base = await db.query.products.findFirst({ where: eq(products.id, baseChildId) });
-  if (!base || base.parentProductId !== parentId) return { ok: false, fehler: "Base-Child gehört nicht zu diesem Parent." };
+  // Base darf ein Child (parentProductId===parentId) ODER der Representative selbst (id===parentId) sein.
+  if (!base || (base.id !== parentId && base.parentProductId !== parentId))
+    return { ok: false, fehler: "Base-Variante gehört nicht zu dieser Familie." };
 
   const content = await leseFreigegebenenContent(db, baseChildId);
   if (!content) return { ok: false, fehler: "Base-Child hat keinen freigegebenen Content (Titel + Bullets + Beschreibung nötig)." };
@@ -158,7 +160,9 @@ export async function auditFamilieKonsistenzKern(
   const master = parent.contentMaster;
   if (!master) return { ok: false, fehler: "Kein Content-Master.", kinder: [] };
 
-  const kinder = await db.query.products.findMany({ where: eq(products.parentProductId, parentId) });
+  const childRows = await db.query.products.findMany({ where: eq(products.parentProductId, parentId) });
+  // Representative-Parent ist selbst eine kaufbare Variante → in die Konsistenz-Prüfung einbeziehen.
+  const kinder = parent.variantParentContainer ? childRows : [parent, ...childRows];
   const out: FamilieAuditKind[] = [];
   for (const k of kinder) {
     const content = await leseAktuellenContent(db, k.id);
@@ -228,8 +232,12 @@ export async function propagiereFamilieKern(
   if (mv.length > 0) return { ok: false, fehler: "Master-Kontrakt verletzt.", mock: false, kinder: [] };
 
   const kinder = await db.query.products.findMany({ where: eq(products.parentProductId, parentId) });
-  const ziele = kinder.filter((k) => (k.asin ?? k.id) !== master.baseChildAsin);
-  if (ziele.length === 0) return { ok: false, fehler: "Keine Geschwister-Childs zum Propagieren (nur Base).", mock: false, kinder: [] };
+  // Representative-Parent ist selbst eine kaufbare Variante — er muss propagiert werden,
+  // wenn er NICHT die Base ist (sonst bliebe sein Alt-Content inkonsistent und der
+  // Audit-Befund würde beim Merge verschluckt). Spiegelt die Variantenmenge des Audits.
+  const alleVarianten = parent.variantParentContainer ? kinder : [parent, ...kinder];
+  const ziele = alleVarianten.filter((k) => (k.asin ?? k.id) !== master.baseChildAsin);
+  if (ziele.length === 0) return { ok: false, fehler: "Keine weiteren Varianten zum Propagieren (nur die Base).", mock: false, kinder: [] };
 
   const hatRegenerate = master.slots.some((s) => s.kind === "regenerate");
   const mock = !!opts.regeneratorMock && hatRegenerate;

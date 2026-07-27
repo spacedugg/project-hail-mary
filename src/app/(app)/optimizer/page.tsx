@@ -6,6 +6,8 @@ import { LoeschButton } from "@/components/loesch-button";
 import { OsShell } from "@/components/shell";
 import { IconContent, IconArrowRight, IconSparkle } from "@/components/icons";
 import { SubmitButton } from "@/components/submit-button";
+import { FamilieGruppieren } from "@/components/familie-gruppieren";
+import { ladeGruppierbar } from "@/lib/variants/laden";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,15 @@ export default async function OptimizerPage() {
     ? await db.query.products.findMany({ where: eq(schema.products.brandId, workbench.id) })
     : [];
   const input = "input-base";
+
+  // Variations-Familien (D221): dieselbe Logik wie im Marken-Katalog, nur als Karten.
+  const gruppierbar = workbench ? await ladeGruppierbar(db, workbench.id) : [];
+  const parentIds = new Set(orders.filter((p) => p.variantRole === "parent").map((p) => p.id));
+  const kinderVon = (pid: string) => orders.filter((p) => p.variantRole === "child" && p.parentProductId === pid);
+  const eingehaengt = (p: (typeof orders)[number]) => p.variantRole === "child" && !!p.parentProductId && parentIds.has(p.parentProductId);
+  const familien = orders.filter((p) => p.variantRole === "parent");
+  // Einzeln = Standalone + evtl. Waisen-Childs (Parent fehlt) — nie unsichtbar.
+  const einzeln = orders.filter((p) => p.variantRole !== "parent" && !eingehaengt(p));
 
   return (
     <OsShell>
@@ -62,13 +73,62 @@ export default async function OptimizerPage() {
           </form>
         </section>
 
+        {workbench && gruppierbar.length > 0 && (
+          <details className="mt-4 rounded-xl border border-hair p-3.5">
+            <summary className="cursor-pointer text-sm font-semibold">Variations-Familie (Parent-Child) anlegen</summary>
+            <p className="mt-2 text-xs text-muted">
+              Ähnliche Aufträge (Geschmack, Größe, Farbe …) zu einer Familie zusammenfassen — Content wird für eine Variante
+              freigegeben und stilgleich auf die anderen übertragen. Familien erscheinen unten als aufklappbare Gruppe.
+            </p>
+            <div className="mt-3">
+              <FamilieGruppieren brandId={workbench.id} produkte={gruppierbar} />
+            </div>
+          </details>
+        )}
+
         <section className="mt-6">
           <h2 className="sect-h">Aufträge · {orders.length}</h2>
-          <div className="stagger mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {familien.length > 0 && (
+            <div className="mt-2 grid gap-3">
+              {familien.map((parent) => {
+                const kinder = kinderVon(parent.id);
+                const anzahl = kinder.length + (parent.variantParentContainer ? 0 : 1);
+                const varianten = parent.variantParentContainer ? kinder : [parent, ...kinder];
+                return (
+                  <details key={parent.id} open className="card p-4">
+                    <summary className="flex cursor-pointer items-center justify-between gap-2">
+                      <span className="font-semibold">{parent.name}</span>
+                      <span className="text-xs text-muted">
+                        Familie · {anzahl} Varianten · {parent.variantParentContainer ? "Container (nicht kaufbar)" : parent.asin}
+                      </span>
+                    </summary>
+                    <div className="mt-3 grid gap-1.5">
+                      <Link href={`/produkte/${parent.id}`} className="w-fit text-xs font-medium text-primary-strong underline">
+                        Familie verwalten →
+                      </Link>
+                      {varianten.map((k) => (
+                        <Link
+                          key={k.id}
+                          href={`/produkte/${k.id}`}
+                          className="flex items-center gap-2 rounded-lg border border-hair px-3 py-1.5 text-sm hover:bg-[var(--primary-soft)]"
+                        >
+                          <span className="font-mono text-[13px]">{k.asin ?? "—"}</span>
+                          <span className="truncate text-muted">{k.name}</span>
+                          {k.id === parent.id && <span className="pill pill-neutral">Parent</span>}
+                        </Link>
+                      ))}
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="stagger mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {orders.length === 0 && (
               <p className="card border-dashed p-6 text-sm text-muted">Noch keine Einzelaufträge.</p>
             )}
-            {orders.map((p) => (
+            {einzeln.map((p) => (
               <div key={p.id} className="card group relative p-4">
                 {/* Mülleimer in der Kachel (D162): Klick → Rückfrage → weg */}
                 <LoeschButton

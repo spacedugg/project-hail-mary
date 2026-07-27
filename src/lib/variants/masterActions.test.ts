@@ -219,4 +219,100 @@ describe("Master-Flow (Ableiten → Freigeben → Propagieren)", () => {
     const kiwi = audit.kinder.find((k) => k.productId === "aud-kiwi")!;
     expect(kiwi.issues.some((i) => i.rule === "familie.locked-konsistent")).toBe(true);
   });
+
+  it("Representative als Base: Master ableiten + auf die übrigen Varianten propagieren", async () => {
+    const { getDb, schema } = await import("../../db/client");
+    const { gruppiereZuFamilieKern } = await import("./gruppieren");
+    const { baueMasterEntwurfKern, gibMasterFreiKern, propagiereFamilieKern } = await import("./masterActions");
+    const { eq } = await import("drizzle-orm");
+    const db = await getDb();
+    await db.insert(schema.clients).values({ id: "rc", name: "K", slug: "k-rep" });
+    await db.insert(schema.brands).values({ id: "rb", clientId: "rc", name: "M" });
+    await db.insert(schema.products).values({ id: "rep-par", brandId: "rb", name: "Erdbeere", asin: "B0REP001", marke: "Freaky Joe", marketplace: "de" });
+    await db.insert(schema.products).values({ id: "rep-a", brandId: "rb", name: "Kiwi", asin: "B0REP002", marke: "Freaky Joe", marketplace: "de" });
+
+    const grp = await gruppiereZuFamilieKern(db, {
+      brandId: "rb",
+      parent: { modus: "vorhanden", productId: "rep-par" }, // Representative = Base
+      theme: ["flavor"],
+      children: [
+        { productId: "rep-par", axisValues: { flavor: "Erdbeere" } },
+        { productId: "rep-a", axisValues: { flavor: "Kiwi" } },
+      ],
+    });
+    expect(grp.ok).toBe(true);
+    if (!grp.ok) return;
+
+    // Freigegebener Content des Representative (= Base)
+    const mk = (type: "title" | "bullets" | "description", payload: Record<string, unknown>) =>
+      db.insert(schema.contentVersions).values({ id: crypto.randomUUID(), productId: "rep-par", type, version: 1, payload, status: "approved" });
+    await mk("title", { text: BASE_TITLE });
+    await mk("bullets", { items: BASE_BULLETS });
+    await mk("description", { text: BASE_DESC });
+
+    const entwurf = await baueMasterEntwurfKern(db, "rep-par", "rep-par", keinRegenerate);
+    expect(entwurf.ok).toBe(true);
+    if (!entwurf.ok) return;
+    await gibMasterFreiKern(db, "rep-par", entwurf.master);
+
+    const prop = await propagiereFamilieKern(db, "rep-par", regeneratorVerboten);
+    expect(prop.ok).toBe(true);
+    expect(prop.kinder.map((k) => k.asin)).toEqual(["B0REP002"]); // nur rep-a (Kiwi), NICHT der Representative
+    const titleV = await db.query.contentVersions.findFirst({
+      where: and(eq(schema.contentVersions.productId, "rep-a"), eq(schema.contentVersions.type, "title")),
+    });
+    expect((titleV?.payload as { text: string }).text).toBe(BASE_TITLE.replace("Erdbeere", "Kiwi"));
+  });
+
+  it("Representative als NICHT-Base wird mit-propagiert (nicht übersprungen)", async () => {
+    const { getDb, schema } = await import("../../db/client");
+    const { gruppiereZuFamilieKern } = await import("./gruppieren");
+    const { baueMasterEntwurfKern, gibMasterFreiKern, propagiereFamilieKern } = await import("./masterActions");
+    const { eq } = await import("drizzle-orm");
+    const db = await getDb();
+    await db.insert(schema.clients).values({ id: "rnc", name: "K", slug: "k-rns" });
+    await db.insert(schema.brands).values({ id: "rnb", clientId: "rnc", name: "M" });
+    await db.insert(schema.products).values({ id: "rns-rep", brandId: "rnb", name: "Cola", asin: "B0RNS001", marke: "Freaky Joe", marketplace: "de" });
+    await db.insert(schema.products).values({ id: "rns-a", brandId: "rnb", name: "Erdbeere", asin: "B0RNS002", marke: "Freaky Joe", marketplace: "de" });
+    await db.insert(schema.products).values({ id: "rns-b", brandId: "rnb", name: "Kiwi", asin: "B0RNS003", marke: "Freaky Joe", marketplace: "de" });
+
+    // rns-rep ist der Representative (Kopf), Base wird aber rns-a (Erdbeere)
+    const grp = await gruppiereZuFamilieKern(db, {
+      brandId: "rnb",
+      parent: { modus: "vorhanden", productId: "rns-rep" },
+      theme: ["flavor"],
+      children: [
+        { productId: "rns-rep", axisValues: { flavor: "Cola" } },
+        { productId: "rns-a", axisValues: { flavor: "Erdbeere" } },
+        { productId: "rns-b", axisValues: { flavor: "Kiwi" } },
+      ],
+    });
+    expect(grp.ok).toBe(true);
+
+    const mk = (type: "title" | "bullets" | "description", payload: Record<string, unknown>) =>
+      db.insert(schema.contentVersions).values({ id: crypto.randomUUID(), productId: "rns-a", type, version: 1, payload, status: "approved" });
+    await mk("title", { text: BASE_TITLE });
+    await mk("bullets", { items: BASE_BULLETS });
+    await mk("description", { text: BASE_DESC });
+
+    const entwurf = await baueMasterEntwurfKern(db, "rns-rep", "rns-a", keinRegenerate); // Base = Child, nicht Representative
+    expect(entwurf.ok).toBe(true);
+    if (!entwurf.ok) return;
+    await gibMasterFreiKern(db, "rns-rep", entwurf.master);
+
+    const prop = await propagiereFamilieKern(db, "rns-rep", regeneratorVerboten);
+    expect(prop.ok).toBe(true);
+    // Ziele = Representative (rns-rep) UND rns-b — NICHT die Base (rns-a).
+    expect(prop.kinder.map((k) => k.asin).sort()).toEqual(["B0RNS001", "B0RNS003"]);
+
+    // Der Representative bekam den Master: locked-Bullet 1 byte-identisch, Titel Cola-getauscht.
+    const repBullets = await db.query.contentVersions.findFirst({
+      where: and(eq(schema.contentVersions.productId, "rns-rep"), eq(schema.contentVersions.type, "bullets")),
+    });
+    expect((repBullets?.payload as { items: string[] }).items[0]).toBe(BASE_BULLETS[0]);
+    const repTitle = await db.query.contentVersions.findFirst({
+      where: and(eq(schema.contentVersions.productId, "rns-rep"), eq(schema.contentVersions.type, "title")),
+    });
+    expect((repTitle?.payload as { text: string }).text).toBe(BASE_TITLE.replace("Erdbeere", "Cola"));
+  });
 });
