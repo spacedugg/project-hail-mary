@@ -455,7 +455,7 @@ export async function toggleKeywordRelevanz(formData: FormData) {
   revalidatePath(`/produkte/${productId}`);
 }
 
-/** Zusatz-Infos zum Produkt speichern (D108) — fließen in jede Text-Generierung ein. */
+/** Optionale Produktbeschreibung speichern (D108/D219) — fließt in jede Text-Generierung UND (als Fallback) in die Beschreibungs-Dimension des Tiefen-Audits ein. */
 export async function saveZusatzKontext(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
   if (!productId) return;
@@ -558,7 +558,7 @@ async function generiereSektionKern(
     }
     const hatGrundlage = Boolean(snapshot?.title || snapshot?.bullets?.length || product.zusatzKontext?.trim());
     if (!hatGrundlage) {
-      throw new GenFehler("Ohne Bewertungs-Analyse braucht die Generierung eine Ersatz-Grundlage: Listing importieren oder Zusatz-Infos eintragen — sonst gäbe es nur erfundenen Text.", "GEN-03");
+      throw new GenFehler("Ohne Bewertungs-Analyse braucht die Generierung eine Ersatz-Grundlage: Listing importieren oder die optionale Produktbeschreibung eintragen — sonst gäbe es nur erfundenen Text.", "GEN-03");
     }
   }
 
@@ -1614,7 +1614,10 @@ async function auditKern(
   const bullets = ((latest("bullets")?.items as string[]) ?? []).length
     ? ((latest("bullets")?.items as string[]) ?? [])
     : (snapshot?.bullets ?? []);
-  const description = (latest("description")?.text as string) || snapshot?.description || "";
+  // D219: Kann Amazon keine Beschreibung liefern (A+ ersetzt das Beschreibungsfeld),
+  // füllt die optionale, manuell eingegebene Produktbeschreibung diese Lücke —
+  // so bekommt der Tiefen-Audit auch dann eine Beschreibungs-Dimension.
+  const description = (latest("description")?.text as string) || snapshot?.description || product.zusatzKontext?.trim() || "";
   if (!title && bullets.length === 0 && !description) {
     back("Tiefen-Audit braucht Listing-Inhalt — erst ‚Listing von Amazon laden' (Sektion 0) oder Content erstellen.");
   }

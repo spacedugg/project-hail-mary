@@ -132,15 +132,16 @@ export const DATENFLUSS: Datenpunkt[] = [
   },
   {
     id: "zusatz-infos",
-    name: "Zusatz-Infos vom Team",
-    quelle: "Freitextfeld am Produkt (D108) — Fakten & Vorbilder",
+    name: "Optionale Produktbeschreibung",
+    quelle: "Freitextfeld am Produkt (D108/D219) — nicht scrapebare Beschreibung, Fakten & Vorbilder",
     speicher: "products (zusatz_kontext)",
     analysen: [
       { name: "Direkte Prompt-Quelle", modul: "src/lib/recipes/listing.ts", outcome: "ZUSATZ-INFOS-Block in jedem Content-Prompt („verwenden, aber NICHTS darüber hinaus erfinden“)" },
       { name: "Zahlen-Herkunfts-Quelle", modul: "src/lib/validation/gate.ts", outcome: "im Zusatz belegte Zahlen/Specs passieren den Herkunfts-Check (D114)" },
+      { name: "Tiefen-Audit-Grundlage", modul: "src/lib/analysis/deepAudit.ts", outcome: "füllt die Beschreibungs-Dimension, wenn Amazon keine scrapebare Beschreibung liefert (A+ ersetzt sie) — D219" },
     ],
-    verwendung: ["Content-Generierung aller Sektionen", "Fakten-Sperre-Quellenbasis"],
-    anzeige: ["Produkt-Arbeitsplatz (Eingabefeld mit gespeichertem Stand)"],
+    verwendung: ["Content-Generierung aller Sektionen", "Fakten-Sperre-Quellenbasis", "Beschreibungs-Dimension des Tiefen-Audits (D219)"],
+    anzeige: ["Produkt-Arbeitsplatz — sichtbar in der Analyse-Start-Maske vor dem Lauf"],
   },
   {
     id: "content",

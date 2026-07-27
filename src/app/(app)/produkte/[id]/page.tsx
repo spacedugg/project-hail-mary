@@ -415,13 +415,13 @@ export default async function ProductPage({
         </section>
         )}
 
-        {/* Start-Phase (D172): Zusatz-Infos + EIN Klick für den ganzen Lauf */}
+        {/* Start-Phase (D172/D219): optionale Produktbeschreibung + EIN Klick für den ganzen Lauf */}
         {!bereit && (
         <section className="card p-5">
           <CardHead icon={<IconSparkle />} chip="chip-violet" title="Analyse & Content" />
-          <details className="mt-3" open={Boolean(product.zusatzKontext?.trim())}>
+          <details className="mt-3" open>
             <summary className="cursor-pointer text-xs text-muted hover:text-foreground">
-              Zusatz-Infos zum Produkt ({product.zusatzKontext?.trim() ? `${product.zusatzKontext.trim().length} Zeichen hinterlegt` : "leer"})
+              Optionale Produktbeschreibung ({product.zusatzKontext?.trim() ? `${product.zusatzKontext.trim().length} Zeichen hinterlegt` : "leer"})
             </summary>
             <form action={saveZusatzKontext} className="mt-2">
               <input type="hidden" name="productId" value={product.id} />
@@ -429,10 +429,10 @@ export default async function ProductPage({
                 name="zusatzKontext"
                 rows={5}
                 defaultValue={product.zusatzKontext ?? ""}
-                placeholder={"Alles, was die Texte wissen sollen und nirgends steht:\n· Details/Fakten zum Produkt\n· eigene Bullets/Titel als Ausgangspunkt\n· gute Bullets, Titel, Beschreibungen ANDERER Produkte als Vorbild"}
+                placeholder={"Die Produktbeschreibung, die sich nicht scrapen lässt (z. B. der Text, den A+-Inhalte auf der Detailseite ersetzt haben) — plus Fakten, die nirgends stehen.\nFließt in die Analyse UND in jede Texterstellung ein."}
                 className={`${input} w-full`}
               />
-              <SubmitButton className="mt-2 btn-dark text-xs">Zusatz-Infos speichern</SubmitButton>
+              <SubmitButton className="mt-2 btn-dark text-xs">Produktbeschreibung speichern</SubmitButton>
             </form>
           </details>
           <AnalyseStart productId={product.id} mainAsin={product.asin} />
@@ -599,10 +599,10 @@ export default async function ProductPage({
             chip="chip-teal"
             title="Content"
           />
-          {/* Zusatz-Infos (D108): fließen in JEDE Generierung ein */}
+          {/* Optionale Produktbeschreibung (D108/D219): fließt in JEDE Generierung UND in die Analyse ein */}
           <details className="mt-3">
             <summary className="cursor-pointer text-xs text-muted hover:text-foreground">
-              Zusatz-Infos zum Produkt ({product.zusatzKontext?.trim() ? `${product.zusatzKontext.trim().length} Zeichen hinterlegt` : "leer"})
+              Optionale Produktbeschreibung ({product.zusatzKontext?.trim() ? `${product.zusatzKontext.trim().length} Zeichen hinterlegt` : "leer"})
             </summary>
             <form action={saveZusatzKontext} className="mt-2">
               <input type="hidden" name="productId" value={product.id} />
@@ -610,10 +610,10 @@ export default async function ProductPage({
                 name="zusatzKontext"
                 rows={5}
                 defaultValue={product.zusatzKontext ?? ""}
-                placeholder={"Alles, was die Texte wissen sollen und nirgends steht:\n· Details/Fakten zum Produkt\n· eigene Bullets/Titel als Ausgangspunkt\n· gute Bullets, Titel, Beschreibungen ANDERER Produkte als Vorbild"}
+                placeholder={"Die Produktbeschreibung, die sich nicht scrapen lässt (z. B. der Text, den A+-Inhalte auf der Detailseite ersetzt haben) — plus Fakten, die nirgends stehen.\nFließt in die Analyse UND in jede Texterstellung ein."}
                 className={`${input} w-full`}
               />
-              <SubmitButton className="mt-2 btn-dark text-xs">Zusatz-Infos speichern</SubmitButton>
+              <SubmitButton className="mt-2 btn-dark text-xs">Produktbeschreibung speichern</SubmitButton>
             </form>
           </details>
           {/* Geführte Kette (D195): Sektion generieren → bearbeiten/freigeben →
