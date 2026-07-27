@@ -1,13 +1,12 @@
 # Tool ohne Terminal nutzen — Klick-Anleitung
 
-> Für die interne Nutzung ohne jede Kommandozeile. Alles läuft über Browser-Oberflächen (GitHub → Vercel → Turso), genau wie bei den anderen Temoa-Tools (Sales Room läuft bereits auf Turso).
+> Für die interne Nutzung ohne jede Kommandozeile. Alles läuft über Browser-Oberflächen (GitHub → Vercel → Supabase). Die Datenbank ist EINE gemeinsame Online-DB (Supabase/Postgres) — alle Personen, Geräte und Sessions sehen denselben Stand; nichts liegt offline oder nur für eine Person einsehbar (D221).
 
 ## Einmalige Einrichtung (ca. 10 Minuten, nur Klicks)
 
-### 1. Turso-Datenbank anlegen
-1. [turso.tech](https://turso.tech) → einloggen → **Create Database** (Region Frankfurt/AMS).
-2. In der Datenbank-Übersicht: **URL kopieren** (beginnt mit `libsql://…`).
-3. **Create Token** (Read & Write) → Token kopieren.
+### 1. Supabase-Datenbank anlegen
+1. [supabase.com](https://supabase.com) → einloggen → **New Project** (Region Frankfurt/EU-Central). Ein DB-Passwort vergeben und sicher notieren.
+2. Projekt öffnen → **Project Settings → Database → Connection string** → Reiter **Transaction pooler** wählen (Port `6543`) → die URL kopieren und das Passwort einsetzen. Sie sieht so aus: `postgresql://postgres.<ref>:<PASSWORT>@aws-…-eu-central-1.pooler.supabase.com:6543/postgres`.
 
 ### 2. Vercel-Projekt anlegen
 1. [vercel.com](https://vercel.com) → **Add New… → Project**.
@@ -18,8 +17,7 @@
 ### 3. Umgebungsvariablen (Vercel → Settings → Environment Variables)
 | Variable | Wert / Wofür | Ohne sie |
 |---|---|---|
-| `TURSO_DATABASE_URL` | die `libsql://…`-URL aus Schritt 1 | **Pflicht** — Serverless speichert sonst nichts dauerhaft |
-| `TURSO_AUTH_TOKEN` | der Token aus Schritt 1 | Pflicht zusammen mit der URL |
+| `DATABASE_URL` | die Transaction-Pooler-URL aus Schritt 1 (mit eingesetztem Passwort) | **Pflicht** — ohne sie startet die App nicht (kein lokaler Fallback mehr) |
 | `ANTHROPIC_API_KEY` | Text-Generierung (Claude) | Mock-Texte (deterministische Templates) |
 | `APIFY_API_KEY` | Review-Scraping | Review-Insights nur als Mock |
 | `AUTH_SECRET` | Signatur der Login-Sitzungen — **beliebige lange Zufallszeichenfolge** (z. B. in Vercel beim Feld auf „Generate" klicken oder einen Passwort-Manager 40+ Zeichen erzeugen lassen; niemals im Chat posten) | Logins nur dev-signiert (Demo-Banner warnt) |
@@ -39,4 +37,5 @@
 
 ## Hinweise
 - Die Keys liegen NUR in Vercel (serverseitig), nie im Code oder Browser.
-- Turso-Dashboard zeigt die Daten live (Tabellen: clients, brands, products, keywords, content_versions, review_insights, report_uploads).
+- Supabase → **Table Editor** zeigt die Daten live (Tabellen: clients, brands, products, keywords, content_versions, review_insights, report_uploads …).
+- Die Tabellen legt die App beim ersten Aufruf automatisch an (Migrationen laufen selbsttätig).

@@ -598,11 +598,14 @@ export async function onboardingProdukteAnlegen(formData: FormData) {
     // Bei Doppel-Submit oder gleichzeitigem Lauf wirft der zweite Insert sonst
     // eine unbehandelte Exception mit halb angelegtem Katalog (Review 23.07.).
     // Marketplace bleibt der Schema-Default "de" (Tool ist DE-only, D32).
+    // .returning() ist dialekt-neutral: bei Konflikt (onConflictDoNothing)
+    // wird keine Zeile eingefügt → leeres Array; sonst genau die neue Zeile.
     const res = await db
       .insert(schema.products)
       .values({ id: id(), brandId, name: asin, asin })
-      .onConflictDoNothing();
-    if (res.rowsAffected > 0) angelegt++;
+      .onConflictDoNothing()
+      .returning({ id: schema.products.id });
+    if (res.length > 0) angelegt++;
   }
 
   revalidatePath(basis);

@@ -1,1 +1,0 @@
-ALTER TABLE `products` ADD `content_sprache` text DEFAULT 'de' NOT NULL;

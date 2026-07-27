@@ -1,1 +1,0 @@
-ALTER TABLE `review_insights` ADD `scrape_id` text REFERENCES review_scrapes(id);

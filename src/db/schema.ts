@@ -1,16 +1,19 @@
-import { sqliteTable, text, integer, real, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { pgTable, text, integer, doublePrecision, boolean, timestamp, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 
 /**
  * Entity-Hierarchie (D16): Kunde → Marke → Marktplatz/Land → Produktgruppe → Produkt (ASIN).
- * Dialekt: Turso/libSQL (D43) — gleicher Stack wie sales-room/seo-os und damit
- * merge-kompatibel zum temoa-os-Kosmos (D39). Enums = getypte text-Spalten,
- * JSON = text im json-Mode (Drizzle validiert via $type).
+ * Dialekt: Supabase/Postgres (D221) — eine gemeinsame Online-DB, auf die alle
+ * Personen/Geräte/Sessions denselben Stand sehen; nichts liegt offline/isoliert.
+ * Enums = getypte text-Spalten, JSON = jsonb (Drizzle validiert via $type).
  */
 
+/** notNull-Timestamp mit Default-Now (JS-seitig gesetzt, dialekt-neutral). */
 const ts = (name: string) =>
-  integer(name, { mode: "timestamp" }).$defaultFn(() => new Date());
+  timestamp(name, { withTimezone: true, mode: "date" }).$defaultFn(() => new Date());
+/** Nullbarer Timestamp ohne Default (z. B. approvedAt). */
+const tsNull = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
 
-export const clients = sqliteTable("clients", {
+export const clients = pgTable("clients", {
   id: text("id").primaryKey(), // crypto.randomUUID()
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
@@ -24,7 +27,7 @@ export const clients = sqliteTable("clients", {
  * sieht die gesamte Anwendung. Passwort als scrypt "saltHex:hashHex"
  * (reporting-main-Muster); Rollen für später (heute alle "member").
  */
-export const users = sqliteTable(
+export const users = pgTable(
   "users",
   {
     id: text("id").primaryKey(),
@@ -42,14 +45,14 @@ export const users = sqliteTable(
  * Override der Amazon-Gebühren-Tabellen. Was hier steht, rechnet SOFORT —
  * das Rechenwerk zeigt immer den wirksamen Stand an (Anti-Blackbox).
  */
-export const settings = sqliteTable("settings", {
+export const settings = pgTable("settings", {
   key: text("key").primaryKey(),
-  value: text("value", { mode: "json" }).$type<unknown>().notNull(),
+  value: jsonb("value").$type<unknown>().notNull(),
   updatedBy: text("updated_by"),
   updatedAt: ts("updated_at").notNull(),
 });
 
-export const brands = sqliteTable("brands", {
+export const brands = pgTable("brands", {
   id: text("id").primaryKey(),
   clientId: text("client_id")
     .notNull()
@@ -62,7 +65,7 @@ export const brands = sqliteTable("brands", {
    * (reporting-main-Priorität: Hand-Eintrag vor berechneten Produkt-Margen;
    * der volle Margen-Rechner mit Gebühren-Tabellen folgt).
    */
-  marginPct: real("margin_pct"),
+  marginPct: doublePrecision("margin_pct"),
   /**
    * "brand" = betreute Kundenmarke (Portfolio/Workspace).
    * "workbench" = interner Listing-Optimizer-Container für Einzelaufträge
@@ -73,7 +76,7 @@ export const brands = sqliteTable("brands", {
    * Content-Verwaltung (E-Feature): Wenn true, blockiert das Publish-Gate, bis der
    * Kunde jeden Kern-Platz freigegeben hat. Die Zustimmung hängt an der Version.
    */
-  publishNurMitKundenfreigabe: integer("publish_nur_mit_kundenfreigabe", { mode: "boolean" })
+  publishNurMitKundenfreigabe: boolean("publish_nur_mit_kundenfreigabe")
     .notNull()
     .default(false),
   createdAt: ts("created_at").notNull(),
@@ -84,7 +87,7 @@ export type Marketplace = "de" | "uk" | "fr" | "it" | "es" | "nl" | "us";
 /** Content-Sprache je Produkt (D128) — unabhängig vom Marktplatz wählbar. */
 export type ContentSprache = "de" | "en" | "fr" | "it" | "es";
 
-export const productGroups = sqliteTable("product_groups", {
+export const productGroups = pgTable("product_groups", {
   id: text("id").primaryKey(),
   brandId: text("brand_id")
     .notNull()
@@ -92,7 +95,7 @@ export const productGroups = sqliteTable("product_groups", {
   name: text("name").notNull(),
 });
 
-export const products = sqliteTable(
+export const products = pgTable(
   "products",
   {
     id: text("id").primaryKey(),
@@ -116,10 +119,10 @@ export const products = sqliteTable(
      * Produkt-Wahrheit (PFLICHT-Input #1, knowledge/inputs.md):
      * Material, Maße, Specs, USPs — der Anker für Reference-Fidelity-Checks.
      */
-    facts: text("facts", { mode: "json" }).$type<ProductFacts>().notNull().default({}),
+    facts: jsonb("facts").$type<ProductFacts>().notNull().default({}),
     price: integer("price_cents"),
     /** Gespeicherte Margen-Kalkulation (Eingaben + Ergebnis) — liefert Break-even-ACoS je Produkt. */
-    marginCalc: text("margin_calc", { mode: "json" }).$type<{
+    marginCalc: jsonb("margin_calc").$type<{
       inputs: import("@/lib/margin/calc").MarginInputs;
       results: import("@/lib/margin/calc").MarginResults;
     }>(),
@@ -159,7 +162,7 @@ export type ProductFacts = {
 /** Keyword-Basis (PFLICHT-Input #2) — aus Cerebro-CSV oder manuell. */
 export type KeywordTier = "primary" | "secondary" | "tertiary" | "backend" | "excluded";
 
-export const keywords = sqliteTable("keywords", {
+export const keywords = pgTable("keywords", {
   id: text("id").primaryKey(),
   productId: text("product_id")
     .notNull()
@@ -176,9 +179,9 @@ export const keywords = sqliteTable("keywords", {
    * Präfix „manuell" ist eine Nutzer-Entscheidung — Auto-Läufe überschreiben
    * sie nie.
    */
-  ausgeschlossen: integer("ausgeschlossen", { mode: "boolean" }).notNull().default(false),
+  ausgeschlossen: boolean("ausgeschlossen").notNull().default(false),
   ausschlussGrund: text("ausschluss_grund"),
-  meta: text("meta", { mode: "json" }).$type<Record<string, unknown>>(),
+  meta: jsonb("meta").$type<Record<string, unknown>>(),
   createdAt: ts("created_at").notNull(),
 });
 
@@ -196,7 +199,7 @@ export type ContentType =
 
 export type ContentStatus = "draft" | "approved" | "synced";
 
-export const contentVersions = sqliteTable("content_versions", {
+export const contentVersions = pgTable("content_versions", {
   id: text("id").primaryKey(),
   productId: text("product_id")
     .notNull()
@@ -204,21 +207,21 @@ export const contentVersions = sqliteTable("content_versions", {
   type: text("type").$type<ContentType>().notNull(),
   version: integer("version").notNull().default(1),
   /** title/description/highlights: { text }, bullets: { items }, qa: { pairs }, + rationale */
-  payload: text("payload", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
   status: text("status").$type<ContentStatus>().notNull().default("draft"),
   /** Ergebnis des Validation-Gates zum Zeitpunkt der Erstellung (Audit-Trail). */
-  validation: text("validation", { mode: "json" }).$type<ValidationReport>(),
+  validation: jsonb("validation").$type<ValidationReport>(),
   /** Herkunft: Modell + Recipe-Version (D28: pro Recipe gepinnt) oder "manual". */
   generatedBy: text("generated_by"),
   createdAt: ts("created_at").notNull(),
-  approvedAt: integer("approved_at", { mode: "timestamp" }),
+  approvedAt: tsNull("approved_at"),
   /** Wer intern freigegeben hat (E-Feature Freigabe-Kette). */
   approvedBy: text("approved_by"),
   /** Wann diese Version an den Kunden geschickt/markiert wurde (E-Feature). */
-  sentToClientAt: integer("sent_to_client_at", { mode: "timestamp" }),
+  sentToClientAt: tsNull("sent_to_client_at"),
   /** Über welchen Freigabe-Link sie beim Kunden liegt (E-Feature). */
   sentShareId: text("sent_share_id"),
-  syncedAt: integer("synced_at", { mode: "timestamp" }),
+  syncedAt: tsNull("synced_at"),
 });
 
 /**
@@ -226,12 +229,12 @@ export const contentVersions = sqliteTable("content_versions", {
  * hier persistent, damit auswertbar ist, WELCHE Regel wie oft scheitert
  * (Anzeige: „Daten & Formeln"). Die Server-Konsole allein war flüchtig.
  */
-export const qmBlocks = sqliteTable("qm_blocks", {
+export const qmBlocks = pgTable("qm_blocks", {
   id: text("id").primaryKey(),
   productId: text("product_id").references(() => products.id, { onDelete: "cascade" }),
   /** z. B. "listing.title" — Pipeline-Bereich des Blocks. */
   bereich: text("bereich").notNull(),
-  findings: text("findings", { mode: "json" }).$type<ValidationIssue[]>().notNull(),
+  findings: jsonb("findings").$type<ValidationIssue[]>().notNull(),
   versuche: integer("versuche").notNull(),
   createdAt: ts("created_at").notNull(),
 });
@@ -256,30 +259,30 @@ export type ValidationReport = {
  * der Nutzer sieht die Datenbasis (Reviews je Sterne-Zahl, je ASIN),
  * bevor er die KI-Auswertung auslöst.
  */
-export const reviewScrapes = sqliteTable("review_scrapes", {
+export const reviewScrapes = pgTable("review_scrapes", {
   id: text("id").primaryKey(),
   productId: text("product_id")
     .notNull()
     .references(() => products.id, { onDelete: "cascade" }),
   source: text("source").$type<"apify" | "mock" | "seed">().notNull().default("apify"),
-  asins: text("asins", { mode: "json" }).$type<string[]>().notNull(),
-  reviews: text("reviews", { mode: "json" }).$type<Array<{ asin: string; rating: number; title: string; body: string }>>().notNull(),
+  asins: jsonb("asins").$type<string[]>().notNull(),
+  reviews: jsonb("reviews").$type<Array<{ asin: string; rating: number; title: string; body: string }>>().notNull(),
   /** Verteilung 1–5 Sterne der GESCRAPTEN Reviews (Stichprobe, je Klasse gedeckelt) — nicht die Amazon-Gesamtverteilung. */
-  starCounts: text("star_counts", { mode: "json" }).$type<Record<string, number>>().notNull(),
-  perAsin: text("per_asin", { mode: "json" }).$type<Record<string, number>>().notNull(),
+  starCounts: jsonb("star_counts").$type<Record<string, number>>().notNull(),
+  perAsin: jsonb("per_asin").$type<Record<string, number>>().notNull(),
   /**
    * Echte Amazon-Zahlen zum Scrape-Zeitpunkt (D74) — Gesamt-Bewertungen, Ø-Rating,
    * Verteilung in % je Klasse. Trennt die Wahrheit („1.343 · Ø 4,6") von der
    * Stichprobe („182 gescraped"), damit die Datenbasis nie trügerisch wirkt.
    */
-  amazonTotals: text("amazon_totals", { mode: "json" }).$type<{
+  amazonTotals: jsonb("amazon_totals").$type<{
     reviewsTotal: number | null;
     ratingAvg: number | null;
     dist: Record<string, number> | null;
     asOf: string;
   }>(),
   /** Ehrlichkeits-Notizen, z. B. „3★-Lauf ins Zeitlimit gelaufen" (D72). */
-  notes: text("notes", { mode: "json" }).$type<string[]>(),
+  notes: jsonb("notes").$type<string[]>(),
   createdAt: ts("created_at").notNull(),
 });
 
@@ -289,14 +292,14 @@ export const reviewScrapes = sqliteTable("review_scrapes", {
  * aus ECHTEN Daten (Listing-Snapshot, Review-Insights, SOV, Basics) statt aus
  * manuell getippten Fakten-Feldern. USPs & Zielgruppe werden HERGELEITET.
  */
-export const deepAudits = sqliteTable("deep_audits", {
+export const deepAudits = pgTable("deep_audits", {
   id: text("id").primaryKey(),
   productId: text("product_id")
     .notNull()
     .references(() => products.id, { onDelete: "cascade" }),
-  payload: text("payload", { mode: "json" }).$type<DeepAuditPayload>().notNull(),
+  payload: jsonb("payload").$type<DeepAuditPayload>().notNull(),
   /** Was tatsächlich eingeflossen ist (Transparenz, Anti-Blackbox). */
-  dataBasis: text("data_basis", { mode: "json" }).$type<string[]>().notNull(),
+  dataBasis: jsonb("data_basis").$type<string[]>().notNull(),
   createdAt: ts("created_at").notNull(),
 });
 
@@ -323,13 +326,13 @@ export type DeepAuditPayload = {
  * Erwähnungen der zugeordneten Review-Aspekte, Quellen-Tags nur nach
  * verifiziertem Verbatim-Beleg im Listing-Text (D133).
  */
-export const featureRankings = sqliteTable("feature_rankings", {
+export const featureRankings = pgTable("feature_rankings", {
   id: text("id").primaryKey(),
   productId: text("product_id")
     .notNull()
     .references(() => products.id, { onDelete: "cascade" }),
-  payload: text("payload", { mode: "json" }).$type<FeatureRankingPayload>().notNull(),
-  dataBasis: text("data_basis", { mode: "json" }).$type<string[]>().notNull(),
+  payload: jsonb("payload").$type<FeatureRankingPayload>().notNull(),
+  dataBasis: jsonb("data_basis").$type<string[]>().notNull(),
   createdAt: ts("created_at").notNull(),
 });
 
@@ -349,13 +352,13 @@ export type FeatureRankingPayload = {
  * kostet Conversion. Karten im Insight-Schema (D132/D135); ein Blocker ohne
  * aufgelösten Beleg-Aspekt fliegt (der Match IST die Existenzberechtigung).
  */
-export const conversionBlockers = sqliteTable("conversion_blockers", {
+export const conversionBlockers = pgTable("conversion_blockers", {
   id: text("id").primaryKey(),
   productId: text("product_id")
     .notNull()
     .references(() => products.id, { onDelete: "cascade" }),
-  payload: text("payload", { mode: "json" }).$type<ConversionBlockerPayload>().notNull(),
-  dataBasis: text("data_basis", { mode: "json" }).$type<string[]>().notNull(),
+  payload: jsonb("payload").$type<ConversionBlockerPayload>().notNull(),
+  dataBasis: jsonb("data_basis").$type<string[]>().notNull(),
   createdAt: ts("created_at").notNull(),
 });
 
@@ -367,7 +370,7 @@ export type ConversionBlockerPayload = {
   stats: { reviewsGesamt: number };
 };
 
-export const reviewInsights = sqliteTable("review_insights", {
+export const reviewInsights = pgTable("review_insights", {
   id: text("id").primaryKey(),
   productId: text("product_id")
     .notNull()
@@ -376,7 +379,7 @@ export const reviewInsights = sqliteTable("review_insights", {
   scrapeId: text("scrape_id").references(() => reviewScrapes.id, { onDelete: "set null" }),
   dataBasis: text("data_basis").notNull(), // uploaded_csv | apify_scrape | none
   confidence: text("confidence").notNull(), // high | medium | low
-  payload: text("payload", { mode: "json" }).$type<ReviewInsightsPayload>().notNull(),
+  payload: jsonb("payload").$type<ReviewInsightsPayload>().notNull(),
   createdAt: ts("created_at").notNull(),
 });
 
@@ -408,15 +411,15 @@ export type AspektUebertragbarkeit = {
  * sind Rohstoff — dort steht, welche Informationen die Konkurrenz abbildet und
  * wir (noch) nicht. Gescrapt beim Review-Scrape, wenn Competitor-ASINs vorliegen.
  */
-export const competitorListings = sqliteTable("competitor_listings", {
+export const competitorListings = pgTable("competitor_listings", {
   id: text("id").primaryKey(),
   productId: text("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
   asin: text("asin").notNull(),
   source: text("source").notNull(), // anthropic | crawler | apify | mock
   title: text("title"),
-  bullets: text("bullets", { mode: "json" }).$type<string[]>(),
+  bullets: jsonb("bullets").$type<string[]>(),
   description: text("description"),
-  attributes: text("attributes", { mode: "json" }).$type<Record<string, string> | null>(),
+  attributes: jsonb("attributes").$type<Record<string, string> | null>(),
   createdAt: ts("created_at").notNull(),
 });
 
@@ -428,11 +431,11 @@ export const competitorListings = sqliteTable("competitor_listings", {
  * unseren Angaben (nie aufnehmen) · „unbekannt" = kein Beleg für Widerspruch
  * ODER Deckung — tendenziell aufnehmbar, aber als PRÜFEN markiert.
  */
-export const competitorInfoGaps = sqliteTable("competitor_info_gaps", {
+export const competitorInfoGaps = pgTable("competitor_info_gaps", {
   id: text("id").primaryKey(),
   productId: text("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
-  payload: text("payload", { mode: "json" }).$type<CompetitorGapPayload>().notNull(),
-  dataBasis: text("data_basis", { mode: "json" }).$type<string[]>().notNull(),
+  payload: jsonb("payload").$type<CompetitorGapPayload>().notNull(),
+  dataBasis: jsonb("data_basis").$type<string[]>().notNull(),
   createdAt: ts("created_at").notNull(),
 });
 
@@ -510,21 +513,21 @@ export type InsightCard = {
 };
 
 /** Hochgeladene Berichte, getaggt mit Marke·Land·Periode (geführter Upload). */
-export const reportUploads = sqliteTable("report_uploads", {
+export const reportUploads = pgTable("report_uploads", {
   id: text("id").primaryKey(),
   brandId: text("brand_id")
     .notNull()
     .references(() => brands.id, { onDelete: "cascade" }),
   marketplace: text("marketplace").$type<Marketplace>().notNull().default("de"),
   reportType: text("report_type").notNull(), // business | sqp | ads | searchterm | cerebro | h10_bundle | reviews_csv
-  periodStart: integer("period_start", { mode: "timestamp" }),
-  periodEnd: integer("period_end", { mode: "timestamp" }),
+  periodStart: tsNull("period_start"),
+  periodEnd: tsNull("period_end"),
   fileName: text("file_name").notNull(),
   /** Geparste, normalisierte Daten — Rohdatei liegt später im Objektspeicher. */
-  parsed: text("parsed", { mode: "json" }),
+  parsed: jsonb("parsed"),
   parseStatus: text("parse_status").notNull().default("pending"), // pending | ok | error
   parseError: text("parse_error"),
-  isSuspended: integer("is_suspended", { mode: "boolean" }).notNull().default(false), // Perioden-Flag-Muster
+  isSuspended: boolean("is_suspended").notNull().default(false), // Perioden-Flag-Muster
   createdAt: ts("created_at").notNull(),
 });
 
@@ -537,7 +540,7 @@ export type ActionScope = "account" | "brand" | "product";
 export type ActionCategory = "content" | "ppc" | "listing" | "produkt" | "daten";
 export type ActionStatus = "open" | "in_progress" | "done";
 
-export const actions = sqliteTable("actions", {
+export const actions = pgTable("actions", {
   id: text("id").primaryKey(),
   brandId: text("brand_id")
     .notNull()
@@ -551,31 +554,31 @@ export const actions = sqliteTable("actions", {
   upliftEur: integer("uplift_eur"),
   status: text("status").$type<ActionStatus>().notNull().default("open"),
   createdAt: ts("created_at").notNull(),
-  doneAt: integer("done_at", { mode: "timestamp" }),
+  doneAt: tsNull("done_at"),
 });
 
 /** Original-Listing-Snapshot (Import aus Amazon-Scrape oder H10-CSV) — das "Vorher". */
-export const listingSnapshots = sqliteTable("listing_snapshots", {
+export const listingSnapshots = pgTable("listing_snapshots", {
   id: text("id").primaryKey(),
   productId: text("product_id")
     .notNull()
     .references(() => products.id, { onDelete: "cascade" }),
   source: text("source").notNull(), // apify | h10_csv | manual
   title: text("title"),
-  bullets: text("bullets", { mode: "json" }).$type<string[]>(),
+  bullets: jsonb("bullets").$type<string[]>(),
   description: text("description"),
-  imageUrls: text("image_urls", { mode: "json" }).$type<string[]>(),
+  imageUrls: jsonb("image_urls").$type<string[]>(),
   /** Amazon-Basics zum Import-Zeitpunkt (D73): echte Gesamt-Bewertungszahl, Ø-Rating, Sterne-Verteilung (% je Klasse) — wie auf der Produktseite sichtbar. */
   reviewsTotal: integer("reviews_total"),
-  ratingAvg: real("rating_avg"),
-  ratingDist: text("rating_dist", { mode: "json" }).$type<Record<string, number>>(),
+  ratingAvg: doublePrecision("rating_avg"),
+  ratingDist: jsonb("rating_dist").$type<Record<string, number>>(),
   /**
    * Erweiterte Listing-Quellen (D145): strukturierte Attribute (Produktinformation-
    * Tabelle als Schlüssel→Wert), die Sektion „Wichtige Informationen" und der
    * A+-Inhalt („Vom Hersteller") als Text. null = vom Import-Weg nicht erfasst —
    * wird im UI ehrlich ausgewiesen, nie als „leer" gedeutet.
    */
-  attributes: text("attributes", { mode: "json" }).$type<Record<string, string>>(),
+  attributes: jsonb("attributes").$type<Record<string, string>>(),
   importantInfo: text("important_info"),
   aplusContent: text("aplus_content"),
   /**
@@ -584,10 +587,10 @@ export const listingSnapshots = sqliteTable("listing_snapshots", {
    * Läuft AUTOMATISCH beim Import (kein Extra-Schritt); null = nicht
    * ausgelesen (z. B. ohne API-Key) — ehrlich ausgewiesen.
    */
-  bilderText: text("bilder_text", { mode: "json" }).$type<Array<{ slot: number; typ?: string | null; textImBild: string[]; inhalt: string; claims: string[]; faktoren?: Record<string, { score: number | null; wasWirSehen: string; warum: string; wieBesser: string }> | null }>>(),
+  bilderText: jsonb("bilder_text").$type<Array<{ slot: number; typ?: string | null; textImBild: string[]; inhalt: string; claims: string[]; faktoren?: Record<string, { score: number | null; wasWirSehen: string; warum: string; wieBesser: string }> | null }>>(),
   /** Bild-Audit-Befunde (nur faktische Regel-Verstöße, z. B. Text auf dem Hauptbild). */
-  bildBefunde: text("bild_befunde", { mode: "json" }).$type<string[]>(),
-  raw: text("raw", { mode: "json" }),
+  bildBefunde: jsonb("bild_befunde").$type<string[]>(),
+  raw: jsonb("raw"),
   createdAt: ts("created_at").notNull(),
 });
 
@@ -597,15 +600,15 @@ export const listingSnapshots = sqliteTable("listing_snapshots", {
  * 3 Header-Zeilen + Feldnamen (klein, kein Binary) und erzeugen daraus
  * upload-fertige tab-getrennte TXT-Dateien.
  */
-export const flatfileTemplates = sqliteTable("flatfile_templates", {
+export const flatfileTemplates = pgTable("flatfile_templates", {
   id: text("id").primaryKey(),
   brandId: text("brand_id")
     .notNull()
     .references(() => brands.id, { onDelete: "cascade" }),
   fileName: text("file_name").notNull(),
   sheetName: text("sheet_name"),
-  headerRows: text("header_rows", { mode: "json" }).$type<string[][]>().notNull(),
-  fieldNames: text("field_names", { mode: "json" }).$type<string[]>().notNull(),
+  headerRows: jsonb("header_rows").$type<string[][]>().notNull(),
+  fieldNames: jsonb("field_names").$type<string[]>().notNull(),
   createdAt: ts("created_at").notNull(),
 });
 
@@ -626,7 +629,7 @@ export const flatfileTemplates = sqliteTable("flatfile_templates", {
 export type PieceQuelle = "optimizer" | "import" | "manuell" | "ist_uebernommen";
 export type PieceStatus = "entwurf" | "intern_frei" | "kunde_frei" | "live";
 
-export const contentPieces = sqliteTable(
+export const contentPieces = pgTable(
   "content_pieces",
   {
     id: text("id").primaryKey(),
@@ -642,7 +645,7 @@ export const contentPieces = sqliteTable(
     /** Einzelwert (Text-Slots) bzw. Asset-URL (Bild-Slots). */
     wert: text("wert"),
     /** Mehrteilige Slots (Bullets, Q&A) und A+-Modul-Listen. */
-    werte: text("werte", { mode: "json" }).$type<unknown>(),
+    werte: jsonb("werte").$type<unknown>(),
     quelle: text("quelle").$type<PieceQuelle>().notNull().default("manuell"),
     status: text("status").$type<PieceStatus>().notNull().default("entwurf"),
     notiz: text("notiz"),
@@ -653,7 +656,7 @@ export const contentPieces = sqliteTable(
 );
 
 /** Publish-Protokoll: was ging wann auf welchem Weg raus (der „Ist ausgeliefert"-Anker). */
-export const contentPublications = sqliteTable("content_publications", {
+export const contentPublications = pgTable("content_publications", {
   id: text("id").primaryKey(),
   brandId: text("brand_id")
     .notNull()
@@ -661,21 +664,21 @@ export const contentPublications = sqliteTable("content_publications", {
   productId: text("product_id").references(() => products.id, { onDelete: "cascade" }),
   weg: text("weg").$type<"flatfile" | "sp_api">().notNull(),
   /** Erzeugter Payload (JSON-Patch) bzw. Zusammenfassung der Flat-File-Zeilen. */
-  payload: text("payload", { mode: "json" }).$type<unknown>(),
-  slots: text("slots", { mode: "json" }).$type<string[]>().notNull(),
+  payload: jsonb("payload").$type<unknown>(),
+  slots: jsonb("slots").$type<string[]>().notNull(),
   /**
    * „erzeugt" = Datei/Payload gebaut · „eingereicht" = an Amazon übergeben ·
    * „bestaetigt" = im Soll/Ist-Abgleich live gesehen. ACCEPTED von Amazon ist
    * KEIN Beweis für live (Kontrakt §3.4) — deshalb der dritte Zustand.
    */
   status: text("status").$type<"erzeugt" | "eingereicht" | "bestaetigt" | "fehler">().notNull().default("erzeugt"),
-  hinweise: text("hinweise", { mode: "json" }).$type<string[]>(),
+  hinweise: jsonb("hinweise").$type<string[]>(),
   createdBy: text("created_by"),
   createdAt: ts("created_at").notNull(),
 });
 
 /** Ein Soll/Ist-Lauf je Produkt — Ergebnis von lib/cms/accuracy.ts. */
-export const contentChecks = sqliteTable("content_checks", {
+export const contentChecks = pgTable("content_checks", {
   id: text("id").primaryKey(),
   brandId: text("brand_id")
     .notNull()
@@ -685,7 +688,7 @@ export const contentChecks = sqliteTable("content_checks", {
     .references(() => products.id, { onDelete: "cascade" }),
   /** Auf welchem Listing-Snapshot der Abgleich lief (Nachvollziehbarkeit). */
   snapshotId: text("snapshot_id").references(() => listingSnapshots.id, { onDelete: "set null" }),
-  ergebnis: text("ergebnis", { mode: "json" }).$type<unknown>().notNull(),
+  ergebnis: jsonb("ergebnis").$type<unknown>().notNull(),
   /** null = nicht messbar (kein Ist-Stand) — bewusst NICHT 0 oder 100. */
   accuracyPct: integer("accuracy_pct"),
   createdAt: ts("created_at").notNull(),
@@ -693,7 +696,7 @@ export const contentChecks = sqliteTable("content_checks", {
 
 export type AlertStatus = "offen" | "bestaetigt" | "erledigt";
 
-export const contentAlerts = sqliteTable("content_alerts", {
+export const contentAlerts = pgTable("content_alerts", {
   id: text("id").primaryKey(),
   brandId: text("brand_id")
     .notNull()
@@ -707,7 +710,7 @@ export const contentAlerts = sqliteTable("content_alerts", {
   nachricht: text("nachricht").notNull(),
   status: text("status").$type<AlertStatus>().notNull().default("offen"),
   createdAt: ts("created_at").notNull(),
-  erledigtAt: integer("erledigt_at", { mode: "timestamp" }),
+  erledigtAt: tsNull("erledigt_at"),
 });
 
 /**
@@ -716,7 +719,7 @@ export const contentAlerts = sqliteTable("content_alerts", {
  * `passwordHash` ist vorbereitet, damit daraus später ein echtes Kundenkonto wird,
  * ohne Datenumzug.
  */
-export const clientContacts = sqliteTable(
+export const clientContacts = pgTable(
   "client_contacts",
   {
     id: text("id").primaryKey(),
@@ -737,7 +740,7 @@ export const clientContacts = sqliteTable(
  * Bewusst ohne Login — der Kunde soll Feedback geben können, nicht ein Konto
  * verwalten. Ablauf + Widerruf sind Pflicht, sonst ist es ein Dauerleck.
  */
-export const contentShares = sqliteTable(
+export const contentShares = pgTable(
   "content_shares",
   {
     id: text("id").primaryKey(),
@@ -748,11 +751,11 @@ export const contentShares = sqliteTable(
     contactId: text("contact_id").references(() => clientContacts.id, { onDelete: "set null" }),
     label: text("label").notNull(),
     /** null = alle Produkte der Marke. */
-    productIds: text("product_ids", { mode: "json" }).$type<string[] | null>(),
+    productIds: jsonb("product_ids").$type<string[] | null>(),
     /** Darf der Kunde freigeben — oder nur kommentieren? */
-    darfFreigeben: integer("darf_freigeben", { mode: "boolean" }).notNull().default(true),
-    expiresAt: integer("expires_at", { mode: "timestamp" }),
-    revokedAt: integer("revoked_at", { mode: "timestamp" }),
+    darfFreigeben: boolean("darf_freigeben").notNull().default(true),
+    expiresAt: tsNull("expires_at"),
+    revokedAt: tsNull("revoked_at"),
     createdBy: text("created_by"),
     createdAt: ts("created_at").notNull(),
   },
@@ -768,7 +771,7 @@ export type FeedbackStatus = "offen" | "erledigt";
  * nachvollziehbar, auf welchen Stand sich eine Kundenaussage bezog, auch wenn
  * danach neu generiert wurde.
  */
-export const contentFeedback = sqliteTable("content_feedback", {
+export const contentFeedback = pgTable("content_feedback", {
   id: text("id").primaryKey(),
   brandId: text("brand_id")
     .notNull()
@@ -790,6 +793,6 @@ export const contentFeedback = sqliteTable("content_feedback", {
   nachricht: text("nachricht").notNull(),
   status: text("status").$type<FeedbackStatus>().notNull().default("offen"),
   erledigtVon: text("erledigt_von"),
-  erledigtAt: integer("erledigt_at", { mode: "timestamp" }),
+  erledigtAt: tsNull("erledigt_at"),
   createdAt: ts("created_at").notNull(),
 });

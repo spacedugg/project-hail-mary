@@ -1,34 +1,39 @@
-import { drizzle, type LibSQLDatabase } from "drizzle-orm/libsql";
+import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import * as schema from "./schema";
 
 /**
- * DB-Zugriff via Turso/libSQL (D43) — gleicher Stack wie sales-room/seo-os:
- * - Mit TURSO_DATABASE_URL (+ TURSO_AUTH_TOKEN): Turso-Cloud, von überall erreichbar.
- * - Ohne: lokale Datei ./.data/dev.db (gleiche Engine, kein Setup nötig).
+ * DB-Zugriff via Supabase/Postgres (D221) — EINE gemeinsame Online-DB, auf die
+ * alle Personen/Geräte/Sessions denselben Stand sehen. Es gibt bewusst KEINEN
+ * lokalen Datei-Fallback mehr (früher SQLite): Nichts darf offline/isoliert
+ * liegen. `DATABASE_URL` ist Pflicht — lokal in .env.local, in Produktion in
+ * Vercel. `prepare: false` ist für den Supabase-Transaction-Pooler nötig
+ * (pgBouncer im Transaction-Modus kennt keine Prepared Statements).
  * Migrationen (./drizzle) laufen beim ersten Zugriff automatisch.
  */
 
-export type Db = LibSQLDatabase<typeof schema>;
+export type Db = PostgresJsDatabase<typeof schema>;
 
 let _db: Promise<Db> | null = null;
 
-/** Minimaler struktureller Typ des libSQL-Clients (nur was wir hier brauchen). */
-type SqlClient = { execute: (sql: string) => Promise<unknown> };
+/** Minimaler struktureller Typ des postgres-js-Clients (nur was wir hier brauchen). */
+type SqlClient = { unsafe: (query: string) => Promise<unknown> };
 
 /**
- * Migrationen anwenden — robust gegen eine bereits provisionierte Turso-DB,
- * deren Ist-Stand vom Migrations-Verlauf abweicht (D207-Nachtrag): Wenn ein
- * Objekt aus einem früheren Deploy/Push schon existiert, scheitert der
- * Standard-Migrator an genau EINER Anweisung und reißt — weil der Fehler in
- * getDb() gecacht wird — die GANZE App mit (500 auf jeder Seite, inkl. Login).
+ * Migrationen anwenden — robust gegen eine bereits provisionierte DB, deren
+ * Ist-Stand vom Migrations-Verlauf abweicht (D207-Muster): Wenn ein Objekt aus
+ * einem früheren Deploy schon existiert, scheitert der Standard-Migrator an
+ * genau EINER Anweisung und reißt — weil der Fehler in getDb() gecacht wird —
+ * die GANZE App mit (500 auf jeder Seite, inkl. Login).
  *
  * Ablauf: erst der normale Drizzle-Migrator. Scheitert er, ziehen wir die
  * .sql-Dateien statementweise nach und überspringen bewusst „already exists"
- * bzw. „duplicate column" — so konvergiert das Schema, ohne dass ein Hickup das
- * Tool lahmlegt. Ein ECHTER Fehler (kein Idempotenz-Fall) wird weitergereicht.
+ * bzw. „duplicate" — so konvergiert das Schema, ohne dass ein Hickup das Tool
+ * lahmlegt. Ein ECHTER Fehler (kein Idempotenz-Fall) wird protokolliert, aber
+ * nicht geworfen (Nutzer-Vorgabe: „das Tool soll trotzdem laden").
  */
 async function runMigrations(client: SqlClient, db: Db): Promise<void> {
-  const { migrate } = await import("drizzle-orm/libsql/migrator");
+  const { migrate } = await import("drizzle-orm/postgres-js/migrator");
   try {
     await migrate(db, { migrationsFolder: "./drizzle" });
     return;
@@ -47,15 +52,14 @@ async function runMigrations(client: SqlClient, db: Db): Promise<void> {
       const stmt = roh.trim().replace(/;\s*$/, "");
       if (!stmt) continue;
       try {
-        await client.execute(stmt);
+        await client.unsafe(stmt);
       } catch (e) {
         const msg = String((e as Error)?.message ?? e).toLowerCase();
-        // Idempotenz: bereits vorhandene Objekte/Spalten sind erwartbar.
-        if (msg.includes("already exists") || msg.includes("duplicate column")) continue;
+        // Idempotenz: bereits vorhandene Objekte/Spalten sind erwartbar
+        // (Postgres: „relation … already exists", „column … already exists").
+        if (msg.includes("already exists") || msg.includes("duplicate")) continue;
         // Anderer Fehler: protokollieren, aber NICHT werfen — ein einzelnes
-        // fehlgeschlagenes Statement darf das ganze Tool nicht lahmlegen
-        // (Nutzer-Vorgabe: „das Tool soll trotzdem laden"). Der /api/health-
-        // Endpunkt und die Logs machen die Ursache sichtbar.
+        // fehlgeschlagenes Statement darf das ganze Tool nicht lahmlegen.
         console.error(`[db] Migrations-Statement übersprungen (${datei}):`, msg, "\n", stmt.slice(0, 200));
       }
     }
@@ -63,28 +67,17 @@ async function runMigrations(client: SqlClient, db: Db): Promise<void> {
 }
 
 async function init(): Promise<Db> {
-  const { createClient } = await import("@libsql/client");
-
-  const url = process.env.TURSO_DATABASE_URL;
-  let client;
-  if (url) {
-    client = createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN });
-  } else if (process.env.VERCEL) {
-    // Auf Vercel gibt es kein beschreibbares Dateisystem — ohne Turso-Variablen
-    // klar scheitern statt kryptisch beim mkdir.
+  const url = process.env.DATABASE_URL;
+  if (!url) {
     throw new Error(
-      "TURSO_DATABASE_URL fehlt. In Vercel unter Settings → Environment Variables setzen (siehe DEPLOY.md) und danach Redeploy klicken.",
+      "DATABASE_URL fehlt. Supabase-Connection-String (Transaction Pooler) lokal in .env.local und in Vercel unter Settings → Environment Variables setzen, dann neu starten/Redeploy.",
     );
-  } else {
-    const file = process.env.DB_FILE ?? "./.data/dev.db";
-    const { mkdirSync } = await import("node:fs");
-    const { dirname } = await import("node:path");
-    mkdirSync(dirname(file), { recursive: true });
-    client = createClient({ url: `file:${file}` });
   }
 
+  // prepare:false = Pflicht hinter dem Supabase-Transaction-Pooler.
+  const client = postgres(url, { prepare: false });
   const db = drizzle(client, { schema });
-  await runMigrations(client as SqlClient, db);
+  await runMigrations(client as unknown as SqlClient, db);
   return db;
 }
 

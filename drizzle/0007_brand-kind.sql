@@ -1,1 +1,0 @@
-ALTER TABLE `brands` ADD `kind` text DEFAULT 'brand' NOT NULL;
