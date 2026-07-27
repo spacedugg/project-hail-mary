@@ -42,9 +42,9 @@ export const BILD_TYP_LABELS: Record<BildTyp, string> = {
 export const BILD_TYP_KRITERIUM: Record<BildTyp, string> = {
   main_image: "Freisteller des Produkts auf reinem weißem Hintergrund, ohne Text/Grafik/Requisiten — der Galerie-Erstplatz.",
   infographic_explainer: "Erklärt per Grafik, Diagramm oder Schaubild, wie das Produkt funktioniert oder aufgebaut ist.",
-  feature_highlight: "Stellt eine konkrete Produkteigenschaft/Funktion mit Headline oder Pill in den Vordergrund.",
+  feature_highlight: "Stellt GENAU EINE konkrete Produkteigenschaft/Funktion mit Headline oder Pill in den Vordergrund — NICHT das ganze Set, keine Bestandteil-Auflistung.",
   brand_trust: "Vertrauens-Signale: Marke, Herkunft, Garantie, Zertifikate, Bewertungen, Vergleich mit Konkurrenz.",
-  packaging_unboxing: "Verpackung, Lieferumfang oder Unboxing — zeigt, was der Kunde tatsächlich erhält.",
+  packaging_unboxing: "Zeigt, was der Kunde GELIEFERT bekommt: Verpackung, Lieferumfang/Unboxing ODER das GANZE SET bzw. mehrere Produkt-Bestandteile nebeneinander (z. B. Dose + Sachets + Box + Shaker) — auch wenn eine Headline dabei steht. Mehrere Bestandteile im Bild ⇒ eher dieser Typ als feature_highlight.",
   lifestyle_in_use: "Produkt in echter Anwendung oder Umgebung, oft mit Mensch/Szene (emotionaler Kontext).",
   technical_detail: "Maße, Spezifikationen, Material-Makro oder Technik-Detail — Fakten zum Nachprüfen.",
 };

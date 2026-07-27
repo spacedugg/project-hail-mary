@@ -1,4 +1,5 @@
 import { parseAttributes, parseImportantInfo, type ProductSnapshot } from "./apifyProduct";
+import { bereinigeBildUrls } from "./bilder";
 import { amazonSprachParam } from "@/lib/text/sprache";
 import type { Marketplace } from "@/db/schema";
 
@@ -46,7 +47,7 @@ export function mapCrawlerItem(it: CrawlerItem, url: string): ProductSnapshot {
     title: String(it.title ?? "").trim() || null,
     bullets: strArr(it.features ?? it.featureBullets),
     description: String(it.description ?? "").trim() || null,
-    imageUrls: images.slice(0, 10),
+    imageUrls: bereinigeBildUrls(images).slice(0, 10), // D216: Größen-Varianten desselben Bilds entdoppeln
     reviewsTotal: reviewsCount !== null && reviewsCount >= 0 ? Math.round(reviewsCount) : null,
     ratingAvg: stars !== null && stars > 0 && stars <= 5 ? Math.round(stars * 10) / 10 : null,
     ratingDist,

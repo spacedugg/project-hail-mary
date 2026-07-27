@@ -4,6 +4,8 @@
  * nie WebFetch-Fallback-Kaskaden, sondern ein sauberer, austauschbarer Anbieter).
  */
 
+import { bereinigeBildUrls } from "./bilder";
+
 const DEFAULT_ACTOR = "axesso_data~amazon-product-details-scraper";
 
 export type ProductSnapshot = {
@@ -176,7 +178,7 @@ export async function scrapeProduct(
     title: String(it.productTitle ?? it.title ?? "").trim() || null,
     bullets: arr(it.features ?? it.bullets ?? it.featureBullets),
     description: String(it.productDescription ?? it.description ?? "").trim() || null,
-    imageUrls: arr(it.imageUrlList ?? it.images ?? it.imageUrls),
+    imageUrls: bereinigeBildUrls(arr(it.imageUrlList ?? it.images ?? it.imageUrls)), // D216: Größen-Varianten entdoppeln
     reviewsTotal: parseCount(it.countReview ?? it.countReviews ?? it.reviewsCount ?? it.ratingsCount ?? it.countRatings),
     ratingAvg: parseAvg(it.productRating ?? it.rating ?? it.averageRating ?? it.ratingScore),
     ratingDist: parseDist(it),
