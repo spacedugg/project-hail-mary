@@ -145,14 +145,6 @@ export default async function ProductPage({
         reviewInsights: insights?.payload ?? null,
       })
     : null;
-  const auditNeuestesInput = Math.max(
-    snapshot?.createdAt.getTime() ?? 0,
-    insights?.createdAt.getTime() ?? 0,
-    versions[0]?.createdAt.getTime() ?? 0,
-    scrape?.createdAt.getTime() ?? 0,
-    sovUpload?.createdAt.getTime() ?? 0,
-  );
-  const auditStale = !deepAudit || auditNeuestesInput > deepAudit.createdAt.getTime();
   const sektionSoll = { title: wirksam.title, bullets: wirksam.bullets.join(" "), description: wirksam.description };
 
   return (
@@ -586,15 +578,6 @@ export default async function ProductPage({
                   <p className="text-sm">✓ Kein Blocker gefunden. Die wichtigen Kunden-Themen sind im Listing beantwortet.</p>
                 )}
               </div>
-              <div className="mt-3 space-y-0.5">
-                {blockerLauf.payload.hinweise.map((h, i) => (
-                  <p key={i} className="text-[11px] text-muted">ℹ {h}</p>
-                ))}
-                {blockerLauf.payload.verworfen > 0 && (
-                  <p className="text-[11px] text-warn">△ {blockerLauf.payload.verworfen} Blocker ohne echten Kunden-Aspekt verworfen.</p>
-                )}
-                <p className="text-[11px] text-muted">Datenbasis: {blockerLauf.dataBasis.join(" · ")} · Stand {blockerLauf.createdAt.toLocaleDateString("de-DE")}</p>
-              </div>
             </>
           )}
         </section>
@@ -605,7 +588,6 @@ export default async function ProductPage({
           <AnalyseHintergrund
             analysis={analysis}
             deepAudit={deepAudit ?? null}
-            auditStale={auditStale}
             featureRanking={featureRanking ?? null}
           />
         )}

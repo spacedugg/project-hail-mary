@@ -146,13 +146,6 @@ export function BewertungsDashboard({
         </div>
       </div>
 
-      {(p.qualitaetsNotizen?.length ?? 0) > 0 && (
-        <div className="space-y-0.5">
-          {p.qualitaetsNotizen!.map((n, i) => (
-            <p key={i} className="text-[11px] text-muted">✕ {n}</p>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

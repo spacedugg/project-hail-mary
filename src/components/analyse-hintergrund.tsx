@@ -20,23 +20,17 @@ const fmt = (n: number) => new Intl.NumberFormat("de-DE").format(n);
 export function AnalyseHintergrund({
   analysis,
   deepAudit,
-  auditStale,
   featureRanking,
 }: {
   analysis: Analysis;
   deepAudit: DeepAuditRow;
-  auditStale: boolean;
   featureRanking: FeatureRow;
 }) {
   return (
     <>
-      {/* Zielgruppe · Positionierung · USPs (D126) */}
+      {/* Zielgruppe · Positionierung · USPs (D126) — äußere Überschrift entfernt (D218):
+          sie doppelte die drei Kachel-Überschriften. */}
       <section className="card p-5">
-        {/* Kein manueller CTA (D177): die KI-Bewertung läuft als Etappe des Analyse-Laufs */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold">Zielgruppe · Positionierung · USPs {deepAudit && <span className="ml-1 pill pill-good">✓ {deepAudit.createdAt.toLocaleDateString("de-DE")}</span>}</h2>
-          {deepAudit && (auditStale ? <span className="pill pill-warn">wird beim nächsten Lauf aktualisiert</span> : <span className="pill pill-neutral">aktuell</span>)}
-        </div>
         {deepAudit ? (
           <div className="stagger mt-3 grid gap-3 lg:grid-cols-3">
             <div className="rounded-xl border-l-4 border-l-[var(--primary)] border border-hair p-4">
@@ -118,18 +112,6 @@ export function AnalyseHintergrund({
               {featureRanking.payload.cards.map((k, i) => (
                 <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={featureRanking.payload.stats.reviewsGesamt} />
               ))}
-            </div>
-            <div className="mt-2 space-y-0.5">
-              {featureRanking.payload.hinweise.map((h, i) => (
-                <p key={i} className="text-[11px] text-muted">ℹ {h}</p>
-              ))}
-              {featureRanking.payload.verworfen > 0 && (
-                <p className="text-[11px] text-warn">△ {featureRanking.payload.verworfen} Feature(s) ohne Listing-Beleg verworfen.</p>
-              )}
-              {featureRanking.payload.entfernteBildIdeen.map((e, i) => (
-                <p key={`b-${i}`} className="text-[11px] text-warn">✕ Bild-Idee entfernt: „{e.idee}" — {e.grund}</p>
-              ))}
-              <p className="text-[11px] text-muted">Datenbasis: {featureRanking.dataBasis.join(" · ")} · Stand {featureRanking.createdAt.toLocaleDateString("de-DE")}</p>
             </div>
           </>
         ) : (
