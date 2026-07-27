@@ -44,11 +44,13 @@ export const DATENFLUSS: Datenpunkt[] = [
       { name: "Fakten-Extraktion", modul: "src/lib/analysis/factsFromListing.ts", outcome: "Produkt-Wahrheit (Materialien, Maße, Specs, USPs)" },
       { name: "Listing-Kontrolle", modul: "src/lib/analysis/listingAudit.ts", outcome: "Sektions-Scores, Keyword-Abdeckung, Maßnahmen" },
       { name: "Marken-Ableitung", modul: "src/lib/text/marken.ts", outcome: "Eigenmarken-Kandidat aus dem Original-Titel (D149, Fallback)" },
+      { name: "A+-Bild-Auslese (Upload, optional)", modul: "src/lib/analysis/bildAuslese.ts", outcome: "hochgeladene A+-Bilder werden EINMAL per Vision ausgelesen → extrahierter Text nach aplusContent; die Bild-Bytes werden verworfen, nie gespeichert (ephemer, D220)" },
     ],
     verwendung: [
       "Content-Prompts (Listing-IST: verbessern, nicht kopieren)",
       "Zahlen-Herkunfts-Quellen des Gates (D114)",
       "Conversion-Blocker-Abgleich (Kunden-Thema vs. Listing-Antwort, D167)",
+      "aplusContent → Content-Beleg-Quellen + Feature-Ranking (D220)",
     ],
     anzeige: ["Reiter „Amazon Listing“ (Scores + Maßnahmen)", "Kopfkarte (Titel, Hauptbild, Stand-Datum)"],
   },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bilderAlsText, leseBilderAus, normalisiereBildAuslese } from "./bildAuslese";
+import { aplusAlsText, bilderAlsText, leseAplusAus, leseBilderAus, normalisiereBildAuslese } from "./bildAuslese";
 
 /** D158: Bild-Auslese — Struktur erzwungen, nichts Erfundenes. */
 describe("normalisiereBildAuslese", () => {
@@ -59,5 +59,30 @@ describe("leseBilderAus — ehrlich ohne Key", () => {
 
   it("ohne Bilder: null", async () => {
     expect(await leseBilderAus([])).toBeNull();
+  });
+});
+
+// D220: A+-Bild-Auslese — einmal auslesen, Text behalten, Bytes verwerfen
+describe("aplusAlsText", () => {
+  it("formatiert je A+-Bild Text + Inhalt + Aussagen", () => {
+    const t = aplusAlsText([
+      { slot: 1, typ: null, textImBild: ["100 % BIO", "MADE IN GERMANY"], inhalt: "Herstellung im Werk", claims: ["nachhaltig produziert"] },
+    ]);
+    expect(t).toBe("A+-Bild 1: 100 % BIO · MADE IN GERMANY — Herstellung im Werk — Aussagen: nachhaltig produziert");
+  });
+  it("leere Bildliste → leerer String", () => {
+    expect(aplusAlsText([])).toBe("");
+  });
+});
+
+describe("leseAplusAus — ehrlich ohne Key", () => {
+  it("ohne ANTHROPIC_API_KEY: null statt Mock", async () => {
+    expect(await leseAplusAus([{ mediaType: "image/jpeg", data: "AAA" }])).toBeNull();
+  });
+  it("ohne Bilder: null", async () => {
+    expect(await leseAplusAus([])).toBeNull();
+  });
+  it("filtert Nicht-Bilder heraus → null, wenn nichts Gültiges bleibt", async () => {
+    expect(await leseAplusAus([{ mediaType: "application/pdf", data: "AAA" }])).toBeNull();
   });
 });

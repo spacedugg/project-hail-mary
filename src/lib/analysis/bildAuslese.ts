@@ -1,7 +1,7 @@
 import { resolveRecipe } from "@/lib/llm/registry";
 import { parseLlmJson } from "@/lib/llm/json";
 import { BILD_TYPEN, BILD_TYP_KRITERIUM, BILD_TYP_LABELS, istBildTyp, type BildTyp } from "./bildTypen";
-import { bildContentBlocks, visionCall, visionUrls } from "./bildVision";
+import { bildBloeckeAus, bildContentBlocks, MAX_VISION_BILDER, visionCall, visionUrls } from "./bildVision";
 
 /**
  * Bild-Auslese + Bild-Audit (D158, Nutzer-Vorgabe 22.07.): Galeriebilder
@@ -74,6 +74,56 @@ export async function leseBilderAus(imageUrls: string[], sprache = "de"): Promis
   // nutzt denselben Prefix und liest ihn aus dem Cache.
   const text = await visionCall({ model, blocks: bildContentBlocks(urls), aufgabe: ausleseAufgabe(urls.length, sprache) });
   return normalisiereBildAuslese(parseLlmJson(text), urls.length);
+}
+
+// ── A+-Bild-Auslese (D220) ───────────────────────────────────────────────────
+// A+-/„Vom Hersteller"-Inhalte sind auf Amazon Bilder und für Text-Scrapes
+// unsichtbar (die Scraper liefern aplusContent = null). Der Nutzer lädt sie
+// deshalb hoch; wir lesen sie EINMAL aus (Vision) und behalten NUR den
+// extrahierten Text — die Bild-Bytes werden nie gespeichert (ephemer). Der Text
+// landet in snapshot.aplusContent und fließt von dort in Generierung
+// (Beleg-Quellen) UND Analyse (Feature-Ranking) ein — kein neuer Datenpfad.
+
+export type AplusBild = { mediaType: string; data: string };
+
+/** Aufgabe für A+-Uploads: sichtbaren Text abtippen + Inhalt knapp beschreiben, kein Urteil. */
+function aplusAufgabe(anzahl: number, sprache: string): string {
+  return `AUFGABE: Dies sind ${anzahl} hochgeladene A+-/„Vom Hersteller"-Bilder eines Amazon-Listings (Antwort-Sprache "${sprache}").
+Je Bild:
+· textImBild = ALLER lesbare Text wortwörtlich (Überschriften, Absätze, Labels, Zahlen — leer, wenn textfrei)
+· inhalt = EIN objektiver Satz, was das Bild zeigt
+· claims = im Bild behauptete Produkt-Aussagen (nur was da steht/gezeigt wird)
+KEINE Urteile, KEINE Stil-Kommentare — nur abtippen und beschreiben.
+JSON-Schema:
+{"bilder":[{"slot":1,"textImBild":["..."],"inhalt":"...","claims":["..."]}]}`;
+}
+
+/** Formatiert die A+-Auslese als zusammenhängenden A+-Text (Ziel: snapshot.aplusContent). */
+export function aplusAlsText(bilder: BildAuslese[]): string {
+  return bilder
+    .map((b) => {
+      const teile = [b.textImBild.join(" · "), b.inhalt, b.claims.length ? `Aussagen: ${b.claims.join(" · ")}` : ""].filter(Boolean);
+      return `A+-Bild ${b.slot}: ${teile.join(" — ")}`;
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+/**
+ * Liest hochgeladene A+-Bilder EINMAL aus und gibt den extrahierten Text zurück
+ * (für snapshot.aplusContent). Bytes werden vom Aufrufer verworfen, nie
+ * gespeichert (D220). Ohne API-Key: null (ehrlich, kein Mock).
+ */
+export async function leseAplusAus(bilder: AplusBild[], sprache = "de"): Promise<string | null> {
+  const gueltig = bilder.filter((b) => b?.data && b?.mediaType?.startsWith("image/")).slice(0, MAX_VISION_BILDER);
+  if (gueltig.length === 0) return null;
+  const { provider, model } = resolveRecipe("listing.bild-auslese");
+  if (provider.name !== "anthropic" || !process.env.ANTHROPIC_API_KEY) return null; // kein Mock — ehrlich „nicht ausgelesen"
+
+  const blocks = bildBloeckeAus(gueltig.map((b) => ({ base64: b })), { hauptbild: false });
+  const text = await visionCall({ model, blocks, aufgabe: aplusAufgabe(gueltig.length, sprache) });
+  const res = normalisiereBildAuslese(parseLlmJson(text), gueltig.length);
+  return aplusAlsText(res.bilder) || null;
 }
 
 /** Auslese als Quelltext für Feature-Ranking/Wahrheits-Filter (Quelle „Bilder", D133). */

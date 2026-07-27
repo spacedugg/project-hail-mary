@@ -1,9 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { runPipelineStufe, type PipelineErgebnis } from "@/app/actions";
 import { AsinChips } from "@/components/asin-chips";
+
+/** A+-Bild im Client: base64 fürs Auslesen + Vorschau/Name für die UI (D220). */
+type AplusBildClient = { mediaType: string; data: string; previewUrl: string; name: string };
+const MAX_APLUS = 9;
+
+/**
+ * Skaliert ein Bild client-seitig herunter (längste Kante ≤ 1400 px, JPEG q0.82)
+ * und gibt base64 zurück. Hält den Server-Action-Request klein (D220) und reicht
+ * für die Text-Auslese locker. Gibt null zurück, wenn die Datei kein Bild ist.
+ */
+async function dateiZuAplus(file: File): Promise<AplusBildClient | null> {
+  if (!file.type.startsWith("image/")) return null;
+  const dataUrl = await new Promise<string>((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result));
+    r.onerror = () => rej(r.error);
+    r.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = () => rej(new Error("Bild konnte nicht gelesen werden"));
+    i.src = dataUrl;
+  });
+  const max = 1400;
+  const scale = Math.min(1, max / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.drawImage(img, 0, 0, w, h);
+  const out = canvas.toDataURL("image/jpeg", 0.82);
+  const komma = out.indexOf(",");
+  return { mediaType: "image/jpeg", data: out.slice(komma + 1), previewUrl: out, name: file.name };
+}
 
 /**
  * Start-Maske + Ein-Klick-Pipeline (D172, Nutzer-Vorgabe 22.07.): EINE Maske
@@ -49,6 +87,17 @@ export function AnalyseStart({
   const [asins, setAsins] = useState<string[]>([]);
   const [laeuft, setLaeuft] = useState(false);
   const [fertig, setFertig] = useState(false);
+  const [aplus, setAplus] = useState<AplusBildClient[]>([]);
+  const [ziehtDrueber, setZiehtDrueber] = useState(false);
+  const dateiRef = useRef<HTMLInputElement>(null);
+
+  const nimmDateien = async (dateien: FileList | null) => {
+    if (!dateien?.length) return;
+    const neu = (await Promise.all([...dateien].map((f) => dateiZuAplus(f).catch(() => null)))).filter(
+      (b): b is AplusBildClient => b !== null,
+    );
+    setAplus((prev) => [...prev, ...neu].slice(0, MAX_APLUS));
+  };
 
   const setzeStatus = (i: number, status: Etappe["status"], detail?: string) =>
     setEtappen((prev) => prev.map((e, n) => (n === i ? { ...e, status, detail } : e)));
@@ -67,9 +116,11 @@ export function AnalyseStart({
           e.stufe,
           e.stufe === "scrape"
             ? { asins: asinListe, force: nurAnalyse }
-            : e.section
-              ? { section: e.section, ohneAnalyseBestaetigt: e.bestaetigt === true }
-              : undefined,
+            : e.stufe === "listing"
+              ? { aplusBilder: aplus.map((b) => ({ mediaType: b.mediaType, data: b.data })) }
+              : e.section
+                ? { section: e.section, ohneAnalyseBestaetigt: e.bestaetigt === true }
+                : undefined,
         );
       } catch (err) {
         res = { ok: false, fehler: err instanceof Error ? err.message : String(err), code: "ALG-00" };
@@ -175,12 +226,59 @@ export function AnalyseStart({
       }}
       className="mt-4 space-y-4"
     >
+      {/* Optionaler A+ (D220): A+-Bilder hochladen → werden EINMAL ausgelesen
+          (Text + Inhalt fließt in Analyse & Texterstellung) und danach NICHT
+          gespeichert. Client skaliert herunter; nur base64 reist zum Server. */}
+      <div>
+        <h3 className="text-sm font-semibold">Optionaler A+</h3>
+        <p className="mt-0.5 text-xs text-muted">
+          Zieh hier die A+-/„Vom Hersteller“-Bilder rein (nicht scrapebar). Sie werden <b>einmal ausgelesen</b> —
+          Text und Inhalt fließen wie eine Beschreibung in Analyse &amp; Texterstellung — und danach <b>nicht gespeichert</b>.
+        </p>
+        <div
+          onDragOver={(e) => { e.preventDefault(); setZiehtDrueber(true); }}
+          onDragLeave={() => setZiehtDrueber(false)}
+          onDrop={(e) => { e.preventDefault(); setZiehtDrueber(false); void nimmDateien(e.dataTransfer.files); }}
+          onClick={() => dateiRef.current?.click()}
+          className={`mt-2 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 text-center text-xs transition-colors ${ziehtDrueber ? "border-[var(--primary)] bg-[var(--primary-soft)]" : "border-hair text-muted hover:border-[var(--primary)]"}`}
+        >
+          <input
+            ref={dateiRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => { void nimmDateien(e.target.files); if (e.target) e.target.value = ""; }}
+          />
+          {aplus.length === 0
+            ? "A+-Bilder hierher ziehen oder klicken zum Auswählen"
+            : `${aplus.length}/${MAX_APLUS} Bild${aplus.length === 1 ? "" : "er"} — klicken für mehr`}
+        </div>
+        {aplus.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {aplus.map((b, i) => (
+              <div key={i} className="group relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={b.previewUrl} alt={b.name} className="h-16 w-16 rounded-lg border border-hair object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setAplus((prev) => prev.filter((_, n) => n !== i))}
+                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-neutral-900 text-[11px] text-white shadow"
+                  aria-label={`${b.name} entfernen`}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       <div>
         <h3 className="text-sm font-semibold">Vergleichs-ASINs</h3>
         <p className="mt-0.5 text-xs text-muted">
           Deine Produkt-ASIN ist vorbelegt. Trag hier zusätzlich die ASINs direkter Wettbewerber ein — genau
           diese Eintragung meint die Analyse-Checkliste. Sie fließen in die Bewertungs-Analyse <b>und</b> in den
-          Wettbewerber-Listing-Abgleich („fehlende Infos"). Ohne Zusatz-ASIN läuft der Abgleich nicht.
+          Wettbewerber-Listing-Abgleich („fehlende Infos“). Ohne Zusatz-ASIN läuft der Abgleich nicht.
         </p>
         <div className="mt-2">
           <AsinChips name="asins" mainAsin={mainAsin} placeholder="Wettbewerber-ASIN eingeben …" />

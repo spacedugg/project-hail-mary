@@ -35,16 +35,34 @@ export function visionUrls(imageUrls: string[]): string[] {
 type Block = { type: string; [k: string]: unknown };
 
 /**
+ * Ein zu übertragendes Bild — entweder als Amazon-URL (Listing-Bilder) oder
+ * als base64 (hochgeladene A+-Bilder, D220: einmal auslesen, nie speichern).
+ */
+export type VisionBild = { url: string } | { base64: { mediaType: string; data: string } };
+
+/**
  * Der gemeinsame, cachebare Prefix: je Bild ein Label-Text + das Bild.
  * Auf dem LETZTEN Bild sitzt der Cache-Breakpoint (`cache_control`), damit
  * System + alle Bilder als ein Prefix gecacht werden.
+ * `hauptbild` markiert BILD 1 als HAUPTBILD (nur für Listing-Bilder sinnvoll,
+ * nicht für A+-Uploads).
  */
-export function bildContentBlocks(urls: string[]): Block[] {
-  return urls.flatMap((url, i) => {
-    const bild: Block = { type: "image", source: { type: "url", url } };
-    if (i === urls.length - 1) bild.cache_control = { type: "ephemeral" };
-    return [{ type: "text", text: `BILD ${i + 1}${i === 0 ? " (HAUPTBILD)" : ""}:` }, bild];
+export function bildBloeckeAus(bilder: VisionBild[], opts: { hauptbild?: boolean } = {}): Block[] {
+  const hauptbild = opts.hauptbild !== false;
+  return bilder.flatMap((b, i) => {
+    const source =
+      "url" in b
+        ? { type: "url", url: b.url }
+        : { type: "base64", media_type: b.base64.mediaType, data: b.base64.data };
+    const bild: Block = { type: "image", source };
+    if (i === bilder.length - 1) bild.cache_control = { type: "ephemeral" };
+    return [{ type: "text", text: `BILD ${i + 1}${hauptbild && i === 0 ? " (HAUPTBILD)" : ""}:` }, bild];
   });
+}
+
+/** Rückwärtskompatibler Helfer für die URL-basierten Listing-Bilder. */
+export function bildContentBlocks(urls: string[]): Block[] {
+  return bildBloeckeAus(urls.map((url) => ({ url })));
 }
 
 /**

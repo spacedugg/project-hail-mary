@@ -1205,7 +1205,7 @@ export type PipelineErgebnis = { ok: boolean; hinweis?: string; fehler?: string;
 export async function runPipelineStufe(
   productId: string,
   stufe: "listing" | "scrape" | "auswertung" | "wettbewerb-texte" | "verdichtung" | "blocker" | "features" | "audit" | "content",
-  extra?: { asins?: string[]; section?: string; force?: boolean; ohneAnalyseBestaetigt?: boolean },
+  extra?: { asins?: string[]; section?: string; force?: boolean; ohneAnalyseBestaetigt?: boolean; aplusBilder?: import("@/lib/analysis/bildAuslese").AplusBild[] },
 ): Promise<PipelineErgebnis> {
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
@@ -1214,7 +1214,7 @@ export async function runPipelineStufe(
   try {
     switch (stufe) {
       case "listing":
-        return { ok: true, hinweis: (await importListingKern(db, product)) ?? undefined };
+        return { ok: true, hinweis: (await importListingKern(db, product, extra?.aplusBilder)) ?? undefined };
       case "scrape": {
         const asins = [...new Set((extra?.asins ?? []).map((a) => a.trim().toUpperCase()).filter(Boolean))];
         return { ok: true, hinweis: (await scrapeKern(db, product, asins, extra?.force === true)) ?? undefined };
@@ -1862,9 +1862,14 @@ export async function setActionStatus(formData: FormData) {
  * Listing-Import-Kern (D172-Pipeline-fähig): wirft GenFehler mit Code,
  * gibt bei Redundanz-Guard einen Hinweis zurück statt zu redirecten.
  */
-async function importListingKern(db: Awaited<ReturnType<typeof getDb>>, product: NonNullable<Awaited<ReturnType<Awaited<ReturnType<typeof getDb>>["query"]["products"]["findFirst"]>>>): Promise<string | null> {
+async function importListingKern(
+  db: Awaited<ReturnType<typeof getDb>>,
+  product: NonNullable<Awaited<ReturnType<Awaited<ReturnType<typeof getDb>>["query"]["products"]["findFirst"]>>>,
+  aplusBilder?: import("@/lib/analysis/bildAuslese").AplusBild[],
+): Promise<string | null> {
   const productId = product.id;
   if (!product.asin) throw new GenFehler("Produkt hat keine ASIN — Import nicht möglich.", "IMP-02");
+  const hatAplus = Boolean(aplusBilder?.length);
 
   // Redundanz-Guard (D81): erfolgreicher Import jünger als 24 h → kein Doppel-Import.
   // AUSNAHME (D191): Ein sprachfalscher Snapshot (Amazon-Maschinenübersetzung,
@@ -1879,7 +1884,9 @@ async function importListingKern(db: Awaited<ReturnType<typeof getDb>>, product:
     const erwartet = marktplatzSprache(product.marketplace);
     const erkannt = erkenneSprache([lastSnap.title ?? "", ...(lastSnap.bullets ?? []), lastSnap.description ?? ""]).sprache;
     const sprachFalsch = Boolean(erwartet && erkannt && erkannt !== erwartet);
-    if (!sprachFalsch) return "Das Listing wurde in den letzten 24 h bereits geladen — Stand ist aktuell.";
+    // A+-Upload (D220) erzwingt einen frischen Import, damit die hochgeladenen
+    // Bilder in den neuen Snapshot ausgelesen werden — sonst blockiert der Guard.
+    if (!sprachFalsch && !hatAplus) return "Das Listing wurde in den letzten 24 h bereits geladen — Stand ist aktuell.";
   }
 
   // Standard-Weg ist die Anthropic-API (D83); scheitert sie (Bot-Block),
@@ -1944,6 +1951,23 @@ async function importListingKern(db: Awaited<ReturnType<typeof getDb>>, product:
     attributes: snap!.attributes, importantInfo: snap!.importantInfo, aplusContent: snap!.aplusContent,
     raw: snap!.raw,
   });
+
+  // A+-Bild-Auslese (D220): hochgeladene A+-Bilder EINMAL auslesen, nur den
+  // extrahierten Text nach aplusContent schreiben — die Bild-Bytes werden hier
+  // verworfen (nie gespeichert). aplusContent fließt von dort in Generierung
+  // (Beleg-Quellen) UND Feature-Ranking ein. Scheitert es, bleibt der Import gültig.
+  if (hatAplus) {
+    try {
+      const { leseAplusAus } = await import("@/lib/analysis/bildAuslese");
+      const aplusText = await leseAplusAus(aplusBilder!, product.contentSprache);
+      if (aplusText) {
+        const zusammen = [snap!.aplusContent?.trim(), aplusText].filter(Boolean).join("\n\n").slice(0, 8000);
+        await db.update(schema.listingSnapshots).set({ aplusContent: zusammen }).where(eq(schema.listingSnapshots.id, snapId));
+      }
+    } catch {
+      // A+-Auslese ist Zusatz-Quelle, kein Blocker für den Import
+    }
+  }
 
   // Bild-Auslese (D158) + Bild-Audit (D211): automatisch beim Import, KEIN
   // Extra-Schritt und kein Knopf — es kommen einfach mehr Analyse-Daten heraus.
