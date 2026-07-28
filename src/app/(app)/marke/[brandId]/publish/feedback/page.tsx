@@ -5,6 +5,7 @@ import { getDb, schema } from "@/db/client";
 import { ladeMarkenCms, istPortal } from "@/lib/cms/laden";
 import { slotDef, type ContentSlot } from "@/lib/amazon/attributes";
 import { PILL_KLASSE } from "@/lib/cms/freigabestand";
+import { asinKopf } from "@/lib/cms/asinKopf";
 import {
   freigabeLinkErstellen,
   freigabeLinkWiderrufen,
@@ -193,8 +194,16 @@ export default async function CmsFeedback({
                       <span className="flex h-10 w-10 flex-none items-center justify-center rounded-lg border border-hair bg-[var(--primary-soft)] text-[10px] text-primary-strong">ASIN</span>
                     )}
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold">{p.name}</span>
-                      {p.asin && <span className="block font-mono text-[11px] text-muted">{p.asin}</span>}
+                      {/* Kein doppeltes ASIN-Rendern (D237): asinKopf entscheidet, ob eine Unterzeile nötig ist. */}
+                      {(() => {
+                        const kopf = asinKopf(p.name, p.asin);
+                        return (
+                          <>
+                            <span className="block truncate text-sm font-semibold">{kopf.titel}</span>
+                            {kopf.asinSub && <span className="block font-mono text-[11px] text-muted">{kopf.asinSub}</span>}
+                          </>
+                        );
+                      })()}
                     </span>
                     {offenHier > 0 ? (
                       <span className="pill pill-warn text-[11px]">{offenHier} offen</span>

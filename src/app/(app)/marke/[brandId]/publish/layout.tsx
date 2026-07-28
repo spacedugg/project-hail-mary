@@ -42,7 +42,10 @@ export default async function PublishLayout({
         brandId={brandId}
         offeneFreigaben={freigaben.length}
         offeneAlerts={alerts.length}
-        offenesFeedback={feedback.length}
+        // Zählt ASINs mit offener Rückmeldung, NICHT einzelne Zeilen (D237): ein
+        // Whole-ASIN-Verdikt fächert auf mehrere Pieces auf — das darf den Badge
+        // nicht künstlich hochzählen.
+        offenesFeedback={new Set(feedback.map((f) => f.productId)).size}
       />
       {children}
     </main>

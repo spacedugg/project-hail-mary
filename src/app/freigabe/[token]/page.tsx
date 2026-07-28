@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { ladeShare, ladeMarkenCms } from "@/lib/cms/laden";
-import { kundenFeedback } from "@/app/cms-actions";
+import { kundenFeedbackAsin } from "@/app/cms-actions";
+import { asinKopf } from "@/lib/cms/asinKopf";
 import { SubmitButton } from "@/components/submit-button";
-import { FreigabeStepper } from "@/components/freigabe-stepper";
 
 export const dynamic = "force-dynamic";
 
@@ -11,13 +11,23 @@ export const dynamic = "force-dynamic";
  * Kunden-Seite (öffentlich, nur mit gültigem Freigabe-Token).
  *
  * Bewusst minimal: Der Kunde sieht ausschließlich den für ihn freigegebenen
- * Content dieser einen Marke — keine Zahlen, keine Berichte, keine anderen
- * Kunden. Kein Login: Die Hürde eines Kontos ist genau der Grund, warum
- * Content-Feedback sonst im E-Mail-Verlauf versandet.
+ * Content dieser einen Marke — keine Zahlen, keine Berichte, keine anderen Kunden.
  *
- * Jede Rückmeldung wird an die konkrete Version geheftet — so bleibt später
- * nachvollziehbar, auf welchen Stand sich eine Aussage bezog.
+ * WHOLE-ASIN (D237, Nutzer-Wunsch): Feedback läuft je ASIN als GANZES — alle
+ * Content-Pieces einer ASIN untereinander, darunter EIN Feld zum Freigeben oder
+ * Änderung-Wünschen. Kein Feedback je Einzel-Piece (ineffizient), kein „Nur
+ * kommentieren" (darauf folgt kein Prozessschritt). Zusätzlich sieht der Kunde
+ * den Status quo: was ist freigegeben, was wartet, was ist noch in Bearbeitung.
  */
+
+type PortalStatus = "bearbeitung" | "wartet" | "aenderung" | "frei";
+const STATUS_PILL: Record<PortalStatus, { pill: string; text: string }> = {
+  frei: { pill: "pill pill-good", text: "von Ihnen freigegeben" },
+  aenderung: { pill: "pill pill-bad", text: "Änderung angefragt" },
+  wartet: { pill: "pill pill-warn", text: "wartet auf Ihre Rückmeldung" },
+  bearbeitung: { pill: "pill pill-neutral", text: "noch in Bearbeitung" },
+};
+
 export default async function FreigabeSeite({
   params,
   searchParams,
@@ -44,7 +54,9 @@ export default async function FreigabeSeite({
   const { share, brand, kontakt } = res.ctx;
   const cms = await ladeMarkenCms(brand.id);
   const erlaubt = share.productIds;
-  const produkte = (cms?.produkte ?? []).filter((p) => !erlaubt || erlaubt.includes(p.id));
+  const produkte = (cms?.produkte ?? [])
+    .filter((p) => !p.variantParentContainer) // Container-Parents haben keinen eigenen Content
+    .filter((p) => !erlaubt || erlaubt.includes(p.id));
 
   const db = await getDb();
   const feedback = await db.query.contentFeedback.findMany({
@@ -52,38 +64,18 @@ export default async function FreigabeSeite({
     orderBy: schema.contentFeedback.createdAt,
   });
 
-  // Wie viele freigegebene Text-/Bild-Bausteine warten noch auf die Antwort des
-  // Kunden (weder freigegeben noch Änderung angefragt)?
-  const sichtbar = (sl: (typeof produkte)[number]["slots"][number]) =>
-    sl.status === "freigegeben" && sl.werte.length > 0 && sl.kind !== "aplus";
-  const kundenStatus = (produktId: string, slot: string): "offen" | "frei" | "aenderung" => {
-    const fb = feedback.filter((f) => f.productId === produktId && f.slot === slot && f.autorTyp === "kunde");
-    if (fb.some((f) => f.art === "aenderung" && f.status === "offen")) return "aenderung";
-    if (fb.some((f) => f.art === "freigabe")) return "frei";
-    return "offen";
+  type Slot = (typeof produkte)[number]["slots"][number];
+  const sichtbar = (s: Slot) => s.status === "freigegeben" && s.werte.length > 0 && s.kind !== "aplus";
+  const statusVon = (p: (typeof produkte)[number]): PortalStatus => {
+    const rel = p.slots.filter(sichtbar);
+    if (rel.length === 0) return "bearbeitung";
+    if (rel.some((s) => s.freigabe.stufe === "kunde_aenderung")) return "aenderung";
+    if (rel.every((s) => s.freigabe.stufe === "kunde_frei")) return "frei";
+    return "wartet";
   };
-  const offeneBausteine = produkte.flatMap((p) => p.slots.filter(sichtbar).filter((sl) => kundenStatus(p.id, sl.slot) === "offen")).length;
-  const gesamtBausteine = produkte.flatMap((p) => p.slots.filter(sichtbar)).length;
 
-  // Bausteine für den fokussierten Durchgang — einer nach dem anderen.
-  const stepperBausteine =
-    produkte.flatMap((p) =>
-      p.slots.filter(sichtbar).map((sl) => {
-        const st = kundenStatus(p.id, sl.slot);
-        return {
-          key: `${p.id}:${sl.slot}`,
-          produktName: p.name,
-          label: sl.label,
-          werte: sl.werte,
-          bildUrl: sl.kind === "image" ? sl.werte[0] : null,
-          erledigt: st !== "offen",
-          statusText: st === "frei" ? "von Ihnen freigegeben" : st === "aenderung" ? "Änderung angefragt" : undefined,
-          productId: p.id,
-          slot: sl.slot,
-          versionId: sl.versionId,
-        };
-      }),
-    );
+  const mitStatus = produkte.map((p) => ({ p, status: statusVon(p), pieces: p.slots.filter(sichtbar) }));
+  const zahl = (s: PortalStatus) => mitStatus.filter((x) => x.status === s).length;
 
   return (
     <main className="mx-auto max-w-3xl p-6 sm:p-10">
@@ -91,142 +83,117 @@ export default async function FreigabeSeite({
         <div className="text-[11px] uppercase tracking-wide text-muted">Content-Freigabe · {brand.name}</div>
         <h1 className="page-title mt-1">{share.label}</h1>
         <p className="page-sub">
-          {kontakt ? `Guten Tag ${kontakt.name}, hier` : "Hier"} sehen Sie den für Ihre Produkte erarbeiteten Content.
-          Sie können zu jedem Baustein direkt eine Rückmeldung hinterlassen
-          {share.darfFreigeben ? " oder ihn freigeben" : ""}.
+          {kontakt ? `Guten Tag ${kontakt.name}, hier` : "Hier"} sehen Sie den für Ihre Produkte erarbeiteten Content —
+          je Artikel gebündelt. Geben Sie einen Artikel als Ganzes frei{share.darfFreigeben ? "" : " (dieser Link erlaubt nur Rückmeldungen)"} oder wünschen Sie eine Änderung.
         </p>
         {share.expiresAt && (
           <p className="mt-2 text-xs text-muted">Dieser Link ist gültig bis {share.expiresAt.toLocaleDateString("de-DE")}.</p>
         )}
       </header>
 
-      {gesamtBausteine > 0 && (
-        <div className="mt-4 rounded-xl border border-hair bg-[var(--primary-soft)] px-4 py-3 text-sm text-primary-strong">
-          {offeneBausteine > 0
-            ? <><b>{offeneBausteine} von {gesamtBausteine} Bausteinen</b> warten auf Ihre Rückmeldung.</>
-            : <>Alles gesichtet — <b>vielen Dank!</b> Ihre Freigaben sind bei uns angekommen.</>}
-        </div>
-      )}
+      {/* Status quo auf einen Blick */}
+      <div className="mt-4 flex flex-wrap gap-2 text-xs">
+        <span className="pill pill-warn">{zahl("wartet") + zahl("aenderung")} wartet auf Sie</span>
+        <span className="pill pill-good">{zahl("frei")} freigegeben</span>
+        {zahl("bearbeitung") > 0 && <span className="pill pill-neutral">{zahl("bearbeitung")} noch in Bearbeitung</span>}
+      </div>
 
       {fehler && <p className="mt-4 rounded-xl bg-[rgb(220_38_38/0.1)] px-3 py-2 text-sm text-bad">{fehler}</p>}
+      {mitStatus.length === 0 && <p className="mt-6 card p-4 text-sm text-muted">Für diese Freigabe liegt noch kein Content bereit.</p>}
 
-      {produkte.length === 0 && <p className="mt-6 card p-4 text-sm text-muted">Für diese Freigabe liegt noch kein Content bereit.</p>}
+      <div className="mt-5 space-y-4">
+        {mitStatus.map(({ p, status, pieces }) => {
+          const kopf = asinKopf(p.name, p.asin);
+          const offen = status === "wartet" || status === "aenderung";
+          // Nachrichten (ein Kunden-Kommentar + Team-Antworten) — Verdikte ohne Text ausgeblendet, keine Dopplung.
+          const nachrichten = feedback.filter((f) => f.productId === p.id && f.nachricht && f.nachricht.trim());
+          return (
+            <details key={p.id} open={offen} className="card overflow-hidden p-0">
+              <summary className="flex cursor-pointer items-center gap-3 p-4">
+                {p.bildUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={p.bildUrl} alt="" className="h-12 w-12 flex-none rounded-lg border border-hair bg-white object-contain" />
+                ) : (
+                  <span className="flex h-12 w-12 flex-none items-center justify-center rounded-lg border border-hair bg-[var(--primary-soft)] text-[10px] text-primary-strong">Artikel</span>
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">{kopf.titel}</span>
+                  {kopf.asinSub && <span className="block font-mono text-[11px] text-muted">{kopf.asinSub}</span>}
+                </span>
+                <span className={STATUS_PILL[status].pill}>{STATUS_PILL[status].text}</span>
+              </summary>
 
-      {/* Fokussierter Durchgang: ein Baustein nach dem anderen (Nutzer-Wunsch 23.07.) */}
-      {stepperBausteine.length > 0 && (
-        <div className="mt-5">
-          <FreigabeStepper
-            variant="kunde"
-            action={kundenFeedback}
-            leerText="Alles gesichtet — vielen Dank!"
-            bausteine={stepperBausteine.map((item) => ({
-              key: item.key,
-              produktName: item.produktName,
-              label: item.label,
-              werte: item.werte,
-              bildUrl: item.bildUrl,
-              erledigt: item.erledigt,
-              statusText: item.statusText,
-              darfFreigeben: share.darfFreigeben,
-              nameFeld: !kontakt,
-              fields: {
-                token,
-                productId: item.productId,
-                slot: item.slot,
-                ...(item.versionId ? { versionId: item.versionId } : {}),
-              },
-            }))}
-          />
-        </div>
-      )}
-
-      <details className="mt-6">
-        <summary className="cursor-pointer text-sm font-medium text-muted">Alle Bausteine am Stück ansehen</summary>
-
-      {produkte.map((p) => (
-        <section key={p.id} className="mt-5 card p-5">
-          <h2 className="text-base font-semibold">{p.name}</h2>
-          {p.asin && <p className="mt-0.5 font-mono text-xs text-muted">{p.asin}</p>}
-
-          {p.slots
-            .filter((s) => s.status === "freigegeben" && s.werte.length > 0 && s.kind !== "aplus")
-            .map((s) => {
-              const eigenes = feedback.filter((f) => f.productId === p.id && f.slot === s.slot);
-              return (
-                <article key={s.slot} className="mt-4 rounded-xl border border-hair p-3.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="text-sm font-semibold">{s.label}</h3>
-                    {(() => {
-                      const st = kundenStatus(p.id, s.slot);
-                      if (st === "frei") return <span className="pill pill-good">von Ihnen freigegeben</span>;
-                      if (st === "aenderung") return <span className="pill pill-bad">Änderung angefragt</span>;
-                      return <span className="pill pill-warn">wartet auf Ihre Rückmeldung</span>;
-                    })()}
-                  </div>
-
-                  {s.kind === "image" ? (
-                    <div className="mt-2">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={s.werte[0]} alt={s.label} className="max-h-64 rounded-lg border border-hair" />
-                    </div>
-                  ) : s.werte.length > 1 ? (
-                    <ul className="mt-2 space-y-1.5">
-                      {s.werte.map((w, i) => (
-                        <li key={i} className="text-sm leading-relaxed">
-                          <span className="mr-1.5 text-muted">{i + 1}.</span>
-                          {w}
-                        </li>
+              <div className="border-t border-hair px-4 pb-4">
+                {status === "bearbeitung" ? (
+                  <p className="mt-3 text-sm text-muted">Dieser Artikel ist noch in Bearbeitung — Sie bekommen ihn hier zur Freigabe, sobald er fertig ist.</p>
+                ) : (
+                  <>
+                    {/* Alle Content-Pieces der ASIN untereinander */}
+                    <div className="mt-3 space-y-3">
+                      {pieces.map((s) => (
+                        <div key={s.slot} className="rounded-xl border border-hair p-3">
+                          <h3 className="text-sm font-semibold">{s.label}</h3>
+                          {s.kind === "image" ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img src={s.werte[0]} alt={s.label} className="mt-2 max-h-64 rounded-lg border border-hair" />
+                          ) : s.werte.length > 1 ? (
+                            <ul className="mt-2 space-y-1.5">
+                              {s.werte.map((w, i) => (
+                                <li key={i} className="text-sm leading-relaxed"><span className="mr-1.5 text-muted">{i + 1}.</span>{w}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="mt-2 whitespace-pre-line text-sm leading-relaxed">{s.werte[0]}</p>
+                          )}
+                        </div>
                       ))}
-                    </ul>
-                  ) : (
-                    <p className="mt-2 whitespace-pre-line text-sm leading-relaxed">{s.werte[0]}</p>
-                  )}
+                    </div>
 
-                  {eigenes.filter((f) => f.nachricht).length > 0 && (
-                    <div className="mt-3 space-y-2 border-t border-hair pt-3">
-                      {eigenes.filter((f) => f.nachricht).map((f) => {
-                        const vomKunden = f.autorTyp === "kunde";
-                        return (
-                          <div key={f.id} className={`flex ${vomKunden ? "justify-end" : "justify-start"}`}>
-                            <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-xs ${vomKunden ? "bg-primary text-white" : "bg-[var(--sunk,rgb(0_0_0/0.04))] border border-hair"}`}>
-                              <div className={`mb-0.5 text-[10px] ${vomKunden ? "text-white/70" : "text-muted"}`}>
-                                {vomKunden ? "Sie" : `${f.autorName} · Team`} · {f.createdAt.toLocaleDateString("de-DE")}
-                                {f.art === "aenderung" && " · Änderungswunsch"}
+                    {/* Unterhaltung zur ASIN */}
+                    {nachrichten.length > 0 && (
+                      <div className="mt-3 space-y-2 border-t border-hair pt-3">
+                        {nachrichten.map((f) => {
+                          const vomKunden = f.autorTyp === "kunde";
+                          return (
+                            <div key={f.id} className={`flex ${vomKunden ? "justify-end" : "justify-start"}`}>
+                              <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-xs ${vomKunden ? "bg-primary text-white" : "border border-hair bg-[var(--sunk,rgb(0_0_0/0.04))]"}`}>
+                                <div className={`mb-0.5 text-[10px] ${vomKunden ? "text-white/70" : "text-muted"}`}>
+                                  {vomKunden ? "Sie" : `${f.autorName} · Team`} · {f.createdAt.toLocaleDateString("de-DE")}
+                                  {f.art === "aenderung" && " · Änderungswunsch"}
+                                </div>
+                                {f.nachricht}
                               </div>
-                              {f.nachricht}
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                          );
+                        })}
+                      </div>
+                    )}
 
-                  <form action={kundenFeedback} className="mt-3 grid gap-2">
-                    <input type="hidden" name="token" value={token} />
-                    <input type="hidden" name="productId" value={p.id} />
-                    <input type="hidden" name="slot" value={s.slot} />
-                    {s.versionId && <input type="hidden" name="versionId" value={s.versionId} />}
-                    {!kontakt && <input name="name" placeholder="Ihr Name" className="input-base text-sm" />}
-                    <textarea name="nachricht" rows={2} className="input-base text-sm" placeholder="Ihre Rückmeldung zu diesem Baustein …" />
-                    <div className="flex flex-wrap gap-2">
-                      <SubmitButton name="art" value="kommentar" className="btn-ghost text-xs">Rückmeldung senden</SubmitButton>
-                      <SubmitButton name="art" value="aenderung" className="btn-dark text-xs">Änderung wünschen</SubmitButton>
-                      {share.darfFreigeben && (
-                        <SubmitButton name="art" value="freigabe" className="btn-primary text-xs">Freigeben</SubmitButton>
-                      )}
-                    </div>
-                  </form>
-                </article>
-              );
-            })}
-
-          {p.slots.every((s) => s.status !== "freigegeben") && (
-            <p className="mt-3 text-sm text-muted">Für dieses Produkt ist noch nichts zur Freigabe fertig.</p>
-          )}
-        </section>
-      ))}
-
-      </details>
+                    {/* EIN Feedback-Feld für die ganze ASIN */}
+                    <form action={kundenFeedbackAsin} className="mt-3 grid gap-2 border-t border-hair pt-3">
+                      <input type="hidden" name="token" value={token} />
+                      <input type="hidden" name="productId" value={p.id} />
+                      {!kontakt && <input name="name" placeholder="Ihr Name" className="input-base text-sm" />}
+                      <textarea
+                        name="nachricht"
+                        rows={2}
+                        className="input-base text-sm"
+                        placeholder={status === "frei" ? "Etwas anmerken oder eine Änderung anstoßen …" : "Optionale Anmerkung zum ganzen Artikel …"}
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        {share.darfFreigeben && (
+                          <SubmitButton name="art" value="freigabe" className="btn-primary text-sm">✓ Artikel freigeben</SubmitButton>
+                        )}
+                        <SubmitButton name="art" value="aenderung" className="btn-dark text-sm">Änderung wünschen</SubmitButton>
+                      </div>
+                    </form>
+                  </>
+                )}
+              </div>
+            </details>
+          );
+        })}
+      </div>
 
       <p className="mt-8 text-center text-[11px] text-muted">temoa OS · Content-Freigabe</p>
     </main>

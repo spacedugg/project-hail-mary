@@ -91,7 +91,7 @@ export function BildKacheln({ imageUrls, bilder }: { imageUrls: string[]; bilder
       </div>
       {!hatAudit && (
         <p className="mt-2 text-[11px] text-muted">
-          Inhalt &amp; Typ je Bild erfasst. Die 4-Faktoren-Bewertung (Design, Wertigkeit, Botschaft) kommt mit einem Listing-Import bei aktivem KI-Schlüssel dazu.
+          Inhalt &amp; Typ je Bild erfasst. Die Bewertung (Design, Botschaft, Klarheit) kommt mit einem Listing-Import bei aktivem KI-Schlüssel dazu.
         </p>
       )}
 

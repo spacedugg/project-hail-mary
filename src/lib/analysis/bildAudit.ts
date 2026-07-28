@@ -32,10 +32,23 @@ export const AUDIT_LABELS: Record<AuditDimension, string> = {
   clarity: "Klarheit",
 };
 
+// Aufmerksam, aber fair bewerten (D242, Nutzer-Befund 28.07.): Ohne Anker urteilt
+// das Modell milde und clustert alles bei 4. Darum je Faktor benannte Schwächen,
+// die die Note MERKLICH drücken — proportional, KEIN starres Minimum, kein Beleg-Zwang.
 const AUDIT_KRITERIUM: Record<AuditDimension, string> = {
-  design: "Handwerk/Bildqualität: Komposition, visuelle Hierarchie, Ausrichtung, konsistentes Farbschema, Schärfe & Licht; nicht überladen (Elemente konkurrieren nicht um Aufmerksamkeit). Tiefe/Überlagerung von Elementen zahlt positiv ein.",
-  message: "Botschaft: Sind die richtigen, belegten Kaufargumente/USPs stark und überzeugend präsent?",
-  clarity: "Klarheit: Eine klare Kernaussage je Bild, gut lesbar auch als kleines Handy-Thumbnail (Schriftgröße, Kontrast, Gruppierung).",
+  design:
+    "Handwerk & Verkaufswirkung: Unterstützt das Bild den Verkauf? Merklich DRÜCKEN (proportional, kein Automatik-Minimum): " +
+    "schwacher Kontrast Produkt↔Hintergrund / Produkt hebt sich nicht ab; Produkt schlecht erkennbar; kein Lifestyle/keine " +
+    "Emotion, wo es helfen würde; keine gezeigten Features/Nutzen; im GESAMTEN Set kein Mensch UND keine echten Nahaufnahmen; " +
+    "generischer/veralteter Look. Einfarbiger Hintergrund ist OK — DANN muss das Produkt aber top erkennbar, scharf und " +
+    "kontrastreich stehen. Durchgängige CI ist Grundlage, kein Extra-Pluspunkt. 4–5 für klar verkaufsfähige, starke Bilder.",
+  message:
+    "Botschaft: transportiert das Bild ein konkretes, belegtes Kaufargument/USP (passend zu den Listing-Texten)? " +
+    "Rein dekorativ ohne Argument oder nur Marken-/Produktname drückt die Note. 4–5 nur bei klar transportiertem, belegtem Nutzen.",
+  clarity:
+    "Klarheit & Lesbarkeit: eine klare Kernaussage, auch als kleines Handy-Thumbnail lesbar. Zu geringer Text-Kontrast " +
+    "(z. B. Schwarz auf Dunkelgrün, Weiß auf Hell) oder zu kleine Schrift drückt die Note deutlich; überladen / mehrere " +
+    "konkurrierende Aussagen ebenso.",
 };
 
 export type BildFaktor = {
@@ -62,7 +75,7 @@ function normFaktor(raw: unknown): BildFaktor {
   };
 }
 
-/** Struktur erzwingen: gültige Slots, Scores geklemmt (0–5), alle vier Faktoren vorhanden, Dedup, sortiert. */
+/** Struktur erzwingen: gültige Slots, Scores geklemmt (0–5), alle drei Faktoren vorhanden, Dedup, sortiert. */
 export function normalisiereBildAudit(raw: unknown, anzahlBilder: number): BildAuditErgebnis {
   const o = (raw ?? {}) as Record<string, unknown>;
   const bilder = (Array.isArray(o.bilder) ? o.bilder : [])
@@ -99,13 +112,17 @@ export function schwaechstesBildProFaktor(audit: BildAuditErgebnis): Partial<Rec
 
 function buildPrompt(anzahl: number, sprache: string, ausleseText?: string): string {
   const dims = AUDIT_DIMENSIONEN.map((d) => `"${d}" (${AUDIT_LABELS[d]}): ${AUDIT_KRITERIUM[d]}`).join("\n");
-  return `AUFGABE: Bewerte die ${anzahl} Listing-Bilder oben (Antwort-Sprache "${sprache}").
+  return `AUFGABE: Bewerte die ${anzahl} Listing-Bilder oben aufmerksam und fair (Antwort-Sprache "${sprache}").
 ${ausleseText ? `\nKONTEXT — was auf den Bildern erkannt wurde:\n${ausleseText.slice(0, 4000)}\n` : ""}
-Je Bild und je Faktor: score (0–5, ehrlich, eine Nachkommastelle), wasWirSehen (1 Satz Beobachtung), warum (1 Satz: warum das für den Verkauf zählt), wieBesser (1 Satz konkreter Fix).
+Die meisten Amazon-Bilder sind solide Mittelklasse (um 3) — vergib 4 nicht reflexartig. Score-Anker (0–5):
+0–1 = grober Mangel · 2 = deutlich schwach · 3 = solide, aber unauffällig/verbesserungswürdig · 4 = stark, klar verkaufsfördernd · 5 = herausragend.
+Sichtbare Schwächen (schwacher Kontrast, Produkt schlecht erkennbar, kein Lifestyle/Feature wo nötig, unlesbarer Text) MÜSSEN sich in der Note niederschlagen — proportional dazu, wie stark sie den Verkauf beeinträchtigen. Kein starres Minimum, keine Rechtfertigungspflicht.
+
+Je Bild und je Faktor: score (0–5, eine Nachkommastelle), wasWirSehen (1 Satz Beobachtung), warum (1 Satz: warum das für den Verkauf zählt), wieBesser (1 Satz konkreter Fix).
 Bewerte diese drei Faktoren:
 ${dims}
 
-Trenne bewusst: design = Handwerk/Bildqualität, message = welche Kaufargumente da sind, clarity = wie klar/lesbar es rüberkommt.
+Trenne bewusst: design = Handwerk/Verkaufswirkung, message = welche belegten Kaufargumente da sind, clarity = wie klar/lesbar es rüberkommt.
 JSON-Schema:
 {"bilder":[{"slot":1,"faktoren":{"design":{"score":3,"wasWirSehen":"...","warum":"...","wieBesser":"..."},"message":{...},"clarity":{...}}}]}`;
 }

@@ -497,6 +497,85 @@ export async function kundenFeedback(formData: FormData) {
 }
 
 /**
+ * Whole-ASIN-Feedback (D237, Nutzer-Wunsch): Der Kunde gibt IMMER eine ASIN als
+ * Ganzes frei oder wünscht eine Änderung — nicht Piece für Piece. „Nur
+ * kommentieren" gibt es nicht mehr: darauf folgt kein Prozessschritt, der Kunde
+ * müsste danach ohnehin freigeben oder eine Änderung wünschen.
+ *
+ * Umsetzung ohne Umbau der erprobten Pro-Piece-Kette (D184): das Verdikt fächert
+ * auf jedes freigegebene Piece der ASIN auf (mit dessen Version), damit
+ * `freigabeStand` je Piece korrekt umspringt und das Board am schwächsten Glied
+ * aggregiert. Ein optionaler Kommentar wird EINMAL abgelegt — die Anzeige
+ * entdoppelt (kein Kommentar N-fach je Piece).
+ */
+export async function kundenFeedbackAsin(formData: FormData) {
+  const tokenWert = String(formData.get("token") ?? "");
+  const productId = String(formData.get("productId") ?? "");
+  const art = String(formData.get("art") ?? "") as "freigabe" | "aenderung";
+  const nachricht = String(formData.get("nachricht") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  const zurueck = `/freigabe/${tokenWert}`;
+
+  const res = await ladeShare(tokenWert);
+  if (!res.ok) redirect(zurueck);
+  const { share, kontakt } = res.ctx;
+
+  if (art !== "freigabe" && art !== "aenderung")
+    redirect(`${zurueck}?fehler=${encodeURIComponent("Bitte freigeben oder eine Änderung wünschen.")}`);
+  if (art === "freigabe" && !share.darfFreigeben)
+    redirect(`${zurueck}?fehler=${encodeURIComponent("Dieser Link erlaubt keine Freigabe, nur Rückmeldungen.")}`);
+  if (art === "aenderung" && !nachricht)
+    redirect(`${zurueck}?fehler=${encodeURIComponent("Bitte schreiben Sie kurz, was geändert werden soll.")}`);
+
+  const cms = await ladeMarkenCms(share.brandId);
+  const produkt = cms?.produkte.find((p) => p.id === productId);
+  const pieces = (produkt?.slots ?? []).filter((s) => s.status === "freigegeben" && s.werte.length > 0 && s.kind !== "aplus");
+  if (pieces.length === 0)
+    redirect(`${zurueck}?fehler=${encodeURIComponent("Für dieses Produkt liegt gerade nichts zur Freigabe bereit.")}`);
+
+  const db = await getDb();
+  const autorName = kontakt?.name || name || "Kunde";
+  // Verdikt je Piece (leere Nachricht = reines Verdikt, wird in der Anzeige zu einer Zeile entdoppelt).
+  // Eine FREIGABE ist keine offene Team-Aufgabe → direkt „erledigt", damit der Zähler
+  // nicht je Piece hochzählt. Ein ÄNDERUNGSwunsch bleibt „offen" (echte Aufgabe).
+  for (const s of pieces) {
+    await db.insert(schema.contentFeedback).values({
+      id: id(),
+      brandId: share.brandId,
+      productId,
+      slot: s.slot,
+      contentVersionId: s.versionId ?? null,
+      autorTyp: "kunde",
+      autorName,
+      autorContactId: share.contactId ?? null,
+      shareId: share.id,
+      art,
+      nachricht: "",
+      status: art === "freigabe" ? "erledigt" : "offen",
+      ...(art === "freigabe" ? { erledigtVon: "Kundenfreigabe", erledigtAt: jetzt() } : {}),
+    });
+  }
+  // Optionaler Kommentar: genau EINMAL (auf dem ersten Piece), nicht je Piece.
+  if (nachricht) {
+    await db.insert(schema.contentFeedback).values({
+      id: id(),
+      brandId: share.brandId,
+      productId,
+      slot: pieces[0].slot,
+      contentVersionId: pieces[0].versionId ?? null,
+      autorTyp: "kunde",
+      autorName,
+      autorContactId: share.contactId ?? null,
+      shareId: share.id,
+      art: "kommentar",
+      nachricht,
+    });
+  }
+  revalidatePath(zurueck);
+  revalidatePath(`/marke/${share.brandId}/publish/feedback`);
+}
+
+/**
  * „An Kunden schicken" — der eine Knopf, der die Kette weiterschaltet.
  *
  * Vorher waren interne Abnahme und Kundenzustimmung zwei getrennte Welten:

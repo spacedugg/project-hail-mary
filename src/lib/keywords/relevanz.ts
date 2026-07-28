@@ -69,6 +69,33 @@ export function extractMasse(text: string): Mass[] {
 
 const gleich = (x: number, y: number) => Math.abs(x - y) / Math.max(x, y, 1) <= 0.05; // 5 % Toleranz (Rundungen)
 
+/**
+ * Häufigstes Produkt-Maß gewinnt (D241, Nutzer-Idee 28.07.).
+ *
+ * Bei Familien-Größentabellen (Variationen) stehen mehrere Maße im Text. Die
+ * EIGENE Größe der Variante wiederholt sich über Felder (Titel + Bullets +
+ * Attribut-Tabelle + Fakten), fremde Familiengrößen tauchen nur einmal auf.
+ * Wir nehmen darum nur das/die häufigste(n) Maß(e) als „Produktgröße" — so
+ * lassen sich Bilder/Beschreibung mit Familientabellen gefahrlos mitlesen.
+ *
+ * Kein klarer Sieger (alles gleich häufig, z. B. genau eine Größe ODER eine
+ * reine Tabelle ohne Wiederholung): alle zählen — ehrlich passiv, wir raten
+ * nicht, welche EINE Größe gemeint ist.
+ */
+export function dominanteMasse(alle: Mass[]): Mass[] {
+  if (alle.length <= 1) return alle;
+  const key = (m: Mass) => `${m.einheit}|${m.a}|${m.b ?? ""}`;
+  const gruppen = new Map<string, { m: Mass; n: number }>();
+  for (const m of alle) {
+    const g = gruppen.get(key(m));
+    if (g) g.n += 1;
+    else gruppen.set(key(m), { m, n: 1 });
+  }
+  const max = Math.max(...[...gruppen.values()].map((g) => g.n));
+  if (max <= 1) return alle; // keine Wiederholung → nicht raten
+  return [...gruppen.values()].filter((g) => g.n === max).map((g) => g.m);
+}
+
 function massGedeckt(kw: Mass, produkt: Mass[]): boolean {
   return produkt.some((p) => {
     if (p.einheit !== kw.einheit) return false;
@@ -137,11 +164,60 @@ export const extractFormen = (text: string) => extractAusWoerterbuch(text, FORM_
 // ── Haupt-Prüfung (deterministisch) ─────────────────────────────────────────
 
 export type ProduktKontext = {
-  /** Freitext, aus dem die Produkt-Attribute (Maße, Anzahl, Farbe, Form) gezogen werden — Fakten + Titel + Name. */
+  /** Freitext, aus dem die Produkt-Attribute (Maße, Anzahl, Farbe, Form) gezogen werden. */
   attributText: string;
   produktName: string;
   eigeneMarke: string | null;
 };
+
+/** Lockere Sicht auf den Listing-Snapshot — nur die Felder, aus denen sich Specs lesen lassen. */
+export type SpecSnapshot = {
+  title?: string | null;
+  bullets?: string[] | null;
+  attributes?: Record<string, string> | null;
+  importantInfo?: string | null;
+  description?: string | null;
+  /** Vision-Auslese der Galeriebilder (Text im Bild + Beschreibung) — D158. */
+  bilderText?: Array<{ textImBild?: string[] | null; inhalt?: string | null } | null> | null;
+};
+/** Lockere Sicht auf die Produkt-Fakten (kein Schema-Import nötig). */
+export type SpecFacts = {
+  dimensions?: string;
+  productType?: string;
+  materials?: string[];
+  specs?: Record<string, string>;
+};
+
+/**
+ * Alle bekannten Produkt-Spezifikationen als EIN Text — Grundlage der
+ * deterministischen Attribut-Exklusion (Maß/Anzahl/Farbe/Form).
+ *
+ * Breit (D240/D241, Nutzer 28.07.): Die Größe steht selten im Titel, sondern in
+ * Bullets, Attribut-Tabelle, „Wichtigen Informationen", der Beschreibung oder
+ * AUF DEN BILDERN (`bilderText`). Vorher las der Filter nur `dimensions + Titel +
+ * Name` — darum überlebten bei einem 80×160-Bett „Kinderbett 90×200" etc.
+ *
+ * Familien-Größentabellen (bei Variationen häufig in Bild/Beschreibung: 80×160 UND
+ * 90×200 UND 140×200) sind KEIN Problem mehr: Die Maß-Regel nimmt nur das/die
+ * HÄUFIGSTEN Maß(e) als Produktgröße (`dominanteMasse`) — die eigene Größe der
+ * Variante wiederholt sich über mehrere Felder, Fremdgrößen tauchen nur einmal auf.
+ */
+export function produktAttributText(name: string, facts?: SpecFacts | null, snapshot?: SpecSnapshot | null): string {
+  const teile: Array<string | null | undefined> = [
+    name,
+    facts?.dimensions,
+    facts?.productType,
+    ...(facts?.materials ?? []),
+    ...Object.values(facts?.specs ?? {}),
+    snapshot?.title,
+    ...(snapshot?.bullets ?? []),
+    ...Object.values(snapshot?.attributes ?? {}),
+    snapshot?.importantInfo,
+    snapshot?.description,
+    ...(snapshot?.bilderText ?? []).flatMap((b) => [...(b?.textImBild ?? []), b?.inhalt]),
+  ];
+  return teile.filter(Boolean).join(" · ");
+}
 
 /**
  * Deterministische Attribut-Prüfung: Maß, Anzahl, Farbe, Form des Keywords
@@ -149,7 +225,7 @@ export type ProduktKontext = {
  * Produkt-Attribut bekannt ist (ehrlich passiv statt raten).
  */
 export function pruefeProduktAttribute(keyword: string, ctx: ProduktKontext): string | null {
-  const produktMasse = extractMasse(ctx.attributText);
+  const produktMasse = dominanteMasse(extractMasse(ctx.attributText));
   const kwMasse = extractMasse(keyword);
   if (produktMasse.length > 0 && kwMasse.length > 0) {
     const fremd = kwMasse.find((k) => !massGedeckt(k, produktMasse));
