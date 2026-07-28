@@ -48,12 +48,14 @@ const SECTIONS = [
 
 function IssueList({ issues }: { issues: ValidationIssue[] }) {
   if (!issues.length)
-    return <p className="mt-1 text-xs text-emerald-600">✓ Gate bestanden — keine Befunde.</p>;
+    return <p className="mt-1 text-xs text-emerald-600">✓ Keine Befunde.</p>;
+  // D232: nur die verständliche Meldung listen — keine technische Regel-ID (Jargon),
+  // kein extra Container. Der Nutzer will das Finding, nicht den Code-Namen.
   return (
     <ul className="mt-1 space-y-0.5">
       {issues.map((i, n) => (
         <li key={n} className={`text-xs ${i.severity === "error" ? "text-red-600" : "text-amber-600"}`}>
-          {i.severity === "error" ? "✕" : "△"} <span className="font-mono">{i.rule}</span> — {i.message}
+          {i.severity === "error" ? "✕" : "△"} {i.message}
         </li>
       ))}
     </ul>
@@ -716,9 +718,11 @@ export default async function ProductPage({
                   {/* Graceful Degradation (D202): ein Entwurf mit passed=false hat
                       das QM-Gate nach allen Versuchen NICHT bestanden — klar markiert,
                       nicht freigabefähig, die offenen Punkte stehen rot unten. */}
+                  {/* D232: keine alarmierende „Gate nicht bestanden"-Meldung mehr — nur ein
+                      sachlicher Hinweis zum Kürzen/Bearbeiten. Die offenen Punkte stehen unten. */}
                   {v?.status === "draft" && v.validation && v.validation.passed === false && (
-                    <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">
-                      ⚠︎ QM-Gate nach mehreren Versuchen <b>nicht bestanden</b>. Dieser Entwurf wird angezeigt, ist aber <b>nicht freigabefähig</b> — behebe die rot markierten Punkte unten (Bearbeiten) oder generiere neu.
+                    <p className="mt-2 rounded-lg bg-amber-50 px-3 py-1.5 text-xs text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+                      Bitte Text bearbeiten — die offenen Punkte stehen unten.
                     </p>
                   )}
                   {/* Kopierbare Einzel-Felder (D175): Klick kopiert; Zeichen-Hinweis
