@@ -3,10 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { baueMasterEntwurf, gibMasterFrei, propagiereFamilie, auditFamilieKonsistenz, loeseFamilieAuf, speichereAchsenwerte } from "@/app/actions";
+import { baueMasterEntwurf, gibMasterFrei, loeseFamilieAuf, speichereAchsenwerte } from "@/app/actions";
+import { FamilieBaum } from "@/components/familie-baum";
 import type { FamilienDaten } from "@/lib/variants/laden";
 import type { MasterSlot, SlotKind } from "@/lib/variants/master";
-import type { PropagierKind, FamilieAuditKind } from "@/lib/variants/masterActions";
 
 /**
  * Master-Freigabe & Propagierung einer Variations-Familie (D221/D222).
@@ -32,8 +32,6 @@ export function FamilieManager({ familie }: { familie: FamilienDaten }) {
   const [mock, setMock] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [meldung, setMeldung] = useState<string | null>(null);
-  const [prop, setProp] = useState<{ mock: boolean; warnung?: string; kinder: PropagierKind[] } | null>(null);
-  const [audit, setAudit] = useState<FamilieAuditKind[] | null>(null);
   // Achsenwerte nachträglich editierbar (D233) — gesperrt, sobald ein Master existiert.
   const [achsenEdit, setAchsenEdit] = useState(false);
   const [achsenLokal, setAchsenLokal] = useState<Record<string, Record<string, string>>>({});
@@ -100,26 +98,6 @@ export function FamilieManager({ familie }: { familie: FamilienDaten }) {
       setMeldung("Master freigegeben.");
       router.refresh();
     } else setMeldung(res.fehler ?? "Freigabe fehlgeschlagen.");
-  }
-
-  async function uebertragen() {
-    setBusy("uebertragen");
-    setMeldung(null);
-    setProp(null);
-    const res = await propagiereFamilie(familie.parentId);
-    setBusy(null);
-    if (res.ok) {
-      setProp({ mock: res.mock, warnung: res.warnung, kinder: res.kinder });
-      router.refresh();
-    } else setMeldung(res.fehler ?? "Übertragung fehlgeschlagen.");
-  }
-
-  async function pruefen() {
-    setBusy("pruefen");
-    const res = await auditFamilieKonsistenz(familie.parentId);
-    setBusy(null);
-    setAudit(res.ok ? res.kinder : null);
-    if (!res.ok) setMeldung(res.fehler ?? "Prüfung fehlgeschlagen.");
   }
 
   async function aufloesen() {
@@ -254,7 +232,7 @@ export function FamilieManager({ familie }: { familie: FamilienDaten }) {
           <p className="text-sm font-semibold">2 · Slots bestätigen {mock && <span className="text-amber-600">(Mock — bitte prüfen)</span>}</p>
           <p className="text-xs text-muted">
             <b>für alle gleich</b> = wortgleich übernommen · <b>Achsenwert eingesetzt</b> = automatischer Tausch ·{" "}
-            <b>je Variante neu</b> = LLM textet neu. Klick wechselt „gleich" ↔ „neu".
+            <b>je Variante neu</b> = LLM textet neu. Klick wechselt „gleich“ ↔ „neu“.
           </p>
           <div className="card divide-y divide-hair overflow-hidden">
             {slots.map((s) => (
@@ -278,62 +256,10 @@ export function FamilieManager({ familie }: { familie: FamilienDaten }) {
         </div>
       )}
 
-      {/* Schritt 3: Übertragen + Prüfen */}
-      {familie.hatMaster && (
-        <div className="flex flex-wrap items-center gap-3">
-          <button onClick={uebertragen} disabled={busy !== null} className="btn-primary text-sm disabled:opacity-50">
-            {busy === "uebertragen" ? "Übertrage…" : "3 · Auf Geschwister übertragen"}
-          </button>
-          <button onClick={pruefen} disabled={busy !== null} className="btn-dark text-sm disabled:opacity-50">
-            {busy === "pruefen" ? "Prüfe…" : "Konsistenz prüfen"}
-          </button>
-        </div>
-      )}
-
       {meldung && <p className="text-sm text-muted">{meldung}</p>}
 
-      {prop && (
-        <div className="grid gap-1.5">
-          {prop.warnung && <p className="rounded-xl border border-amber-400/50 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">⚠ {prop.warnung}</p>}
-          {prop.kinder.map((k) => (
-            <div key={k.productId} className="rounded-xl border border-hair px-3 py-2 text-sm">
-              <span className="font-mono text-[13px]">{k.asin}</span>{" "}
-              {k.passed ? <span className="text-good">✓ Gate bestanden</span> : <span className="text-bad">✕ {k.issues.filter((i) => i.severity === "error").length} Fehler</span>}
-              {k.issues.length > 0 && (
-                <ul className="mt-1 space-y-0.5">
-                  {k.issues.map((i, n) => (
-                    <li key={n} className={`text-xs ${i.severity === "error" ? "text-bad" : "text-amber-600"}`}>
-                      {i.severity === "error" ? "✕" : "△"} <span className="font-mono">{i.rule}</span> — {i.message}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {audit && (
-        <div className="grid gap-1.5">
-          <p className="text-sm font-semibold">Konsistenz-Prüfung</p>
-          {audit.every((a) => a.issues.length === 0) ? (
-            <p className="text-sm text-good">✓ Alle „für alle gleich"-Inhalte sind über die Familie identisch.</p>
-          ) : (
-            audit
-              .filter((a) => a.issues.length > 0)
-              .map((a) => (
-                <div key={a.productId} className="rounded-xl border border-bad/40 bg-bad/5 px-3 py-2 text-xs text-bad">
-                  <span className="font-mono">{a.asin}</span>
-                  <ul className="mt-1 list-disc pl-4">
-                    {a.issues.map((i, n) => (
-                      <li key={n}>{i.message}</li>
-                    ))}
-                  </ul>
-                </div>
-              ))
-          )}
-        </div>
-      )}
+      {/* Schritt 3: Live-Baum — Content von der Base auf die Geschwister übertragen */}
+      {familie.hatMaster && <FamilieBaum familie={familie} />}
     </div>
   );
 }

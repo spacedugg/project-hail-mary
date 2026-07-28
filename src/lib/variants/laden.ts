@@ -1,8 +1,25 @@
 import { and, eq, desc } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { products, listingSnapshots } from "@/db/schema";
+import { products, listingSnapshots, contentVersions } from "@/db/schema";
 import { leseFreigegebenenContent } from "./masterActions";
 import type { ContentMaster } from "./master";
+
+/**
+ * Content-Pieces, die im Familien-Baum je ASIN als Häkchen angezeigt werden (D236).
+ * Reihenfolge = Anzeigereihenfolge.
+ */
+export const TREE_PIECES = ["title", "bullets", "description", "backend_keywords", "qa"] as const;
+export type TreePiece = (typeof TREE_PIECES)[number];
+export const TREE_PIECE_LABEL: Record<TreePiece, string> = {
+  title: "Titel",
+  bullets: "Bullet Points",
+  description: "Beschreibung",
+  backend_keywords: "Backend-Keywords",
+  qa: "Q&A",
+};
+/** NUR diese Pieces erzeugt die Master-Propagierung — nur sie können live grün werden. */
+export const PROPAGIERTE_PIECES: TreePiece[] = ["title", "bullets", "description"];
+export type PieceStatus = "approved" | "draft" | "none";
 
 /**
  * Lade-Helfer für die Variations-Familien-UI (D221). Reine Funktionen (nehmen `db`),
@@ -50,7 +67,23 @@ export type FamilienKind = {
   axisValues: Record<string, string>;
   hatFreigegebenenContent: boolean;
   istKopf: boolean; // true = Representative (Parent, der zugleich kaufbare Variante ist)
+  /** Status je Content-Piece — Basis der Häkchen im Familien-Baum (D236). */
+  pieces: Record<TreePiece, PieceStatus>;
 };
+
+/** Status jedes Tree-Pieces eines Produkts: freigegeben > Entwurf > nichts. */
+async function lesePieceStatus(db: Db, productId: string): Promise<Record<TreePiece, PieceStatus>> {
+  const versions = await db.query.contentVersions.findMany({
+    where: eq(contentVersions.productId, productId),
+    orderBy: desc(contentVersions.createdAt),
+  });
+  const status = (t: TreePiece): PieceStatus => {
+    const rel = versions.filter((v) => v.type === t);
+    if (rel.some((v) => v.status === "approved")) return "approved";
+    return rel.length > 0 ? "draft" : "none";
+  };
+  return Object.fromEntries(TREE_PIECES.map((p) => [p, status(p)])) as Record<TreePiece, PieceStatus>;
+}
 export type FamilienDaten = {
   parentId: string;
   brandId: string;
@@ -84,6 +117,7 @@ export async function ladeFamilie(db: Db, parentId: string): Promise<FamilienDat
       axisValues: k.variantAxisValues ?? {},
       hatFreigegebenenContent: !!content,
       istKopf: k.id === parentId,
+      pieces: await lesePieceStatus(db, k.id),
     });
   }
   return {

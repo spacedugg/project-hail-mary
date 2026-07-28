@@ -20,9 +20,11 @@ import {
   baueMasterEntwurfKern,
   gibMasterFreiKern,
   propagiereFamilieKern,
+  propagiereChildKern,
   auditFamilieKonsistenzKern,
   type MasterEntwurf,
   type PropagierErgebnis,
+  type PropagierChildErgebnis,
   type FamilieAuditKind,
 } from "@/lib/variants/masterActions";
 import { klassifiziereSlots, regeneriereSlot, istMockRecipe } from "@/lib/variants/masterLlm";
@@ -211,6 +213,21 @@ export async function propagiereFamilie(parentId: string): Promise<PropagierErge
   if (!(await getSessionUser())) return { ok: false, fehler: "Nicht angemeldet.", mock: false, kinder: [] };
   const db = await getDb();
   const res = await propagiereFamilieKern(db, parentId, regeneriereSlot, {
+    regeneratorMock: istMockRecipe("variants.regenerator"),
+  });
+  if (res.ok) revalidatePath(`/produkte/${parentId}`);
+  return res;
+}
+
+/**
+ * Master auf EIN Geschwister-Child propagieren (D236) — für die Live-Baum-UI, die
+ * Kind für Kind überträgt und den Fortschritt sichtbar macht. Ergebnis landet als
+ * Entwurf am Child.
+ */
+export async function propagiereChild(parentId: string, childId: string): Promise<PropagierChildErgebnis> {
+  if (!(await getSessionUser())) return { ok: false, fehler: "Nicht angemeldet.", mock: false };
+  const db = await getDb();
+  const res = await propagiereChildKern(db, parentId, childId, regeneriereSlot, {
     regeneratorMock: istMockRecipe("variants.regenerator"),
   });
   if (res.ok) revalidatePath(`/produkte/${parentId}`);

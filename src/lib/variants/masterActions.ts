@@ -286,3 +286,71 @@ export async function propagiereFamilieKern(
     kinder: ergebnisse,
   };
 }
+
+export type PropagierChildErgebnis =
+  | { ok: true; mock: boolean; warnung?: string; kind: PropagierKind }
+  | { ok: false; fehler: string; mock: false };
+
+/**
+ * Propagiert den Master auf GENAU EIN Geschwister-Child (D236) — dieselbe Logik
+ * wie `propagiereFamilieKern`, nur für ein Ziel. Dadurch kann die Baum-UI die
+ * Übertragung Kind für Kind live anstoßen und den Fortschritt sichtbar machen,
+ * statt auf einen einzigen Sammel-Aufruf zu warten. Bewusst als eigene Funktion
+ * neben der getesteten Batch-Variante — kein Umbau erprobter Logik.
+ */
+export async function propagiereChildKern(
+  db: Db,
+  parentId: string,
+  childId: string,
+  regenerate: SlotRegenerator,
+  opts: { regeneratorMock?: boolean } = {},
+): Promise<PropagierChildErgebnis> {
+  const parent = await db.query.products.findFirst({ where: eq(products.id, parentId) });
+  if (!parent || parent.variantRole !== "parent") return { ok: false, fehler: "Kein Parent.", mock: false };
+  const master = parent.contentMaster;
+  if (!master) return { ok: false, fehler: "Kein freigegebener Content-Master.", mock: false };
+  const mv = pruefeMaster(master);
+  if (mv.length > 0) return { ok: false, fehler: "Master-Kontrakt verletzt.", mock: false };
+
+  const child = await db.query.products.findFirst({ where: eq(products.id, childId) });
+  if (!child || (child.id !== parentId && child.parentProductId !== parentId))
+    return { ok: false, fehler: "Variante gehört nicht zu dieser Familie.", mock: false };
+  const asin = child.asin ?? child.id;
+  if (asin === master.baseChildAsin)
+    return { ok: false, fehler: "Das ist die Base-Variante — sie wird nicht überschrieben.", mock: false };
+
+  const hatRegenerate = master.slots.some((s) => s.kind === "regenerate");
+  const mock = !!opts.regeneratorMock && hatRegenerate;
+
+  const fehlend = fehlendeAchsen(child.variantAxisValues, master.theme);
+  if (fehlend.length > 0) {
+    return {
+      ok: true, mock,
+      kind: {
+        asin, productId: child.id, passed: false,
+        issues: [{ rule: "familie.achsenwert-fehlt", severity: "error", evidence: "deterministic", message: `Child ${asin}: Achsenwert fehlt für: ${fehlend.join(", ")}.` }],
+      },
+    };
+  }
+
+  const { content } = await wendeMasterAn(master, child.variantAxisValues ?? {}, regenerate);
+  const issues: ValidationIssue[] = [];
+  if (hatResttoken(content))
+    issues.push({ rule: "familie.token-unaufgeloest", severity: "error", evidence: "deterministic", message: `Child ${asin}: unaufgelöster Platzhalter im abgeleiteten Content.` });
+  const ctx = await baueGateCtxKern(db, child);
+  issues.push(...validateTitle(content.title, ctx), ...validateBullets(content.bullets, ctx), ...validateDescription(content.description, content.bullets, ctx));
+  await persistiereChildContent(db, child.id, content, issues, `variants.master:${parentId}${mock ? ":mock" : ""}`);
+
+  // Cross-Child-Gate über den JETZT persistierten Content — nur für dieses Child.
+  const audit = await auditFamilieKonsistenzKern(db, parentId);
+  if (audit.ok) {
+    const a = audit.kinder.find((x) => x.productId === child.id);
+    if (a && a.issues.length) issues.push(...a.issues);
+  }
+
+  return {
+    ok: true, mock,
+    warnung: mock ? "Regenerate-Slot im Mock-Modus nicht wirklich neu getextet (kein API-Key)." : undefined,
+    kind: { asin, productId: child.id, issues, passed: !issues.some((i) => i.severity === "error") },
+  };
+}
