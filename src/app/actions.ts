@@ -11,6 +11,7 @@ import { contentMarkenKontext } from "@/lib/text/marken";
 import {
   gruppiereZuFamilieKern,
   loeseFamilieAufKern,
+  aktualisiereAchsenwerteKern,
   type GruppierenInput,
   type GruppierenErgebnis,
 } from "@/lib/variants/gruppieren";
@@ -163,6 +164,18 @@ export async function loeseFamilieAuf(parentId: string, brandId: string): Promis
     revalidatePath(`/marke/${brandId}/katalog`);
     revalidatePath("/optimizer");
   }
+  return res;
+}
+
+/** Achsenwerte einer Familie nachträglich korrigieren (D233) — gesperrt, sobald ein Master existiert. */
+export async function speichereAchsenwerte(
+  parentId: string,
+  werte: Record<string, Record<string, string>>,
+): Promise<{ ok: boolean; fehler?: string; verstoesse?: Array<{ feld: string; problem: string }> }> {
+  if (!(await getSessionUser())) return { ok: false, fehler: "Nicht angemeldet." };
+  const db = await getDb();
+  const res = await aktualisiereAchsenwerteKern(db, parentId, werte);
+  if (res.ok) revalidatePath(`/produkte/${parentId}`);
   return res;
 }
 
