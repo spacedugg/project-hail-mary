@@ -23,13 +23,15 @@ export function PublishNav({
 }) {
   const pathname = usePathname();
   const basis = `/marke/${brandId}/publish`;
-  // Reihenfolge = Häufigkeit im Alltag. „Sammel-Export" steht bewusst hinten:
-  // Publiziert wird normalerweise EIN Produkt, und zwar im Produkt selbst.
+  // Reihenfolge = der Lebenszyklus (D236, Nutzer-Wunsch): Auf die Dashboard-
+  // Übersicht (Freigaben) folgt der Kunden-Schritt, dann die Überwachung des
+  // Live-Stands, zuletzt „Push" (früher „Sammel-Export") — die Übertragung
+  // nach Amazon, manuell oder per API.
   const items = [
     { href: basis, label: "Freigaben", exact: true, zahl: offeneFreigaben },
-    { href: `${basis}/alerts`, label: "Überwachung", exact: false, zahl: offeneAlerts },
     { href: `${basis}/feedback`, label: "Kunden-Feedback", exact: false, zahl: offenesFeedback },
-    { href: `${basis}/dateien`, label: "Sammel-Export", exact: false, zahl: 0 },
+    { href: `${basis}/alerts`, label: "Überwachung", exact: false, zahl: offeneAlerts },
+    { href: `${basis}/dateien`, label: "Push", exact: false, zahl: 0 },
   ];
   return (
     <nav className="mt-4 flex flex-wrap gap-1.5 print:hidden">
