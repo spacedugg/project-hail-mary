@@ -60,6 +60,13 @@ export type RecipeInputs = {
   competitorBrands?: string[];
   /** IST-Zustand des Listings (letzter Import) — Arbeitsgrundlage, besonders ohne Bewertungs-Analyse (D108). */
   listingIst?: { title?: string | null; bullets?: string[] | null } | null;
+  /**
+   * Beleg-Text aus den EIGENEN Status-quo-Bildern (Vision-Auslese) + A+ + Produktinfo-Tabelle
+   * (D114/D230): Aussagen und Zahlen, die DORT stehen, gelten als BELEGT — z. B. „30 Sekunden",
+   * das auf dem Produktbild steht, darf nicht als erfunden markiert werden. Fließt in die
+   * Zahlen-Herkunfts-Quellen (Gate) UND in die Beschreibungs-Beleg-Quelle (Prompt).
+   */
+  bildBelege?: string | null;
   /** Zusätzliche Produkt-Infos vom Team (D108) — z. B. fremde Bullets/Titel als Vorbild. */
   zusatzKontext?: string | null;
   /** Content-Sprache (D128) — unabhängig vom Marktplatz; Default Deutsch. */
@@ -688,6 +695,9 @@ function prueferKontext(inputs: RecipeInputs): string {
     inputs.listingIst?.title || inputs.listingIst?.bullets?.length
       ? `ORIGINAL-LISTING (Beleg-Quelle — dort stehende Aussagen und Wirkangaben gelten als BELEGT):${inputs.listingIst.title ? `\nTitel: ${inputs.listingIst.title}` : ""}${inputs.listingIst.bullets?.length ? `\nBullets: ${inputs.listingIst.bullets.join(" • ")}` : ""}`
       : "",
+    inputs.bildBelege?.trim()
+      ? `BILDER / A+ / PRODUKTINFO (Beleg-Quelle — dort stehende Aussagen & Zahlen gelten als BELEGT):\n${inputs.bildBelege.trim().slice(0, 3000)}`
+      : "",
     inputs.zusatzKontext?.trim() ? `ZUSATZ-INFOS (Beleg-Quelle):\n${inputs.zusatzKontext.trim().slice(0, 2000)}` : "",
     `KEYWORDS (dürfen ausschließlich grammatisch integriert vorkommen): ${Object.values(inputs.keywords).flat().join(", ")}`,
   ].filter(Boolean).join("\n");
@@ -761,6 +771,7 @@ export async function generateSection(
     JSON.stringify(inputs.facts),
     inputs.listingIst?.title ?? "",
     ...(inputs.listingIst?.bullets ?? []),
+    inputs.bildBelege ?? "", // D230: Zahlen/Aussagen aus den eigenen Bildern/A+/Produktinfo gelten als belegt
     inputs.zusatzKontext ?? "",
     ...Object.values(inputs.keywords).flat(),
     ...Object.values(inputs.approved ?? {}).flatMap((v) => (Array.isArray(v) ? v : [v ?? ""])),

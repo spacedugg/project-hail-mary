@@ -195,7 +195,20 @@ export default async function ProductPage({
                 )}
                 {/* Marktplatz + Content-Sprache sind nach dem Anlegen fest (D169) — hier nur Anzeige */}
                 <p className="mt-1 text-xs text-muted">
-                  {product.asin && <span className="font-mono">{product.asin} · </span>}
+                  {/* Statt der ASIN doppelt (steht schon in der Überschrift): Link aufs Live-Listing (D231). */}
+                  {product.asin && (
+                    <>
+                      <a
+                        href={`https://www.amazon.${amazonDomain(product.marketplace)}/dp/${product.asin}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-primary-strong hover:underline"
+                      >
+                        auf Amazon öffnen ↗
+                      </a>
+                      {" · "}
+                    </>
+                  )}
                   amazon.{amazonDomain(product.marketplace)} · {SPRACH_NAMEN[product.contentSprache]}
                   {stand && <> · Stand {stand.toLocaleDateString("de-DE")}</>}
                 </p>

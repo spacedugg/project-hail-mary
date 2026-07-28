@@ -701,6 +701,16 @@ async function generiereSektionKern(
   // Werkbank-Name nie als Marke, Eigenmarke nie auf der Blacklist
   const mk = contentMarkenKontext(brand ?? undefined, snapshot?.title, fremdmarkenAusKeywords(alleKws), product.marke);
 
+  // Beleg-Text aus den EIGENEN Bildern (Vision-Auslese) + A+ + Produktinfo (D230):
+  // Zahlen/Aussagen, die dort stehen, gelten als belegt (z. B. „30 Sekunden" auf dem Bild)
+  // und dürfen nicht als erfunden geflaggt werden.
+  const { bilderAlsText } = await import("@/lib/analysis/bildAuslese");
+  const bildBelege =
+    [bilderAlsText(snapshot?.bilderText), snapshot?.aplusContent, typeof snapshot?.importantInfo === "string" ? snapshot.importantInfo : ""]
+      .map((s) => (s ?? "").trim())
+      .filter(Boolean)
+      .join("\n\n") || null;
+
   const inputs: RecipeInputs = {
     brand: mk.marke,
     eigenmarkeAusListing: mk.eigenmarkeAusListing,
@@ -726,6 +736,7 @@ async function generiereSektionKern(
     },
     competitorBrands: mk.fremdmarken,
     listingIst: snapshot ? { title: snapshot.title, bullets: snapshot.bullets } : null,
+    bildBelege,
     zusatzKontext: product.zusatzKontext,
     sprache: product.contentSprache,
     // Conversion-Blocker in die Content-Prompts (D194, Nutzer 23.07.):

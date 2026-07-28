@@ -364,6 +364,14 @@ describe("Fakten-Fixer: erfundene Zahl-Sätze streichen (D198)", () => {
     expect(entfernt).toEqual([]);
   });
 
+  it("Zahl, die NUR im Bild-Beleg-Text steht, gilt als belegt (D230 - Nutzer-Fall 30 Sekunden)", () => {
+    // „30 Sekunden"/„500 ml" stehen auf dem Status-quo-Bild → fließen als bildBelege in
+    // zahlenQuellen → dürfen NICHT als erfunden markiert werden.
+    const quellenMitBild = "HOLY Iced Tea Pulver\nBILDER: In 30 Sekunden im Shaker mit 500 ml Wasser gemixt.";
+    const text = "Koffeinfrei & vegan; in 30 Sekunden im Shaker mit 500 ml Wasser gemixt.";
+    expect(pruefeZahlenTreue(text, quellenMitBild, "highlights").filter((i) => i.rule.startsWith("highlights.zahl"))).toEqual([]);
+  });
+
   it("leert nie den ganzen Text — bleibt kein sauberer Satz, Regenerierung übernimmt", () => {
     const bullet = "TITEL: Nach einer Woche kein Grasfressen mehr.";
     const { text, entfernt } = entferneUnbelegteZahlSaetze(bullet, quellen);

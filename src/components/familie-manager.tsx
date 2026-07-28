@@ -145,10 +145,22 @@ export function FamilieManager({ familie }: { familie: FamilienDaten }) {
             {familie.kinder.map((k) => (
               <tr key={k.id} className="border-b border-hair/60 last:border-0">
                 <td className="py-2 pl-4 pr-3">
-                  <Link href={`/produkte/${k.id}`} className="font-mono text-[13px] underline">{k.asin ?? "—"}</Link>
-                  {k.istKopf && <span className="ml-1.5 rounded bg-[var(--primary-soft)] px-1.5 py-0.5 text-[10px] text-primary-strong">Parent</span>}
-                  {/* Titel gekappt (max. ~46vw) → Tabelle passt ohne horizontales Scrollen (Nutzer 27.07.). */}
-                  {k.titel && k.titel !== k.asin && <span className="block max-w-[46vw] truncate text-[11px] text-muted" title={k.titel}>{k.titel}</span>}
+                  <div className="flex items-center gap-2.5">
+                    {k.bildUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={k.bildUrl} alt="" className="h-9 w-9 flex-none rounded border border-hair bg-white object-contain" />
+                    ) : (
+                      <div className="grid h-9 w-9 flex-none place-items-center rounded border border-hair bg-neutral-100 text-[10px] text-muted dark:bg-neutral-800">–</div>
+                    )}
+                    <div className="min-w-0">
+                      <span>
+                        <Link href={`/produkte/${k.id}`} className="font-mono text-[13px] underline">{k.asin ?? "—"}</Link>
+                        {k.istKopf && <span className="ml-1.5 rounded bg-[var(--primary-soft)] px-1.5 py-0.5 text-[10px] text-primary-strong">Parent</span>}
+                      </span>
+                      {/* Titel gekappt (max. ~42vw) → Tabelle passt ohne horizontales Scrollen (Nutzer 27.07.). */}
+                      {k.titel && k.titel !== k.asin && <span className="block max-w-[42vw] truncate text-[11px] text-muted" title={k.titel}>{k.titel}</span>}
+                    </div>
+                  </div>
                 </td>
                 <td className="py-2 pr-3 text-xs">{familie.theme.map((a) => `${a}: ${k.axisValues[a] ?? "—"}`).join(" · ")}</td>
                 <td className="py-2 pr-3 text-xs">{k.hatFreigegebenenContent ? <span className="text-good">freigegeben</span> : <span className="text-muted">offen</span>}</td>
