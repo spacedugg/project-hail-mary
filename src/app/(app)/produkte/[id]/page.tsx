@@ -277,9 +277,15 @@ export default async function ProductPage({
           />
           {snapshot && (
             <div className="mt-4 rounded-xl bg-background p-3 text-xs">
-              {snapshot.title && <p className="font-medium">{snapshot.title}</p>}
-              {snapshot.bullets && snapshot.bullets.length > 0 && (
-                <ul className="mt-1.5 space-y-0.5 text-muted">{snapshot.bullets.slice(0, 5).map((b, i) => <li key={i}>• {b.slice(0, 140)}{b.length > 140 ? "…" : ""}</li>)}</ul>
+              {/* D234: Original-Texte NICHT sofort ausbreiten — optional per Dropdown. */}
+              {(snapshot.title || (snapshot.bullets?.length ?? 0) > 0) && (
+                <details>
+                  <summary className="cursor-pointer font-medium hover:underline">Original-Listing-Texte anzeigen</summary>
+                  {snapshot.title && <p className="mt-1.5 font-medium">{snapshot.title}</p>}
+                  {snapshot.bullets && snapshot.bullets.length > 0 && (
+                    <ul className="mt-1.5 space-y-0.5 text-muted">{snapshot.bullets.slice(0, 5).map((b, i) => <li key={i}>• {b.slice(0, 140)}{b.length > 140 ? "…" : ""}</li>)}</ul>
+                  )}
+                </details>
               )}
               <p className="mt-2 text-muted">
                 {snapshot.description ? `Beschreibung ${fmt(snapshot.description.length)} Zeichen` : "keine Beschreibung"} · {snapshot.imageUrls?.length ?? 0} Bilder
