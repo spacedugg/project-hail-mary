@@ -206,6 +206,7 @@ export const RECIPE_INPUT_HERKUNFT: Record<keyof RecipeInputs, string> = {
   approved: "content",
   competitorBrands: "keywords",
   listingIst: "listing-import",
+  bildBelege: "listing-import",
   zusatzKontext: "zusatz-infos",
   sprache: "stammdaten",
   conversionBlocker: "reviews",

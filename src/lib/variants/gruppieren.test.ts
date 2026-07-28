@@ -231,4 +231,40 @@ describe("gruppiereZuFamilieKern", () => {
     const ch1 = await db.query.products.findFirst({ where: eq(schema.products.id, "rg-ch1") });
     expect(ch1?.variantRole).toBe("child");
   });
+
+  it("aktualisiereAchsenwerteKern: ändert Werte, lehnt Dubletten ab, ist gesperrt sobald ein Master existiert (D233)", async () => {
+    const { getDb, schema } = await import("../../db/client");
+    const { gruppiereZuFamilieKern, aktualisiereAchsenwerteKern } = await import("./gruppieren");
+    const db = await getDb();
+    const brandId = await seedMarke(db, schema, "ax");
+    await db.insert(schema.products).values({ id: "ax-1", brandId, name: "A", asin: "B0AXW001", marke: "X", marketplace: "de" });
+    await db.insert(schema.products).values({ id: "ax-2", brandId, name: "B", asin: "B0AXW002", marke: "X", marketplace: "de" });
+    const grp = await gruppiereZuFamilieKern(db, {
+      brandId,
+      parent: { modus: "container", name: "X" },
+      theme: ["flavor"],
+      children: [
+        { productId: "ax-1", axisValues: { flavor: "A" } },
+        { productId: "ax-2", axisValues: { flavor: "B" } },
+      ],
+    });
+    expect(grp.ok).toBe(true);
+    if (!grp.ok) return;
+
+    // Ändern
+    const upd = await aktualisiereAchsenwerteKern(db, grp.parentId, { "ax-1": { flavor: "Erdbeere" } });
+    expect(upd.ok).toBe(true);
+    const ch1 = await db.query.products.findFirst({ where: eq(schema.products.id, "ax-1") });
+    expect(ch1?.variantAxisValues).toEqual({ flavor: "Erdbeere" });
+
+    // Dublette (beide „Erdbeere") wird abgelehnt, nichts geschrieben
+    const dup = await aktualisiereAchsenwerteKern(db, grp.parentId, { "ax-2": { flavor: "Erdbeere" } });
+    expect(dup.ok).toBe(false);
+
+    // Sobald ein Master existiert → gesperrt
+    await db.update(schema.products).set({ contentMaster: { baseChildAsin: "B0AXW001", theme: ["flavor"], slots: [] } }).where(eq(schema.products.id, grp.parentId));
+    const gesperrt = await aktualisiereAchsenwerteKern(db, grp.parentId, { "ax-1": { flavor: "Kiwi" } });
+    expect(gesperrt.ok).toBe(false);
+    if (!gesperrt.ok) expect(gesperrt.fehler).toContain("gesperrt");
+  });
 });

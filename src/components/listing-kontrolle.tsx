@@ -97,9 +97,13 @@ export function ListingKontrolle({
         </div>
       )}
 
-      {/* Sektionen im Detail (D126): Richtlinien-Score + KI-Befund + Live-Abgleich */}
-      <div>
-        <p className="text-xs text-muted">
+      {/* Sektionen im Detail (D126) — standardmäßig EINGEKLAPPT (D234, Nutzer: nicht mit Text
+          erschlagen): Die Score-Karten oben genügen als Überblick; Befunde/KI/Live erst per Dropdown. */}
+      <details>
+        <summary className="cursor-pointer text-sm font-medium text-primary-strong hover:underline">
+          Details je Sektion anzeigen (Befunde · KI-Bewertung · Live-Abgleich)
+        </summary>
+        <p className="mt-2 text-xs text-muted">
           Basis: Titel {quelleText(quellen.title)} · Bullets {quelleText(quellen.bullets)} · Beschreibung {quelleText(quellen.description)} — Entwürfe zählen nicht.
         </p>
         <div className="stagger mt-2 grid gap-3 lg:grid-cols-2">
@@ -179,7 +183,7 @@ export function ListingKontrolle({
         {deepAudit && (
           <p className="mt-2 text-[11px] text-muted">KI-Bewertung vom {deepAudit.createdAt.toLocaleDateString("de-DE")}</p>
         )}
-      </div>
+      </details>
     </div>
   );
 }

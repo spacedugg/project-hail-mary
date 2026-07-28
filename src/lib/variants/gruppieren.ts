@@ -154,3 +154,38 @@ export async function loeseFamilieAufKern(db: Db, parentId: string): Promise<{ o
   });
   return { ok: true };
 }
+
+/**
+ * Achsenwerte einer Familie nachträglich korrigieren (D233) — z. B. Tippfehler oder
+ * ein zunächst leerer Parent-Achsenwert. GESPERRT, sobald ein Content-Master existiert:
+ * danach hängt der Token-Tausch an den Werten, eine Änderung würde den Content desynchronisieren.
+ * `werte`: productId → { achse: wert } (nur die geänderten Varianten müssen enthalten sein).
+ */
+export async function aktualisiereAchsenwerteKern(
+  db: Db,
+  parentId: string,
+  werte: Record<string, Record<string, string>>,
+): Promise<{ ok: true } | { ok: false; fehler: string; verstoesse?: FamilieVerstoss[] }> {
+  const parent = await db.query.products.findFirst({ where: eq(products.id, parentId) });
+  if (!parent || parent.variantRole !== "parent") return { ok: false, fehler: "Kein Parent." };
+  if (parent.contentMaster) return { ok: false, fehler: "Achsenwerte gesperrt — es existiert bereits ein Content-Master. Erst Master zurücksetzen." };
+  const theme = parent.variationTheme ?? [];
+  if (theme.length === 0) return { ok: false, fehler: "Parent hat kein variationTheme." };
+
+  const childRows = await db.query.products.findMany({ where: eq(products.parentProductId, parentId) });
+  const varianten = parent.variantParentContainer ? childRows : [parent, ...childRows];
+
+  // Zusammengeführte Achsenwerte je Variante (bestehende + geänderte) gegen den Kontrakt prüfen.
+  const zusammengefuehrt = new Map(varianten.map((v) => [v.id, { ...(v.variantAxisValues ?? {}), ...(werte[v.id] ?? {}) }]));
+  const verstoesse = pruefeFamilie({
+    variationTheme: theme,
+    children: varianten.map((v) => ({ asin: v.asin ?? "", axisValues: zusammengefuehrt.get(v.id)!, productId: v.id })),
+  });
+  if (verstoesse.length > 0) return { ok: false, fehler: "Achsenwerte verletzen den Familien-Kontrakt.", verstoesse };
+
+  await db.transaction(async (tx) => {
+    for (const v of varianten)
+      await tx.update(products).set({ variantAxisValues: zusammengefuehrt.get(v.id)! }).where(eq(products.id, v.id));
+  });
+  return { ok: true };
+}

@@ -35,7 +35,7 @@ export const REGELN: Regel[] = [
     art: "llm",
     severity: "error",
     text:
-      "Fehlerfreies Deutsch: vollständige, grammatisch korrekte Sätze; Substantive groß; keine sinnfreien Wortfolgen. Ein Text, der wie eine aneinandergereihte Suchbegriff-Liste klingt, ist falsch.",
+      "Fehlerfreies Deutsch: vollständige, grammatisch korrekte Sätze; Substantive groß; keine sinnfreien Wortfolgen. Ein Text, der wie eine aneinandergereihte Suchbegriff-Liste klingt, ist falsch. Groß-/Kleinschreibung mitten im Satz beachten: NUR Satzanfang und Substantive groß — Adjektive und Verben im Satzinneren kleinschreiben (richtig: „kein umständliches Abmessen“, FALSCH: „kein Umständliches Abmessen“). Solche Fehler bereits beim Schreiben vermeiden, nicht erst korrigieren.",
   },
   {
     id: "sprache.keyword-natuerlich",

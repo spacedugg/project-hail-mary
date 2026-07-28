@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { baueMasterEntwurf, gibMasterFrei, propagiereFamilie, auditFamilieKonsistenz, loeseFamilieAuf } from "@/app/actions";
+import { baueMasterEntwurf, gibMasterFrei, propagiereFamilie, auditFamilieKonsistenz, loeseFamilieAuf, speichereAchsenwerte } from "@/app/actions";
 import type { FamilienDaten } from "@/lib/variants/laden";
 import type { MasterSlot, SlotKind } from "@/lib/variants/master";
 import type { PropagierKind, FamilieAuditKind } from "@/lib/variants/masterActions";
@@ -34,8 +34,32 @@ export function FamilieManager({ familie }: { familie: FamilienDaten }) {
   const [meldung, setMeldung] = useState<string | null>(null);
   const [prop, setProp] = useState<{ mock: boolean; warnung?: string; kinder: PropagierKind[] } | null>(null);
   const [audit, setAudit] = useState<FamilieAuditKind[] | null>(null);
+  // Achsenwerte nachträglich editierbar (D233) — gesperrt, sobald ein Master existiert.
+  const [achsenEdit, setAchsenEdit] = useState(false);
+  const [achsenLokal, setAchsenLokal] = useState<Record<string, Record<string, string>>>({});
 
   const baseKandidaten = familie.kinder.filter((k) => k.hatFreigegebenenContent);
+
+  function startAchsenEdit() {
+    const init: Record<string, Record<string, string>> = {};
+    for (const k of familie.kinder) init[k.id] = { ...k.axisValues };
+    setAchsenLokal(init);
+    setMeldung(null);
+    setAchsenEdit(true);
+  }
+  const setAchse = (pid: string, achse: string, wert: string) =>
+    setAchsenLokal((s) => ({ ...s, [pid]: { ...s[pid], [achse]: wert } }));
+  async function speichereAchsen() {
+    setBusy("achsen");
+    const res = await speichereAchsenwerte(familie.parentId, achsenLokal);
+    setBusy(null);
+    if (res.ok) {
+      setAchsenEdit(false);
+      router.refresh();
+    } else {
+      setMeldung([res.fehler, ...(res.verstoesse ?? []).map((v) => `${v.feld}: ${v.problem}`)].filter(Boolean).join(" · "));
+    }
+  }
 
   async function ableiten() {
     if (!baseId) return;
@@ -136,7 +160,18 @@ export function FamilieManager({ familie }: { familie: FamilienDaten }) {
           <thead>
             <tr className="border-b border-hair text-left text-[11px] uppercase tracking-wide text-muted">
               <th className="py-2 pl-4 pr-3">Variante</th>
-              <th className="py-2 pr-3">Achsenwerte</th>
+              <th className="py-2 pr-3">
+                Achsenwerte
+                {!familie.hatMaster && !achsenEdit && (
+                  <button
+                    onClick={startAchsenEdit}
+                    title="Achsenwerte bearbeiten (nur solange kein Master erzeugt wurde)"
+                    className="ml-1.5 align-middle text-[13px] text-muted hover:text-foreground"
+                  >
+                    ✎
+                  </button>
+                )}
+              </th>
               <th className="py-2 pr-3">Content</th>
               <th className="py-2 pr-4">Base?</th>
             </tr>
@@ -145,12 +180,40 @@ export function FamilieManager({ familie }: { familie: FamilienDaten }) {
             {familie.kinder.map((k) => (
               <tr key={k.id} className="border-b border-hair/60 last:border-0">
                 <td className="py-2 pl-4 pr-3">
-                  <Link href={`/produkte/${k.id}`} className="font-mono text-[13px] underline">{k.asin ?? "—"}</Link>
-                  {k.istKopf && <span className="ml-1.5 rounded bg-[var(--primary-soft)] px-1.5 py-0.5 text-[10px] text-primary-strong">Parent</span>}
-                  {/* Titel gekappt (max. ~46vw) → Tabelle passt ohne horizontales Scrollen (Nutzer 27.07.). */}
-                  {k.titel && k.titel !== k.asin && <span className="block max-w-[46vw] truncate text-[11px] text-muted" title={k.titel}>{k.titel}</span>}
+                  <div className="flex items-center gap-2.5">
+                    {k.bildUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={k.bildUrl} alt="" className="h-9 w-9 flex-none rounded border border-hair bg-white object-contain" />
+                    ) : (
+                      <div className="grid h-9 w-9 flex-none place-items-center rounded border border-hair bg-neutral-100 text-[10px] text-muted dark:bg-neutral-800">–</div>
+                    )}
+                    <div className="min-w-0">
+                      <span>
+                        <Link href={`/produkte/${k.id}`} className="font-mono text-[13px] underline">{k.asin ?? "—"}</Link>
+                        {k.istKopf && <span className="ml-1.5 rounded bg-[var(--primary-soft)] px-1.5 py-0.5 text-[10px] text-primary-strong">Parent</span>}
+                      </span>
+                      {/* Titel gekappt (max. ~42vw) → Tabelle passt ohne horizontales Scrollen (Nutzer 27.07.). */}
+                      {k.titel && k.titel !== k.asin && <span className="block max-w-[42vw] truncate text-[11px] text-muted" title={k.titel}>{k.titel}</span>}
+                    </div>
+                  </div>
                 </td>
-                <td className="py-2 pr-3 text-xs">{familie.theme.map((a) => `${a}: ${k.axisValues[a] ?? "—"}`).join(" · ")}</td>
+                <td className="py-2 pr-3 text-xs">
+                  {achsenEdit ? (
+                    <span className="flex flex-wrap gap-1.5">
+                      {familie.theme.map((a) => (
+                        <input
+                          key={a}
+                          value={achsenLokal[k.id]?.[a] ?? ""}
+                          onChange={(e) => setAchse(k.id, a, e.target.value)}
+                          placeholder={a}
+                          className="input-base w-28 text-xs"
+                        />
+                      ))}
+                    </span>
+                  ) : (
+                    familie.theme.map((a) => `${a}: ${k.axisValues[a] ?? "—"}`).join(" · ")
+                  )}
+                </td>
                 <td className="py-2 pr-3 text-xs">{k.hatFreigegebenenContent ? <span className="text-good">freigegeben</span> : <span className="text-muted">offen</span>}</td>
                 <td className="py-2 pr-4">
                   {k.hatFreigegebenenContent && (
@@ -164,6 +227,16 @@ export function FamilieManager({ familie }: { familie: FamilienDaten }) {
           </tbody>
         </table>
       </div>
+
+      {achsenEdit && (
+        <div className="flex items-center gap-3">
+          <button onClick={speichereAchsen} disabled={busy !== null} className="btn-primary text-sm disabled:opacity-50">
+            {busy === "achsen" ? "Speichere…" : "Achsenwerte speichern"}
+          </button>
+          <button onClick={() => setAchsenEdit(false)} className="text-xs text-muted hover:underline">Abbrechen</button>
+          <span className="text-[11px] text-muted">Danach gesperrt, sobald ein Content-Master erzeugt wird.</span>
+        </div>
+      )}
 
       {/* Schritt 1: Ableiten */}
       <div className="flex flex-wrap items-center gap-3">
