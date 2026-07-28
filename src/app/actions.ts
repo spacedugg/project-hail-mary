@@ -290,9 +290,9 @@ export async function saveKeywords(formData: FormData) {
     where: eq(schema.listingSnapshots.productId, productId),
     orderBy: desc(schema.listingSnapshots.createdAt),
   });
-  const { pruefeProduktAttribute } = await import("@/lib/keywords/relevanz");
+  const { pruefeProduktAttribute, produktAttributText } = await import("@/lib/keywords/relevanz");
   const ctx = {
-    attributText: [product.facts.dimensions, snapshot?.title, product.name].filter(Boolean).join(" · "),
+    attributText: produktAttributText(product.name, product.facts, snapshot),
     produktName: product.name,
     eigeneMarke: null,
   };
@@ -538,14 +538,14 @@ export async function resetContentChain(formData: FormData) {
   revalidatePath(`/produkte/${productId}`);
 }
 
-/** Keyword-Tiering aus dem SOV-Audit ableiten — ersetzt nur source="cerebro", manuelle bleiben. */
-export async function deriveKeywordsFromSov(formData: FormData) {
-  const productId = String(formData.get("productId") ?? "");
-  if (!productId) return;
-  const db = await getDb();
+/**
+ * Kern: Cerebro/SOV-Keywords neu ableiten (Tiers + Relevanz-Exklusion) mit dem
+ * AKTUELLEN Listing-Stand. Kein Redirect/Revalidate — Aufrufer behandeln das.
+ * Lädt das Produkt frisch (wegen zwischenzeitlich aktualisierter Fakten).
+ */
+async function keywordsAusSovNeuAbleiten(db: Awaited<ReturnType<typeof getDb>>, productId: string): Promise<void> {
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return;
-
   const uploads = await db.query.reportUploads.findMany({
     where: eq(schema.reportUploads.brandId, product.brandId),
     orderBy: desc(schema.reportUploads.createdAt),
@@ -555,15 +555,22 @@ export async function deriveKeywordsFromSov(formData: FormData) {
   );
   const audit = (sovUpload?.parsed as { audit?: import("@/lib/sov/audit").SovAudit })?.audit;
   if (!audit) return;
-
   const { deriveKeywordTiers } = await import("@/lib/sov/tiering");
   const { tiered } = deriveKeywordTiers(audit);
+  await keywordBasisSchreiben(db, product, tiered.map((k) => ({
+    keyword: k.keyword,
+    searchVolume: k.searchVolume,
+    tier: k.tier as "primary" | "secondary" | "tertiary" | "backend",
+  })));
+}
+
+/** Keyword-Tiering aus dem SOV-Audit ableiten — ersetzt nur source="cerebro", manuelle bleiben. */
+export async function deriveKeywordsFromSov(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  if (!productId) return;
+  const db = await getDb();
   try {
-    await keywordBasisSchreiben(db, product, tiered.map((k) => ({
-      keyword: k.keyword,
-      searchVolume: k.searchVolume,
-      tier: k.tier as "primary" | "secondary" | "tertiary" | "backend",
-    })));
+    await keywordsAusSovNeuAbleiten(db, productId);
   } catch (e) {
     redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Keyword-Relevanz-Prüfung: ${e instanceof Error ? e.message : String(e)}`)}&code=KW-02`);
   }
@@ -894,10 +901,12 @@ async function keywordBasisSchreiben(
     where: eq(schema.listingSnapshots.productId, product.id),
     orderBy: desc(schema.listingSnapshots.createdAt),
   });
-  const { pruefeRelevanz } = await import("@/lib/keywords/relevanz");
+  const { pruefeRelevanz, produktAttributText } = await import("@/lib/keywords/relevanz");
   const kandidaten = kandidatenListe.filter((k) => !manual.has(k.keyword.toLowerCase().trim()));
   const res = await pruefeRelevanz(kandidaten.map((k) => k.keyword), {
-    attributText: [product.facts.dimensions, snapshot?.title, product.name].filter(Boolean).join(" · "),
+    // Specs aus Fakten + Titel + Bullets + Attribut-Tabelle + „Wichtige Infos" (D240):
+    // so greift die Maß-Exklusion auch, wenn die Größe nicht im Titel steht.
+    attributText: produktAttributText(product.name, product.facts, snapshot),
     produktName: product.name,
     eigeneMarke: brand?.kind === "workbench" ? null : brand?.name ?? null,
   });
@@ -2150,6 +2159,16 @@ async function importListingKern(
     if (facts) await db.update(schema.products).set({ facts }).where(eq(schema.products.id, productId));
   } catch {
     // Autofill ist Komfort, kein Blocker
+  }
+
+  // Keywords mit dem FRISCHEN Listing-Stand neu filtern (D241): Reihenfolge egal.
+  // Wurden Cerebro/SOV-Keywords VOR dem ersten Scrape hochgeladen, konnte die
+  // Maß-/Attribut-Exklusion mangels Specs nichts ausschließen — jetzt läuft sie
+  // nach jedem Scrape automatisch nach. Nur bei vorhandenem SOV-Upload; leise.
+  try {
+    await keywordsAusSovNeuAbleiten(db, productId);
+  } catch {
+    // Neubewertung ist Komfort, kein Blocker für den Import
   }
   return null;
 }

@@ -1,6 +1,5 @@
 import type { analyzeListing } from "@/lib/analysis/listingAudit";
 import type { DeepAuditPayload, FeatureRankingPayload } from "@/db/schema";
-import { befundKarten } from "@/lib/analysis/auditKarten";
 import { InsightKarte } from "@/components/insight-karte";
 
 /**
@@ -119,17 +118,9 @@ export function AnalyseHintergrund({
         )}
       </section>
 
-      {/* Stärken & Schwächen (D135) */}
-      {deepAudit && befundKarten(deepAudit.payload, deepAudit.dataBasis).length > 0 && (
-        <section className="card p-5">
-          <h2 className="text-sm font-semibold">Stärken &amp; Schwächen</h2>
-          <div className="mt-3 space-y-2">
-            {befundKarten(deepAudit.payload, deepAudit.dataBasis).map((k, i) => (
-              <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={0} belegHinweis="aus Tiefen-Audit" />
-            ))}
-          </div>
-        </section>
-      )}
+      {/* „Stärken & Schwächen" (D135) entfernt (D243, Nutzer 28.07.): brachte
+          keinen Mehrwert — die Befunde sind über Score-Board, Listing-Kontrolle
+          und Nächste Maßnahmen bereits abgedeckt. */}
     </>
   );
 }
