@@ -106,12 +106,15 @@ export function unbelegteZahlen(text: string, quellen: string): ZahlBefund[] {
 }
 
 export function pruefeZahlenTreue(text: string, quellen: string, rulePrefix: string): ValidationIssue[] {
+  // Klartext-Findings (D243, Nutzer): mit „Text sagt …" beginnen; Bilder ausdrücklich
+  // als gültige Quelle nennen (Status-quo-Bilder belegen Zahlen, D231/D240). Der Beleg-
+  // Hinweis bleibt drin — die Meldung ist auch Korrektur-Auftrag an das LLM.
   return unbelegteZahlen(text, quellen).map((b) =>
     b.art === "widerspruch"
       ? issue(`${rulePrefix}.zahl-widerspruch`, "error",
-          `Zahlen-Widerspruch: Text sagt „${b.roh}", die Quellen nennen dort ${b.umfeld.slice(0, 3).join("/")} — Spezifikationen NIE verändern.`)
+          `Text sagt „${b.roh}" — die Produktdaten nennen dort ${b.umfeld.slice(0, 3).join("/")}; Spezifikation nicht verändern.`)
       : issue(`${rulePrefix}.zahl-ohne-quelle`, "error",
-          `Zahl ohne Quelle: „${b.roh}" kommt in keiner Daten-Quelle vor (Produkt-Wahrheit, Listing, Zusatz-Infos, Keywords) — nichts erfinden.`),
+          `Text sagt „${b.roh}" — nicht durch Produkt-Wahrheit, Listing, Bilder, Zusatz-Infos oder Keywords belegt; nichts erfinden.`),
   );
 }
 
