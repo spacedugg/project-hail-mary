@@ -25,6 +25,7 @@ import { ListingKontrolle, MassnahmenBlock } from "@/components/listing-kontroll
 import { AnalyseHintergrund } from "@/components/analyse-hintergrund";
 import { analyzeListing, wirksamesListing } from "@/lib/analysis/listingAudit";
 import { BildKacheln } from "@/components/bild-kacheln";
+import { bereinigeBildUrls } from "@/lib/scrape/bilder";
 import type { SovAudit } from "@/lib/sov/audit";
 import { ladeFamilie } from "@/lib/variants/laden";
 import { FamilieManager } from "@/components/familie-manager";
@@ -288,7 +289,10 @@ export default async function ProductPage({
             </div>
           )}
           {snapshot?.imageUrls && snapshot.imageUrls.length > 0 && (
-            <BildKacheln imageUrls={snapshot.imageUrls} bilder={snapshot.bilderText ?? []} />
+            // D216-Nachzug: Größen-Varianten desselben Bilds auch bei Anzeige entdoppeln
+            // (heilt Alt-Snapshots vor D216) — entfernt die verpixelten Phantom-Slots 8/9.
+            // Erst-Reihenfolge bleibt, echte Slots 1..n behalten ihre Audit-Zuordnung.
+            <BildKacheln imageUrls={bereinigeBildUrls(snapshot.imageUrls)} bilder={snapshot.bilderText ?? []} />
           )}
           {snapshot && !snapshot.bilderText && (snapshot.imageUrls?.length ?? 0) > 0 && (
             <p className="mt-2 text-[11px] text-muted">Bildanalyse folgt automatisch beim nächsten Listing-Import.</p>
