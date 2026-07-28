@@ -75,10 +75,12 @@ export default async function BrandKatalog({
   const baumKnoten: BaumKnoten[] = cms.produkte
     .filter((p) => !eingehaengt(p))
     .map((p) => {
-      const kinder = p.variantRole === "parent" ? kinderVon(p.id).map(zeileProps) : [];
-      // Representative-Kopf (kein Container) ist selbst eine Variante → +1.
-      const variantenAnzahl = kinder.length + (p.variantRole === "parent" && !p.variantParentContainer ? 1 : 0);
-      return { self: zeileProps(p), kinder, variantenAnzahl };
+      // Representative-Parent ist SELBST eine kaufbare Variante → er erscheint doppelt:
+      // als Kopf UND als erstes eingerücktes Child (Nutzer-Wunsch 27.07.). Ein Container
+      // ist keine Variante → nur die echten Childs eingerückt.
+      const varianten = p.variantRole === "parent" ? (p.variantParentContainer ? kinderVon(p.id) : [p, ...kinderVon(p.id)]) : [];
+      const kinder = varianten.map(zeileProps);
+      return { self: zeileProps(p), kinder, variantenAnzahl: kinder.length };
     });
 
   return (
@@ -133,15 +135,15 @@ export default async function BrandKatalog({
       </details>
 
       <details className="mt-3 rounded-xl border border-hair p-3.5">
-        <summary className="cursor-pointer text-sm font-semibold">Variations-Familie (Parent-Child) anlegen</summary>
+        <summary className="cursor-pointer text-sm font-semibold">Child-ASINs anlegen (Variations-Familie)</summary>
         <p className="mt-2 text-xs text-muted">
-          Ähnliche Varianten (Geschmack, Größe, Farbe …) zu einer Familie zusammenfassen — danach wird Content für eine
-          Variante freigegeben und stilgleich auf die anderen übertragen.
+          Bereits angelegte ASINs zu einer Parent-Child-Familie zusammenfassen: Varianten wählen, Achse + Achsenwert je
+          Variante setzen, Parent bestimmen. Danach wird Content für eine Variante freigegeben und stilgleich übertragen.
+          Die Familie erscheint anschließend direkt in der Produktliste unten (Parent mit eingerückten Childs).
         </p>
         <div className="mt-3">
           <FamilieGruppieren brandId={brandId} produkte={gruppierbar} />
         </div>
-        <p className="mt-3 text-[11px] text-muted">Bestehende Familien erscheinen direkt unten in der Produktliste (Parent mit eingerückten Varianten).</p>
       </details>
 
       {ohneSnapshot.length > 0 && (

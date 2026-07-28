@@ -19,6 +19,8 @@
  * Aufrufer (`normalisiereBildAuslese` / `normalisiereBildAudit`).
  */
 
+import { bereinigeBildUrls } from "@/lib/scrape/bilder";
+
 /** Neutral genug für beide Aufgaben — die konkrete Anweisung steht im Aufgaben-Text nach den Bildern. */
 export const BILD_VISION_SYSTEM =
   "Du bist Experte für Amazon-Listing-Bilder und arbeitest für eine deutsche Agentur. " +
@@ -27,9 +29,15 @@ export const BILD_VISION_SYSTEM =
 
 export const MAX_VISION_BILDER = 9;
 
-/** Gültige, begrenzte Bild-URLs — bei beiden Aufrufen identisch, damit der Cache greift. */
+/**
+ * Gültige, begrenzte Bild-URLs — bei beiden Aufrufen identisch, damit der Cache greift.
+ * Entdoppelt zuerst Größen-Varianten desselben Bilds (D216): sonst füllen verpixelte
+ * Dubletten die hinteren Slots und werden mit-analysiert (Phantom-Slots 8/9).
+ */
 export function visionUrls(imageUrls: string[]): string[] {
-  return imageUrls.filter((u) => u.startsWith("https://")).slice(0, MAX_VISION_BILDER);
+  return bereinigeBildUrls(imageUrls)
+    .filter((u) => u.startsWith("https://"))
+    .slice(0, MAX_VISION_BILDER);
 }
 
 type Block = { type: string; [k: string]: unknown };

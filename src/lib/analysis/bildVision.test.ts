@@ -9,6 +9,20 @@ describe("bildVision", () => {
     expect(visionUrls(many)).toHaveLength(MAX_VISION_BILDER);
   });
 
+  it("visionUrls entdoppelt Größen-Varianten desselben Bilds → keine Phantom-Slots (D216)", () => {
+    // Dasselbe Amazon-Bild in groß + klein + eine kleine Variante eines 2. Bilds:
+    // ergibt NICHT 3 Slots, sondern 2 (je die größte Variante), Reihenfolge erhalten.
+    const urls = [
+      "https://m.media-amazon.com/images/I/71ABC._AC_SL1500_.jpg",
+      "https://m.media-amazon.com/images/I/72DEF._AC_SL1500_.jpg",
+      "https://m.media-amazon.com/images/I/71ABC._SX300_.jpg", // verpixelte Dublette von Bild 1
+    ];
+    expect(visionUrls(urls)).toEqual([
+      "https://m.media-amazon.com/images/I/71ABC._AC_SL1500_.jpg",
+      "https://m.media-amazon.com/images/I/72DEF._AC_SL1500_.jpg",
+    ]);
+  });
+
   it("bildContentBlocks: je Bild Label + Bild, Cache-Breakpoint NUR auf dem letzten Bild", () => {
     const blocks = bildContentBlocks(["https://a.jpg", "https://b.jpg"]);
     expect(blocks).toHaveLength(4); // 2 Bilder × (Label + Bild)
