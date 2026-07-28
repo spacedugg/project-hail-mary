@@ -7,11 +7,13 @@
 export const RULES = {
   title: {
     // Spec-Update 07/2026: Amazon beschränkt Titel auf 75 Zeichen.
-    // PFLICHTBAND 68–75 (Nutzer 23.07., D192): unter 68 = Fehler (verschenkter
-    // Platz), 68–69 als Puffer, damit der deterministische Kürzungs-Fixer und
-    // die Generierung nicht an 1–2 Zeichen scheitern. Kategorie-Override via Wissens-Layer.
+    // PFLICHTBAND 60–75 (Nutzer 28.07., D240): unter 60 = Fehler (verschenkter
+    // Platz). Von 68 auf 60 gesenkt, weil abgeleitete Varianten-Titel beim
+    // Token-Tausch eines kürzeren Achsenwerts (z. B. „Acai" statt „Peach x Black
+    // Tea") legitim unter 68 fallen — ein reiner Kopier-Titel kann das Budget
+    // nicht deterministisch nachfüllen. Kategorie-Override via Wissens-Layer.
     maxChars: 75,
-    targetMinChars: 68,
+    targetMinChars: 60,
     maxKeywordOccurrence: 1,
   },
   /**

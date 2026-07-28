@@ -315,4 +315,121 @@ describe("Master-Flow (Ableiten → Freigeben → Propagieren)", () => {
     });
     expect((repTitle?.payload as { text: string }).text).toBe(BASE_TITLE.replace("Erdbeere", "Cola"));
   });
+
+  it("kopierte Base-Zahlen gelten in Geschwistern als belegt — kein Scrape-Rausch-Widerspruch, erfundene Zahl schlägt weiter an", async () => {
+    const { getDb, schema } = await import("../../db/client");
+    const { gruppiereZuFamilieKern } = await import("./gruppieren");
+    const { baueMasterEntwurfKern, gibMasterFreiKern, propagiereFamilieKern } = await import("./masterActions");
+    const db = await getDb();
+    await db.insert(schema.clients).values({ id: "zc", name: "K", slug: "k-zahl" });
+    await db.insert(schema.brands).values({ id: "zb", clientId: "zc", name: "M" });
+    // Base trägt die physische Familien-Wahrheit; Kiwi wurde pro-ASIN leicht abweichend gescrapt
+    // (10,8 statt 10,2 → genau das „Scrape-Rauschen", das früher falsche Widersprüche erzeugte).
+    await db.insert(schema.products).values({ id: "z-base", brandId: "zb", name: "Erdbeere", asin: "B0ZAH001", marke: "Freaky Joe", marketplace: "de", facts: { dimensions: "10,2 x 10,1 x 9 cm", specs: { zubereitung: "30 Sekunden" } } });
+    await db.insert(schema.products).values({ id: "z-kiwi", brandId: "zb", name: "Kiwi", asin: "B0ZAH002", marke: "Freaky Joe", marketplace: "de", facts: { dimensions: "10,8 x 10,3 x 9 cm" } });
+
+    const grp = await gruppiereZuFamilieKern(db, {
+      brandId: "zb",
+      parent: { modus: "container", name: "Fam" },
+      theme: ["flavor"],
+      children: [
+        { productId: "z-base", axisValues: { flavor: "Erdbeere" } },
+        { productId: "z-kiwi", axisValues: { flavor: "Kiwi" } },
+      ],
+    });
+    expect(grp.ok).toBe(true);
+    if (!grp.ok) return;
+
+    // LOCKED-Bullets (kein Flavor) tragen Base-Maße + Zubereitungszeit → wortgleich zum Kiwi kopiert.
+    // Bullet 5 trägt eine ERFUNDENE Zahl (42, in KEINER Quelle) als Gegenprobe.
+    const bullets = [
+      "PRAKTISCHE DOSE: Kompakt mit 10,2 x 10,1 cm für unterwegs.",
+      "SCHNELL FERTIG: In 30 Sekunden angerührt und trinkfertig.",
+      "REIN PFLANZLICH: Zuckerfrei und vegan ohne künstliche Zusätze.",
+      "IDEAL UNTERWEGS: Passt in jede Sporttasche und jeden Rucksack.",
+      "HITZEFEST: Hält problemlos 42 Grad Sommerhitze im Auto aus.",
+    ];
+    const titel = "Freaky Joe Elektrolytpulver Erdbeere zuckerfrei vegan zum Anmischen in stillem Wasser";
+    const mk = (type: "title" | "bullets" | "description", payload: Record<string, unknown>) =>
+      db.insert(schema.contentVersions).values({ id: crypto.randomUUID(), productId: "z-base", type, version: 1, payload, status: "approved" });
+    await mk("title", { text: titel });
+    await mk("bullets", { items: bullets });
+    await mk("description", { text: "Kompakt mit 10,2 x 10,1 cm und in 30 Sekunden fertig angerührt." });
+
+    const entwurf = await baueMasterEntwurfKern(db, grp.parentId, "z-base", keinRegenerate);
+    expect(entwurf.ok).toBe(true);
+    if (!entwurf.ok) return;
+    await gibMasterFreiKern(db, grp.parentId, entwurf.master);
+
+    const prop = await propagiereFamilieKern(db, grp.parentId, regeneratorVerboten);
+    expect(prop.ok).toBe(true);
+    const kiwi = prop.kinder.find((k) => k.productId === "z-kiwi")!;
+
+    // Base-belegte Zahlen dürfen im Geschwister NICHT als ohne-quelle/widerspruch anschlagen.
+    const zahlMeldungen = kiwi.issues.filter((i) => i.rule.includes("zahl")).map((i) => i.message).join(" | ");
+    expect(zahlMeldungen).not.toContain("10,1");
+    expect(zahlMeldungen).not.toContain("10,2");
+    expect(zahlMeldungen).not.toContain("30 Sekunden");
+    // Gegenprobe: die ERFUNDENE Zahl (42, in keiner Quelle) MUSS weiter anschlagen — Check bleibt scharf.
+    expect(kiwi.issues.some((i) => i.rule === "bullets.zahl-ohne-quelle" && i.message.includes("42"))).toBe(true);
+  });
+
+  it("Zahl nur auf dem Base-Bild gilt im Geschwister als belegt (D240 Bild-Beleg fließt in die Familien-Wahrheit)", async () => {
+    const { getDb, schema } = await import("../../db/client");
+    const { gruppiereZuFamilieKern } = await import("./gruppieren");
+    const { baueMasterEntwurfKern, gibMasterFreiKern, propagiereFamilieKern } = await import("./masterActions");
+    const db = await getDb();
+    await db.insert(schema.clients).values({ id: "bc", name: "K", slug: "k-bild" });
+    await db.insert(schema.brands).values({ id: "bb", clientId: "bc", name: "M" });
+    // facts LEER + KEINE Keywords → die Zahl „480 mg" hat NUR eine mögliche Quelle: den Bild-Text.
+    await db.insert(schema.products).values({ id: "b-base", brandId: "bb", name: "Erdbeere", asin: "B0BILD01", marke: "Freaky Joe", marketplace: "de", facts: {} });
+    await db.insert(schema.products).values({ id: "b-kiwi", brandId: "bb", name: "Kiwi", asin: "B0BILD02", marke: "Freaky Joe", marketplace: "de", facts: {} });
+
+    // Base-Snapshot: „480 mg Koffein" steht NUR im ausgelesenen Bild-Text (bilderText).
+    await db.insert(schema.listingSnapshots).values({
+      id: crypto.randomUUID(),
+      productId: "b-base",
+      source: "manual",
+      bilderText: [{ slot: 1, textImBild: ["480 mg Koffein pro Dose"], inhalt: "Nährwert-Grafik auf der Dose", claims: [] }],
+    });
+
+    const grp = await gruppiereZuFamilieKern(db, {
+      brandId: "bb",
+      parent: { modus: "container", name: "Fam" },
+      theme: ["flavor"],
+      children: [
+        { productId: "b-base", axisValues: { flavor: "Erdbeere" } },
+        { productId: "b-kiwi", axisValues: { flavor: "Kiwi" } },
+      ],
+    });
+    expect(grp.ok).toBe(true);
+    if (!grp.ok) return;
+
+    // Locked-Bullet + Beschreibung tragen die Bild-Zahl → wortgleich nach Kiwi kopiert.
+    const bullets = [
+      "STARKER KICK: Enthält 480 mg Koffein pro Dose für lange Wachheit.",
+      "REIN PFLANZLICH: Zuckerfrei und vegan ohne künstliche Zusätze im Pulver.",
+      "IDEAL UNTERWEGS: Passt in jede Sporttasche und jeden Rucksack bequem.",
+      "SCHNELL FERTIG: Einfach mit stillem Wasser anrühren und sofort genießen.",
+      "MADE IN GERMANY: Nach streng geprüften Qualitätsstandards produziert.",
+    ];
+    const mk = (type: "title" | "bullets" | "description", payload: Record<string, unknown>) =>
+      db.insert(schema.contentVersions).values({ id: crypto.randomUUID(), productId: "b-base", type, version: 1, payload, status: "approved" });
+    await mk("title", { text: "Freaky Joe Energy Pulver Erdbeere zuckerfrei vegan mit Koffein zum Anmischen" });
+    await mk("bullets", { items: bullets });
+    await mk("description", { text: "Enthält 480 mg Koffein pro Dose und ist mit Wasser schnell angerührt." });
+
+    const entwurf = await baueMasterEntwurfKern(db, grp.parentId, "b-base", keinRegenerate);
+    expect(entwurf.ok).toBe(true);
+    if (!entwurf.ok) return;
+    await gibMasterFreiKern(db, grp.parentId, entwurf.master);
+
+    const prop = await propagiereFamilieKern(db, grp.parentId, regeneratorVerboten);
+    expect(prop.ok).toBe(true);
+    const kiwi = prop.kinder.find((k) => k.productId === "b-kiwi")!;
+
+    // Die Bild-Zahl (480) darf NICHT als „ohne Quelle" anschlagen — ihre einzige Quelle ist der Bild-Text.
+    const zahlMeldungen = kiwi.issues.filter((i) => i.rule.includes("zahl")).map((i) => i.message).join(" | ");
+    expect(zahlMeldungen).not.toContain("480");
+  });
 });

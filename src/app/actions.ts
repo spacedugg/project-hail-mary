@@ -741,12 +741,8 @@ async function generiereSektionKern(
   // Beleg-Text aus den EIGENEN Bildern (Vision-Auslese) + A+ + Produktinfo (D230):
   // Zahlen/Aussagen, die dort stehen, gelten als belegt (z. B. „30 Sekunden" auf dem Bild)
   // und dürfen nicht als erfunden geflaggt werden.
-  const { bilderAlsText } = await import("@/lib/analysis/bildAuslese");
-  const bildBelege =
-    [bilderAlsText(snapshot?.bilderText), snapshot?.aplusContent, typeof snapshot?.importantInfo === "string" ? snapshot.importantInfo : ""]
-      .map((s) => (s ?? "").trim())
-      .filter(Boolean)
-      .join("\n\n") || null;
+  const { snapshotBildBelege } = await import("@/lib/analysis/bildAuslese");
+  const bildBelege = snapshotBildBelege(snapshot) || null;
 
   const inputs: RecipeInputs = {
     brand: mk.marke,
@@ -2307,18 +2303,21 @@ export async function saveContentManual(formData: FormData) {
   });
   const latest = (t: string) => versions.find((v) => v.type === t)?.payload as Record<string, unknown> | undefined;
   const manuBrand = await db.query.brands.findFirst({ where: eq(schema.brands.id, product.brandId) });
+  const { snapshotBildBelege } = await import("@/lib/analysis/bildAuslese");
   const ctx = {
     facts: product.facts,
     primaryKeywords: kws.filter((k) => k.tier === "primary").map((k) => k.keyword),
     // Auch Handarbeit läuft gegen die Fremdmarken-Blacklist (D97) — Marken-Kontext D149
     competitorBrands: contentMarkenKontext(manuBrand ?? undefined, manuSnapshot?.title, fremdmarkenAusKeywords(alleKws), product.marke).fremdmarken,
-    // … und gegen den Zahlen-Herkunfts-Check (D114) — gleiche Quellen wie die Generierung
+    // … und gegen den Zahlen-Herkunfts-Check (D114) — gleiche Quellen wie die Generierung,
+    // inkl. Bild-/A+/Produktinfo-Beleg (D231/D240), damit Bild-Zahlen nicht als erfunden gelten.
     zahlenQuellen: [
       product.name,
       JSON.stringify(product.facts),
       manuSnapshot?.title ?? "",
       ...(manuSnapshot?.bullets ?? []),
       manuSnapshot?.description ?? "",
+      snapshotBildBelege(manuSnapshot),
       product.zusatzKontext ?? "",
       ...kws.map((k) => k.keyword),
     ].join("\n"),

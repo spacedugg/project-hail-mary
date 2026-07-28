@@ -336,8 +336,9 @@ export function validateTitle(title: string, ctx: Ctx = {}): ValidationIssue[] {
   const chars = charLength(t);
   if (chars > RULES.title.maxChars)
     issues.push(issue("title.max-length", "error", `Titel ${chars} Zeichen > ${RULES.title.maxChars} (Amazon-Limit 07/2026).`));
-  // Pflichtband 70–75 (Nutzer-Regel 23.07., D190): unter 70 ist verschenkter
+  // Pflichtband 60–75 (Nutzer-Regel 28.07., D240): unter 60 ist verschenkter
   // Platz und damit FEHLER (erzwingt Regenerierung), nicht mehr nur Warnung.
+  // Untergrenze von 68 auf 60 gesenkt für abgeleitete Varianten-Titel (s. rules.ts).
   if (chars < RULES.title.targetMinChars && chars <= RULES.title.maxChars)
     issues.push(issue("title.budget", "error", `Titel nur ${chars} Zeichen — Pflichtband ${RULES.title.targetMinChars}–${RULES.title.maxChars}: das Budget MUSS ausgenutzt werden (weiteres belegtes Attribut/Nutzen ergänzen).`));
 

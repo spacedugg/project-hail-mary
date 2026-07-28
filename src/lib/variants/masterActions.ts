@@ -15,6 +15,7 @@ import {
   type SlotRegenerator,
 } from "./master";
 import type { SlotKlassifikator } from "./masterLlm";
+import { snapshotBildBelege } from "@/lib/analysis/bildAuslese";
 
 /**
  * Kern-Logik der Content-Master-Actions (D221/D222) — testbar, nimmt `db`.
@@ -23,6 +24,7 @@ import type { SlotKlassifikator } from "./masterLlm";
 
 const uuid = () => crypto.randomUUID();
 type ProductRow = typeof products.$inferSelect;
+type KeywordRow = typeof keywords.$inferSelect;
 
 // ── Content lesen ────────────────────────────────────────────────────────────
 
@@ -65,30 +67,63 @@ async function leseAktuellenContent(db: Db, productId: string): Promise<MasterCo
 
 // ── Gate-Kontext (spiegelt den Haupt-Generierungsflow, D114/D181) ───────────────
 
-async function baueGateCtxKern(db: Db, child: ProductRow) {
+/**
+ * Zahlen-Herkunft EINES Produkts (D114): eigene Fakten + eigenes Listing-IST +
+ * Zusatz-Infos + Keywords. Als Helper herausgezogen, damit dieselbe Kette auch
+ * für die BASE-Variante gebaut werden kann (siehe `baueGateCtxKern`).
+ */
+async function leseZahlenQuellen(db: Db, p: ProductRow, kwsVorab?: KeywordRow[]): Promise<string> {
+  const kws = kwsVorab ?? (await db.query.keywords.findMany({ where: eq(keywords.productId, p.id) }));
+  const alleKeywords = kws.filter((k) => !k.ausgeschlossen).map((k) => k.keyword);
+  const snapshot = await db.query.listingSnapshots.findFirst({
+    where: eq(listingSnapshots.productId, p.id),
+    orderBy: desc(listingSnapshots.createdAt),
+  });
+  return [
+    p.marke ?? "",
+    p.name,
+    JSON.stringify(p.facts),
+    snapshot?.title ?? "",
+    ...(snapshot?.bullets ?? []),
+    // Bild-/A+/Produktinfo-Beleg (D231/D240): Zahlen, die nur auf den EIGENEN Bildern
+    // stehen (z. B. „30 Sekunden"), gelten als belegt — sonst würde die Varianten-
+    // Ableitung sie fälschlich als „zahl-ohne-quelle" flaggen. Spiegelt den Hauptflow.
+    snapshotBildBelege(snapshot),
+    p.zusatzKontext ?? "",
+    ...alleKeywords,
+  ].join("\n");
+}
+
+/**
+ * Findet die BASE-Variante einer Familie (die, aus deren Content der Master
+ * abgeleitet wurde). `master.baseChildAsin` ist ASIN-oder-ProductId.
+ */
+function findeBaseVariante(varianten: ProductRow[], master: ContentMaster): ProductRow | undefined {
+  return varianten.find((v) => (v.asin ?? v.id) === master.baseChildAsin);
+}
+
+/**
+ * Gate-Kontext eines Childs. `basisZahlenQuellen` (optional) trägt die Zahlen-
+ * Herkunft der BASE-Variante bei: Beim Ableiten aus einem Master IST die Base
+ * die Produkt-Wahrheit der Familie. Geschmacks-/Farb-Varianten sind physisch
+ * dasselbe Produkt — Maße, Zubereitungszeit, Portionen sind identisch; jede
+ * pro-ASIN neu gescrapte Zahl weicht nur durch Scrape-Rauschen ab (10,1 vs 10,8).
+ * Ohne diese Vereinigung meldet das Gate KOPIERTE Base-Zahlen fälschlich als
+ * „ohne Quelle"/„Widerspruch" (Kern-Bug der Varianten-Ableitung). Erfundene
+ * Zahlen (in KEINER Quelle) schlagen weiterhin an — die Vereinigung ist additiv.
+ */
+async function baueGateCtxKern(db: Db, child: ProductRow, basisZahlenQuellen = "") {
   const kws = await db.query.keywords.findMany({ where: eq(keywords.productId, child.id) });
   const aktiv = kws.filter((k) => !k.ausgeschlossen);
   const byTier = (t: string) => aktiv.filter((k) => k.tier === t).map((k) => k.keyword);
   const alleKeywords = aktiv.map((k) => k.keyword);
-  const snapshot = await db.query.listingSnapshots.findFirst({
-    where: eq(listingSnapshots.productId, child.id),
-    orderBy: desc(listingSnapshots.createdAt),
-  });
   const fremdmarken = [
     ...new Set(
       kws.map((k) => k.ausschlussGrund ?? "").filter((g) => g.startsWith("Marke: ")).map((g) => g.slice("Marke: ".length).trim()).filter(Boolean),
     ),
   ];
-  // Zahlen-Herkunft (D114): NUR eigene Wahrheit — Fakten, eigenes Listing-IST, Zusatz, Keywords.
-  const zahlenQuellen = [
-    child.marke ?? "",
-    child.name,
-    JSON.stringify(child.facts),
-    snapshot?.title ?? "",
-    ...(snapshot?.bullets ?? []),
-    child.zusatzKontext ?? "",
-    ...alleKeywords,
-  ].join("\n");
+  const eigene = await leseZahlenQuellen(db, child, kws); // kws bereits geladen → kein Doppel-Read
+  const zahlenQuellen = basisZahlenQuellen ? `${eigene}\n${basisZahlenQuellen}` : eigene;
   return { facts: child.facts, primaryKeywords: byTier("primary"), alleKeywords, competitorBrands: fremdmarken, zahlenQuellen };
 }
 
@@ -239,6 +274,10 @@ export async function propagiereFamilieKern(
   const ziele = alleVarianten.filter((k) => (k.asin ?? k.id) !== master.baseChildAsin);
   if (ziele.length === 0) return { ok: false, fehler: "Keine weiteren Varianten zum Propagieren (nur die Base).", mock: false, kinder: [] };
 
+  // Familien-Wahrheit: die Zahlen-Quellen der Base fließen in JEDES Child-Gate ein (siehe baueGateCtxKern).
+  const baseRow = findeBaseVariante(alleVarianten, master);
+  const basisZahlenQuellen = baseRow ? await leseZahlenQuellen(db, baseRow) : "";
+
   const hatRegenerate = master.slots.some((s) => s.kind === "regenerate");
   const mock = !!opts.regeneratorMock && hatRegenerate;
 
@@ -259,7 +298,7 @@ export async function propagiereFamilieKern(
     if (hatResttoken(content))
       issues.push({ rule: "familie.token-unaufgeloest", severity: "error", evidence: "deterministic", message: `Child ${asin}: unaufgelöster Platzhalter im abgeleiteten Content.` });
 
-    const ctx = await baueGateCtxKern(db, k);
+    const ctx = await baueGateCtxKern(db, k, basisZahlenQuellen);
     issues.push(...validateTitle(content.title, ctx), ...validateBullets(content.bullets, ctx), ...validateDescription(content.description, content.bullets, ctx));
 
     await persistiereChildContent(db, k.id, content, issues, `variants.master:${parentId}${mock ? ":mock" : ""}`);
@@ -337,7 +376,12 @@ export async function propagiereChildKern(
   const issues: ValidationIssue[] = [];
   if (hatResttoken(content))
     issues.push({ rule: "familie.token-unaufgeloest", severity: "error", evidence: "deterministic", message: `Child ${asin}: unaufgelöster Platzhalter im abgeleiteten Content.` });
-  const ctx = await baueGateCtxKern(db, child);
+
+  // Familien-Wahrheit: Base-Zahlen-Quellen in das Child-Gate einbeziehen (siehe baueGateCtxKern).
+  const kinder = await db.query.products.findMany({ where: eq(products.parentProductId, parentId) });
+  const baseRow = findeBaseVariante(parent.variantParentContainer ? kinder : [parent, ...kinder], master);
+  const basisZahlenQuellen = baseRow ? await leseZahlenQuellen(db, baseRow) : "";
+  const ctx = await baueGateCtxKern(db, child, basisZahlenQuellen);
   issues.push(...validateTitle(content.title, ctx), ...validateBullets(content.bullets, ctx), ...validateDescription(content.description, content.bullets, ctx));
   await persistiereChildContent(db, child.id, content, issues, `variants.master:${parentId}${mock ? ":mock" : ""}`);
 
