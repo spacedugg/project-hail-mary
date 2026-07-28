@@ -14,7 +14,6 @@ import {
   produktSchluesselSpeichern,
   istAlsSollUebernehmen,
 } from "@/app/cms-actions";
-import { ProduktNav } from "@/components/produkt-nav";
 import { SubmitButton } from "@/components/submit-button";
 import { FehlerPopup } from "@/components/fehler-popup";
 import { fehlerInfo } from "@/lib/fehlercodes";
@@ -76,14 +75,17 @@ export default async function ProduktContent({
     <main className="w-full p-8">
       {fehler && <FehlerPopup message={fehler} {...fehlerInfo(code)} />}
 
-      <Link href={`/marke/${product.brandId}/katalog`} className="text-xs text-neutral-500 hover:underline">← Katalog</Link>
+      {/* Ein zurück zur Werkbank — KEINE zweite Reiter-Leiste (D239, Nutzer-Befund
+          28.07.): Die Produkt-Steuerung lebt in der Werkbank. Ein eigenes
+          Reiter-Menü hier war ein redundantes Zwischenmenü, das nur auf dieselben
+          Reiter zurückverwies — entfernt für eine einfache, nachvollziehbare Führung. */}
+      <Link href={`/produkte/${id}`} className="text-xs text-neutral-500 hover:underline">← Werkbank</Link>
       <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
         <h1 className="page-title">
           {p.name} {p.asin && <span className="font-mono text-sm text-neutral-500">{p.asin} · amazon.{p.marketplace}</span>}
         </h1>
         <Link href={`/marke/${product.brandId}/katalog`} className="btn-ghost text-xs">Alle Produkte dieser Marke →</Link>
       </div>
-      <ProduktNav productId={id} feedbackOffen={offen.length} />
 
       {/* ── Zustand auf einen Blick ─────────────────────────────────────── */}
       <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

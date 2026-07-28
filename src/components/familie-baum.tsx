@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { propagiereChild, auditFamilieKonsistenz } from "@/app/actions";
 import {
   TREE_PIECES,
@@ -14,19 +15,26 @@ import type { FamilieAuditKind } from "@/lib/variants/masterActions";
 import type { ValidationIssue } from "@/db/schema";
 
 /**
- * Familien-Baum (D236, Nutzer-Wunsch): freigegebene Base-ASIN oben, Geschwister
- * darunter aufgefächert und per Linie verbunden. „Auf Geschwister übertragen"
- * läuft Kind für Kind LIVE — je Kind füllen sich Titel → Bullets → Beschreibung
- * gestaffelt grün. Ideal für Kunden-Demos (Screenshare): man sieht, wie in
- * Sekunden aus einer ASIN der Content auf viele Varianten übertragen wird.
+ * Familien-Baum (D236/D238, Nutzer-Wunsch): freigegebene Base-ASIN oben,
+ * Geschwister darunter aufgefächert und per Linie verbunden. „Auf Geschwister
+ * übertragen" läuft Kind für Kind LIVE.
  *
- * Green = Content vorhanden/übertragen · Sanduhr = wird gerade erzeugt ·
- * graues Minus = nicht angelegt (bzw. nicht Teil des Masters).
+ * Häkchen-Logik (D238, Nutzer-Korrektur):
+ * - WEISSER Haken  = dieses Piece SOLL generiert werden (ist im Plan/Master).
+ * - GRÜNER Haken   = wurde gerade generiert (Fortschritt dieses Laufs).
+ * - Sanduhr        = wird gerade erzeugt.
+ * - graues Minus   = nicht Teil des Plans (kein Master-Piece).
+ * Die Geschwister starten also WEISS und werden Piece für Piece grün.
+ *
+ * Fehler werden je Kind AUSGESCHRIEBEN (Regel + Klartext), nicht nur als Zahl —
+ * der Nutzer muss sehen, WARUM/WO das Gate anschlägt (D238). Jede Kachel ist
+ * klickbar und führt zum Content der ASIN.
  */
 
-const CHILD_W = 190; // px — feste Kachelbreite, damit die Verbindungslinien passen
+const CHILD_W = 200; // px — feste Kachelbreite, damit die Verbindungslinien passen
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+type Zustand = "gruen" | "weiss" | "pending" | "leer";
 type KindLauf = {
   status: "idle" | "running" | "done";
   gruen: Set<TreePiece>;
@@ -34,15 +42,13 @@ type KindLauf = {
   issues?: ValidationIssue[];
 };
 
-function initGruen(k: FamilienKind): Set<TreePiece> {
-  return new Set(TREE_PIECES.filter((p) => k.pieces[p] !== "none"));
-}
-
-function PieceZeile({ label, zustand }: { label: string; zustand: "gruen" | "pending" | "leer" }) {
+function PieceZeile({ label, zustand }: { label: string; zustand: Zustand }) {
   return (
     <li className="flex items-center gap-1.5 text-[11px]">
       {zustand === "gruen" ? (
         <span className="grid h-4 w-4 flex-none place-items-center rounded-full bg-[rgb(22_163_74/0.15)] text-[10px] text-good">✓</span>
+      ) : zustand === "weiss" ? (
+        <span className="grid h-4 w-4 flex-none place-items-center rounded-full border border-hair bg-[var(--surface)] text-[10px] text-foreground">✓</span>
       ) : zustand === "pending" ? (
         <span className="grid h-4 w-4 flex-none animate-pulse place-items-center rounded-full bg-amber-100 text-[9px] text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">⏳</span>
       ) : (
@@ -55,34 +61,64 @@ function PieceZeile({ label, zustand }: { label: string; zustand: "gruen" | "pen
 
 function Kachel({
   kind,
+  href,
   zustand,
-  badge,
+  fuss,
 }: {
   kind: FamilienKind;
-  zustand: (p: TreePiece) => "gruen" | "pending" | "leer";
-  badge?: React.ReactNode;
+  href: string;
+  zustand: (p: TreePiece) => Zustand;
+  fuss?: React.ReactNode;
 }) {
   return (
     <div className="rounded-xl border-2 border-hair bg-[var(--surface)] p-2.5 shadow-sm" style={{ width: CHILD_W }}>
-      <div className="grid aspect-square w-full place-items-center overflow-hidden rounded-lg border border-hair bg-white">
-        {kind.bildUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={kind.bildUrl} alt="" className="h-full w-full object-contain" />
-        ) : (
-          <span className="text-[10px] text-muted">kein Bild</span>
+      {/* Klickbarer Kopf → Content der ASIN (D238) */}
+      <Link href={href} className="block rounded-lg outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-primary" title="Content dieser ASIN öffnen">
+        <div className="grid aspect-square w-full place-items-center overflow-hidden rounded-lg border border-hair bg-white">
+          {kind.bildUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={kind.bildUrl} alt="" className="h-full w-full object-contain" />
+          ) : (
+            <span className="text-[10px] text-muted">kein Bild</span>
+          )}
+        </div>
+        <div className="mt-1.5 truncate font-mono text-[12px] font-bold text-primary-strong" title={kind.asin ?? undefined}>{kind.asin ?? "—"}</div>
+        {kind.titel && kind.titel !== kind.asin && (
+          <div className="truncate text-[10px] text-muted" title={kind.titel}>{kind.titel}</div>
         )}
-      </div>
-      <div className="mt-1.5 truncate font-mono text-[12px] font-bold" title={kind.asin ?? undefined}>{kind.asin ?? "—"}</div>
-      {kind.titel && kind.titel !== kind.asin && (
-        <div className="truncate text-[10px] text-muted" title={kind.titel}>{kind.titel}</div>
-      )}
+      </Link>
       <ul className="mt-1.5 space-y-1">
         {TREE_PIECES.map((p) => (
           <PieceZeile key={p} label={TREE_PIECE_LABEL[p]} zustand={zustand(p)} />
         ))}
       </ul>
-      {badge && <div className="mt-2">{badge}</div>}
+      {fuss && <div className="mt-2">{fuss}</div>}
     </div>
+  );
+}
+
+/** Fehler/Warnungen eines Kindes ausgeschrieben — aufklappbar, nicht nur als Zahl. */
+function GateBefund({ issues }: { issues: ValidationIssue[] }) {
+  const fehler = issues.filter((i) => i.severity === "error");
+  const warn = issues.filter((i) => i.severity === "warning");
+  if (fehler.length === 0 && warn.length === 0)
+    return <span className="inline-block rounded-full bg-[rgb(22_163_74/0.15)] px-2 py-0.5 text-[10px] font-semibold text-good">✓ Gate bestanden</span>;
+  return (
+    <details className="rounded-lg border border-bad/40 bg-bad/5">
+      <summary className="cursor-pointer px-2 py-1 text-[10px] font-semibold text-bad">
+        ✕ {fehler.length} Fehler{warn.length ? ` · ${warn.length} Hinweise` : ""} — Gründe zeigen
+      </summary>
+      <ul className="space-y-1 px-2 pb-2 pt-1">
+        {[...fehler, ...warn].map((i, n) => (
+          <li key={n} className="text-[10px] leading-snug">
+            <span className={i.severity === "error" ? "text-bad" : "text-amber-600"}>{i.severity === "error" ? "✕" : "△"}</span>{" "}
+            <span className="font-mono text-[9px] text-muted">{i.rule}</span>
+            <br />
+            <span className="text-foreground/80">{i.message}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
@@ -94,8 +130,9 @@ export function FamilieBaum({ familie }: { familie: FamilienDaten }) {
     null;
   const targets = familie.kinder.filter((k) => k !== base);
 
+  // Geschwister starten WEISS (Plan) — gruen-Set leer, füllt sich beim Übertragen (D238).
   const [lauf, setLauf] = useState<Record<string, KindLauf>>(() =>
-    Object.fromEntries(targets.map((t) => [t.id, { status: "idle", gruen: initGruen(t) } as KindLauf])),
+    Object.fromEntries(targets.map((t) => [t.id, { status: "idle", gruen: new Set<TreePiece>() } as KindLauf])),
   );
   const [running, setRunning] = useState(false);
   const [mockWarn, setMockWarn] = useState(false);
@@ -111,8 +148,10 @@ export function FamilieBaum({ familie }: { familie: FamilienDaten }) {
     setFehler(null);
     setMockWarn(false);
     setAudit(null);
+    // Zurück auf Start: alle Geschwister wieder WEISS, damit der Fortschritt sichtbar läuft.
+    setLauf(Object.fromEntries(targets.map((t) => [t.id, { status: "idle", gruen: new Set<TreePiece>() } as KindLauf])));
     for (const t of targets) {
-      setKind(t.id, { status: "running" });
+      setKind(t.id, { status: "running", gruen: new Set() });
       const res = await propagiereChild(familie.parentId, t.id);
       if (!res.ok) {
         setFehler(res.fehler);
@@ -147,13 +186,14 @@ export function FamilieBaum({ familie }: { familie: FamilienDaten }) {
     else setFehler(res.fehler ?? "Prüfung fehlgeschlagen.");
   }
 
-  const baseZustand = (p: TreePiece): "gruen" | "leer" => (base && base.pieces[p] !== "none" ? "gruen" : "leer");
+  const baseZustand = (p: TreePiece): Zustand => (base && base.pieces[p] !== "none" ? "gruen" : "leer");
   function kindZustand(id: string) {
-    return (p: TreePiece): "gruen" | "pending" | "leer" => {
+    return (p: TreePiece): Zustand => {
       const s = lauf[id];
       if (s?.gruen.has(p)) return "gruen";
       if (s?.status === "running" && PROPAGIERTE_PIECES.includes(p)) return "pending";
-      return "leer";
+      if (PROPAGIERTE_PIECES.includes(p)) return "weiss"; // im Plan, noch nicht generiert
+      return "leer"; // nicht Teil des Masters
     };
   }
 
@@ -172,10 +212,11 @@ export function FamilieBaum({ familie }: { familie: FamilienDaten }) {
       </div>
 
       <p className="text-xs text-muted">
-        <span className="mr-3"><span className="text-good">✓</span> Content vorhanden / übertragen</span>
+        <span className="mr-3"><span className="text-foreground">✓ weiß</span> = geplant / im Master</span>
+        <span className="mr-3"><span className="text-good">✓ grün</span> = generiert</span>
         <span className="mr-3">⏳ wird erzeugt</span>
-        <span><span className="text-muted">–</span> nicht angelegt</span>
-        {" · Grün = im Tool erstellt (Entwurf), noch nicht Amazon-live."}
+        <span><span className="text-muted">–</span> nicht Teil des Masters</span>
+        {" · Grün = im Tool erstellt (Entwurf), noch nicht Amazon-live. Kachel anklicken öffnet den Content."}
       </p>
 
       {mockWarn && (
@@ -191,8 +232,9 @@ export function FamilieBaum({ familie }: { familie: FamilienDaten }) {
           <div className="flex justify-center">
             <Kachel
               kind={base}
+              href={`/produkte/${base.id}/content`}
               zustand={baseZustand}
-              badge={<span className="inline-block rounded-full bg-[rgb(22_163_74/0.15)] px-2 py-0.5 text-[10px] font-semibold text-good">Base · freigegeben</span>}
+              fuss={<span className="inline-block rounded-full bg-[rgb(22_163_74/0.15)] px-2 py-0.5 text-[10px] font-semibold text-good">Base · freigegeben</span>}
             />
           </div>
 
@@ -200,30 +242,19 @@ export function FamilieBaum({ familie }: { familie: FamilienDaten }) {
             <>
               <div className="mx-auto h-5 w-px bg-hair" />
               <div className="relative flex justify-center gap-5">
-                {targets.length > 1 && (
-                  <div className="absolute left-[95px] right-[95px] top-0 h-px bg-hair" />
-                )}
+                {targets.length > 1 && <div className="absolute left-[100px] right-[100px] top-0 h-px bg-hair" />}
                 {targets.map((t) => {
                   const s = lauf[t.id];
-                  const badge =
+                  const fuss =
                     s?.status === "done" ? (
-                      s.passed ? (
-                        <span className="inline-block rounded-full bg-[rgb(22_163_74/0.15)] px-2 py-0.5 text-[10px] font-semibold text-good">✓ Gate bestanden</span>
-                      ) : (
-                        <span
-                          className="inline-block cursor-help rounded-full bg-bad/10 px-2 py-0.5 text-[10px] font-semibold text-bad"
-                          title={(s.issues ?? []).filter((i) => i.severity === "error").map((i) => `${i.rule}: ${i.message}`).join("\n") || undefined}
-                        >
-                          ✕ {(s.issues ?? []).filter((i) => i.severity === "error").length} Fehler
-                        </span>
-                      )
+                      <GateBefund issues={s.issues ?? []} />
                     ) : s?.status === "running" ? (
                       <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">generiert …</span>
                     ) : undefined;
                   return (
                     <div key={t.id} className="flex flex-col items-center" style={{ width: CHILD_W }}>
                       <div className="h-5 w-px bg-hair" />
-                      <Kachel kind={t} zustand={kindZustand(t.id)} badge={badge} />
+                      <Kachel kind={t} href={`/produkte/${t.id}/content`} zustand={kindZustand(t.id)} fuss={fuss} />
                     </div>
                   );
                 })}
