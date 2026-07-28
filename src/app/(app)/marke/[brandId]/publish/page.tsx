@@ -30,6 +30,17 @@ export default async function Freigaben({ params }: { params: Promise<{ brandId:
 
   const offen = await ladeOffeneFreigaben(brandId);
   const erledigt = await ladeErledigteFreigaben(brandId);
+  // Produkt-zentriert gruppieren (D235, Nutzer-Wunsch): nicht mehr eine flache Baustein-Liste
+  // quer über alle Produkte — sondern je Produkt, mit Anzahl offener Freigaben.
+  const offenProProdukt = Object.values(
+    offen.reduce(
+      (acc, f) => {
+        (acc[f.productId] ??= { productId: f.productId, produktName: f.produktName, items: [] as typeof offen }).items.push(f);
+        return acc;
+      },
+      {} as Record<string, { productId: string; produktName: string; items: typeof offen }>,
+    ),
+  ).sort((a, b) => b.items.length - a.items.length);
   // Für den zweiten Abschnitt: intern abgenommene Stände, die noch auf den
   // Kunden warten. Das ist der Teil der Kette, der vorher nirgends sichtbar war.
   const cms = await ladeMarkenCms(brandId);
@@ -44,33 +55,48 @@ export default async function Freigaben({ params }: { params: Promise<{ brandId:
       <section className="mt-5 card p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="sect-h">Wartet auf deine Abnahme</h2>
-          <span className="text-xs text-muted">{offen.length} Stand/Stände</span>
+          <span className="text-xs text-muted">{offen.length} Stand/Stände · {offenProProdukt.length} Produkt(e)</span>
         </div>
         <p className="mt-1 text-xs text-muted">
-          <b>Was hier landet:</b> Sobald in der Werkstatt eines Produkts ein Text erzeugt oder von Hand geändert wird
-          und die automatische Prüfung besteht, erscheint er hier — als jeweils <i>neuester</i> Stand je Sektion.
-          Er verschwindet, sobald du ihn freigibst oder ein neuerer Stand ihn ersetzt.
-          Was die Prüfung <b>nicht</b> besteht, taucht gar nicht auf: Das ist Werkstatt-Arbeit, keine Freigabe-Aufgabe.
+          <b>Nach Produkt gruppiert:</b> Jede Zeile ist ein Produkt mit der Anzahl offener Freigaben. Aufklappen zeigt
+          NUR die Stände dieses Produkts — als jeweils <i>neuester</i> Stand je Sektion. Ein Stand verschwindet, sobald du
+          ihn freigibst oder ein neuerer ihn ersetzt. Was die Prüfung nicht besteht, ist Werkstatt-Arbeit, keine Freigabe.
         </p>
 
-        {/* Fokussierter Durchgang: ein Stand nach dem anderen (Nutzer-Wunsch 23.07.) */}
-        <div className="mt-4">
-          <FreigabeStepper
-            variant="intern"
-            action={approveContent}
-            leerText="Nichts offen — alles abgenommen."
-            bausteine={offen.map((f) => ({
-              key: f.versionId,
-              produktName: f.produktName,
-              label: `${f.label} · v${f.version}`,
-              werte: f.werte,
-              erledigt: false,
-              statusText: f.generiertVon ?? "manuell",
-              fields: { productId: f.productId, versionId: f.versionId },
-              werkstattHref: `/produkte/${f.productId}`,
-            }))}
-          />
-        </div>
+        {/* Produkt-zentriert (D235): Produktliste mit Anzahl; aufklappen → nur dessen Freigaben. */}
+        {offenProProdukt.length === 0 ? (
+          <p className="mt-4 text-sm text-muted">Nichts offen — alles abgenommen.</p>
+        ) : (
+          <div className="mt-4 space-y-2">
+            {offenProProdukt.map((pp) => (
+              <details key={pp.productId} className="rounded-xl border border-hair p-3">
+                <summary className="flex cursor-pointer items-center justify-between gap-2">
+                  <span className="font-medium">{pp.produktName}</span>
+                  <span className="rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-xs text-primary-strong">
+                    {pp.items.length} Freigabe{pp.items.length === 1 ? "" : "n"} offen
+                  </span>
+                </summary>
+                <div className="mt-3">
+                  <FreigabeStepper
+                    variant="intern"
+                    action={approveContent}
+                    leerText="—"
+                    bausteine={pp.items.map((f) => ({
+                      key: f.versionId,
+                      produktName: f.produktName,
+                      label: `${f.label} · v${f.version}`,
+                      werte: f.werte,
+                      erledigt: false,
+                      statusText: f.generiertVon ?? "manuell",
+                      fields: { productId: f.productId, versionId: f.versionId },
+                      werkstattHref: `/produkte/${f.productId}`,
+                    }))}
+                  />
+                </div>
+              </details>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* ── Zweite Hälfte der Kette: vom Kunden absichern ─────────────── */}
