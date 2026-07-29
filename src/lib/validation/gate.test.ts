@@ -235,6 +235,18 @@ describe("validateBackendKeywords", () => {
     const andereDimension = validateBullets(["REICHT: Ergibt 8 Portionen pro Dose praktisch."], { zahlenQuellen: quellen });
     expect(andereDimension.some((i) => i.rule === "bullets.zahl-widerspruch")).toBe(false);
   });
+  it("nur echte Mess-Einheiten verankern einen Widerspruch — Adjektiv/Trenner nicht (D248-Review)", () => {
+    // Adjektiv „verschiedene" darf 5 nicht gegen 3 stellen (unterschiedliche Attribute).
+    const adj = validateBullets(["AUSWAHL: In 5 verschiedene Farben erhältlich für jeden Geschmack im Alltag."], { zahlenQuellen: "Erhältlich in 3 verschiedene Größen für jeden Bedarf" });
+    expect(adj.some((i) => i.rule === "bullets.zahl-widerspruch")).toBe(false);
+    // „x" ist Trenner/Multiplikator, keine Einheit → Packungsmenge 2x nicht gegen Maße stellen.
+    const x = validateBullets(["SET: Enthält 2x Ersatzfilter praktisch verpackt im Karton mitgeliefert."], { zahlenQuellen: "Abmessungen 10 x 20 x 5 cm laut Hersteller" });
+    expect(x.some((i) => i.rule === "bullets.zahl-widerspruch")).toBe(false);
+  });
+  it("Nachkomma-Nullen normalisiert: 1,50 m gleich 1,5 m — kein Schein-Widerspruch (D248-Review)", () => {
+    const issues = validateBullets(["LÄNGE: Das Kabel misst 1,50 m für flexible Nutzung im ganzen Raum."], { zahlenQuellen: "Kabellänge 1,5 m für flexible Platzierung" });
+    expect(issues.filter((i) => i.rule.startsWith("bullets.zahl"))).toEqual([]);
+  });
 
   it("Satzzeichen verschwenden Bytes — WARNUNG (Blog 07/2026: Amazon ignoriert sie)", () => {
     expect(validateBackendKeywords("salatschüssel; backschüssel.", "", ctx).map((i) => i.rule)).toContain("backend.punctuation");
