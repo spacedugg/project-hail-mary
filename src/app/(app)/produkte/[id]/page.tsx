@@ -251,10 +251,11 @@ export default async function ProductPage({
           basisHref={`/produkte/${product.id}`}
           tabs={[...TABS]}
           aktiv={tab}
-          extra={[
-            { href: `/produkte/${product.id}/content`, label: "Content-Verwaltung" },
-            { href: `/produkte/${product.id}/briefs`, label: "Briefings" },
-          ]}
+          /* „Content-Verwaltung" ist KEIN Produkt-Reiter mehr (D255, Nutzer): Die
+             Content-Verwaltung lebt im linken Hauptmenü — ein zweiter Einstieg hier
+             führte in eine Publish-/Soll-Ansicht, die im Produkt-Kontext nicht
+             zuzuordnen war. Die Route bleibt, erreichbar über das Menü. */
+          extra={[{ href: `/produkte/${product.id}/briefs`, label: "Briefings" }]}
         />
       )}
 
