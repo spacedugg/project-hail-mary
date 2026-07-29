@@ -191,29 +191,37 @@ export function enforceDeepAudit(
 const stamm = (w: string) => normalizeToken(w);
 
 /** Kommt der Begriff (wortstamm- & komposita-bewusst) im Text vor? */
-function begriffImText(begriff: string, textStaemme: Set<string>): boolean {
+function begriffImText(begriff: string, textStaemme: Set<string>, staemmeListe?: string[]): boolean {
   const woerter = begriff.split(/[\s\-/]+/).map(stamm).filter((s) => s.length >= 3);
   if (woerter.length === 0) return false;
+  const liste = staemmeListe ?? [...textStaemme]; // Review-Fix: Set nicht pro Wort spreaden
   return woerter.every((w) =>
-    [...textStaemme].some((t) => t === w || (w.length >= 4 && t.includes(w)) || (t.length >= 4 && w.includes(t))),
+    liste.some((t) => t === w || (w.length >= 4 && t.includes(w)) || (t.length >= 4 && w.includes(t))),
   );
 }
 
 /**
- * Zitierte Begriffe aus einer KI-Behauptung ziehen. Auch EINFACHE Anführungszeichen
- * (D252): das Modell schreibt in der Praxis oft 'schnell löslich' statt „schnell löslich".
+ * Zitierte Begriffe aus einer KI-Behauptung ziehen.
+ *
+ * Einfache Anführungszeichen NUR mit Wortgrenze davor/danach (Review-Fix D254):
+ * ein Apostroph mitten im Wort („wie's geht") eröffnete sonst ein Phantom-Zitat,
+ * verschluckte das ECHTE Zitat und ließ die Behauptung fälschlich als „belegt"
+ * gelten. Doppelte Anführungszeichen bleiben ohne Grenz-Bedingung.
  */
-const ZITAT_RE = /[„“"'‚‘]([^„“"'‚‘’]{2,})[”“"'’‘]/g;
+const ZITAT_RE = /[„“"]([^„“"”]{2,})[”“"]|(?<![\p{L}\p{N}])['‚‘]([^'‘’]{2,})['’](?![\p{L}\p{N}])/gu;
+const zitateAus = (s: string) => [...s.matchAll(ZITAT_RE)].map((m) => m[1] ?? m[2]).filter(Boolean);
 
 /**
- * „Etwas fehlt"-Formulierungen. Bewusst BREIT (D252): Das Muster löst nur die
- * Beleg-PRÜFUNG der zitierten Begriffe aus — verworfen wird eine Behauptung erst,
- * wenn ihre Zitate nachweislich im Listing stehen. Zu eng heißt: echte Falsch-
- * Behauptungen überleben. Der Nutzer-Screenshot („Kein klar erkennbares
- * Löslichkeits-/Zubereitungs-Keyword …") wurde vom alten Muster NICHT erfasst.
+ * ABSENZ-Formulierungen: die Behauptung ist, dass etwas GAR NICHT vorkommt.
+ * Nur solche Aussagen darf ein Zitat-Beleg widerlegen.
+ *
+ * Bewusst NICHT enthalten (Review-Fix D254): „verpasst", „nicht kommuniziert",
+ * „keine Angabe/Aussage/Information". Die zielen auf die QUALITÄT der Nutzung
+ * („Der Nutzen von „Koffein" wird nicht kommuniziert") — dass das Wort im Text
+ * steht, widerlegt sie NICHT. Sie zu filtern löschte berechtigte Kritik.
  */
 const FEHLT_MUSTER =
-  /fehlt|fehlen|fehlend|nirgends|ohne bezug auf|keine erwähnung|nicht erwähnt|nicht enthalten|nicht vorhanden|nicht erkennbar|nicht adressiert|unadressiert|nicht aufgegriffen|nicht genannt|nicht kommuniziert|verpasst|kein(?:e|en|em|er|es)?\s+[^.!?;]{0,60}?(?:keyword|begriff|hinweis|signal|angabe|nennung|erwähnung|aussage|information)/i;
+  /fehlt|fehlen|fehlend|nirgends|ohne bezug auf|keine erwähnung|nicht erwähnt|nicht enthalten|nicht vorhanden|nicht genannt|nicht auffindbar|kein(?:e|en|em|er|es)?\s+[^.!?;]{0,60}?(?:keyword|begriff|nennung|erwähnung)/i;
 /**
  * Sprach-/Anglizismus-Kritik (D253). Trifft sie NUR feste Eigennamen (Marke,
  * Sorten-/Variantenname), ist sie nicht umsetzbar und damit falsch — der Name
@@ -250,20 +258,51 @@ export function istDeutsch(text: string): boolean {
  * Sorten-/Variantenname), fliegt ebenfalls — sie ist nicht umsetzbar.
  */
 export function pruefeAuditBehauptungen(payload: DeepAuditPayload, input: DeepAuditInput): DeepAuditPayload {
-  const gesamtText = [input.title, ...input.bullets, input.description, input.backendKeywords, input.bildBelege].join(" ");
-  const textStaemme = new Set(gesamtText.split(/[\s\-–—/,.;:!?()•·]+/).map(stamm).filter((s) => s.length >= 3));
+  // Getrennte Beleg-Räume (Review-Fix D254): Der SICHTBARE TEXT ist der einzige
+  // Raum, der eine „fehlt im Text"-Behauptung widerlegen darf. Bild-/A+-Text ist
+  // Listing-INHALT, aber kein Text — eine Aussage wie „steht nur im Bild, nicht im
+  // Titel" ist WAHR und darf niemals gelöscht werden (sie ist genau der Befund,
+  // den das Tool liefern soll). Bild-Belege korrigieren daher nur die Prämisse.
+  const zerlege = (s: string) => s.split(/[\s\-–—/,.;:!?()•·]+/).map(stamm).filter((x) => x.length >= 3);
+  const textStaemme = new Set(zerlege([input.title, ...input.bullets, input.description, input.backendKeywords].join(" ")));
+  const bildStaemme = new Set(zerlege(input.bildBelege));
+  const textListe = [...textStaemme];
+  const bildListe = [...bildStaemme];
 
-  // Zitate, die (Teil) eines festen Eigennamens sind — beidseitig geprüft, damit
-  // sowohl „Peach x Black Tea" als auch das Teilzitat „Peach" erkannt wird.
-  const fix = input.fixeBegriffe.map((b) => b.toLowerCase().trim()).filter(Boolean);
-  const istFesterName = (zitat: string) => {
-    const z = zitat.toLowerCase().trim();
-    return z.length >= 2 && fix.some((f) => f.includes(z) || z.includes(f));
+  /**
+   * Beleg-Lage einer Behauptung anhand IHRER EIGENEN Zitate:
+   *  "text" → alle Zitate stehen im sichtbaren Text → Absenz-Behauptung ist falsch.
+   *  "bild" → alle Zitate belegt, aber mindestens eines nur über Bild/A+ → Prämisse
+   *           korrigieren („steht im Bild"), NIE löschen.
+   *  "nein" → nicht (vollständig) belegt → Behauptung bleibt unangetastet.
+   * Ein durch die Längen-Grenze VERSTÜMMELTES Zitat-Set gilt als "nein" (Review-Fix):
+   * sonst reichte ein kurzes belegtes Zitat, um ein langes unbelegtes mitzulöschen.
+   */
+  const belegLage = (behauptung: string): "text" | "bild" | "nein" => {
+    const alle = zitateAus(behauptung);
+    const kurz = alle.filter((z) => z.length <= 60);
+    if (kurz.length === 0 || kurz.length !== alle.length) return "nein";
+    if (kurz.every((z) => begriffImText(z, textStaemme, textListe))) return "text";
+    if (kurz.every((z) => begriffImText(z, textStaemme, textListe) || begriffImText(z, bildStaemme, bildListe))) return "bild";
+    return "nein";
   };
+
+  // Feste Eigennamen als TOKEN-Menge, nicht als Substring (Review-Fix D254): Ein
+  // kurzer Achsenwert („S", „XL") hätte per Substring fast jedes Zitat getroffen und
+  // jede Sprachkritik gelöscht. Und ein Zitat, das den Eigennamen nur ENTHÄLT
+  // („Iced Peach x Black Tea Refresher Mix"), kritisiert den freien Text drumherum —
+  // das muss stehen bleiben. Verworfen wird nur, was AUSSCHLIESSLICH aus Namens-Tokens besteht.
+  const fixTokens = new Set(
+    input.fixeBegriffe.flatMap((b) => b.split(/[\s\-–—/]+/)).map(stamm).filter((t) => t.length >= 3),
+  );
   const nurEigennamenKritik = (behauptung: string) => {
-    if (fix.length === 0 || !SPRACH_KRITIK_MUSTER.test(behauptung)) return false;
-    const zitate = [...behauptung.matchAll(ZITAT_RE)].map((m) => m[1]).filter((z) => z.length <= 60);
-    return zitate.length > 0 && zitate.every(istFesterName);
+    if (fixTokens.size === 0 || !SPRACH_KRITIK_MUSTER.test(behauptung)) return false;
+    const zitate = zitateAus(behauptung).filter((z) => z.length <= 60);
+    if (zitate.length === 0) return false;
+    return zitate.every((z) => {
+      const toks = z.split(/[\s\-–—/]+/).map(stamm).filter((t) => t.length >= 3);
+      return toks.length > 0 && toks.every((t) => fixTokens.has(t));
+    });
   };
   const sektionsText: Partial<Record<DeepAuditDimension["key"], string>> = {
     title: input.title,
@@ -272,57 +311,79 @@ export function pruefeAuditBehauptungen(payload: DeepAuditPayload, input: DeepAu
     backend: input.backendKeywords,
   };
 
+  const BILD_HINWEIS = "Hinweis: Das Thema steht bereits im Bild-/A+-Inhalt — es geht also nur darum, es ZUSÄTZLICH in den Text zu heben.";
+  const gruende: string[] = []; // Log-Spur (D182): jedes Filter-Ereignis ist nachvollziehbar
+
   const dimensions = payload.dimensions.map((d) => {
     const eigenerText = sektionsText[d.key];
     const entfernt: string[] = [];
-    const probleme = d.probleme.filter((p) => {
-      // Fall 1: Fehlt-Behauptung mit zitierten Begriffen, die nachweislich da sind
-      if (FEHLT_MUSTER.test(p)) {
-        const zitate = [...p.matchAll(ZITAT_RE)].map((m) => m[1]).filter((z) => z.length <= 60);
-        if (zitate.length > 0 && zitate.every((z) => begriffImText(z, textStaemme))) {
-          entfernt.push(p);
-          return false;
-        }
+    const probleme: string[] = [];
+    for (const p of d.probleme) {
+      const lage = FEHLT_MUSTER.test(p) ? belegLage(p) : "nein";
+      // Fall 1a: Absenz-Behauptung, im sichtbaren TEXT widerlegt → falsch, raus.
+      if (lage === "text") {
+        entfernt.push(p);
+        gruende.push(`probleme/${d.key}: im Text belegt`);
+        continue;
+      }
+      // Fall 1b (Review-Fix D254): nur über Bild/A+ belegt → die Behauptung ist über
+      // den TEXT zutreffend. Nicht löschen, sondern die Prämisse ergänzen.
+      if (lage === "bild") {
+        probleme.push(`${p} — ${BILD_HINWEIS}`);
+        gruende.push(`probleme/${d.key}: nur im Bild belegt → Hinweis ergänzt`);
+        continue;
       }
       // Fall 2: „nicht auf Deutsch", obwohl die Sektion deutsch ist
       if (eigenerText && NICHT_DEUTSCH_MUSTER.test(p) && istDeutsch(eigenerText)) {
         entfernt.push(p);
-        return false;
+        gruende.push(`probleme/${d.key}: Sektion ist deutsch`);
+        continue;
       }
       // Fall 3 (D253): Sprach-Kritik, die ausschließlich feste Eigennamen trifft
       if (nurEigennamenKritik(p)) {
         entfernt.push(p);
-        return false;
+        gruende.push(`probleme/${d.key}: betrifft nur feste Eigennamen`);
+        continue;
       }
-      return true;
-    });
-    if (entfernt.length === 0) return d;
+      probleme.push(p);
+    }
+    if (entfernt.length === 0) return { ...d, probleme };
     return {
       ...d,
       probleme,
-      aktuell: `${d.aktuell}${d.aktuell ? " " : ""}(${entfernt.length} KI-Behauptung${entfernt.length > 1 ? "en" : ""} entfernt — der bemängelte Begriff steht nachweislich im Listing bzw. der Text ist deutsch.)`,
+      aktuell: `${d.aktuell}${d.aktuell ? " " : ""}(${entfernt.length} KI-Behauptung${entfernt.length > 1 ? "en" : ""} entfernt — nachweislich unzutreffend: Begriff steht im Listing-Text, Text ist deutsch, oder die Kritik betraf einen vorgegebenen Eigennamen.)`,
     };
   });
 
-  // topActions (D252): liefen vorher UNGEPRÜFT durch — daher stand ein längst
-  // adressierter Pain Point als Maßnahme Nr. 1. Zwei Fälle, je nach Formulierung:
-  //  (a) „fehlt"-Behauptung + Begriff nachweislich vorhanden → schlicht FALSCH, raus.
-  //  (b) Handlungs-Aufforderung („adressieren"/„einarbeiten") zu einem Thema, das
-  //      nachweislich schon im Listing/in den Bildern steht → die Prämisse ist falsch,
-  //      die Maßnahme aber nicht wertlos: Sie wird auf die einzig zutreffende Aussage
-  //      korrigiert (Thema ist belegt, höchstens zusätzlich in den Text heben) statt
-  //      still gelöscht — Nutzer-Vorgabe.
-  const belegt = (a: string) => {
-    const zitate = [...a.matchAll(ZITAT_RE)].map((m) => m[1]).filter((z) => z.length <= 60);
-    return zitate.length > 0 && zitate.every((z) => begriffImText(z, textStaemme));
-  };
-  const topActions = payload.topActions
-    .filter((a) => !(FEHLT_MUSTER.test(a) && belegt(a)) && !nurEigennamenKritik(a))
-    .map((a) =>
-      MASSNAHME_MUSTER.test(a) && belegt(a)
-        ? `${a} — Hinweis: Das Thema ist im Listing bzw. in den Bildern/A+ bereits belegt; höchstens zusätzlich in den Text heben.`
-        : a,
-    );
+  // topActions (D252/D254): liefen vorher UNGEPRÜFT durch — daher stand ein längst
+  // adressierter Pain Point als Maßnahme Nr. 1. Grundsatz jetzt: KORRIGIEREN statt
+  // still löschen (Review-Fix) — eine verschwundene Maßnahme ist unsichtbar und
+  // verstößt gegen „nie still". Nur eine im Text widerlegte Absenz-Behauptung ODER
+  // reine Eigennamen-Kritik fliegt ganz; das wird protokolliert.
+  const topActions: string[] = [];
+  for (const a of payload.topActions) {
+    const lage = belegLage(a);
+    if (FEHLT_MUSTER.test(a) && lage === "text") {
+      gruende.push("topAction: im Text belegt → entfernt");
+      continue;
+    }
+    if (nurEigennamenKritik(a)) {
+      gruende.push("topAction: betrifft nur feste Eigennamen → entfernt");
+      continue;
+    }
+    if (lage === "bild" && (FEHLT_MUSTER.test(a) || MASSNAHME_MUSTER.test(a))) {
+      topActions.push(`${a} — ${BILD_HINWEIS}`);
+      gruende.push("topAction: nur im Bild belegt → Hinweis ergänzt");
+      continue;
+    }
+    if (MASSNAHME_MUSTER.test(a) && lage === "text") {
+      topActions.push(`${a} — Hinweis: Das Thema ist im Listing-Text bereits belegt; es geht höchstens um mehr Prominenz.`);
+      gruende.push("topAction: im Text belegt → Hinweis ergänzt");
+      continue;
+    }
+    topActions.push(a);
+  }
+  if (gruende.length > 0) console.warn("[AUDIT-FILTER]", JSON.stringify({ asin: input.asin, gruende }));
   return { ...payload, dimensions, topActions };
 }
 
