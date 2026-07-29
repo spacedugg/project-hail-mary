@@ -38,6 +38,18 @@ export const REGELN: Regel[] = [
       "Fehlerfreies Deutsch: vollständige, grammatisch korrekte Sätze; Substantive groß; keine sinnfreien Wortfolgen. Ein Text, der wie eine aneinandergereihte Suchbegriff-Liste klingt, ist falsch. Groß-/Kleinschreibung mitten im Satz beachten: NUR Satzanfang und Substantive groß — Adjektive und Verben im Satzinneren kleinschreiben (richtig: „kein umständliches Abmessen“, FALSCH: „kein Umständliches Abmessen“). Solche Fehler bereits beim Schreiben vermeiden, nicht erst korrigieren.",
   },
   {
+    // D251 (Nutzer-Befund, Screenshot: „Jeder Schluck schmeckt sauber durchgemischt“):
+    // Grammatisch korrekt, aber semantisch Unsinn — „sauber“ gehört ins Sinnfeld
+    // Reinheit, nicht zu Durchmischung oder Geschmack. sprache.grammatik greift hier
+    // NICHT (der Satz IST grammatisch), darum eine eigene Kollokations-Regel.
+    id: "sprache.kollokation",
+    sektionen: ["title", "bullets", "highlights", "description", "qa"],
+    art: "llm",
+    severity: "error",
+    text:
+      "Jedes Adjektiv/Adverb/Verb muss semantisch zu dem passen, was es beschreibt (übliche deutsche Wortverbindung). Ein Wort aus einem FREMDEN Sinnfeld zu übertragen ist falsch — auch wenn der Satz grammatisch korrekt ist. FALSCH: „jeder Schluck schmeckt sauber durchgemischt“ („sauber“ = Reinheit und beschreibt weder Geschmack noch Durchmischung; „schmecken“ verlangt eine Geschmacksangabe). RICHTIG: „löst sich klümpchenfrei auf“, „schmeckt gleichmäßig fruchtig“. Prüfe jede Wortverbindung: Würde ein deutscher Muttersprachler das so sagen? Benutze für jede Eigenschaft das dafür übliche Wort — Löslichkeit: klümpchenfrei/rückstandslos/vollständig; Geschmack: fruchtig/mild/erfrischend; Konsistenz: gleichmäßig/sämig; Reinheit: sauber/rein. Keine Wort-Neuschöpfungen, keine gestapelten Adjektive ohne Sinn.",
+  },
+  {
     id: "sprache.keyword-natuerlich",
     sektionen: ["title", "bullets", "highlights", "description"],
     art: "llm",
