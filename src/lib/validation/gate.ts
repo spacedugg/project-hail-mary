@@ -66,10 +66,30 @@ function zahlMitEinheitBelegt(q: string, zahl: string, unit: string): boolean {
   return new RegExp(`(?<![\\d.,])${escRe(zahl)}\\s*-?\\s*${escRe(unit)}`).test(q);
 }
 
-/** Zahl-Claims (Zahl + Einheit + bis zu 2 Folgewörter) aus einem Text ziehen. */
-function zahlClaims(text: string): Array<{ zahl: string; unit: string; kontext: string[]; roh: string }> {
+/**
+ * Zahlen im Umfeld jedes Vorkommens der Einheit als eigenständiges Token — Fenster
+ * aber HART auf die aktuelle Quell-Zeile begrenzt (Quellen sind mit \n getrennt).
+ * Anker für den Widerspruch-Check (D248): verglichen wird NUR mit Zahlen desselben
+ * Einheiten-Kontexts (inkl. Mehrzahl-Specs wie „18/8", „22 x 5,5 x 2,2") — nie über
+ * die Zeilengrenze hinweg in eine fremde Angabe (das war der 0,5-Fehl-Match).
+ */
+function zahlenUmEinheit(q: string, unit: string): Set<string> {
+  const um = new Set<string>();
+  if (!unit) return um;
+  const re = new RegExp(`(?<![a-zäöüß0-9])${escRe(unit)}(?![a-zäöüß])`, "g");
+  for (let m = re.exec(q); m; m = re.exec(q)) {
+    const zeilenStart = q.lastIndexOf("\n", m.index - 1) + 1;
+    const zeilenEnde = q.indexOf("\n", m.index) === -1 ? q.length : q.indexOf("\n", m.index);
+    const fenster = q.slice(Math.max(m.index - 40, zeilenStart), Math.min(m.index + unit.length + 40, zeilenEnde));
+    for (const z of fenster.match(/\d+(?:\.\d+)?/g) ?? []) um.add(normZahl(z));
+  }
+  return um;
+}
+
+/** Zahl-Claims (Zahl + Einheit) aus einem Text ziehen. Einheit = erstes sinntragendes Wort nach der Zahl. */
+function zahlClaims(text: string): Array<{ zahl: string; unit: string; roh: string }> {
   const tokens = text.split(/[\s/()„“"«»;:–—]+/).filter(Boolean);
-  const claims: Array<{ zahl: string; unit: string; kontext: string[]; roh: string }> = [];
+  const claims: Array<{ zahl: string; unit: string; roh: string }> = [];
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i].toLowerCase().replace(/[.!?,]+$/, "");
     let zahl: string | null = null;
@@ -89,12 +109,7 @@ function zahlClaims(text: string): Array<{ zahl: string; unit: string; kontext: 
       } else continue;
     } else continue;
 
-    const kontext = tokens
-      .slice(i + 1, i + 3)
-      .flatMap((w) => w.split("-"))
-      .map((w) => w.toLowerCase().replace(/[^a-zäöüß]/g, ""))
-      .filter((w) => w.length >= 2);
-    claims.push({ zahl, unit, kontext, roh: tokens.slice(i, i + 3).join(" ") });
+    claims.push({ zahl, unit, roh: tokens.slice(i, i + 3).join(" ") });
   }
   return claims;
 }
@@ -119,23 +134,18 @@ export function unbelegteZahlen(text: string, quellen: string): ZahlBefund[] {
     // gegen eine unzusammenhängende Zahl (0,5 aus „reicht für 0,5 l") gematcht wurde.
     // Additiv: erfundene/falsche Zahlen ohne Einheits-Beleg schlagen weiter an.
     if (zahlMitEinheitBelegt(q, c.zahl, c.unit)) continue;
-    // Kontextwort-Stämme in den Quellen suchen; Zahlen im Umfeld einsammeln
-    const stamm = c.kontext.map((k) => k.slice(0, 6)).find((k) => k.length >= 2 && q.includes(k));
-    if (stamm) {
-      let kontextTrifftZahl = false;
-      const umfeldZahlen = new Set<string>();
-      for (let idx = q.indexOf(stamm); idx !== -1; idx = q.indexOf(stamm, idx + 1)) {
-        const fenster = q.slice(Math.max(0, idx - 40), idx + stamm.length + 40);
-        for (const z of fenster.match(/\d+(?:\.\d+)?/g) ?? []) {
-          umfeldZahlen.add(normZahl(z));
-          if (normZahl(z) === c.zahl) kontextTrifftZahl = true;
-        }
-      }
-      if (!kontextTrifftZahl && umfeldZahlen.size > 0) {
-        befunde.push({ roh: c.roh, art: "widerspruch", umfeld: [...umfeldZahlen] });
+    // D248: Widerspruch NUR einheiten-/sachgleich. Anker ist die EIGENE Einheit der Zahl
+    // (das erste sinntragende Wort nach der Zahl — „g", „cm", „aa", „portionen"), NIE ein
+    // beliebiges Füllwort. So kann „350 g" nie gegen eine unzusammenhängende „0,5" verglichen
+    // werden; verglichen wird ausschließlich mit Zahlen desselben Einheiten-Kontexts.
+    if (c.unit) {
+      const umfeld = zahlenUmEinheit(q, c.unit);
+      if (umfeld.size > 0) {
+        if (umfeld.has(c.zahl)) continue; // Zahl steht im selben Einheiten-Kontext → belegt
+        befunde.push({ roh: c.roh, art: "widerspruch", umfeld: [...umfeld] });
         continue;
       }
-      if (kontextTrifftZahl) continue;
+      // Einheit kommt in den Quellen gar nicht vor → auf reiner Zahl-Ebene entscheiden
     }
     if (!zahlBekannt) befunde.push({ roh: c.roh, art: "ohne-quelle", umfeld: [] });
   }
