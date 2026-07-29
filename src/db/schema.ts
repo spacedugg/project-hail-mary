@@ -861,3 +861,171 @@ export const contentFeedback = pgTable("content_feedback", {
   erledigtAt: tsNull("erledigt_at"),
   createdAt: ts("created_at").notNull(),
 });
+
+// ── Amazon-Anbindung (D263) ──────────────────────────────────────────────────
+
+/**
+ * SP-API-Regionen. Ein Seller-Account gehört zu genau einer Region; alle
+ * Marktplätze dieser Region laufen über denselben Endpunkt und denselben
+ * Refresh Token. Europa deckt DE/UK/FR/IT/ES/NL/SE/PL/BE/IE/TR.
+ */
+export type AmazonRegion = "eu" | "na" | "fe";
+
+/**
+ * Lebenszyklus einer Seller-Verbindung.
+ * - "pending": angelegt, aber der Kunde hat noch nicht autorisiert (kein Token).
+ * - "active": Token vorhanden, Aufrufe erlaubt.
+ * - "error": letzter Aufruf scheiterte technisch — Aufrufe bleiben erlaubt (Retry).
+ * - "reauthorization_required": Amazon hat den Token entwertet (invalid_grant)
+ *   ODER die Reautorisierungsfrist läuft ab. Aufrufe gesperrt bis Neu-Autorisierung.
+ * - "disconnected": bewusst getrennt. Token gelöscht, KEINE automatische
+ *   Reaktivierung — eine neue Autorisierung ist Pflicht.
+ */
+export type AmazonConnectionStatus =
+  | "pending"
+  | "active"
+  | "error"
+  | "reauthorization_required"
+  | "disconnected";
+
+/**
+ * Eine autorisierte Amazon-Seller-Verbindung (D263). Bewusst NICHT identisch mit
+ * `brands`: mehrere Marken können denselben Seller-Account nutzen, und ein Kunde
+ * kann mehrere Seller-Accounts haben. Die Zuordnung läuft über
+ * `amazon_connection_brands`.
+ *
+ * `encryptedRefreshToken` hält ausschließlich AES-256-GCM-Chiffrat (siehe
+ * integrations/amazon/auth/tokenCrypto.ts). Der Klartext-Token verlässt niemals
+ * den Server, landet nie in Logs, Audit-Einträgen oder API-Antworten.
+ */
+export const amazonConnections = pgTable(
+  "amazon_connections",
+  {
+    id: text("id").primaryKey(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    /** Anzeigename im Tool (z. B. „Seller DE — Hauptkonto"), rein intern. */
+    label: text("label"),
+    /** Amazons Seller-Kennung, kommt erst mit dem OAuth-Callback. */
+    sellingPartnerId: text("selling_partner_id"),
+    region: text("region").$type<AmazonRegion>().notNull().default("eu"),
+    /** AES-256-GCM-Chiffrat, Format `v1:<base64>`. NULL, sobald getrennt. */
+    encryptedRefreshToken: text("encrypted_refresh_token"),
+    /**
+     * SHA-256 des Klartext-Tokens. Erlaubt „ist das derselbe Token wie vorher?"
+     * (Reautorisierung erkennen) OHNE Entschlüsselung — und ist selbst nutzlos,
+     * falls die Zeile abfließt.
+     */
+    tokenFingerprint: text("token_fingerprint"),
+    status: text("status").$type<AmazonConnectionStatus>().notNull().default("pending"),
+    authorizedAt: tsNull("authorized_at"),
+    /** Amazon-Autorisierungen laufen ab; Frist wird in der Oberfläche angezeigt. */
+    reauthorizationDueAt: tsNull("reauthorization_due_at"),
+    revokedAt: tsNull("revoked_at"),
+    lastSuccessAt: tsNull("last_success_at"),
+    lastErrorAt: tsNull("last_error_at"),
+    /** Maschinenlesbarer Code aus mapAmazonError — nie die Rohmeldung Amazons. */
+    lastErrorCode: text("last_error_code"),
+    archivedAt: tsNull("archived_at"),
+    createdAt: ts("created_at").notNull(),
+    updatedAt: ts("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("amazon_connections_client_spid_region").on(t.clientId, t.sellingPartnerId, t.region),
+  ],
+);
+
+/** Welche Marken laufen über welche Seller-Verbindung (n:m, D263). */
+export const amazonConnectionBrands = pgTable(
+  "amazon_connection_brands",
+  {
+    connectionId: text("connection_id")
+      .notNull()
+      .references(() => amazonConnections.id, { onDelete: "cascade" }),
+    brandId: text("brand_id")
+      .notNull()
+      .references(() => brands.id, { onDelete: "cascade" }),
+    createdAt: ts("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("amazon_connection_brands_pk").on(t.connectionId, t.brandId)],
+);
+
+/**
+ * Marktplatz-Teilnahme je Verbindung — gefüllt aus
+ * GET /sellers/v1/marketplaceParticipations. Die Feldnamen folgen bewusst der
+ * API (D114/D115: keine erfundenen Felder): Amazon liefert `isParticipating`
+ * und `hasSuspendedListings`, keinen freien „listings_status".
+ */
+export const amazonMarketplaces = pgTable(
+  "amazon_marketplaces",
+  {
+    id: text("id").primaryKey(),
+    connectionId: text("connection_id")
+      .notNull()
+      .references(() => amazonConnections.id, { onDelete: "cascade" }),
+    /** Amazons Marketplace-ID, z. B. A1PA6795UKMFR9 für amazon.de. */
+    marketplaceId: text("marketplace_id").notNull(),
+    countryCode: text("country_code").notNull(),
+    name: text("name").notNull(),
+    defaultCurrency: text("default_currency"),
+    defaultLanguage: text("default_language"),
+    isParticipating: boolean("is_participating").notNull().default(false),
+    hasSuspendedListings: boolean("has_suspended_listings").notNull().default(false),
+    lastSyncedAt: tsNull("last_synced_at"),
+    createdAt: ts("created_at").notNull(),
+    updatedAt: ts("updated_at").notNull(),
+  },
+  (t) => [uniqueIndex("amazon_marketplaces_conn_mp").on(t.connectionId, t.marketplaceId)],
+);
+
+/**
+ * OAuth-State (CSRF + Mandantenbindung, D263). Gespeichert wird der SHA-256-Hash
+ * des State-Werts, nicht der Wert selbst — eine abgeflossene Zeile erlaubt damit
+ * keinen Replay. Einmalverwendung wird über `usedAt` per bedingtem UPDATE
+ * erzwungen, nicht im Anwendungscode geprüft (sonst gewinnt bei Doppel-Callback
+ * niemand deterministisch).
+ */
+export const amazonOauthStates = pgTable(
+  "amazon_oauth_states",
+  {
+    id: text("id").primaryKey(),
+    stateHash: text("state_hash").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    connectionId: text("connection_id")
+      .notNull()
+      .references(() => amazonConnections.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
+    usedAt: tsNull("used_at"),
+    createdAt: ts("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("amazon_oauth_states_hash").on(t.stateHash)],
+);
+
+/**
+ * Audit-Protokoll (D263) für alles, was Zustand ändert oder Amazon berührt.
+ * Absichtlich append-only gedacht: es gibt im Tool keine Update-/Delete-Pfade
+ * darauf. `beforeData`/`afterData` dürfen NIEMALS Tokens oder personenbezogene
+ * Käuferdaten enthalten — das ist Bedingung unserer Amazon-Registrierung.
+ */
+export const auditLogs = pgTable("audit_logs", {
+  id: text("id").primaryKey(),
+  clientId: text("client_id").references(() => clients.id, { onDelete: "set null" }),
+  brandId: text("brand_id").references(() => brands.id, { onDelete: "set null" }),
+  connectionId: text("connection_id").references(() => amazonConnections.id, { onDelete: "set null" }),
+  userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+  /** Punktnotation, z. B. "amazon.connection.disconnected". */
+  action: text("action").notNull(),
+  entityType: text("entity_type").notNull(),
+  entityId: text("entity_id"),
+  beforeData: jsonb("before_data").$type<unknown>(),
+  afterData: jsonb("after_data").$type<unknown>(),
+  /** Amazons x-amzn-RequestId — der Anker für jede Support-Anfrage. */
+  amazonRequestId: text("amazon_request_id"),
+  createdAt: ts("created_at").notNull(),
+});
