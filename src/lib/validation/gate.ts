@@ -40,21 +40,53 @@ const EINS_ARTIKEL = /^ein(e|em|er|en|es)?$/; // nur vor Einheiten werten (sonst
 const EINHEITEN = /^(meter|metern|zentimeter|millimeter|kilometer|stunde|stunden|minute|minuten|sekunde|sekunden|tag|tagen|woche|wochen|monat|monaten|jahr|jahre|jahren|kg|kilogramm|gramm|liter|milliliter|watt|volt|lumen|prozent|grad|kelvin)$/;
 
 const normZahl = (s: string) => s.replace(",", ".").replace(/\.0+$/, "");
+const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** Zahl-Claims (Zahl + bis zu 2 Folgewörter) aus einem Text ziehen. */
-function zahlClaims(text: string): Array<{ zahl: string; kontext: string[]; roh: string }> {
+/**
+ * Einheit einer Zahl bestimmen (D244): die Buchstaben unmittelbar NACH der Zahl —
+ * im selben Token („350-g-Tub" → „g", „10ml" → „ml") oder das nächste Token
+ * („350 g" → „g", „30 Sekunden" → „sekunden"). Das ist der eigentliche Kontext
+ * einer Spezifikation; die bisherigen „Folgewörter" (reicht, für) waren Füllwörter,
+ * an denen der Widerspruch-Check gegen unzusammenhängende Zahlen (0,5) fehlmatchte.
+ */
+function zahlEinheit(tokens: string[], i: number, restImToken: string): string {
+  const rest = restImToken.replace(/^[.,!?]+/, "");
+  const inTok = rest.match(/^[-\s]*([a-zäöüß]+)/);
+  if (inTok) return inTok[1];
+  return (tokens[i + 1] ?? "").toLowerCase().match(/^[^a-zäöüß]*([a-zäöüß]+)/)?.[1] ?? "";
+}
+
+/**
+ * Zahl gilt als belegt, wenn sie in den Quellen MIT IHRER EINHEIT vorkommt
+ * („350 g", „350-g", „350g", „350 gramm") — Kern-Fix gegen den Fehl-Widerspruch,
+ * bei dem eine echte Spezifikation gegen eine unzusammenhängende Zahl gematcht wurde.
+ */
+function zahlMitEinheitBelegt(q: string, zahl: string, unit: string): boolean {
+  if (!unit) return false;
+  return new RegExp(`(?<![\\d.,])${escRe(zahl)}\\s*-?\\s*${escRe(unit)}`).test(q);
+}
+
+/** Zahl-Claims (Zahl + Einheit + bis zu 2 Folgewörter) aus einem Text ziehen. */
+function zahlClaims(text: string): Array<{ zahl: string; unit: string; kontext: string[]; roh: string }> {
   const tokens = text.split(/[\s/()„“"«»;:–—]+/).filter(Boolean);
-  const claims: Array<{ zahl: string; kontext: string[]; roh: string }> = [];
+  const claims: Array<{ zahl: string; unit: string; kontext: string[]; roh: string }> = [];
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i].toLowerCase().replace(/[.!?,]+$/, "");
     let zahl: string | null = null;
+    let unit = "";
     const mDigit = t.match(/^(\d+(?:[.,]\d+)?)/);
-    if (mDigit) zahl = normZahl(mDigit[1]);
-    else if (ZAHLWORT[t]) zahl = ZAHLWORT[t];
-    else if (EINS_ARTIKEL.test(t)) {
+    if (mDigit) {
+      zahl = normZahl(mDigit[1]);
+      unit = zahlEinheit(tokens, i, t.slice(mDigit[1].length));
+    } else if (ZAHLWORT[t]) {
+      zahl = ZAHLWORT[t];
+      unit = zahlEinheit(tokens, i, "");
+    } else if (EINS_ARTIKEL.test(t)) {
       const next = (tokens[i + 1] ?? "").toLowerCase().replace(/[^a-zäöüß]/g, "");
-      if (EINHEITEN.test(next)) zahl = "1";
-      else continue;
+      if (EINHEITEN.test(next)) {
+        zahl = "1";
+        unit = next;
+      } else continue;
     } else continue;
 
     const kontext = tokens
@@ -62,7 +94,7 @@ function zahlClaims(text: string): Array<{ zahl: string; kontext: string[]; roh:
       .flatMap((w) => w.split("-"))
       .map((w) => w.toLowerCase().replace(/[^a-zäöüß]/g, ""))
       .filter((w) => w.length >= 2);
-    claims.push({ zahl, kontext, roh: tokens.slice(i, i + 3).join(" ") });
+    claims.push({ zahl, unit, kontext, roh: tokens.slice(i, i + 3).join(" ") });
   }
   return claims;
 }
@@ -82,6 +114,11 @@ export function unbelegteZahlen(text: string, quellen: string): ZahlBefund[] {
 
   for (const c of zahlClaims(text)) {
     const zahlBekannt = qZahlen.has(c.zahl);
+    // D244: Zahl MIT ihrer Einheit in den Quellen vorhanden („350 g") → belegt.
+    // Verhindert den Fehl-Widerspruch, bei dem eine echte Spezifikation (350 g)
+    // gegen eine unzusammenhängende Zahl (0,5 aus „reicht für 0,5 l") gematcht wurde.
+    // Additiv: erfundene/falsche Zahlen ohne Einheits-Beleg schlagen weiter an.
+    if (zahlMitEinheitBelegt(q, c.zahl, c.unit)) continue;
     // Kontextwort-Stämme in den Quellen suchen; Zahlen im Umfeld einsammeln
     const stamm = c.kontext.map((k) => k.slice(0, 6)).find((k) => k.length >= 2 && q.includes(k));
     if (stamm) {
