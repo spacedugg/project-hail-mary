@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { generateSection, QmBlockFehler, type ListingSection, type RecipeInputs } from "@/lib/recipes/listing";
+import { dbTypFuer, geplanteVorgaenger, naechsteGeplant, normalisierePlan, sektionVonDbTyp } from "@/lib/content/plan";
 import type { ContentSprache, Marketplace, ProductFacts } from "@/db/schema";
 import { amazonDomain, erkenneSprache, marktplatzFuerSprache, marktplatzSprache, SPRACH_NAMEN } from "@/lib/text/sprache";
 import { contentMarkenKontext } from "@/lib/text/marken";
@@ -490,20 +491,25 @@ export async function approveContent(formData: FormData) {
   await db.update(schema.contentVersions).set({ status: "approved" }).where(eq(schema.contentVersions.id, versionId));
 
   // Geführte Kette (D195; Reihenfolge D204): Die Freigabe ist der Taktgeber —
-  // direkt danach wird die NÄCHSTE Sektion generiert (Titel → Highlights →
-  // Bullets → Backend → Beschreibung → Q&A). Kontext sind ausschließlich Freigaben; so entstehen
-  // keine Wort-Dopplungen zwischen parallel gewürfelten Sektionen mehr.
-  const sektionVonDbType: Record<string, ListingSection> = {
-    title: "title", bullets: "bullets", item_highlights: "highlights",
-    backend_keywords: "backend", description: "description", qa: "qa",
-  };
-  const aktuelle = sektionVonDbType[version.type];
-  const naechste = SEKTIONS_REIHENFOLGE[SEKTIONS_REIHENFOLGE.indexOf(aktuelle) + 1];
+  // direkt danach wird die nächste GEPLANTE Sektion generiert. Kontext sind
+  // ausschließlich Freigaben; so entstehen keine Wort-Dopplungen zwischen
+  // parallel gewürfelten Sektionen mehr.
+  //
+  // D257 (Nutzer-Befund): Der Taktgeber folgt jetzt dem Content-Plan des Produkts
+  // statt blind der festen Reihenfolge. Wer keine Beschreibung/kein Q&A will,
+  // bekommt sie nicht mehr ungefragt generiert.
+  const aktuelle = sektionVonDbTyp(version.type);
+  if (!aktuelle) {
+    revalidatePath(`/produkte/${productId}`);
+    return;
+  }
+  const planProdukt = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  const naechste = naechsteGeplant(planProdukt?.contentPlan, aktuelle);
   if (naechste) {
     const schonFreigegeben = await db.query.contentVersions.findFirst({
       where: and(
         eq(schema.contentVersions.productId, productId),
-        eq(schema.contentVersions.type, naechste === "backend" ? "backend_keywords" : naechste === "highlights" ? "item_highlights" : naechste),
+        eq(schema.contentVersions.type, dbTypFuer(naechste)),
         eq(schema.contentVersions.status, "approved"),
       ),
     });
@@ -518,6 +524,24 @@ export async function approveContent(formData: FormData) {
       }
     }
   }
+  revalidatePath(`/produkte/${productId}`);
+}
+
+/**
+ * Content-Plan speichern (D257): welche Sektionen für dieses Produkt entstehen
+ * sollen. Leere Auswahl wird NICHT gespeichert (das hieße „nichts erstellen") —
+ * dann bleibt der Plan `null` = alle Sektionen. Auf einem Parent ist der Plan
+ * zugleich der Umfang der Varianten-Ableitung.
+ */
+export async function saveContentPlan(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  if (!productId) return;
+  const plan = normalisierePlan(formData.getAll("sections").map(String));
+  const db = await getDb();
+  await db
+    .update(schema.products)
+    .set({ contentPlan: plan.length > 0 ? plan : null })
+    .where(eq(schema.products.id, productId));
   revalidatePath(`/produkte/${productId}`);
 }
 
@@ -725,9 +749,10 @@ async function generiereSektionKern(
   // (Wort-Dopplung Titel↔Highlights entsteht, wenn parallel statt sequenziell
   // generiert wird). Eine Sektion wird erst generiert, wenn ALLE Vorgänger
   // FREIGEGEBEN sind — die Freigabe ist der Taktgeber der Kette.
-  const dbTypeFuer = (s: ListingSection) => (s === "backend" ? "backend_keywords" : s === "highlights" ? "item_highlights" : s);
-  for (const vorgaenger of SEKTIONS_REIHENFOLGE.slice(0, SEKTIONS_REIHENFOLGE.indexOf(section))) {
-    if (!versions.some((v) => v.type === dbTypeFuer(vorgaenger) && v.status === "approved"))
+  // D257: Nur GEPLANTE Vorgänger blockieren. Eine abgewählte Sektion darf die
+  // Kette nie aufhalten (vorher hing z. B. Q&A an einer nie gewollten Beschreibung).
+  for (const vorgaenger of geplanteVorgaenger(product.contentPlan, section)) {
+    if (!versions.some((v) => v.type === dbTypFuer(vorgaenger) && v.status === "approved"))
       throw new GenFehler(
         `Die Texte bauen aufeinander auf (geführte Kette): Erst „${SEKTIONS_LABEL[vorgaenger]}" freigeben — danach wird ${SEKTIONS_LABEL[section] ?? section} automatisch generiert.`,
         "GEN-05",

@@ -192,6 +192,16 @@ export const products = sqliteTable(
     contentMaster: text("content_master", { mode: "json" }).$type<
       import("@/lib/variants/master").ContentMaster
     >(),
+    /**
+     * Content-Plan (D257): WELCHE Sektionen für dieses Produkt überhaupt erstellt
+     * werden sollen. `null` = alle (Alt-Daten, rückwärtskompatibel). Die geführte
+     * Kette überspringt nicht geplante Sektionen — vorher wurde nach jeder Freigabe
+     * blind die nächste Sektion generiert, auch eine ungewollte.
+     * Auf einem Parent gilt der Plan zugleich als Umfang der Varianten-Ableitung.
+     */
+    contentPlan: text("content_plan", { mode: "json" }).$type<
+      import("@/lib/recipes/listing").ListingSection[]
+    >(),
     createdAt: ts("created_at").notNull(),
   },
   (t) => [uniqueIndex("products_brand_asin_mp").on(t.brandId, t.asin, t.marketplace)],
