@@ -2,13 +2,13 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { eq } from "drizzle-orm";
 
 /**
- * Integrationstest der Gruppieren-Kern-Funktion gegen eine echte (lokale) DB —
- * Muster wie db.smoke.test.ts: eigener DB_FILE, Auto-Migration beim ersten Zugriff.
+ * Integrationstest der Gruppieren-Kern-Funktion gegen eine echte DB — Muster wie
+ * db.smoke.test.ts: PGlite (Postgres in-memory), Auto-Migration beim ersten Zugriff.
  * Prüft die Persistenz der Variations-Familie inkl. Auflösen (D221).
  */
 
 beforeAll(() => {
-  process.env.DB_FILE = `.data/gruppieren-${Date.now()}.db`;
+  process.env.DB_DRIVER = "pglite";
 });
 
 async function seedMarke(db: Awaited<ReturnType<(typeof import("../../db/client"))["getDb"]>>, schema: (typeof import("../../db/client"))["schema"], suffix: string) {

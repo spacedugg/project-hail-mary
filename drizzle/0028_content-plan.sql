@@ -1,1 +1,0 @@
-ALTER TABLE `products` ADD `content_plan` text;

@@ -1,1 +1,0 @@
-ALTER TABLE `review_scrapes` ADD `amazon_totals` text;
