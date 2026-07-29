@@ -238,17 +238,20 @@ export function MassnahmenBlock({ analysis, deepAudit }: { analysis: Analysis; d
     deepAudit?.dataBasis ?? [],
   );
   if (karten.length === 0) return null;
+  // D246 (Nutzer): standardmäßig EINGEKLAPPT — die Maßnahmen sind bei der Content-
+  // Erstellung bereits berücksichtigt und daher meist redundant. Nicht gelöscht,
+  // weil sie die Datengrundlage fürs spätere Kunden-Briefing/Findings-Sheet bleiben.
   return (
-    <section className="card overflow-hidden p-0 ring-1 ring-[var(--primary)]/30">
-      <div className="flex items-center gap-2.5 bg-[var(--primary-soft)] px-5 py-3">
+    <details className="card overflow-hidden p-0 ring-1 ring-[var(--primary)]/30">
+      <summary className="flex cursor-pointer items-center gap-2.5 bg-[var(--primary-soft)] px-5 py-3">
         <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-[var(--primary)] text-xs font-bold text-white tabular-nums">{karten.length}</span>
-        <h2 className="text-sm font-bold text-primary-strong">Nächste Maßnahmen</h2>
-      </div>
+        <h2 className="text-sm font-bold text-primary-strong">Nächste Maßnahmen — Datengrundlage der Optimierung (anzeigen)</h2>
+      </summary>
       <div className="space-y-2 p-5">
         {karten.map((k, i) => (
           <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={0} belegHinweis={i < (deepAudit?.payload.topActions.length ?? 0) ? "Tiefen-Audit" : "Regel-Messung"} />
         ))}
       </div>
-    </section>
+    </details>
   );
 }
