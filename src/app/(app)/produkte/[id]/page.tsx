@@ -663,12 +663,7 @@ export default async function ProductPage({
             damit immer sichtbar ist, in welcher Variantenstruktur man sich befindet.
             Parent: der Manager (seine Tabelle IST die Struktur + Verwaltung) — keine
             doppelte Tabelle. Child: die rein lesende Struktur-Tabelle. */}
-        {bereit && tab === "content" && familiePanel && (
-          <section className="card mb-4 p-5">
-            <FamilieManager familie={familiePanel} />
-          </section>
-        )}
-        {bereit && tab === "content" && !familiePanel && familie && (
+        {bereit && tab === "content" && familie && (
           <div className="mb-4">
             <FamilieStruktur familie={familie} aktuellId={product.id} />
           </div>
@@ -823,6 +818,14 @@ export default async function ProductPage({
                       )}
                     </div>
                   </div>
+                  {/* Bausteine standardmäßig EINGEKLAPPT (D260, Nutzer): Wer schon Content
+                      hat, will nicht mit Text erschlagen werden — je Baustein eine Zeile,
+                      die man aufklappt. Ohne Inhalt ist der Block offen (nichts zu verbergen). */}
+                  <details open={!v} className="mt-1">
+                    <summary className="cursor-pointer text-xs text-primary-strong hover:underline">
+                      {v ? "Text anzeigen" : "Details"}
+                    </summary>
+                    <div className="mt-1">
                   {/* Graceful Degradation (D202): ein Entwurf mit passed=false hat
                       das QM-Gate nach allen Versuchen NICHT bestanden — klar markiert,
                       nicht freigabefähig, die offenen Punkte stehen rot unten. */}
@@ -899,6 +902,8 @@ export default async function ProductPage({
                       </SubmitButton>
                     </form>
                   </details>
+                    </div>
+                  </details>
                 </div>
               );
             })}
@@ -907,7 +912,14 @@ export default async function ProductPage({
         </section>
         )}
 
-        {/* (Familien-Panel steht jetzt GANZ OBEN im Content-Bereich — D256.) */}
+        {/* Varianten-Baum + Master (D260): UNTER dem eigenen Content. Reihenfolge auf der
+            Parent-Content-Seite: Kopfkarte → Familien-Tabelle → eigener Content (aufklappbar)
+            → „Base festlegen und auf alle Childs anwenden". */}
+        {bereit && tab === "content" && familiePanel && (
+          <section className="card mt-4 p-5">
+            <FamilieManager familie={familiePanel} />
+          </section>
+        )}
 
         {bereit && tab === "marge" && (
         <section className="card p-5">

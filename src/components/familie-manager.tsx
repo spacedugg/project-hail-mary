@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { baueMasterEntwurf, gibMasterFrei, loeseFamilieAuf, speichereAchsenwerte } from "@/app/actions";
 import { FamilieBaum } from "@/components/familie-baum";
@@ -133,77 +132,47 @@ export function FamilieManager({ familie }: { familie: FamilienDaten }) {
       </div>
 
       {/* Kinder */}
-      <div className="card overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-hair text-left text-[11px] uppercase tracking-wide text-muted">
-              <th className="py-2 pl-4 pr-3">Variante</th>
-              <th className="py-2 pr-3">
-                Achsenwerte
-                {!familie.hatMaster && !achsenEdit && (
-                  <button
-                    onClick={startAchsenEdit}
-                    title="Achsenwerte bearbeiten (nur solange kein Master erzeugt wurde)"
-                    className="ml-1.5 align-middle text-[13px] text-muted hover:text-foreground"
-                  >
-                    ✎
-                  </button>
-                )}
-              </th>
-              <th className="py-2 pr-3">Content</th>
-              <th className="py-2 pr-4">Base?</th>
-            </tr>
-          </thead>
-          <tbody>
-            {familie.kinder.map((k) => (
-              <tr key={k.id} className="border-b border-hair/60 last:border-0">
-                <td className="py-2 pl-4 pr-3">
-                  <div className="flex items-center gap-2.5">
-                    {k.bildUrl ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={k.bildUrl} alt="" className="h-9 w-9 flex-none rounded border border-hair bg-white object-contain" />
-                    ) : (
-                      <div className="grid h-9 w-9 flex-none place-items-center rounded border border-hair bg-neutral-100 text-[10px] text-muted dark:bg-neutral-800">–</div>
-                    )}
-                    <div className="min-w-0">
-                      <span>
-                        <Link href={`/produkte/${k.id}?tab=content`} className="font-mono text-[13px] underline">{k.asin ?? "—"}</Link>
-                        {k.istKopf && <span className="ml-1.5 rounded bg-[var(--primary-soft)] px-1.5 py-0.5 text-[10px] text-primary-strong">Parent</span>}
-                      </span>
-                      {/* Titel gekappt (max. ~42vw) → Tabelle passt ohne horizontales Scrollen (Nutzer 27.07.). */}
-                      {k.titel && k.titel !== k.asin && <span className="block max-w-[42vw] truncate text-[11px] text-muted" title={k.titel}>{k.titel}</span>}
-                    </div>
-                  </div>
-                </td>
-                <td className="py-2 pr-3 text-xs">
-                  {achsenEdit ? (
-                    <span className="flex flex-wrap gap-1.5">
-                      {familie.theme.map((a) => (
-                        <input
-                          key={a}
-                          value={achsenLokal[k.id]?.[a] ?? ""}
-                          onChange={(e) => setAchse(k.id, a, e.target.value)}
-                          placeholder={a}
-                          className="input-base w-28 text-xs"
-                        />
-                      ))}
-                    </span>
-                  ) : (
-                    familie.theme.map((a) => `${a}: ${k.axisValues[a] ?? "—"}`).join(" · ")
-                  )}
-                </td>
-                <td className="py-2 pr-3 text-xs">{k.hatFreigegebenenContent ? <span className="text-good">freigegeben</span> : <span className="text-muted">offen</span>}</td>
-                <td className="py-2 pr-4">
-                  {k.hatFreigegebenenContent && (
-                    <label className="flex items-center gap-1.5 text-xs">
-                      <input type="radio" name="base" checked={baseId === k.id} onChange={() => setBaseId(k.id)} /> Base
-                    </label>
-                  )}
-                </td>
-              </tr>
+      {/* Base-Auswahl + Achsenwerte (D260): Die VOLLSTÄNDIGE Varianten-Tabelle steht
+          oben im Content-Bereich (FamilieStruktur) — hier nur, was zur Verwaltung
+          nötig ist. Eine zweite identische Tabelle war Dopplung. */}
+      <div className="grid gap-3 rounded-xl border border-hair p-3">
+        <label className="grid gap-1 text-xs">
+          <span className="font-semibold">Base-Variante — ihr freigegebener Content ist die Vorlage</span>
+          <select value={baseId} onChange={(e) => setBaseId(e.target.value)} className="input-base max-w-md text-xs">
+            <option value="">— Variante wählen —</option>
+            {baseKandidaten.map((k) => (
+              <option key={k.id} value={k.id}>
+                {(k.asin ?? k.id) + (k.istKopf ? " (Parent)" : "") + " · " + familie.theme.map((a) => k.axisValues[a] ?? "—").join(" / ")}
+              </option>
             ))}
-          </tbody>
-        </table>
+          </select>
+          {baseKandidaten.length === 0 && (
+            <span className="text-muted">Erst für eine Variante Content freigeben — dann ist sie als Base wählbar.</span>
+          )}
+        </label>
+        {!familie.hatMaster && !achsenEdit && (
+          <button onClick={startAchsenEdit} className="justify-self-start text-xs text-primary-strong hover:underline">
+            ✎ Achsenwerte bearbeiten
+          </button>
+        )}
+        {achsenEdit && (
+          <div className="grid gap-2">
+            {familie.kinder.map((k) => (
+              <div key={k.id} className="flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="w-28 flex-none font-mono">{k.asin ?? "—"}</span>
+                {familie.theme.map((a) => (
+                  <input
+                    key={a}
+                    value={achsenLokal[k.id]?.[a] ?? ""}
+                    onChange={(e) => setAchse(k.id, a, e.target.value)}
+                    placeholder={a}
+                    className="input-base w-28 text-xs"
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {achsenEdit && (
