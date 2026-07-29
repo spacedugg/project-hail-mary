@@ -247,7 +247,7 @@ export function FamilieBaum({ familie }: { familie: FamilienDaten }) {
           <div className="flex justify-center">
             <Kachel
               kind={base}
-              href={`/produkte/${base.id}/content`}
+              href={`/produkte/${base.id}?tab=content`}
               zustand={baseZustand}
               fuss={<span className="inline-block rounded-full bg-[rgb(22_163_74/0.15)] px-2 py-0.5 text-[10px] font-semibold text-good">Base · freigegeben</span>}
             />
@@ -269,7 +269,7 @@ export function FamilieBaum({ familie }: { familie: FamilienDaten }) {
                   return (
                     <div key={t.id} className="flex flex-col items-center" style={{ width: CHILD_W }}>
                       <div className="h-5 w-px bg-hair" />
-                      <Kachel kind={t} href={`/produkte/${t.id}/content`} zustand={kindZustand(t.id)} fuss={fuss} />
+                      <Kachel kind={t} href={`/produkte/${t.id}?tab=content`} zustand={kindZustand(t.id)} fuss={fuss} />
                     </div>
                   );
                 })}

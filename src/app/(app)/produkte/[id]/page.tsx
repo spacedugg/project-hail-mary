@@ -169,12 +169,14 @@ export default async function ProductPage({
   return (
     <main className="w-full p-8">
       <Link href={backHref} className="text-xs text-neutral-500 hover:underline">← {parentBrand?.kind === "workbench" ? "Listing Optimizer" : "Katalog"}</Link>
-      {/* Representative-Parent (D221): kaufbare Variante UND Familienkopf — Familien-Panel oben. */}
-      {familiePanel && (
-        <div className="mb-6 mt-4 rounded-2xl border border-hair bg-surface p-5">
-          <FamilieManager familie={familiePanel} />
-        </div>
+      {/* Child → Parent (D245): von einer Varianten-ASIN zurück zur Familie (Content-Reiter,
+          wo Baum + Übertragung leben). Bisher gab es keinen Rückweg zum Parent. */}
+      {product.parentProductId && (
+        <Link href={`/produkte/${product.parentProductId}?tab=content`} className="ml-3 text-xs text-primary-strong hover:underline">↑ zur Variationsfamilie</Link>
       )}
+      {/* Familien-Panel NICHT mehr als Überhang über allen Reitern (D245): die
+          Struktur (Master ableiten · Slots · Konsistenz · Übertragen auf Childs)
+          gehört in den Content-Reiter, direkt unter den Parent-Content. Siehe unten. */}
       {/* Produkt-Kopfkarte (D166): EINE immer sichtbare Übersicht über alle Reiter —
           Bild, Listing-Titel, ASIN, Stand, editierbare Steuergrößen, Reviews analysiert. */}
       {(() => {
@@ -803,6 +805,14 @@ export default async function ProductPage({
           </div>
           </GenerierSperre>
         </section>
+        )}
+
+        {/* Variations-Familie (D245): Master ableiten · Slots · Übertragen auf die Child-ASINs
+            — bewusst UNTER dem Parent-Content und NUR im Content-Reiter (kein Reiter-Überhang). */}
+        {bereit && tab === "content" && familiePanel && (
+          <section className="card mt-4 p-5">
+            <FamilieManager familie={familiePanel} />
+          </section>
         )}
 
         {bereit && tab === "marge" && (

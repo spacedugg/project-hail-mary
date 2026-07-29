@@ -82,7 +82,12 @@ export default async function ProduktContent({
       <Link href={`/produkte/${id}`} className="text-xs text-neutral-500 hover:underline">← Werkbank</Link>
       <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
         <h1 className="page-title">
-          {p.name} {p.asin && <span className="font-mono text-sm text-neutral-500">{p.asin} · amazon.{p.marketplace}</span>}
+          {p.name}
+          {/* ASIN nur ergänzen, wenn der Name nicht ohnehin die ASIN IST (D245, Nutzer-Befund:
+              „B0… · B0…" doppelt) — sonst nur den Marktplatz-Zusatz zeigen. */}
+          {p.asin && (
+            <span className="font-mono text-sm text-neutral-500"> {p.name === p.asin ? `amazon.${p.marketplace}` : `${p.asin} · amazon.${p.marketplace}`}</span>
+          )}
         </h1>
         <Link href={`/marke/${product.brandId}/katalog`} className="btn-ghost text-xs">Alle Produkte dieser Marke →</Link>
       </div>
