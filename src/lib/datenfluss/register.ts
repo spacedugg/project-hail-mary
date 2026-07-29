@@ -197,6 +197,8 @@ export const DATENFLUSS: Datenpunkt[] = [
 export const RECIPE_INPUT_HERKUNFT: Record<keyof RecipeInputs, string> = {
   brand: "stammdaten",
   eigenmarkeAusListing: "listing-import",
+  // Varianten-/Sortenname (D253): kommt aus den Achsenwerten der Variations-Familie.
+  variantenName: "stammdaten",
   productName: "stammdaten",
   marketplace: "stammdaten",
   facts: "listing-import",

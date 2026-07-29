@@ -20,6 +20,7 @@ const base: DeepAuditInput = {
   backendKeywords: "",
   imageCount: 5,
   bildBelege: "",
+  fixeBegriffe: [],
   basics: { reviewsTotal: 1343, ratingAvg: 4.6, dist: { "5": 70, "4": 15, "3": 6, "2": 3, "1": 6 } },
   priceEur: null,
   reviewInsights: ri,
@@ -155,6 +156,36 @@ describe("enforceDeepAudit — LLM generiert, Code erzwingt", () => {
     expect(out.topActions).toHaveLength(2);
     expect(out.topActions[0]).toContain("bereits belegt");
     expect(out.topActions[1]).toBe('Keyword „Hundefutter" fehlt komplett — einarbeiten');
+  });
+
+  it("feste Eigennamen (D253): Sprach-Kritik am Sortennamen fliegt, echte Sprach-Kritik bleibt", () => {
+    const input: DeepAuditInput = {
+      ...base,
+      title: "HOLY Iced Tea Pulver Peach x Black Tea zuckerfrei 50 Portionen",
+      bullets: ["ERFRISCHEND: Fruchtiger Eistee ohne Zuckerzusatz im Shaker."],
+      description: "Der vegane Eistee ist schnell angerührt und erfrischt den ganzen Tag über zuverlässig.",
+      fixeBegriffe: ["HOLY", "Peach x Black Tea"],
+    };
+    const payload: DeepAuditPayload = {
+      derived: { usps: [], zielgruppe: "", positionierung: "" },
+      dimensions: [
+        {
+          key: "title", label: "Titel", score10: 7,
+          aktuell: "Titel vorhanden.",
+          probleme: [
+            // FALSCH: kritisiert nur den vorgegebenen Sortennamen
+            'Der englische Slang-Anteil („Peach x Black Tea") mischt Englisch/Deutsch',
+            // WAHR: betrifft einen frei formulierbaren Textteil, bleibt
+            'Der Begriff „Relax Formel" bleibt unerklärt und wirkt vage',
+          ],
+          empfehlung: "",
+        },
+      ],
+      topActions: ['Sortennamen „Peach x Black Tea" eindeutschen'],
+    };
+    const out = pruefeAuditBehauptungen(payload, input);
+    expect(out.dimensions[0].probleme).toEqual(['Der Begriff „Relax Formel" bleibt unerklärt und wirkt vage']);
+    expect(out.topActions).toEqual([]); // nicht umsetzbare Umbenennung raus
   });
 
   it("istDeutsch: erkennt deutschen Text, urteilt nicht bei zu kurzem Text", () => {

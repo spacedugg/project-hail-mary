@@ -747,6 +747,8 @@ async function generiereSektionKern(
   const inputs: RecipeInputs = {
     brand: mk.marke,
     eigenmarkeAusListing: mk.eigenmarkeAusListing,
+    // Sorten-/Variantenname (D253): fester Eigenname, wortwörtlich übernehmen.
+    variantenName: Object.values(product.variantAxisValues ?? {}).map((v) => v.trim()).filter(Boolean),
     productName: product.name,
     marketplace: product.marketplace,
     facts: product.facts,
@@ -1833,6 +1835,11 @@ async function auditKern(
       // Bild-/A+/Produktinfo-Text als Audit-Quelle (D252): sonst bemängelt das Audit
       // Themen als fehlend, die die Status-quo-Bilder beantworten.
       bildBelege: bildBelegeAudit(snapshot),
+      // Feste Eigennamen (D253): Marke + Varianten-/Sortenname sind vorgegeben —
+      // das Audit darf sie nicht sprachlich bemängeln oder umbenennen wollen.
+      fixeBegriffe: [product.marke ?? "", ...Object.values(product.variantAxisValues ?? {})]
+        .map((s) => s.trim())
+        .filter(Boolean),
       basics,
       priceEur: product.price !== null ? product.price / 100 : null,
       reviewInsights: insights!.payload,

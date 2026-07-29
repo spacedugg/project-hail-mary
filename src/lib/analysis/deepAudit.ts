@@ -32,6 +32,14 @@ export type DeepAuditInput = {
    * das die Bilder längst beantworten. Leer = nicht ausgelesen (kein API-Key).
    */
   bildBelege: string;
+  /**
+   * UNVERÄNDERLICHE Eigennamen (D253): Marke + Varianten-Achsenwerte (z. B.
+   * „Peach x Black Tea", „Strawberry Shark"). Das sind Produktnamen, keine
+   * Textentscheidungen — sie können nicht umbenannt werden. Ohne diese Liste
+   * bemängelte das Audit „englischen Slang", der nur der Sortenname ist, und
+   * gab damit eine Empfehlung, die nie umsetzbar wäre.
+   */
+  fixeBegriffe: string[];
   basics: { reviewsTotal: number | null; ratingAvg: number | null; dist: Record<string, number> | null } | null;
   priceEur: number | null;
   reviewInsights: ReviewInsightsPayload;
@@ -115,6 +123,7 @@ ${input.topGaps.length ? `TOP-UMSATZLÜCKEN (SOV): ${input.topGaps.slice(0, 5).m
 BEWERTUNGS-REGELN (Nutzer-Feedback 21.07. — Verstöße machen das Audit unglaubwürdig):
 - SYNONYME ZÄHLEN: Ein Kaufargument gilt als abgedeckt, wenn es sinngemäß im Text steht („kabellos" deckt „Batteriebetrieb" ab, „Werkstatt" deckt „Garage" ab). Kritisiere NIE das Fehlen eines Wortes, dessen Bedeutung bereits da ist.
 - VOR JEDER FEHLT-BEHAUPTUNG: Lies den gelieferten Text wörtlich nach. Behaupte nur „X fehlt", wenn X wirklich nirgends steht (auch nicht als Wortstamm, Kompositum oder Synonym) — und setze den fehlenden Begriff in „Anführungszeichen".
+${input.fixeBegriffe.length ? `- FESTE EIGENNAMEN (D253): ${input.fixeBegriffe.map((b) => `„${b}"`).join(", ")} sind Marke bzw. Varianten-/Sortenname — VORGEGEBEN und unveränderlich. Bewerte sie NICHT: keine Kritik an Sprache/Anglizismen/Sprachmix, keine Empfehlung zum Umbenennen, Übersetzen oder Weglassen. Sie zählen als vorhanden und korrekt. Beurteile ausschließlich die frei formulierbaren Textteile drumherum.` : ""}
 - BILDER SIND LISTING-INHALT (D252): Ein Thema, das im ausgelesenen Bild-/A+-/Produktinfo-Text beantwortet ist (z. B. Zubereitung, Dosierung, Anwendung), gilt als ABGEDECKT — es darf nicht als „fehlt" bemängelt und nicht als Maßnahme vorgeschlagen werden. Wenn ein Pain Point dort schon adressiert ist, ist die einzig zulässige Aussage, ihn ZUSÄTZLICH in den Text zu heben — niemals „wird nicht adressiert". Ist der Bild-Inhalt nicht ausgelesen, gilt er als UNBEKANNT, nicht als leer.
 - EIN SYSTEM: Titel, Bullets und Beschreibung arbeiten zusammen — bewusste NICHT-Duplizierung ist richtig. Ein Kaufargument, das prominent in einer anderen Sektion steht, senkt den Score dieser Sektion NICHT (Beispiel: „Batteriebetrieb" prägnant in den Bullets reicht; der Titel darf andere kaufrelevante Keywords tragen).
 - SPRACHE: Behaupte „Text ist nicht auf Deutsch" nur, wenn der Text tatsächlich überwiegend fremdsprachig ist.
@@ -205,6 +214,13 @@ const ZITAT_RE = /[„“"'‚‘]([^„“"'‚‘’]{2,})[”“"'’‘]/g;
  */
 const FEHLT_MUSTER =
   /fehlt|fehlen|fehlend|nirgends|ohne bezug auf|keine erwähnung|nicht erwähnt|nicht enthalten|nicht vorhanden|nicht erkennbar|nicht adressiert|unadressiert|nicht aufgegriffen|nicht genannt|nicht kommuniziert|verpasst|kein(?:e|en|em|er|es)?\s+[^.!?;]{0,60}?(?:keyword|begriff|hinweis|signal|angabe|nennung|erwähnung|aussage|information)/i;
+/**
+ * Sprach-/Anglizismus-Kritik (D253). Trifft sie NUR feste Eigennamen (Marke,
+ * Sorten-/Variantenname), ist sie nicht umsetzbar und damit falsch — der Name
+ * ist vorgegeben. Deterministischer Backstop zur Prompt-Regel.
+ */
+const SPRACH_KRITIK_MUSTER = /englisch|anglizism|sprachmix|slang|misch\w*\s+(englisch|deutsch)|deutsch\s*\/\s*englisch|englisch\s*\/\s*deutsch|fremdsprach|eindeutschen|übersetz/i;
+
 /** Handlungs-Aufforderungen in topActions („X adressieren/einarbeiten/aufnehmen"). */
 const MASSNAHME_MUSTER =
   /adressier|einarbeit|aufnehm|ergänz|hervorheb|kommunizier|integrier|prominent|platzier|benenn|betonen|herausstell/i;
@@ -229,10 +245,26 @@ export function istDeutsch(text: string): boolean {
  * sonst überlebt eine „fehlt"-Behauptung, die die Status-quo-Bilder widerlegen.
  * Und `topActions` läuft durch DENSELBEN Filter (lief vorher ganz ungeprüft durch,
  * daher stand ein längst adressierter Pain Point als Maßnahme Nr. 1).
+ *
+ * D253: Sprach-/Anglizismus-Kritik, die NUR feste Eigennamen trifft (Marke,
+ * Sorten-/Variantenname), fliegt ebenfalls — sie ist nicht umsetzbar.
  */
 export function pruefeAuditBehauptungen(payload: DeepAuditPayload, input: DeepAuditInput): DeepAuditPayload {
   const gesamtText = [input.title, ...input.bullets, input.description, input.backendKeywords, input.bildBelege].join(" ");
   const textStaemme = new Set(gesamtText.split(/[\s\-–—/,.;:!?()•·]+/).map(stamm).filter((s) => s.length >= 3));
+
+  // Zitate, die (Teil) eines festen Eigennamens sind — beidseitig geprüft, damit
+  // sowohl „Peach x Black Tea" als auch das Teilzitat „Peach" erkannt wird.
+  const fix = input.fixeBegriffe.map((b) => b.toLowerCase().trim()).filter(Boolean);
+  const istFesterName = (zitat: string) => {
+    const z = zitat.toLowerCase().trim();
+    return z.length >= 2 && fix.some((f) => f.includes(z) || z.includes(f));
+  };
+  const nurEigennamenKritik = (behauptung: string) => {
+    if (fix.length === 0 || !SPRACH_KRITIK_MUSTER.test(behauptung)) return false;
+    const zitate = [...behauptung.matchAll(ZITAT_RE)].map((m) => m[1]).filter((z) => z.length <= 60);
+    return zitate.length > 0 && zitate.every(istFesterName);
+  };
   const sektionsText: Partial<Record<DeepAuditDimension["key"], string>> = {
     title: input.title,
     bullets: input.bullets.join(" "),
@@ -254,6 +286,11 @@ export function pruefeAuditBehauptungen(payload: DeepAuditPayload, input: DeepAu
       }
       // Fall 2: „nicht auf Deutsch", obwohl die Sektion deutsch ist
       if (eigenerText && NICHT_DEUTSCH_MUSTER.test(p) && istDeutsch(eigenerText)) {
+        entfernt.push(p);
+        return false;
+      }
+      // Fall 3 (D253): Sprach-Kritik, die ausschließlich feste Eigennamen trifft
+      if (nurEigennamenKritik(p)) {
         entfernt.push(p);
         return false;
       }
@@ -280,7 +317,7 @@ export function pruefeAuditBehauptungen(payload: DeepAuditPayload, input: DeepAu
     return zitate.length > 0 && zitate.every((z) => begriffImText(z, textStaemme));
   };
   const topActions = payload.topActions
-    .filter((a) => !(FEHLT_MUSTER.test(a) && belegt(a)))
+    .filter((a) => !(FEHLT_MUSTER.test(a) && belegt(a)) && !nurEigennamenKritik(a))
     .map((a) =>
       MASSNAHME_MUSTER.test(a) && belegt(a)
         ? `${a} — Hinweis: Das Thema ist im Listing bzw. in den Bildern/A+ bereits belegt; höchstens zusätzlich in den Text heben.`

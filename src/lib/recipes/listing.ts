@@ -39,6 +39,11 @@ export type RecipeInputs = {
    * eine Marke erfindet oder einen Werkzeug-Namen verwendet.
    */
   eigenmarkeAusListing?: string;
+  /**
+   * Varianten-/Sortenname (D253), z. B. „Peach x Black Tea". VORGEGEBEN und
+   * unveränderlich — wortwörtlich übernehmen, nie übersetzen oder eindeutschen.
+   */
+  variantenName?: string[];
   productName: string;
   marketplace: string; // "de"
   facts: ProductFacts;
@@ -156,6 +161,10 @@ function contextBlock(inputs: RecipeInputs): string {
       : "MARKE: unbekannt — der Titel beginnt mit dem PRODUKTTYP. KEINE Marke erfinden, keinen Projekt- oder Werkzeug-Namen verwenden.";
   const lines: string[] = [
     markeZeile,
+    // Sorten-/Variantenname (D253): fester Eigenname — wortwörtlich, nicht eindeutschen.
+    ...(inputs.variantenName?.length
+      ? [`VARIANTE / SORTENNAME: ${inputs.variantenName.map((v) => `„${v}"`).join(", ")} — VORGEGEBENER Eigenname. Wortwörtlich und unverändert übernehmen (auch englische Namen), NICHT übersetzen, eindeutschen oder weglassen. Der Name selbst ist kein Sprachfehler.`]
+      : []),
     `PRODUKT: ${inputs.productName}`,
     `MARKTPLATZ: amazon.${inputs.marketplace}`,
     // Zielsprache (D128): lokalisieren, nicht übersetzen — bei Deutsch kein Extra-Block nötig.
