@@ -175,6 +175,10 @@ export default async function ProductPage({
         bildBelege: snapshotBildBelege(snapshot),
       })
     : null;
+  // Varianten-Child (D259): Content wird NICHT pro Child erzeugt. Sinn der Familie
+  // ist gleicher Content über alle Varianten — er entsteht EINMAL auf dem Parent
+  // und wird von dort übertragen. Ein Child hat daher keine Generier-Oberfläche.
+  const istVariantenChild = !!product.parentProductId;
   // Wirksamer Content-Plan (D257): null/leer ⇒ alle Sektionen.
   const planAktiv = wirksamerPlan(product.contentPlan);
   const sektionSoll = { title: wirksam.title, bullets: wirksam.bullets.join(" "), description: wirksam.description };
@@ -670,7 +674,53 @@ export default async function ProductPage({
           </div>
         )}
 
-        {bereit && tab === "content" && (
+        {/* Varianten-Child (D259): KEINE eigene Generier-Oberfläche. Der Content der
+            Familie entsteht einmal auf dem Parent und wird übertragen — pro Child
+            einzeln zu generieren würde die Gleichheit über die Varianten zerstören.
+            Hier daher nur der übertragene Stand, lesend und eingeklappt. */}
+        {bereit && tab === "content" && istVariantenChild && (
+          <section className="card p-5">
+            <CardHead icon={<IconContent />} chip="chip-teal" title="Content dieser Variante" />
+            <p className="mt-2 text-xs text-muted">
+              Der Content der Familie wird auf der Parent-ASIN erzeugt und von dort übertragen — so bleibt er über alle
+              Varianten gleich (bis auf die Varianten-Unterschiede).{" "}
+              {product.parentProductId && (
+                <Link href={`/produkte/${product.parentProductId}?tab=content`} className="text-primary-strong underline">
+                  Zum Content der Parent-ASIN →
+                </Link>
+              )}
+            </p>
+            <div className="mt-3 space-y-2">
+              {planAktiv.map((key) => {
+                const v = latestOf(dbTypFuer(key));
+                const p2 = v?.payload as { text?: string; items?: string[]; pairs?: Array<{ q: string; a: string }> } | undefined;
+                const text = p2?.items ? p2.items.join("\n") : p2?.pairs ? p2.pairs.map((x) => `${x.q} → ${x.a}`).join("\n") : p2?.text ?? "";
+                return (
+                  <details key={key} className="rounded-xl border border-hair p-3">
+                    <summary className="cursor-pointer text-sm font-medium">
+                      {SEKTIONS_LABEL[key]}{" "}
+                      {v ? (
+                        v.status === "approved"
+                          ? <span className="ml-1 pill pill-good">✓ freigegeben</span>
+                          : <span className="ml-1 pill pill-neutral">Entwurf v{v.version}</span>
+                      ) : (
+                        <span className="ml-1 pill pill-neutral">noch nicht übertragen</span>
+                      )}
+                    </summary>
+                    {text ? (
+                      <pre className="mt-2 whitespace-pre-wrap break-words text-xs text-foreground/80">{text}</pre>
+                    ) : (
+                      <p className="mt-2 text-xs text-muted">Noch kein Inhalt — auf dem Parent erzeugen und übertragen.</p>
+                    )}
+                    {v?.validation?.issues?.length ? <IssueList issues={v.validation.issues} /> : null}
+                  </details>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {bereit && tab === "content" && !istVariantenChild && (
         <section className="card p-5">
           <CardHead
             icon={<IconContent />}
