@@ -8,6 +8,13 @@
       "when": 1785339773686,
       "tag": "0000_init_supabase",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785343334356,
+      "tag": "0001_amazon_fundament",
+      "breakpoints": true
     }
   ]
 }
