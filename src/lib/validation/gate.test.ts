@@ -210,6 +210,31 @@ describe("validateBackendKeywords", () => {
     const passiv = validateBullets(["TEST: 6500 K Farbtemperatur."], {});
     expect(passiv.filter((i) => i.rule.startsWith("bullets.zahl"))).toEqual([]);
   });
+  it("Zahl mit Einheit gilt als belegt — kein Fehl-Widerspruch gegen unzusammenhängende Zahl (D244)", () => {
+    // Genau der Nutzer-Fall: 350 g ist die echte Spec; 0,5 gehört zu einer anderen
+    // Dimension (Portion/Liter) und stand nur zufällig neben „reicht" in den Quellen.
+    const quellen = [
+      "Elektrolytpulver 350 g Dose zum Anmischen",
+      "Ein Messlöffel reicht für 0,5 l Wasser",
+    ].join("\n");
+    const ok = validateBullets(["MENGE: Die 350-g-Dose reicht für viele Portionen am Tag."], { zahlenQuellen: quellen });
+    expect(ok.filter((i) => i.rule.startsWith("bullets.zahl"))).toEqual([]);
+    // Gegenprobe: eine erfundene Menge OHNE Einheits-Beleg (999 g) schlägt weiter an.
+    const erfunden = validateBullets(["MENGE: Die 999-g-Dose reicht für viele Portionen am Tag."], { zahlenQuellen: quellen });
+    expect(erfunden.some((i) => i.rule.startsWith("bullets.zahl"))).toBe(true);
+  });
+  it("Widerspruch nur einheiten-gleich — Zahl anderer Dimension löst NIE einen Widerspruch aus (D248)", () => {
+    const quellen = ["Dose 350 g Pulver", "Ein Messlöffel reicht für 0,5 l Wasser"].join("\n");
+    // Falsche Menge BEI GLEICHER Einheit (500 g) → echter Widerspruch, verglichen NUR mit dem g-Wert (350), nie mit 0,5 l.
+    const gleicheEinheit = validateBullets(["MENGE: Die 500-g-Dose ist praktisch dabei."], { zahlenQuellen: quellen });
+    const w = gleicheEinheit.find((i) => i.rule === "bullets.zahl-widerspruch");
+    expect(w).toBeTruthy();
+    expect(w!.message).toContain("350");
+    expect(w!.message).not.toContain("0.5");
+    // Einheit, die in den Quellen gar nicht vorkommt (Portionen) → KEIN Cross-Dimension-Widerspruch gegen 0,5.
+    const andereDimension = validateBullets(["REICHT: Ergibt 8 Portionen pro Dose praktisch."], { zahlenQuellen: quellen });
+    expect(andereDimension.some((i) => i.rule === "bullets.zahl-widerspruch")).toBe(false);
+  });
 
   it("Satzzeichen verschwenden Bytes — WARNUNG (Blog 07/2026: Amazon ignoriert sie)", () => {
     expect(validateBackendKeywords("salatschüssel; backschüssel.", "", ctx).map((i) => i.rule)).toContain("backend.punctuation");

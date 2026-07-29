@@ -167,7 +167,7 @@ export function FamilieManager({ familie }: { familie: FamilienDaten }) {
                     )}
                     <div className="min-w-0">
                       <span>
-                        <Link href={`/produkte/${k.id}`} className="font-mono text-[13px] underline">{k.asin ?? "—"}</Link>
+                        <Link href={`/produkte/${k.id}?tab=content`} className="font-mono text-[13px] underline">{k.asin ?? "—"}</Link>
                         {k.istKopf && <span className="ml-1.5 rounded bg-[var(--primary-soft)] px-1.5 py-0.5 text-[10px] text-primary-strong">Parent</span>}
                       </span>
                       {/* Titel gekappt (max. ~42vw) → Tabelle passt ohne horizontales Scrollen (Nutzer 27.07.). */}
