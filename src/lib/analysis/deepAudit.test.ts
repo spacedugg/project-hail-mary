@@ -19,6 +19,7 @@ const base: DeepAuditInput = {
   description: "",
   backendKeywords: "",
   imageCount: 5,
+  bildBelege: "",
   basics: { reviewsTotal: 1343, ratingAvg: 4.6, dist: { "5": 70, "4": 15, "3": 6, "2": 3, "1": 6 } },
   priceEur: null,
   reviewInsights: ri,
@@ -118,6 +119,42 @@ describe("enforceDeepAudit — LLM generiert, Code erzwingt", () => {
     expect(titel.aktuell).toContain("entfernt");
     const beschr = out.dimensions.find((d) => d.key === "description")!;
     expect(beschr.probleme).toEqual(["Zu wenige Absätze"]);
+  });
+
+  it("Bild-Text belegt Themen (D252) — der HOLY-Fall: Zubereitung-fehlt-Behauptung fliegt, topActions mitgefiltert", () => {
+    const input: DeepAuditInput = {
+      ...base,
+      title: "HOLY Iced Tea Pulver Peach x Black Tea zuckerfrei 50 Portionen vegan",
+      bullets: ["ERFRISCHEND: Fruchtiger Eistee ohne Zuckerzusatz."],
+      description: "Der vegane Iced Tea kommt ohne tierische Zutaten aus.",
+      // Genau der Screenshot-Inhalt des Status-quo-Bildes:
+      bildBelege: "Bild 3: ZUBEREITUNG — Mix it, shake it, enjoy. Text im Bild: Misch eine Portion HOLY mit 500 ml Wasser | Shaker kräftig schütteln | Eiswürfel rein",
+    };
+    const payload: DeepAuditPayload = {
+      derived: { usps: [], zielgruppe: "", positionierung: "" },
+      dimensions: [
+        {
+          key: "title", label: "Titel", score10: 7,
+          aktuell: "Titel vorhanden.",
+          probleme: [
+            'Kein klar erkennbares Keyword zur „Zubereitung" — verpasstes Vertrauenssignal', // FALSCH: steht im Bild
+            'Das Keyword „Hundefutter" fehlt', // WAHR — nirgends, muss bleiben
+          ],
+          empfehlung: "",
+        },
+      ],
+      topActions: [
+        'Pain Point „Zubereitung" im Listing offensiv adressieren', // FALSCH: Bild deckt es ab
+        'Keyword „Hundefutter" fehlt komplett — einarbeiten', // WAHR — bleibt
+      ],
+    };
+    const out = pruefeAuditBehauptungen(payload, input);
+    expect(out.dimensions[0].probleme).toEqual(['Das Keyword „Hundefutter" fehlt']);
+    // topActions liefen früher UNGEPRÜFT durch. Die belegte Maßnahme behält ihren
+    // Kern, wird aber auf die zutreffende Aussage korrigiert; die wahre bleibt pur.
+    expect(out.topActions).toHaveLength(2);
+    expect(out.topActions[0]).toContain("bereits belegt");
+    expect(out.topActions[1]).toBe('Keyword „Hundefutter" fehlt komplett — einarbeiten');
   });
 
   it("istDeutsch: erkennt deutschen Text, urteilt nicht bei zu kurzem Text", () => {

@@ -24,6 +24,14 @@ export type DeepAuditInput = {
   description: string;
   backendKeywords: string;
   imageCount: number | null;
+  /**
+   * Text der EIGENEN Listing-Bilder + A+ + Produktinfo (Vision-Auslese, D231).
+   * PFLICHT-Quelle des Audits (D252, Nutzer-Befund): Was auf den Status-quo-Bildern
+   * steht (z. B. „ZUBEREITUNG — Mix it, shake it … Portion mit 500 ml Wasser"),
+   * IST Listing-Inhalt. Ohne dieses Feld behauptete das Audit, ein Thema fehle,
+   * das die Bilder längst beantworten. Leer = nicht ausgelesen (kein API-Key).
+   */
+  bildBelege: string;
   basics: { reviewsTotal: number | null; ratingAvg: number | null; dist: Record<string, number> | null } | null;
   priceEur: number | null;
   reviewInsights: ReviewInsightsPayload;
@@ -89,7 +97,8 @@ BULLETS:
 ${input.bullets.map((b) => `• ${b}`).join("\n") || "(fehlen)"}
 BESCHREIBUNG: ${input.description.slice(0, 3000) || "(fehlt)"}
 ${input.backendKeywords ? `BACKEND-KEYWORDS: ${input.backendKeywords}` : ""}
-BILDER: ${input.imageCount !== null ? `${input.imageCount} Slots belegt (nur Kontext — die Bild-Dimension bewertet der Code, NICHT du)` : "unbekannt"}
+BILDER: ${input.imageCount !== null ? `${input.imageCount} Slots belegt (die Bild-QUALITÄT bewertet der Code, NICHT du — der Bild-INHALT unten ist aber Listing-Inhalt und zählt als vorhanden)` : "unbekannt"}
+${input.bildBelege ? `INHALT DER BILDER / A+ / PRODUKTINFO (ausgelesen — ZÄHLT ALS TEIL DES LISTINGS):\n${input.bildBelege.slice(0, 3000)}` : "INHALT DER BILDER: (nicht ausgelesen — UNBEKANNT, nicht leer: behaupte NICHT, ein Thema fehle, das dort beantwortet sein könnte)"}
 BEWERTUNGS-BASIS: ${input.basics ? `${input.basics.reviewsTotal ?? "?"} Bewertungen · Ø ${input.basics.ratingAvg ?? "?"} ★${input.basics.dist ? ` · Verteilung ${Object.entries(input.basics.dist).map(([s, p]) => `${s}★ ${p}%`).join(", ")}` : ""}` : "unbekannt"}
 ${input.priceEur !== null ? `PREIS: ${input.priceEur} €` : ""}
 
@@ -106,6 +115,7 @@ ${input.topGaps.length ? `TOP-UMSATZLÜCKEN (SOV): ${input.topGaps.slice(0, 5).m
 BEWERTUNGS-REGELN (Nutzer-Feedback 21.07. — Verstöße machen das Audit unglaubwürdig):
 - SYNONYME ZÄHLEN: Ein Kaufargument gilt als abgedeckt, wenn es sinngemäß im Text steht („kabellos" deckt „Batteriebetrieb" ab, „Werkstatt" deckt „Garage" ab). Kritisiere NIE das Fehlen eines Wortes, dessen Bedeutung bereits da ist.
 - VOR JEDER FEHLT-BEHAUPTUNG: Lies den gelieferten Text wörtlich nach. Behaupte nur „X fehlt", wenn X wirklich nirgends steht (auch nicht als Wortstamm, Kompositum oder Synonym) — und setze den fehlenden Begriff in „Anführungszeichen".
+- BILDER SIND LISTING-INHALT (D252): Ein Thema, das im ausgelesenen Bild-/A+-/Produktinfo-Text beantwortet ist (z. B. Zubereitung, Dosierung, Anwendung), gilt als ABGEDECKT — es darf nicht als „fehlt" bemängelt und nicht als Maßnahme vorgeschlagen werden. Wenn ein Pain Point dort schon adressiert ist, ist die einzig zulässige Aussage, ihn ZUSÄTZLICH in den Text zu heben — niemals „wird nicht adressiert". Ist der Bild-Inhalt nicht ausgelesen, gilt er als UNBEKANNT, nicht als leer.
 - EIN SYSTEM: Titel, Bullets und Beschreibung arbeiten zusammen — bewusste NICHT-Duplizierung ist richtig. Ein Kaufargument, das prominent in einer anderen Sektion steht, senkt den Score dieser Sektion NICHT (Beispiel: „Batteriebetrieb" prägnant in den Bullets reicht; der Titel darf andere kaufrelevante Keywords tragen).
 - SPRACHE: Behaupte „Text ist nicht auf Deutsch" nur, wenn der Text tatsächlich überwiegend fremdsprachig ist.
 
@@ -180,7 +190,24 @@ function begriffImText(begriff: string, textStaemme: Set<string>): boolean {
   );
 }
 
-const FEHLT_MUSTER = /fehlt|fehlen|keine erwähnung|nicht erwähnt|nicht enthalten|nirgends|ohne bezug auf/i;
+/**
+ * Zitierte Begriffe aus einer KI-Behauptung ziehen. Auch EINFACHE Anführungszeichen
+ * (D252): das Modell schreibt in der Praxis oft 'schnell löslich' statt „schnell löslich".
+ */
+const ZITAT_RE = /[„“"'‚‘]([^„“"'‚‘’]{2,})[”“"'’‘]/g;
+
+/**
+ * „Etwas fehlt"-Formulierungen. Bewusst BREIT (D252): Das Muster löst nur die
+ * Beleg-PRÜFUNG der zitierten Begriffe aus — verworfen wird eine Behauptung erst,
+ * wenn ihre Zitate nachweislich im Listing stehen. Zu eng heißt: echte Falsch-
+ * Behauptungen überleben. Der Nutzer-Screenshot („Kein klar erkennbares
+ * Löslichkeits-/Zubereitungs-Keyword …") wurde vom alten Muster NICHT erfasst.
+ */
+const FEHLT_MUSTER =
+  /fehlt|fehlen|fehlend|nirgends|ohne bezug auf|keine erwähnung|nicht erwähnt|nicht enthalten|nicht vorhanden|nicht erkennbar|nicht adressiert|unadressiert|nicht aufgegriffen|nicht genannt|nicht kommuniziert|verpasst|kein(?:e|en|em|er|es)?\s+[^.!?;]{0,60}?(?:keyword|begriff|hinweis|signal|angabe|nennung|erwähnung|aussage|information)/i;
+/** Handlungs-Aufforderungen in topActions („X adressieren/einarbeiten/aufnehmen"). */
+const MASSNAHME_MUSTER =
+  /adressier|einarbeit|aufnehm|ergänz|hervorheb|kommunizier|integrier|prominent|platzier|benenn|betonen|herausstell/i;
 const NICHT_DEUTSCH_MUSTER = /(nicht|kein[e]?)\s+(auf\s+)?deutsch|komplett\s+englisch|text\s+ist\s+englisch|auf\s+englisch\s+verfasst/i;
 const DEUTSCH_SIGNAL = new Set(["der", "die", "das", "und", "ist", "mit", "für", "ein", "eine", "einen", "dem", "den", "nicht", "auf", "im", "sich", "auch", "bei", "aus", "wird", "werden", "von", "zu", "zum", "zur", "über", "nach", "durch", "oder", "wie", "sowie", "dank", "ihre", "ihr", "bis"]);
 
@@ -197,9 +224,14 @@ export function istDeutsch(text: string): boolean {
  *    (auch Cross-Sektion — ein Argument in den Bullets senkt den Titel nicht).
  * 2. „Text ist nicht auf Deutsch", obwohl die Sektion deutsch ist.
  * Gefilterte Behauptungen werden ehrlich als Hinweis ausgewiesen, nie still.
+ *
+ * D252: Der Vergleichstext enthält jetzt auch den BILD-/A+-/Produktinfo-Text —
+ * sonst überlebt eine „fehlt"-Behauptung, die die Status-quo-Bilder widerlegen.
+ * Und `topActions` läuft durch DENSELBEN Filter (lief vorher ganz ungeprüft durch,
+ * daher stand ein längst adressierter Pain Point als Maßnahme Nr. 1).
  */
 export function pruefeAuditBehauptungen(payload: DeepAuditPayload, input: DeepAuditInput): DeepAuditPayload {
-  const gesamtText = [input.title, ...input.bullets, input.description, input.backendKeywords].join(" ");
+  const gesamtText = [input.title, ...input.bullets, input.description, input.backendKeywords, input.bildBelege].join(" ");
   const textStaemme = new Set(gesamtText.split(/[\s\-–—/,.;:!?()•·]+/).map(stamm).filter((s) => s.length >= 3));
   const sektionsText: Partial<Record<DeepAuditDimension["key"], string>> = {
     title: input.title,
@@ -214,7 +246,7 @@ export function pruefeAuditBehauptungen(payload: DeepAuditPayload, input: DeepAu
     const probleme = d.probleme.filter((p) => {
       // Fall 1: Fehlt-Behauptung mit zitierten Begriffen, die nachweislich da sind
       if (FEHLT_MUSTER.test(p)) {
-        const zitate = [...p.matchAll(/[„"]([^"""]+)["""]/g)].map((m) => m[1]).filter((z) => z.length <= 60);
+        const zitate = [...p.matchAll(ZITAT_RE)].map((m) => m[1]).filter((z) => z.length <= 60);
         if (zitate.length > 0 && zitate.every((z) => begriffImText(z, textStaemme))) {
           entfernt.push(p);
           return false;
@@ -234,7 +266,27 @@ export function pruefeAuditBehauptungen(payload: DeepAuditPayload, input: DeepAu
       aktuell: `${d.aktuell}${d.aktuell ? " " : ""}(${entfernt.length} KI-Behauptung${entfernt.length > 1 ? "en" : ""} entfernt — der bemängelte Begriff steht nachweislich im Listing bzw. der Text ist deutsch.)`,
     };
   });
-  return { ...payload, dimensions };
+
+  // topActions (D252): liefen vorher UNGEPRÜFT durch — daher stand ein längst
+  // adressierter Pain Point als Maßnahme Nr. 1. Zwei Fälle, je nach Formulierung:
+  //  (a) „fehlt"-Behauptung + Begriff nachweislich vorhanden → schlicht FALSCH, raus.
+  //  (b) Handlungs-Aufforderung („adressieren"/„einarbeiten") zu einem Thema, das
+  //      nachweislich schon im Listing/in den Bildern steht → die Prämisse ist falsch,
+  //      die Maßnahme aber nicht wertlos: Sie wird auf die einzig zutreffende Aussage
+  //      korrigiert (Thema ist belegt, höchstens zusätzlich in den Text heben) statt
+  //      still gelöscht — Nutzer-Vorgabe.
+  const belegt = (a: string) => {
+    const zitate = [...a.matchAll(ZITAT_RE)].map((m) => m[1]).filter((z) => z.length <= 60);
+    return zitate.length > 0 && zitate.every((z) => begriffImText(z, textStaemme));
+  };
+  const topActions = payload.topActions
+    .filter((a) => !(FEHLT_MUSTER.test(a) && belegt(a)))
+    .map((a) =>
+      MASSNAHME_MUSTER.test(a) && belegt(a)
+        ? `${a} — Hinweis: Das Thema ist im Listing bzw. in den Bildern/A+ bereits belegt; höchstens zusätzlich in den Text heben.`
+        : a,
+    );
+  return { ...payload, dimensions, topActions };
 }
 
 export async function buildDeepAudit(input: DeepAuditInput): Promise<DeepAuditPayload> {

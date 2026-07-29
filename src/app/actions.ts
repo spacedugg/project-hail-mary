@@ -1820,6 +1820,7 @@ async function auditKern(
       : null;
 
   const { buildDeepAudit } = await import("@/lib/analysis/deepAudit");
+  const { snapshotBildBelege: bildBelegeAudit } = await import("@/lib/analysis/bildAuslese");
   try {
     const payload = await buildDeepAudit({
       productName: product.name,
@@ -1829,6 +1830,9 @@ async function auditKern(
       description,
       backendKeywords: (latest("backend_keywords")?.text as string) ?? "",
       imageCount: snapshot?.imageUrls ? snapshot.imageUrls.length : null,
+      // Bild-/A+/Produktinfo-Text als Audit-Quelle (D252): sonst bemängelt das Audit
+      // Themen als fehlend, die die Status-quo-Bilder beantworten.
+      bildBelege: bildBelegeAudit(snapshot),
       basics,
       priceEur: product.price !== null ? product.price / 100 : null,
       reviewInsights: insights!.payload,

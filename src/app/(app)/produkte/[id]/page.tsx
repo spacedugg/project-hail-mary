@@ -24,6 +24,7 @@ import { KopierFeld } from "@/components/kopier-feld";
 import { ListingKontrolle, MassnahmenBlock } from "@/components/listing-kontrolle";
 import { AnalyseHintergrund } from "@/components/analyse-hintergrund";
 import { analyzeListing, wirksamesListing } from "@/lib/analysis/listingAudit";
+import { snapshotBildBelege } from "@/lib/analysis/bildAuslese";
 import { BildKacheln } from "@/components/bild-kacheln";
 import { bereinigeBildUrls } from "@/lib/scrape/bilder";
 import type { SovAudit } from "@/lib/sov/audit";
@@ -162,6 +163,9 @@ export default async function ProductPage({
         primaryKeywords: kws.filter((k) => k.tier === "primary" && !k.ausgeschlossen).map((k) => k.keyword),
         sovAudit,
         reviewInsights: insights?.payload ?? null,
+        // Bild-/A+/Produktinfo-Text (D252): ein Pain Point, den die Status-quo-Bilder
+        // beantworten, gilt als adressiert und wird nicht als Maßnahme gefordert.
+        bildBelege: snapshotBildBelege(snapshot),
       })
     : null;
   const sektionSoll = { title: wirksam.title, bullets: wirksam.bullets.join(" "), description: wirksam.description };
