@@ -19,6 +19,8 @@ const base: DeepAuditInput = {
   description: "",
   backendKeywords: "",
   imageCount: 5,
+  bildBelege: "",
+  fixeBegriffe: [],
   basics: { reviewsTotal: 1343, ratingAvg: 4.6, dist: { "5": 70, "4": 15, "3": 6, "2": 3, "1": 6 } },
   priceEur: null,
   reviewInsights: ri,
@@ -118,6 +120,127 @@ describe("enforceDeepAudit — LLM generiert, Code erzwingt", () => {
     expect(titel.aktuell).toContain("entfernt");
     const beschr = out.dimensions.find((d) => d.key === "description")!;
     expect(beschr.probleme).toEqual(["Zu wenige Absätze"]);
+  });
+
+  it("Bild-Text belegt Themen (D252) — der HOLY-Fall: Zubereitung-fehlt-Behauptung fliegt, topActions mitgefiltert", () => {
+    const input: DeepAuditInput = {
+      ...base,
+      title: "HOLY Iced Tea Pulver Peach x Black Tea zuckerfrei 50 Portionen vegan",
+      bullets: ["ERFRISCHEND: Fruchtiger Eistee ohne Zuckerzusatz."],
+      description: "Der vegane Iced Tea kommt ohne tierische Zutaten aus.",
+      // Genau der Screenshot-Inhalt des Status-quo-Bildes:
+      bildBelege: "Bild 3: ZUBEREITUNG — Mix it, shake it, enjoy. Text im Bild: Misch eine Portion HOLY mit 500 ml Wasser | Shaker kräftig schütteln | Eiswürfel rein",
+    };
+    const payload: DeepAuditPayload = {
+      derived: { usps: [], zielgruppe: "", positionierung: "" },
+      dimensions: [
+        {
+          key: "title", label: "Titel", score10: 7,
+          aktuell: "Titel vorhanden.",
+          probleme: [
+            'Kein klar erkennbares Keyword zur „Zubereitung" — verpasstes Vertrauenssignal', // FALSCH: steht im Bild
+            'Das Keyword „Hundefutter" fehlt', // WAHR — nirgends, muss bleiben
+          ],
+          empfehlung: "",
+        },
+      ],
+      topActions: [
+        'Pain Point „Zubereitung" im Listing offensiv adressieren', // FALSCH: Bild deckt es ab
+        'Keyword „Hundefutter" fehlt komplett — einarbeiten', // WAHR — bleibt
+      ],
+    };
+    const out = pruefeAuditBehauptungen(payload, input);
+    // Der Zubereitungs-Befund wird NICHT gelöscht (über den TITEL ist er zutreffend),
+    // aber um die Wahrheit ergänzt: das Bild deckt das Thema ab (D254-Korrektur).
+    expect(out.dimensions[0].probleme).toHaveLength(2);
+    expect(out.dimensions[0].probleme[0]).toContain("bereits im Bild");
+    expect(out.dimensions[0].probleme[1]).toBe('Das Keyword „Hundefutter" fehlt');
+    // topActions liefen früher UNGEPRÜFT durch. Die im Bild belegte Maßnahme behält
+    // ihren Kern samt korrigierter Prämisse; die wahre bleibt unangetastet.
+    expect(out.topActions).toHaveLength(2);
+    expect(out.topActions[0]).toContain("bereits im Bild");
+    expect(out.topActions[1]).toBe('Keyword „Hundefutter" fehlt komplett — einarbeiten');
+  });
+
+  it("feste Eigennamen (D253): Sprach-Kritik am Sortennamen fliegt, echte Sprach-Kritik bleibt", () => {
+    const input: DeepAuditInput = {
+      ...base,
+      title: "HOLY Iced Tea Pulver Peach x Black Tea zuckerfrei 50 Portionen",
+      bullets: ["ERFRISCHEND: Fruchtiger Eistee ohne Zuckerzusatz im Shaker."],
+      description: "Der vegane Eistee ist schnell angerührt und erfrischt den ganzen Tag über zuverlässig.",
+      fixeBegriffe: ["HOLY", "Peach x Black Tea"],
+    };
+    const payload: DeepAuditPayload = {
+      derived: { usps: [], zielgruppe: "", positionierung: "" },
+      dimensions: [
+        {
+          key: "title", label: "Titel", score10: 7,
+          aktuell: "Titel vorhanden.",
+          probleme: [
+            // FALSCH: kritisiert nur den vorgegebenen Sortennamen
+            'Der englische Slang-Anteil („Peach x Black Tea") mischt Englisch/Deutsch',
+            // WAHR: betrifft einen frei formulierbaren Textteil, bleibt
+            'Der Begriff „Relax Formel" bleibt unerklärt und wirkt vage',
+          ],
+          empfehlung: "",
+        },
+      ],
+      topActions: ['Sortennamen „Peach x Black Tea" eindeutschen'],
+    };
+    const out = pruefeAuditBehauptungen(payload, input);
+    expect(out.dimensions[0].probleme).toEqual(['Der Begriff „Relax Formel" bleibt unerklärt und wirkt vage']);
+    expect(out.topActions).toEqual([]); // nicht umsetzbare Umbenennung raus
+  });
+
+  it("Filter löscht KEINE berechtigte Kritik (D254 — Review-Gegenproben)", () => {
+    const input: DeepAuditInput = {
+      ...base,
+      title: "HOLY Energy Peach x Black Tea Pulver 30 Portionen für Gamer",
+      bullets: ["So geht's: 1 Portion in 500 ml Wasser. Vegan, ohne Zucker, mit Koffein."],
+      description: "Der Eistee ist schnell angerührt und erfrischt den ganzen Tag über zuverlässig gut.",
+      bildBelege: "Bild 2: 30 Portionen pro Dose",
+      fixeBegriffe: ["HOLY", "Peach x Black Tea", "S"], // „S" = kurzer Größen-Achsenwert
+    };
+    const pruef = (probleme: string[], topActions: string[] = []) =>
+      pruefeAuditBehauptungen(
+        {
+          derived: { usps: [], zielgruppe: "", positionierung: "" },
+          dimensions: [{ key: "title", label: "Titel", score10: 6, aktuell: "", probleme, empfehlung: "" }],
+          topActions,
+        },
+        input,
+      );
+
+    // (a) Apostroph darf kein Phantom-Zitat eröffnen und das echte Zitat verschlucken
+    const a = pruef(["Das Listing sagt nicht, wie's geht — 'löslich' fehlt komplett."]);
+    expect(a.dimensions[0].probleme).toHaveLength(1);
+
+    // (b) „nur im Bild, nicht im Titel" ist WAHR — darf nie verschwinden
+    const b = pruef(['Keine Angabe zur Menge — „30 Portionen" steht nur im Bild, nicht im Titel.']);
+    expect(b.dimensions[0].probleme).toHaveLength(1);
+
+    // (c) Qualitäts-Kritik („verpasst"/„nicht kommuniziert") ist keine Absenz-Behauptung
+    const c = pruef([
+      'Die Chance, „Peach x Black Tea" als Geschmackserlebnis zu inszenieren, wird verpasst.',
+      'Der Nutzen von „Koffein" wird nicht kommuniziert.',
+    ]);
+    expect(c.dimensions[0].probleme).toHaveLength(2);
+
+    // (d) Gemischtes Zitat-Set: ein langes (unbelegtes) Zitat darf nicht mitgelöscht werden
+    const d = pruef(['Es fehlt „Zubereitung in 500 ml Wasser innerhalb von 10 Sekunden ohne Klümpchen"; auch „Pulver" fehlt.']);
+    expect(d.dimensions[0].probleme).toHaveLength(1);
+
+    // (e) Kurzer Achsenwert („S") darf nicht jede Sprachkritik abschießen
+    const e = pruef(['Bullet 3 ist Denglisch: „Premium Stretch Fabric" statt deutschem Nutzen — englisch.']);
+    expect(e.dimensions[0].probleme).toHaveLength(1);
+
+    // (f) Zitat, das den Eigennamen nur ENTHÄLT, kritisiert den freien Text drumherum
+    const f = pruef(['Anglizismen wie „Iced Peach x Black Tea Refresher Mix" eindeutschen.']);
+    expect(f.dimensions[0].probleme).toHaveLength(1);
+
+    // (g) topAction wird nie STILL gelöscht — echte Absenz-Maßnahme bleibt erhalten
+    const g = pruef([], ['Fehlenden Hinweis „Klümpchen" im Titel ergänzen.']);
+    expect(g.topActions).toHaveLength(1);
   });
 
   it("istDeutsch: erkennt deutschen Text, urteilt nicht bei zu kurzem Text", () => {

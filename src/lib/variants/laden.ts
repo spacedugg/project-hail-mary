@@ -1,7 +1,7 @@
 import { and, eq, desc } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { products, listingSnapshots, contentVersions } from "@/db/schema";
-import { leseFreigegebenenContent } from "./masterActions";
+import { leseFreigegebenenContent, umfangAusPlan } from "./masterActions";
 import type { ContentMaster } from "./master";
 
 /**
@@ -17,8 +17,13 @@ export const TREE_PIECE_LABEL: Record<TreePiece, string> = {
   backend_keywords: "Backend-Keywords",
   qa: "Q&A",
 };
-/** NUR diese Pieces erzeugt die Master-Propagierung — nur sie können live grün werden. */
-export const PROPAGIERTE_PIECES: TreePiece[] = ["title", "bullets", "description"];
+/**
+ * Bausteine, die die Master-Propagierung STRUKTURELL abdecken kann. Der wirklich
+ * propagierte Umfang ergibt sich zusätzlich aus dem Content-Plan des Parents
+ * (D257/D258) — siehe `FamilienDaten.plan`. Backend-Keywords und Q&A werden
+ * bewusst nicht kopiert: sie sind je Variante eigenständig.
+ */
+export const PROPAGIERBARE_PIECES: TreePiece[] = ["title", "bullets", "description"];
 export type PieceStatus = "approved" | "draft" | "none";
 
 /**
@@ -85,6 +90,14 @@ async function lesePieceStatus(db: Db, productId: string): Promise<Record<TreePi
   };
   return Object.fromEntries(TREE_PIECES.map((p) => [p, status(p)])) as Record<TreePiece, PieceStatus>;
 }
+/** Content-Plan → propagierte Tree-Pieces (D258). Kein Plan ⇒ alles Propagierbare. */
+export function propagierterUmfang(plan: readonly string[] | null | undefined): TreePiece[] {
+  if (!plan || plan.length === 0) return [...PROPAGIERBARE_PIECES];
+  const gewaehlt = new Set(plan);
+  const treffer = PROPAGIERBARE_PIECES.filter((p) => gewaehlt.has(p));
+  return treffer.length > 0 ? treffer : [...PROPAGIERBARE_PIECES];
+}
+
 export type FamilienDaten = {
   parentId: string;
   brandId: string;
@@ -93,6 +106,12 @@ export type FamilienDaten = {
   istContainer: boolean;
   hatMaster: boolean;
   master: ContentMaster | null;
+  /**
+   * Tatsächlich propagierter Umfang (D258): Content-Plan des Parents ∩ strukturell
+   * propagierbare Bausteine. Steuert die Häkchen im Baum — vorher stand dort eine
+   * fest verdrahtete Liste, unabhängig davon, was der Nutzer wollte.
+   */
+  plan: TreePiece[];
   kinder: FamilienKind[];
 };
 
@@ -106,9 +125,12 @@ export async function ladeFamilie(db: Db, parentId: string): Promise<FamilienDat
   const varianten = parent.variantParentContainer ? childRows : [parent, ...childRows];
   const snaps = await snapMap(db, varianten.map((v) => v.id));
 
+  // Base-Tauglichkeit gegen den PLAN prüfen (D258): Wer keine Beschreibung geplant
+  // hat, soll eine Variante mit Titel+Bullets als „freigegeben" sehen.
+  const umfangPlan = umfangAusPlan(parent.contentPlan);
   const kinder: FamilienKind[] = [];
   for (const k of varianten) {
-    const content = await leseFreigegebenenContent(db, k.id);
+    const content = await leseFreigegebenenContent(db, k.id, umfangPlan);
     kinder.push({
       id: k.id,
       asin: k.asin,
@@ -130,6 +152,7 @@ export async function ladeFamilie(db: Db, parentId: string): Promise<FamilienDat
     istContainer: parent.variantParentContainer,
     hatMaster: !!parent.contentMaster,
     master: parent.contentMaster ?? null,
+    plan: propagierterUmfang(parent.contentPlan),
     kinder,
   };
 }

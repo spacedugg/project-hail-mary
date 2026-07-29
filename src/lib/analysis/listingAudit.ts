@@ -154,8 +154,15 @@ export function analyzeListing(input: {
   primaryKeywords: string[];
   sovAudit?: SovAudit | null;
   reviewInsights?: ReviewInsightsPayload | null;
+  /**
+   * Text der eigenen Bilder/A+/Produktinfo (D252). Zählt für die INHALTLICHE
+   * Abdeckung (ein Thema, das die Bilder beantworten, ist adressiert), NICHT für
+   * die Keyword-Messung: Amazon indexiert Bildtext nicht — ein Keyword im Bild
+   * rankt nicht. Darum bewusst getrennt von `allText`.
+   */
+  bildBelege?: string;
 }): ListingAnalysis {
-  const { snapshot, facts, primaryKeywords, sovAudit, reviewInsights } = input;
+  const { snapshot, facts, primaryKeywords, sovAudit, reviewInsights, bildBelege = "" } = input;
   const dims: AnalysisDimension[] = [];
   const recs: string[] = [];
   const allText = [snapshot.title, ...snapshot.bullets, snapshot.description].join(" ");
@@ -211,8 +218,12 @@ export function analyzeListing(input: {
   // noch die MASSNAHMEN (unadressierter Top-Einwand).
   if (reviewInsights && reviewInsights.painPoints.length > 0) {
     const top = reviewInsights.painPoints.slice(0, 5);
-    const bulletsText = snapshot.bullets.join(" ");
-    const missing = top.filter((p) => !adressiert(bulletsText, p.label).ok);
+    // D252 (Nutzer-Befund): Der Abgleich sah NUR die Bullets — dadurch galt ein
+    // Einwand als „nicht adressiert", obwohl Titel, Beschreibung oder die
+    // Status-quo-BILDER ihn längst beantworten (z. B. Zubereitung/Dosierung auf
+    // dem Bild). Geprüft wird jetzt das gesamte Kundensichtbare inkl. Bild-Text.
+    const kundenSichtbar = [snapshot.title, ...snapshot.bullets, snapshot.description, bildBelege].join(" ");
+    const missing = top.filter((p) => !adressiert(kundenSichtbar, p.label).ok);
     if (missing[0]) recs.push(`Häufigsten Kunden-Einwand („${missing[0].label}") prominent in Bullet 1–2 entkräften.`);
   }
 

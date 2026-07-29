@@ -6,7 +6,6 @@ import { propagiereChild, auditFamilieKonsistenz } from "@/app/actions";
 import {
   TREE_PIECES,
   TREE_PIECE_LABEL,
-  PROPAGIERTE_PIECES,
   type FamilienDaten,
   type FamilienKind,
   type TreePiece,
@@ -112,16 +111,26 @@ function Kachel({
   );
 }
 
-/** Fehler/Warnungen eines Kindes ausgeschrieben — aufklappbar, nicht nur als Zahl. */
+/**
+ * Fehler/Warnungen eines Kindes ausgeschrieben — aufklappbar, nicht nur als Zahl.
+ * Ampel-Logik (D250, Nutzer): NUR echte Fehler färben rot. Ohne Fehler ist das
+ * Ergebnis freigabefähig → GRÜNES Feld, auch wenn Hinweise vorliegen; die Hinweise
+ * stehen dann amber INNERHALB der grünen Rückmeldung. „0 Fehler" darf nie rot sein.
+ */
 function GateBefund({ issues }: { issues: ValidationIssue[] }) {
   const fehler = issues.filter((i) => i.severity === "error");
   const warn = issues.filter((i) => i.severity === "warning");
   if (fehler.length === 0 && warn.length === 0)
     return <span className="inline-block rounded-full bg-[rgb(22_163_74/0.15)] px-2 py-0.5 text-[10px] font-semibold text-good">✓ Gate bestanden</span>;
+  const hatFehler = fehler.length > 0;
   return (
-    <details className="rounded-lg border border-bad/40 bg-bad/5">
-      <summary className="cursor-pointer px-2 py-1 text-[10px] font-semibold text-bad">
-        ✕ {fehler.length} Fehler{warn.length ? ` · ${warn.length} Hinweise` : ""} — Gründe zeigen
+    <details className={`rounded-lg border ${hatFehler ? "border-bad/40 bg-bad/5" : "border-good/40 bg-[rgb(22_163_74/0.07)]"}`}>
+      <summary className={`cursor-pointer px-2 py-1 text-[10px] font-semibold ${hatFehler ? "text-bad" : "text-good"}`}>
+        {hatFehler ? (
+          <>✕ {fehler.length} Fehler{warn.length ? ` · ${warn.length} Hinweise` : ""} — Gründe zeigen</>
+        ) : (
+          <>✓ Gate bestanden · <span className="text-amber-600">{warn.length} Hinweis{warn.length === 1 ? "" : "e"}</span> — anzeigen</>
+        )}
       </summary>
       <ul className="space-y-1 px-2 pb-2 pt-1">
         {[...fehler, ...warn].map((i, n) => (
@@ -177,7 +186,7 @@ export function FamilieBaum({ familie }: { familie: FamilienDaten }) {
       // Achsen-fehlt = nichts persistiert → keine grünen Häkchen setzen.
       const persistiert = !res.kind.issues.some((i) => i.rule === "familie.achsenwert-fehlt");
       if (persistiert) {
-        for (const p of PROPAGIERTE_PIECES) {
+        for (const p of familie.plan) {
           await sleep(260); // gestaffelt für den Live-Effekt (Content ist bereits gespeichert)
           setLauf((prev) => {
             const s = prev[t.id];
@@ -206,8 +215,8 @@ export function FamilieBaum({ familie }: { familie: FamilienDaten }) {
     return (p: TreePiece): Zustand => {
       const s = lauf[id];
       if (s?.gruen.has(p)) return "gruen";
-      if (s?.status === "running" && PROPAGIERTE_PIECES.includes(p)) return "pending";
-      if (PROPAGIERTE_PIECES.includes(p)) return "weiss"; // im Plan, noch nicht generiert
+      if (s?.status === "running" && familie.plan.includes(p)) return "pending";
+      if (familie.plan.includes(p)) return "weiss"; // im Plan, noch nicht generiert
       return "leer"; // nicht Teil des Masters
     };
   }

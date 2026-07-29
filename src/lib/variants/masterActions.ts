@@ -13,6 +13,8 @@ import {
   type MasterVerstoss,
   type AufgeloesterSlot,
   type SlotRegenerator,
+  type SlotQuelle,
+  MASTER_UMFANG_ALLE,
 } from "./master";
 import type { SlotKlassifikator } from "./masterLlm";
 import { snapshotBildBelege } from "@/lib/analysis/bildAuslese";
@@ -28,27 +30,39 @@ type KeywordRow = typeof keywords.$inferSelect;
 
 // ── Content lesen ────────────────────────────────────────────────────────────
 
+/**
+ * Payloads → MasterContent. `umfang` (D258) bestimmt, welche Bausteine PFLICHT
+ * sind: Wer keine Beschreibung im Content-Plan hat, soll die Ableitung nicht an
+ * einer fehlenden Beschreibung scheitern sehen.
+ */
 function payloadZuContent(
-  titleP?: Record<string, unknown>,
-  bulletsP?: Record<string, unknown>,
-  descP?: Record<string, unknown>,
+  titleP: Record<string, unknown> | undefined,
+  bulletsP: Record<string, unknown> | undefined,
+  descP: Record<string, unknown> | undefined,
+  umfang: SlotQuelle[] = MASTER_UMFANG_ALLE,
 ): MasterContent | null {
-  if (!titleP || !bulletsP || !descP) return null;
-  const title = typeof titleP.text === "string" ? titleP.text : "";
-  const bullets = Array.isArray(bulletsP.items) ? (bulletsP.items as unknown[]).filter((x): x is string => typeof x === "string") : [];
-  const description = typeof descP.text === "string" ? descP.text : "";
-  if (!title || bullets.length === 0 || !description) return null;
+  const title = typeof titleP?.text === "string" ? titleP.text : "";
+  const bullets = Array.isArray(bulletsP?.items) ? (bulletsP.items as unknown[]).filter((x): x is string => typeof x === "string") : [];
+  const description = typeof descP?.text === "string" ? descP.text : "";
+  if (umfang.includes("title") && !title) return null;
+  if (umfang.includes("bullet") && bullets.length === 0) return null;
+  if (umfang.includes("description") && !description) return null;
+  if (!title && bullets.length === 0 && !description) return null;
   return { title, bullets, description };
 }
 
 /** NUR freigegebener Content (für die Master-Ableitung — der Nutzer war zufrieden). */
-export async function leseFreigegebenenContent(db: Db, productId: string): Promise<MasterContent | null> {
+export async function leseFreigegebenenContent(
+  db: Db,
+  productId: string,
+  umfang: SlotQuelle[] = MASTER_UMFANG_ALLE,
+): Promise<MasterContent | null> {
   const versions = await db.query.contentVersions.findMany({
     where: eq(contentVersions.productId, productId),
     orderBy: desc(contentVersions.createdAt),
   });
   const approved = (t: string) => versions.find((v) => v.type === t && v.status === "approved")?.payload as Record<string, unknown> | undefined;
-  return payloadZuContent(approved("title"), approved("bullets"), approved("description"));
+  return payloadZuContent(approved("title"), approved("bullets"), approved("description"), umfang);
 }
 
 /** Aktueller Content (freigegeben bevorzugt, sonst neuester Entwurf) — Basis des Familien-Audits. */
@@ -127,6 +141,21 @@ async function baueGateCtxKern(db: Db, child: ProductRow, basisZahlenQuellen = "
   return { facts: child.facts, primaryKeywords: byTier("primary"), alleKeywords, competitorBrands: fremdmarken, zahlenQuellen };
 }
 
+/**
+ * Content-Plan (D257) → Umfang der Varianten-Ableitung (D258). Die Master-Engine
+ * deckt strukturell Titel · Bullets · Beschreibung ab; Backend-Keywords und Q&A
+ * sind per Variante eigenständig (eigene Keywords/Antworten) und werden NICHT
+ * kopiert — sie entstehen je Child über die normale Generierung.
+ */
+export function umfangAusPlan(plan: readonly string[] | null | undefined): SlotQuelle[] {
+  if (!plan || plan.length === 0) return MASTER_UMFANG_ALLE;
+  const out: SlotQuelle[] = [];
+  if (plan.includes("title")) out.push("title");
+  if (plan.includes("bullets")) out.push("bullet");
+  if (plan.includes("description")) out.push("description");
+  return out.length > 0 ? out : MASTER_UMFANG_ALLE;
+}
+
 // ── Master ableiten & freigeben ─────────────────────────────────────────────────
 
 export type MasterEntwurf = { ok: true; master: ContentMaster; mock: boolean } | { ok: false; fehler: string };
@@ -147,14 +176,19 @@ export async function baueMasterEntwurfKern(
   if (!base || (base.id !== parentId && base.parentProductId !== parentId))
     return { ok: false, fehler: "Base-Variante gehört nicht zu dieser Familie." };
 
-  const content = await leseFreigegebenenContent(db, baseChildId);
-  if (!content) return { ok: false, fehler: "Base-Child hat keinen freigegebenen Content (Titel + Bullets + Beschreibung nötig)." };
+  // Umfang aus dem Content-Plan des Parents (D258): nur geplante Bausteine werden abgeleitet.
+  const umfang = umfangAusPlan(parent.contentPlan);
+  const content = await leseFreigegebenenContent(db, baseChildId, umfang);
+  if (!content) {
+    const noetig = umfang.map((u) => (u === "title" ? "Titel" : u === "bullet" ? "Bullets" : "Beschreibung")).join(" + ");
+    return { ok: false, fehler: `Base-Child hat keinen freigegebenen Content (${noetig} nötig).` };
+  }
 
   const baseAxis = base.variantAxisValues ?? {};
-  const roh = zerlegeInSlots(content, baseAxis, theme);
+  const roh = zerlegeInSlots(content, baseAxis, theme, umfang);
   const { regenerateIds, mock } = await klassifikator(roh, theme, baseAxis);
   const slots = wendeKlassifikationAn(roh, regenerateIds, theme);
-  return { ok: true, master: { baseChildAsin: base.asin ?? baseChildId, theme, slots }, mock };
+  return { ok: true, master: { baseChildAsin: base.asin ?? baseChildId, theme, slots, umfang }, mock };
 }
 
 export async function gibMasterFreiKern(
@@ -243,8 +277,15 @@ function filtereNachSlotRolle(issues: ValidationIssue[], master: ContentMaster):
   const titelRegen = master.slots.some((s) => s.quelle === "title" && s.kind === "regenerate");
   const regenBullets = new Set(master.slots.filter((s) => s.quelle === "bullet" && s.kind === "regenerate").map((s) => s.index));
   const descRegen = master.slots.some((s) => s.quelle === "description" && s.kind === "regenerate");
+  // D258: Bausteine AUSSERHALB des Umfangs werden nicht abgeleitet — ihre Gate-Befunde
+  // (z. B. „Beschreibung fehlt") wären Rauschen über etwas, das absichtlich fehlt.
+  const umfang = new Set(master.umfang ?? MASTER_UMFANG_ALLE);
   return issues.filter((i) => {
-    if (i.rule.startsWith("familie.") || HARTE_LIMITS.has(i.rule)) return true;
+    if (i.rule.startsWith("familie.")) return true;
+    if (i.rule.startsWith("title.") && !umfang.has("title")) return false;
+    if (i.rule.startsWith("bullets.") && !umfang.has("bullet")) return false;
+    if (i.rule.startsWith("description.") && !umfang.has("description")) return false;
+    if (HARTE_LIMITS.has(i.rule)) return true;
     if (i.rule.startsWith("title.")) return titelRegen;
     if (i.rule.startsWith("description.")) return descRegen;
     if (i.rule.startsWith("bullets.")) {
@@ -261,6 +302,7 @@ async function persistiereChildContent(
   content: MasterContent,
   gateIssues: ValidationIssue[],
   generatedBy: string,
+  umfang: SlotQuelle[] = MASTER_UMFANG_ALLE,
 ): Promise<void> {
   const vorhanden = await db.query.contentVersions.findMany({ where: eq(contentVersions.productId, productId) });
   const naechste = (t: string) => vorhanden.filter((v) => v.type === t).reduce((m, v) => Math.max(m, v.version), 0) + 1;
@@ -269,10 +311,16 @@ async function persistiereChildContent(
     const rel = gateIssues.filter((i) => i.rule.startsWith(prefix));
     return { passed: !rel.some((i) => i.severity === "error"), issues: rel, checkedAt: new Date().toISOString() };
   };
+  // Nur Bausteine im Umfang schreiben (D258): ein abgewählter Baustein darf beim
+  // Child nicht als leerer Entwurf entstehen.
+  const schreibe = new Set(umfang);
   await db.transaction(async (tx) => {
-    await tx.insert(contentVersions).values({ id: uuid(), productId, type: "title", version: naechste("title"), payload: { text: content.title, rationale }, status: "draft", validation: report("title"), generatedBy });
-    await tx.insert(contentVersions).values({ id: uuid(), productId, type: "bullets", version: naechste("bullets"), payload: { items: content.bullets, rationale }, status: "draft", validation: report("bullets"), generatedBy });
-    await tx.insert(contentVersions).values({ id: uuid(), productId, type: "description", version: naechste("description"), payload: { text: content.description, rationale }, status: "draft", validation: report("description"), generatedBy });
+    if (schreibe.has("title"))
+      await tx.insert(contentVersions).values({ id: uuid(), productId, type: "title", version: naechste("title"), payload: { text: content.title, rationale }, status: "draft", validation: report("title"), generatedBy });
+    if (schreibe.has("bullet"))
+      await tx.insert(contentVersions).values({ id: uuid(), productId, type: "bullets", version: naechste("bullets"), payload: { items: content.bullets, rationale }, status: "draft", validation: report("bullets"), generatedBy });
+    if (schreibe.has("description"))
+      await tx.insert(contentVersions).values({ id: uuid(), productId, type: "description", version: naechste("description"), payload: { text: content.description, rationale }, status: "draft", validation: report("description"), generatedBy });
   });
 }
 
@@ -335,7 +383,7 @@ export async function propagiereFamilieKern(
     const gate = [...validateTitle(content.title, ctx), ...validateBullets(content.bullets, ctx), ...validateDescription(content.description, content.bullets, ctx)];
     issues.push(...filtereNachSlotRolle(gate, master)); // nur regenerate-Slots inhaltlich prüfen (D247)
 
-    await persistiereChildContent(db, k.id, content, issues, `variants.master:${parentId}${mock ? ":mock" : ""}`);
+    await persistiereChildContent(db, k.id, content, issues, `variants.master:${parentId}${mock ? ":mock" : ""}`, master.umfang ?? MASTER_UMFANG_ALLE);
     ergebnisse.push({ asin, productId: k.id, issues, passed: !issues.some((i) => i.severity === "error") });
   }
 
@@ -418,7 +466,7 @@ export async function propagiereChildKern(
   const ctx = await baueGateCtxKern(db, child, basisZahlenQuellen);
   const gate = [...validateTitle(content.title, ctx), ...validateBullets(content.bullets, ctx), ...validateDescription(content.description, content.bullets, ctx)];
   issues.push(...filtereNachSlotRolle(gate, master)); // nur regenerate-Slots inhaltlich prüfen (D247)
-  await persistiereChildContent(db, child.id, content, issues, `variants.master:${parentId}${mock ? ":mock" : ""}`);
+  await persistiereChildContent(db, child.id, content, issues, `variants.master:${parentId}${mock ? ":mock" : ""}`, master.umfang ?? MASTER_UMFANG_ALLE);
 
   // Cross-Child-Gate über den JETZT persistierten Content — nur für dieses Child.
   const audit = await auditFamilieKonsistenzKern(db, parentId);

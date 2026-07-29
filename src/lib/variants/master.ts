@@ -16,7 +16,14 @@
  * Die reale LLM-Verdrahtung liegt in einer separaten Adapter-Datei; dieses Modul bleibt rein.
  */
 
+/**
+ * Content-Bausteine, die die Master-Engine strukturell ableiten kann. Leere
+ * Felder sind erlaubt, wenn der Baustein NICHT im Umfang liegt (D258).
+ */
 export type MasterContent = { title: string; bullets: string[]; description: string };
+
+/** Bausteine, die die Ableitung tatsächlich abdeckt — Umfang eines Masters (D258). */
+export const MASTER_UMFANG_ALLE: SlotQuelle[] = ["title", "bullet", "description"];
 
 export type SlotKind = "locked" | "token" | "regenerate";
 export type SlotQuelle = "title" | "bullet" | "description";
@@ -39,6 +46,12 @@ export type ContentMaster = {
   baseChildAsin: string;
   theme: string[];
   slots: MasterSlot[];
+  /**
+   * Umfang der Ableitung (D258): welche Bausteine auf die Geschwister übertragen
+   * werden. Kommt aus dem Content-Plan des Parents (D257). `undefined` = alle drei
+   * (Alt-Master, rückwärtskompatibel).
+   */
+  umfang?: SlotQuelle[];
 };
 
 /** Ein Slot nach Auflösung für ein konkretes Child (Text final eingesetzt/regeneriert). */
@@ -101,8 +114,10 @@ export function zerlegeInSlots(
   content: MasterContent,
   baseAxisValues: Record<string, string>,
   theme: string[],
+  umfang: SlotQuelle[] = MASTER_UMFANG_ALLE,
 ): MasterSlot[] {
   const slots: MasterSlot[] = [];
+  const imUmfang = (q: SlotQuelle) => umfang.includes(q);
 
   const baue = (id: string, quelle: SlotQuelle, index: number, roh: string): MasterSlot => {
     let text = roh;
@@ -126,9 +141,12 @@ export function zerlegeInSlots(
     };
   };
 
-  slots.push(baue("title", "title", 0, content.title));
-  content.bullets.forEach((b, i) => slots.push(baue(`bullet.${i + 1}`, "bullet", i + 1, b)));
-  absaetze(content.description).forEach((p, i) => slots.push(baue(`desc.${i + 1}`, "description", i + 1, p)));
+  // Nur Bausteine im Umfang werden zerlegt (D258) — was nicht im Content-Plan
+  // steht, wird auch nicht auf die Geschwister übertragen.
+  if (imUmfang("title") && content.title.trim()) slots.push(baue("title", "title", 0, content.title));
+  if (imUmfang("bullet")) content.bullets.forEach((b, i) => slots.push(baue(`bullet.${i + 1}`, "bullet", i + 1, b)));
+  if (imUmfang("description") && content.description.trim())
+    absaetze(content.description).forEach((p, i) => slots.push(baue(`desc.${i + 1}`, "description", i + 1, p)));
 
   return slots;
 }

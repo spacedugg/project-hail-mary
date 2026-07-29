@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { saveKeywords, deriveKeywordsFromSov, generateContent, deleteProductAction, uploadCerebro, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, resetContentChain, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarke } from "@/app/actions";
+import { saveKeywords, deriveKeywordsFromSov, generateContent, deleteProductAction, uploadCerebro, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, resetContentChain, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarke, saveContentPlan } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
@@ -24,11 +24,14 @@ import { KopierFeld } from "@/components/kopier-feld";
 import { ListingKontrolle, MassnahmenBlock } from "@/components/listing-kontrolle";
 import { AnalyseHintergrund } from "@/components/analyse-hintergrund";
 import { analyzeListing, wirksamesListing } from "@/lib/analysis/listingAudit";
+import { snapshotBildBelege } from "@/lib/analysis/bildAuslese";
+import { dbTypFuer, geplanteVorgaenger, wirksamerPlan, SEKTIONS_LABEL } from "@/lib/content/plan";
 import { BildKacheln } from "@/components/bild-kacheln";
 import { bereinigeBildUrls } from "@/lib/scrape/bilder";
 import type { SovAudit } from "@/lib/sov/audit";
 import { ladeFamilie } from "@/lib/variants/laden";
 import { FamilieManager } from "@/components/familie-manager";
+import { FamilieStruktur } from "@/components/familie-struktur";
 
 export const dynamic = "force-dynamic";
 // Apify-Scrapes & LLM-Generierung: sonnet-5 denkt adaptiv und braucht bei
@@ -112,7 +115,12 @@ export default async function ProductPage({
       </main>
     );
   }
-  const familiePanel = product.variantRole === "parent" ? await ladeFamilie(db, product.id) : null;
+  // Familien-Kontext (D256): Struktur-Tabelle auf JEDER Parent- UND Child-ASIN.
+  // Für ein Child wird die Familie über seinen Parent geladen. Die VERWALTUNG
+  // (Master ableiten · Slots · Übertragen) bleibt dem Parent vorbehalten.
+  const familieAnkerId = product.variantRole === "parent" ? product.id : product.parentProductId;
+  const familie = familieAnkerId ? await ladeFamilie(db, familieAnkerId) : null;
+  const familiePanel = product.variantRole === "parent" ? familie : null;
 
   // Unabhängige Queries parallel (Review-Fix): jeder Reiter-Wechsel zahlte
   // vorher 8+ serielle Roundtrips.
@@ -162,8 +170,13 @@ export default async function ProductPage({
         primaryKeywords: kws.filter((k) => k.tier === "primary" && !k.ausgeschlossen).map((k) => k.keyword),
         sovAudit,
         reviewInsights: insights?.payload ?? null,
+        // Bild-/A+/Produktinfo-Text (D252): ein Pain Point, den die Status-quo-Bilder
+        // beantworten, gilt als adressiert und wird nicht als Maßnahme gefordert.
+        bildBelege: snapshotBildBelege(snapshot),
       })
     : null;
+  // Wirksamer Content-Plan (D257): null/leer ⇒ alle Sektionen.
+  const planAktiv = wirksamerPlan(product.contentPlan);
   const sektionSoll = { title: wirksam.title, bullets: wirksam.bullets.join(" "), description: wirksam.description };
 
   return (
@@ -247,10 +260,11 @@ export default async function ProductPage({
           basisHref={`/produkte/${product.id}`}
           tabs={[...TABS]}
           aktiv={tab}
-          extra={[
-            { href: `/produkte/${product.id}/content`, label: "Content-Verwaltung" },
-            { href: `/produkte/${product.id}/briefs`, label: "Briefings" },
-          ]}
+          /* „Content-Verwaltung" ist KEIN Produkt-Reiter mehr (D255, Nutzer): Die
+             Content-Verwaltung lebt im linken Hauptmenü — ein zweiter Einstieg hier
+             führte in eine Publish-/Soll-Ansicht, die im Produkt-Kontext nicht
+             zuzuordnen war. Die Route bleibt, erreichbar über das Menü. */
+          extra={[{ href: `/produkte/${product.id}/briefs`, label: "Briefings" }]}
         />
       )}
 
@@ -641,6 +655,21 @@ export default async function ProductPage({
           />
         )}
 
+        {/* Familien-Kontext GANZ OBEN im Content-Bereich (D256) — auf Parent UND Child,
+            damit immer sichtbar ist, in welcher Variantenstruktur man sich befindet.
+            Parent: der Manager (seine Tabelle IST die Struktur + Verwaltung) — keine
+            doppelte Tabelle. Child: die rein lesende Struktur-Tabelle. */}
+        {bereit && tab === "content" && familiePanel && (
+          <section className="card mb-4 p-5">
+            <FamilieManager familie={familiePanel} />
+          </section>
+        )}
+        {bereit && tab === "content" && !familiePanel && familie && (
+          <div className="mb-4">
+            <FamilieStruktur familie={familie} aktuellId={product.id} />
+          </div>
+        )}
+
         {bereit && tab === "content" && (
         <section className="card p-5">
           <CardHead
@@ -665,10 +694,30 @@ export default async function ProductPage({
               <SubmitButton className="mt-2 btn-dark text-xs">Produktbeschreibung speichern</SubmitButton>
             </form>
           </details>
+          {/* Content-Plan (D257, Nutzer-Befund): VORHER auswählen, welche Bausteine
+              überhaupt entstehen sollen. Die Kette überspringt Abgewähltes — vorher
+              wurde nach jeder Freigabe blind die nächste Sektion generiert, auch eine
+              nie gewollte, und Q&A hing an einer Beschreibung, die niemand wollte. */}
+          <form action={saveContentPlan} className="mt-3 rounded-xl border border-hair p-3">
+            <input type="hidden" name="productId" value={product.id} />
+            <p className="text-xs font-semibold">Was soll erstellt werden?</p>
+            <p className="mt-0.5 text-[11px] text-muted">
+              Nur Angehaktes wird generiert und in der Kette verlangt. {product.contentPlan?.length ? "" : "Aktuell: alles."}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+              {SECTIONS.map(({ key, label }) => (
+                <label key={key} className="flex items-center gap-1.5 text-xs">
+                  <input type="checkbox" name="sections" value={key} defaultChecked={planAktiv.includes(key)} />
+                  {label}
+                </label>
+              ))}
+            </div>
+            <SubmitButton className="btn-dark mt-2 text-xs">Auswahl speichern</SubmitButton>
+          </form>
           {/* Geführte Kette (D195): Sektion generieren → bearbeiten/freigeben →
-              die Freigabe generiert automatisch die nächste. Nach der Freigabe
-              gibt es bewusst KEINE Einzel-Regenerierung mehr (die Sektionen
-              bauen aufeinander auf) — nur Neu-aufsetzen für alle. */}
+              die Freigabe generiert automatisch die nächste GEPLANTE. Nach der
+              Freigabe gibt es bewusst KEINE Einzel-Regenerierung mehr (die
+              Sektionen bauen aufeinander auf) — nur Neu-aufsetzen für alle. */}
           <GenerierSperre>
           {SECTIONS.some(({ key }) => {
             const t = key === "backend" ? "backend_keywords" : key === "highlights" ? "item_highlights" : key;
@@ -680,14 +729,15 @@ export default async function ProductPage({
             </form>
           )}
           <div className="mt-4 space-y-3">
-            {SECTIONS.map(({ key, label }, sektionsIndex) => {
-              const dbType = key === "backend" ? "backend_keywords" : key === "highlights" ? "item_highlights" : key;
+            {SECTIONS.filter(({ key }) => planAktiv.includes(key)).map(({ key, label }) => {
+              const dbType = dbTypFuer(key);
               const v = latestOf(dbType);
-              // Ketten-Status: alle Vorgänger freigegeben?
-              const wartetAuf = SECTIONS.slice(0, sektionsIndex).find(({ key: vk }) => {
-                const vt = vk === "backend" ? "backend_keywords" : vk === "highlights" ? "item_highlights" : vk;
-                return latestOf(vt)?.status !== "approved";
-              });
+              // Ketten-Status (D257): nur GEPLANTE Vorgänger blockieren — eine
+              // abgewählte Sektion darf nie als „wartet auf Freigabe" erscheinen.
+              const wartetAufKey = geplanteVorgaenger(product.contentPlan, key).find(
+                (vk) => latestOf(dbTypFuer(vk))?.status !== "approved",
+              );
+              const wartetAuf = wartetAufKey ? { label: SEKTIONS_LABEL[wartetAufKey] } : undefined;
               const payload = v?.payload as { text?: string; items?: string[]; pairs?: Array<{ q: string; a: string }>; rationale?: Array<{ part: string; source: string; verified: boolean }> } | undefined;
               return (
                 <div key={key} className="rounded-xl border border-hair p-3">
@@ -807,13 +857,7 @@ export default async function ProductPage({
         </section>
         )}
 
-        {/* Variations-Familie (D245): Master ableiten · Slots · Übertragen auf die Child-ASINs
-            — bewusst UNTER dem Parent-Content und NUR im Content-Reiter (kein Reiter-Überhang). */}
-        {bereit && tab === "content" && familiePanel && (
-          <section className="card mt-4 p-5">
-            <FamilieManager familie={familiePanel} />
-          </section>
-        )}
+        {/* (Familien-Panel steht jetzt GANZ OBEN im Content-Bereich — D256.) */}
 
         {bereit && tab === "marge" && (
         <section className="card p-5">
