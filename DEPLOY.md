@@ -1,28 +1,32 @@
 # Tool ohne Terminal nutzen — Klick-Anleitung
 
-> Für die interne Nutzung ohne jede Kommandozeile. Alles läuft über Browser-Oberflächen (GitHub → Vercel → Turso), genau wie bei den anderen Temoa-Tools (Sales Room läuft bereits auf Turso).
+> Für die interne Nutzung ohne jede Kommandozeile. Alles läuft über Browser-Oberflächen (GitHub → Vercel → Supabase).
 
 ## Einmalige Einrichtung (ca. 10 Minuten, nur Klicks)
 
-### 1. Turso-Datenbank anlegen
-1. [turso.tech](https://turso.tech) → einloggen → **Create Database** (Region Frankfurt/AMS).
-2. In der Datenbank-Übersicht: **URL kopieren** (beginnt mit `libsql://…`).
-3. **Create Token** (Read & Write) → Token kopieren.
+### 1. Supabase-Datenbank anlegen
+1. [supabase.com](https://supabase.com) → einloggen → **New Project**.
+2. **Region: Central EU (Frankfurt)**. Das Datenbank-Passwort dabei **sofort in den Passwort-Manager** — es wird nur einmal angezeigt.
+3. Unter **Security** (D262):
+   - **Enable Data API** → **aus**. Wir sprechen Postgres nur serverseitig über Drizzle an; ohne Data API antwortet kein generierter REST-Endpunkt, egal welcher Key im Umlauf ist. Das ersetzt Row Level Security, die bei einer Direktverbindung als Tabellen-Eigentümer ohnehin umgangen würde.
+   - **Enable automatic RLS** → **an**. Reiner Notriegel: Sollte die Data API je aktiviert werden, sind alle Tabellen sofort dicht statt offen.
+4. Nach dem Provisionieren: **Connect** → **Direct Connection string** → **Transaction pooler** → **URI** kopieren und `[YOUR-PASSWORD]` ersetzen. Port muss **6543** sein (nicht 5432 — Serverless braucht den Pooler).
 
 ### 2. Vercel-Projekt anlegen
 1. [vercel.com](https://vercel.com) → **Add New… → Project**.
 2. GitHub-Repo **`spacedugg/project-hail-mary`** auswählen → **Import**.
-3. Branch ggf. auf `claude/amazon-listing-analysis-tool-u3uety` stellen (bis zum Merge auf main).
-4. Framework wird automatisch als Next.js erkannt — nichts ändern.
+3. Framework wird automatisch als Next.js erkannt — nichts ändern.
+4. **Settings → Functions → Function Region → Frankfurt (fra1)** setzen. Sonst laufen die Funktionen in Washington und jede DB-Abfrage geht über den Atlantik.
 
 ### 3. Umgebungsvariablen (Vercel → Settings → Environment Variables)
 | Variable | Wert / Wofür | Ohne sie |
 |---|---|---|
-| `TURSO_DATABASE_URL` | die `libsql://…`-URL aus Schritt 1 | **Pflicht** — Serverless speichert sonst nichts dauerhaft |
-| `TURSO_AUTH_TOKEN` | der Token aus Schritt 1 | Pflicht zusammen mit der URL |
+| `DATABASE_URL` | der Connection String aus Schritt 1.4 (`postgresql://postgres.<ref>:<PASSWORT>@aws-0-eu-central-1.pooler.supabase.com:6543/postgres`) | **Pflicht** — die App startet nicht |
 | `ANTHROPIC_API_KEY` | Text-Generierung (Claude) | Mock-Texte (deterministische Templates) |
 | `APIFY_API_KEY` | Review-Scraping | Review-Insights nur als Mock |
 | `AUTH_SECRET` | Signatur der Login-Sitzungen — **beliebige lange Zufallszeichenfolge** (z. B. in Vercel beim Feld auf „Generate" klicken oder einen Passwort-Manager 40+ Zeichen erzeugen lassen; niemals im Chat posten) | Logins nur dev-signiert (Demo-Banner warnt) |
+
+> TLS für die DB-Verbindung erzwingt der Code (`ssl: "require"` in `src/db/client.ts`) — sie kann beim Kopieren der URL also nicht verloren gehen. Nur falls ein Pooler-Endpunkt sie verweigert, gibt es den Notausgang `DATABASE_SSL=off`.
 
 > **Anmeldung:** Nach dem Deploy öffnet sich die Login-Seite. Jedes Agentur-Mitglied legt sein Konto selbst an („Konto anlegen") — das **erste Konto wird automatisch Admin**. Profil, Passwort & Team-Übersicht unter *Einstellungen* (Zahnrad unten in der Seitenleiste).
 
@@ -39,4 +43,5 @@
 
 ## Hinweise
 - Die Keys liegen NUR in Vercel (serverseitig), nie im Code oder Browser.
-- Turso-Dashboard zeigt die Daten live (Tabellen: clients, brands, products, keywords, content_versions, review_insights, report_uploads).
+- Das Supabase-Dashboard zeigt die Daten live (**Table Editor** bzw. **SQL Editor**) — 27 Tabellen, u. a. clients, brands, products, keywords, content_versions, content_pieces, review_insights, report_uploads.
+- **Nach dem Deploy prüfen:** `…vercel.app/api/health` aufrufen. `{"ok":true,"db":"reachable","migrationsOk":true,…}` heißt: Verbindung steht und die Migration ist durchgelaufen. Bei `ok:false` steht die Ursache in der Meldung.

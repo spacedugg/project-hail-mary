@@ -1,11 +1,15 @@
 import { defineConfig } from "drizzle-kit";
 
+/**
+ * Supabase/Postgres (D262). `generate` braucht keine Verbindung — Migrationen
+ * entstehen allein aus dem Schema. `dbCredentials` wird nur für `push`/`studio`
+ * gebraucht und kommt dann aus .env.local.
+ */
 export default defineConfig({
   schema: "./src/db/schema.ts",
   out: "./drizzle",
-  dialect: "turso",
+  dialect: "postgresql",
   dbCredentials: {
-    url: process.env.TURSO_DATABASE_URL ?? "file:./.data/dev.db",
-    authToken: process.env.TURSO_AUTH_TOKEN,
+    url: process.env.DATABASE_URL ?? "",
   },
 });

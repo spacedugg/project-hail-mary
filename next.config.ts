@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["@libsql/client"],
+  serverExternalPackages: ["postgres"],
   // A+-Upload (D220): hochgeladene A+-Bilder reisen als base64 im Server-Action-
   // Request der listing-Etappe. Der Client skaliert sie vorher herunter; 12 MB
   // deckt mehrere Bilder sicher ab (Default 1 MB reichte nicht).

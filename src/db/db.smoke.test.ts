@@ -1,11 +1,16 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { eq } from "drizzle-orm";
 
+/**
+ * Läuft gegen PGlite (D262): echtes Postgres als WASM im Prozess, in-memory,
+ * pro Testprozess frisch. Nie gegen die gemeinsame Online-DB — deshalb wird
+ * DATABASE_URL hier bewusst ignoriert.
+ */
 beforeAll(() => {
-  process.env.DB_FILE = `.data/smoke-${Date.now()}.db`;
+  process.env.DB_DRIVER = "pglite";
 });
 
-describe("DB (libSQL/Turso, Auto-Migration)", () => {
+describe("DB (Postgres via PGlite, Auto-Migration)", () => {
   it("migriert, schreibt und liest die Hierarchie", { timeout: 30000 }, async () => {
     const { getDb, schema } = await import("./client");
     const db = await getDb();

@@ -4,13 +4,13 @@ import type { SlotKlassifikator } from "./masterLlm";
 import type { SlotRegenerator } from "./master";
 
 /**
- * Voller Master-Flow gegen echte (lokale) DB (D221/D222): gruppieren → Content des
+ * Voller Master-Flow gegen echte DB via PGlite (D221/D222/D262): gruppieren → Content des
  * Base-Childs freigeben → Master ableiten → freigeben → auf Geschwister propagieren.
  * LLM (Klassifikator/Regenerator) wird als Stub injiziert — deterministisch.
  */
 
 beforeAll(() => {
-  process.env.DB_FILE = `.data/master-${Date.now()}.db`;
+  process.env.DB_DRIVER = "pglite";
 });
 
 const keinRegenerate: SlotKlassifikator = async () => ({ regenerateIds: [], mock: true });
