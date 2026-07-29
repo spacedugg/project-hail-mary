@@ -39,8 +39,29 @@ const ZAHLWORT: Record<string, string> = {
 const EINS_ARTIKEL = /^ein(e|em|er|en|es)?$/; // nur vor Einheiten werten (sonst Artikel-Rauschen)
 const EINHEITEN = /^(meter|metern|zentimeter|millimeter|kilometer|stunde|stunden|minute|minuten|sekunde|sekunden|tag|tagen|woche|wochen|monat|monaten|jahr|jahre|jahren|kg|kilogramm|gramm|liter|milliliter|watt|volt|lumen|prozent|grad|kelvin)$/;
 
-const normZahl = (s: string) => s.replace(",", ".").replace(/\.0+$/, "");
+// Dezimal-Komma → Punkt; überflüssige Nachkomma-Nullen entfernen, damit „1,50" und
+// „1,5" (bzw. „10,0" und „10") als dieselbe Zahl gelten (Review-Finding D248).
+const normZahl = (s: string) => s.replace(",", ".").replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
 const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Echte Mess-/Spezifikations-Einheiten, die einen Zahlen-WIDERSPRUCH verankern dürfen
+ * (D248-Review): nur physikalische Einheiten, gängige Abkürzungen und Batteriegrößen.
+ * Ein beliebiges Folgewort (Adjektiv „verschiedene", Trenner „x", Substantiv) darf NIE
+ * einen Widerspruch auslösen — sonst kehrt genau die Fehlerklasse zurück (5 verschiedene
+ * ↔ 3 verschiedene). Beleg (Zahl+Wort) bleibt bewusst permissiv; nur das FLAGGEN ist streng.
+ */
+const MESSEINHEITEN = new Set([
+  "g", "gr", "gramm", "kg", "kilogramm", "mg", "milligramm", "pfund",
+  "ml", "milliliter", "cl", "dl", "l", "liter",
+  "mm", "millimeter", "cm", "zentimeter", "dm", "m", "meter", "km", "kilometer", "zoll",
+  "w", "watt", "kw", "v", "volt", "a", "ampere", "mah", "wh", "kwh", "ohm",
+  "lumen", "lux", "lm", "hz", "khz", "mhz", "ghz", "kb", "mb", "gb", "tb", "mp", "mpx", "dpi", "ppi", "nm",
+  "s", "sek", "sekunde", "sekunden", "min", "minute", "minuten", "h", "std", "stunde", "stunden",
+  "tag", "tage", "tagen", "woche", "wochen", "monat", "monate", "monaten", "jahr", "jahre", "jahren",
+  "prozent", "grad", "kelvin", "bar",
+  "aa", "aaa", "aaaa", "lr6", "lr03", "lr14", "lr20", "cr2032", "cr2016", "cr2025",
+]);
 
 /**
  * Einheit einer Zahl bestimmen (D244): die Buchstaben unmittelbar NACH der Zahl —
@@ -63,7 +84,9 @@ function zahlEinheit(tokens: string[], i: number, restImToken: string): string {
  */
 function zahlMitEinheitBelegt(q: string, zahl: string, unit: string): boolean {
   if (!unit) return false;
-  return new RegExp(`(?<![\\d.,])${escRe(zahl)}\\s*-?\\s*${escRe(unit)}`).test(q);
+  // Einheit als ganzes Wort (Wortgrenze hinten) — sonst würde „5 l" fälschlich in
+  // „5 lumen" belegt (Review-Finding D248): konsistent zur Grenze in zahlenUmEinheit.
+  return new RegExp(`(?<![\\d.,])${escRe(zahl)}\\s*-?\\s*${escRe(unit)}(?![a-zäöüß0-9])`).test(q);
 }
 
 /**
@@ -134,11 +157,12 @@ export function unbelegteZahlen(text: string, quellen: string): ZahlBefund[] {
     // gegen eine unzusammenhängende Zahl (0,5 aus „reicht für 0,5 l") gematcht wurde.
     // Additiv: erfundene/falsche Zahlen ohne Einheits-Beleg schlagen weiter an.
     if (zahlMitEinheitBelegt(q, c.zahl, c.unit)) continue;
-    // D248: Widerspruch NUR einheiten-/sachgleich. Anker ist die EIGENE Einheit der Zahl
-    // (das erste sinntragende Wort nach der Zahl — „g", „cm", „aa", „portionen"), NIE ein
-    // beliebiges Füllwort. So kann „350 g" nie gegen eine unzusammenhängende „0,5" verglichen
-    // werden; verglichen wird ausschließlich mit Zahlen desselben Einheiten-Kontexts.
-    if (c.unit) {
+    // D248: Widerspruch NUR bei ECHTER Mess-Einheit (g/cm/ml/aa/…), nie an einem
+    // beliebigen Folgewort (Adjektiv „verschiedene", Trenner „x", Substantiv). Anker ist
+    // die eigene Einheit der Zahl; verglichen wird ausschließlich mit Zahlen desselben
+    // Einheiten-Kontexts derselben Quell-Zeile. So kann „350 g" nie gegen eine
+    // unzusammenhängende „0,5" (andere Dimension) verglichen werden.
+    if (MESSEINHEITEN.has(c.unit)) {
       const umfeld = zahlenUmEinheit(q, c.unit);
       if (umfeld.size > 0) {
         if (umfeld.has(c.zahl)) continue; // Zahl steht im selben Einheiten-Kontext → belegt
