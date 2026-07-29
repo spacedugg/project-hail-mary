@@ -183,6 +183,32 @@ export default async function ProductPage({
   const planAktiv = wirksamerPlan(product.contentPlan);
   const sektionSoll = { title: wirksam.title, bullets: wirksam.bullets.join(" "), description: wirksam.description };
 
+  // Content-Plan-Auswahl (D257/D261) — EIN Formular, zwei Einsatzorte:
+  // bei einer Variations-Familie in der Übertragungs-Maske (dort gilt sie für alle
+  // Varianten), bei einer Einzel-ASIN direkt über der Ketten-Oberfläche.
+  // VORHER auswählen, welche Bausteine überhaupt entstehen sollen. Die Kette
+  // überspringt Abgewähltes — vorher wurde nach jeder Freigabe blind die nächste
+  // Sektion generiert, auch eine nie gewollte, und Q&A hing an einer Beschreibung,
+  // die niemand wollte (D257).
+  const planAuswahl = (
+    <form action={saveContentPlan} className="mt-3 rounded-xl border border-hair p-3">
+      <input type="hidden" name="productId" value={product.id} />
+      <p className="text-xs font-semibold">Was soll erstellt werden?</p>
+      <p className="mt-0.5 text-[11px] text-muted">
+        Nur Angehaktes wird generiert und in der Kette verlangt. {product.contentPlan?.length ? "" : "Aktuell: alles."}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+        {SECTIONS.map(({ key, label }) => (
+          <label key={key} className="flex items-center gap-1.5 text-xs">
+            <input type="checkbox" name="sections" value={key} defaultChecked={planAktiv.includes(key)} />
+            {label}
+          </label>
+        ))}
+      </div>
+      <SubmitButton className="btn-dark mt-2 text-xs">Auswahl speichern</SubmitButton>
+    </form>
+  );
+
   return (
     <main className="w-full p-8">
       <Link href={backHref} className="text-xs text-neutral-500 hover:underline">← {parentBrand?.kind === "workbench" ? "Listing Optimizer" : "Katalog"}</Link>
@@ -739,26 +765,10 @@ export default async function ProductPage({
               <SubmitButton className="mt-2 btn-dark text-xs">Produktbeschreibung speichern</SubmitButton>
             </form>
           </details>
-          {/* Content-Plan (D257, Nutzer-Befund): VORHER auswählen, welche Bausteine
-              überhaupt entstehen sollen. Die Kette überspringt Abgewähltes — vorher
-              wurde nach jeder Freigabe blind die nächste Sektion generiert, auch eine
-              nie gewollte, und Q&A hing an einer Beschreibung, die niemand wollte. */}
-          <form action={saveContentPlan} className="mt-3 rounded-xl border border-hair p-3">
-            <input type="hidden" name="productId" value={product.id} />
-            <p className="text-xs font-semibold">Was soll erstellt werden?</p>
-            <p className="mt-0.5 text-[11px] text-muted">
-              Nur Angehaktes wird generiert und in der Kette verlangt. {product.contentPlan?.length ? "" : "Aktuell: alles."}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
-              {SECTIONS.map(({ key, label }) => (
-                <label key={key} className="flex items-center gap-1.5 text-xs">
-                  <input type="checkbox" name="sections" value={key} defaultChecked={planAktiv.includes(key)} />
-                  {label}
-                </label>
-              ))}
-            </div>
-            <SubmitButton className="btn-dark mt-2 text-xs">Auswahl speichern</SubmitButton>
-          </form>
+          {/* Plan-Auswahl steht bei Varianten-Familien in der Übertragungs-Maske
+              unten (D261) — dort wird der Content für ALLE Varianten festgelegt.
+              Nur ohne Familie (Einzel-ASIN) gehört sie hierher. */}
+          {!familiePanel && planAuswahl}
           {/* Geführte Kette (D195): Sektion generieren → bearbeiten/freigeben →
               die Freigabe generiert automatisch die nächste GEPLANTE. Nach der
               Freigabe gibt es bewusst KEINE Einzel-Regenerierung mehr (die
@@ -917,7 +927,12 @@ export default async function ProductPage({
             → „Base festlegen und auf alle Childs anwenden". */}
         {bereit && tab === "content" && familiePanel && (
           <section className="card mt-4 p-5">
-            <FamilieManager familie={familiePanel} />
+            {/* D261: HIER wird festgelegt, welche Bausteine die Familie bekommt — die
+                Übertragung ist der Ort der Entscheidung, nicht jede einzelne ASIN. */}
+            {planAuswahl}
+            <div className="mt-4">
+              <FamilieManager familie={familiePanel} />
+            </div>
           </section>
         )}
 
