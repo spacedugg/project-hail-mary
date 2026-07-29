@@ -6,7 +6,6 @@ import { propagiereChild, auditFamilieKonsistenz } from "@/app/actions";
 import {
   TREE_PIECES,
   TREE_PIECE_LABEL,
-  PROPAGIERTE_PIECES,
   type FamilienDaten,
   type FamilienKind,
   type TreePiece,
@@ -187,7 +186,7 @@ export function FamilieBaum({ familie }: { familie: FamilienDaten }) {
       // Achsen-fehlt = nichts persistiert → keine grünen Häkchen setzen.
       const persistiert = !res.kind.issues.some((i) => i.rule === "familie.achsenwert-fehlt");
       if (persistiert) {
-        for (const p of PROPAGIERTE_PIECES) {
+        for (const p of familie.plan) {
           await sleep(260); // gestaffelt für den Live-Effekt (Content ist bereits gespeichert)
           setLauf((prev) => {
             const s = prev[t.id];
@@ -216,8 +215,8 @@ export function FamilieBaum({ familie }: { familie: FamilienDaten }) {
     return (p: TreePiece): Zustand => {
       const s = lauf[id];
       if (s?.gruen.has(p)) return "gruen";
-      if (s?.status === "running" && PROPAGIERTE_PIECES.includes(p)) return "pending";
-      if (PROPAGIERTE_PIECES.includes(p)) return "weiss"; // im Plan, noch nicht generiert
+      if (s?.status === "running" && familie.plan.includes(p)) return "pending";
+      if (familie.plan.includes(p)) return "weiss"; // im Plan, noch nicht generiert
       return "leer"; // nicht Teil des Masters
     };
   }

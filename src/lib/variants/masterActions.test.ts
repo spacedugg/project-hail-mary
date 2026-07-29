@@ -379,6 +379,64 @@ describe("Master-Flow (Ableiten → Freigeben → Propagieren)", () => {
     expect(kiwi.issues.some((i) => i.rule === "bullets.zahl-ohne-quelle" && i.message.includes("42"))).toBe(true);
   });
 
+  it("Content-Plan begrenzt den Ableitungs-Umfang — Abgewähltes wird nicht propagiert (D258)", async () => {
+    const { getDb, schema } = await import("../../db/client");
+    const { gruppiereZuFamilieKern } = await import("./gruppieren");
+    const { baueMasterEntwurfKern, gibMasterFreiKern, propagiereFamilieKern, umfangAusPlan } = await import("./masterActions");
+    const { eq: eqOp, and: andOp } = await import("drizzle-orm");
+    const db = await getDb();
+
+    // Plan-Mapping: nur Titel + Bullets geplant (keine Beschreibung).
+    expect(umfangAusPlan(["title", "bullets", "qa"])).toEqual(["title", "bullet"]);
+    expect(umfangAusPlan(null)).toEqual(["title", "bullet", "description"]);
+
+    await db.insert(schema.clients).values({ id: "pc", name: "K", slug: "k-plan" });
+    await db.insert(schema.brands).values({ id: "pb", clientId: "pc", name: "M" });
+    await db.insert(schema.products).values({ id: "p-base", brandId: "pb", name: "Erdbeere", asin: "B0PLAN01", marke: "Freaky Joe", marketplace: "de", facts: {} });
+    await db.insert(schema.products).values({ id: "p-kiwi", brandId: "pb", name: "Kiwi", asin: "B0PLAN02", marke: "Freaky Joe", marketplace: "de", facts: {} });
+    const grp = await gruppiereZuFamilieKern(db, {
+      brandId: "pb",
+      parent: { modus: "container", name: "Fam" },
+      theme: ["flavor"],
+      children: [
+        { productId: "p-base", axisValues: { flavor: "Erdbeere" } },
+        { productId: "p-kiwi", axisValues: { flavor: "Kiwi" } },
+      ],
+    });
+    expect(grp.ok).toBe(true);
+    if (!grp.ok) return;
+    // Parent-Plan: NUR Titel + Bullets.
+    await db.update(schema.products).set({ contentPlan: ["title", "bullets"] }).where(eqOp(schema.products.id, grp.parentId));
+
+    // Base hat freigegebenen Titel + Bullets, aber KEINE Beschreibung.
+    const mk = (type: "title" | "bullets", payload: Record<string, unknown>) =>
+      db.insert(schema.contentVersions).values({ id: crypto.randomUUID(), productId: "p-base", type, version: 1, payload, status: "approved" });
+    await mk("title", { text: "Freaky Joe Elektrolytpulver Erdbeere vegan zuckerfrei zum Anmischen" });
+    await mk("bullets", { items: ["PRAKTISCH: Kompakt.", "VEGAN: Ohne Zutaten.", "SCHNELL: Fix.", "DABEI: Tasche.", "DEUTSCH: Germany."] });
+
+    // Ableitung gelingt OHNE Beschreibung, weil sie nicht im Plan steht.
+    const entwurf = await baueMasterEntwurfKern(db, grp.parentId, "p-base", keinRegenerate);
+    expect(entwurf.ok).toBe(true);
+    if (!entwurf.ok) return;
+    expect(entwurf.master.umfang).toEqual(["title", "bullet"]);
+    expect(entwurf.master.slots.some((s) => s.quelle === "description")).toBe(false);
+    await gibMasterFreiKern(db, grp.parentId, entwurf.master);
+
+    const prop = await propagiereFamilieKern(db, grp.parentId, regeneratorVerboten);
+    expect(prop.ok).toBe(true);
+    // Beim Kind entstehen Titel + Bullets — aber KEINE Beschreibung.
+    const hat = async (t: "title" | "bullets" | "description") =>
+      !!(await db.query.contentVersions.findFirst({
+        where: andOp(eqOp(schema.contentVersions.productId, "p-kiwi"), eqOp(schema.contentVersions.type, t)),
+      }));
+    expect(await hat("title")).toBe(true);
+    expect(await hat("bullets")).toBe(true);
+    expect(await hat("description")).toBe(false);
+    // Und kein Beschreibungs-Befund als Rauschen über etwas absichtlich Fehlendes.
+    const kiwi = prop.kinder.find((k) => k.productId === "p-kiwi")!;
+    expect(kiwi.issues.some((i) => i.rule.startsWith("description."))).toBe(false);
+  });
+
   it("kopierte Slots (locked/token) werden nicht erneut geprüft — Budget-Unterschreitung blockt nicht (D247)", async () => {
     const { getDb, schema } = await import("../../db/client");
     const { gruppiereZuFamilieKern } = await import("./gruppieren");
