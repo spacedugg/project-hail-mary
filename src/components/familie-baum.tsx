@@ -13,6 +13,7 @@ import {
 } from "@/lib/variants/laden";
 import type { FamilieAuditKind } from "@/lib/variants/masterActions";
 import type { ValidationIssue } from "@/db/schema";
+import { amazonProduktUrl } from "@/lib/scrape/amazonUrl";
 
 /**
  * Familien-Baum (D236/D238, Nutzer-Wunsch): freigegebene Base-ASIN oben,
@@ -72,7 +73,7 @@ function Kachel({
 }) {
   return (
     <div className="rounded-xl border-2 border-hair bg-[var(--surface)] p-2.5 shadow-sm" style={{ width: CHILD_W }}>
-      {/* Klickbarer Kopf → Content der ASIN (D238) */}
+      {/* Klickbarer Kopf → Content der ASIN (D238). Bild + Titel führen intern zum Content. */}
       <Link href={href} className="block rounded-lg outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-primary" title="Content dieser ASIN öffnen">
         <div className="grid aspect-square w-full place-items-center overflow-hidden rounded-lg border border-hair bg-white">
           {kind.bildUrl ? (
@@ -82,11 +83,25 @@ function Kachel({
             <span className="text-[10px] text-muted">kein Bild</span>
           )}
         </div>
-        <div className="mt-1.5 truncate font-mono text-[12px] font-bold text-primary-strong" title={kind.asin ?? undefined}>{kind.asin ?? "—"}</div>
         {kind.titel && kind.titel !== kind.asin && (
-          <div className="truncate text-[10px] text-muted" title={kind.titel}>{kind.titel}</div>
+          <div className="mt-1.5 truncate text-[11px] font-medium text-foreground" title={kind.titel}>{kind.titel}</div>
         )}
       </Link>
+      {/* Statt die ASIN klein zu wiederholen (D241): Direktlink aufs aktuelle Amazon-Listing.
+          MUSS außerhalb des internen <Link> stehen — verschachtelte <a> sind ungültig. */}
+      {kind.asin ? (
+        <a
+          href={amazonProduktUrl(kind.asin, kind.marketplace)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-1 inline-flex items-center gap-0.5 text-[11px] font-medium text-primary-strong underline decoration-dotted underline-offset-2 hover:opacity-80"
+          title={`Amazon-Listing öffnen (${kind.asin})`}
+        >
+          auf Amazon öffnen ↗
+        </a>
+      ) : (
+        <div className="mt-1 text-[11px] text-muted">keine ASIN</div>
+      )}
       <ul className="mt-1.5 space-y-1">
         {TREE_PIECES.map((p) => (
           <PieceZeile key={p} label={TREE_PIECE_LABEL[p]} zustand={zustand(p)} />

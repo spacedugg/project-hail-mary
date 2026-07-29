@@ -110,8 +110,12 @@ describe("QM-Schleife (D182/D183)", () => {
   });
 
   it("bleibende Regelverstöße blocken hart nach 3 Versuchen — kein Ergebnis, voller Prüfbericht (D182)", async () => {
+    // Über 75 Zeichen UND nicht verlustarm ins Band kürzbar: der überlange Rest
+    // ist EIN Bindestrich-Token (kein Segment-/Wort-Schnitt greift), jeder
+    // Kürzungs-Kandidat fiele unter die Untergrenze → Fixer gibt unverändert
+    // zurück, das Gate blockt mit title.max-length (unabhängig vom Pflichtband-Wert).
     const zuLang = JSON.stringify({
-      title: "AquaNova Edelstahl-Trinkflasche 750 ml, auslaufsicher, doppelwandig isoliert, BPA-frei und spülmaschinenfest",
+      title: "AquaNova Edelstahl-Trinkflasche Vakuumisolierte-Sportflasche-auslaufsicher-doppelwandig-BPA-frei-robust",
       rationale: [{ part: "Titel", source: "Test" }],
     });
     const { genPrompts, prueferCallCount } = skriptProvider([zuLang, zuLang, zuLang], []);

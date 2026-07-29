@@ -9,7 +9,7 @@
 | Regel | Wert | Quelle |
 |---|---|---|
 | Max. Länge | **75 Zeichen** (hart) | Amazon-Neuerung, Nutzer 07/2026 |
-| Ziel-Länge | **68–75 Zeichen PFLICHT** (unter 68 = FEHLER, erzwingt Regenerierung — verschenkter Platz; 68/69 = Puffer, Nutzer-Nachtrag 23.07., D192). Über 75 kürzt der CODE deterministisch von hinten (Segmente → Wörter), Hauptkeyword-Abdeckung bleibt erhalten — Zeichen zählt nie das LLM (D184/D192) | Nutzer-Vorgabe 07/2026 + 23.07. |
+| Ziel-Länge | **60–75 Zeichen PFLICHT** (unter 60 = FEHLER, erzwingt Regenerierung — verschenkter Platz). Untergrenze am 28.07. von 68 → 60 gesenkt (D240): aus dem Master abgeleitete Varianten-Titel fallen beim Token-Tausch eines kürzeren Achsenwerts legitim unter 68, ein reiner Kopier-Titel kann das Budget nicht deterministisch nachfüllen. Über 75 kürzt der CODE deterministisch von hinten (Segmente → Wörter), Hauptkeyword-Abdeckung bleibt erhalten — Zeichen zählt nie das LLM (D184/D192/D240) | Nutzer-Vorgabe 07/2026 + 23.07. + 28.07. |
 | Hauptkeyword | muss im Titel **abgedeckt** sein — Wortstamm-Abdeckung, Flexion/Komposita zählen („Ulmenrinde-Drops für Hunde" deckt „ulmenrinde für hunde"); NIE als wörtliche Phrase erzwungen (D190: die Phrasen-Pflicht erzwang Stuffing) | abgeleitet aus alter 80-Zeichen-Regel, präzisiert 23.07. |
 | Keyword-Wiederholung | **Jedes Keyword max. 1×** | Blog 06 („Wiederholung bringt kein Ranking"). Überstimmt seo-os (erlaubte 2×) |
 | Begründungs-Pflicht | Jeder generierte Titel liefert eine **Komponenten-Begründung** mit: welcher Bestandteil woher kommt (Keyword-Analyse/SV, USP, Produkt-Wahrheit, Marke) | Nutzer-Vorgabe 07/2026 — „auf Knopfdruck sehen, warum der Titel so formuliert ist" |

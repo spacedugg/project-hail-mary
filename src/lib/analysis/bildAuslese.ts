@@ -126,6 +126,33 @@ export async function leseAplusAus(bilder: AplusBild[], sprache = "de"): Promise
   return aplusAlsText(res.bilder) || null;
 }
 
+/**
+ * Bild-Beleg-Text EINES Snapshots (D231/D240): Vision-Auslese der eigenen Bilder
+ * + A+-Text + Produktinfo, als EINE Zahlen-/Aussagen-Quelle fürs Gate — was auf
+ * dem Bild/A+/Produktinfo steht, gilt als belegt (z. B. „30 Sekunden" auf dem
+ * Bild) und darf NICHT als erfunden geflaggt werden. Genau EINE Quelle für ALLE
+ * Flows (Haupt-Generierung, Varianten-Ableitung, Handarbeit), damit die
+ * Quellen-Mengen nie wieder auseinanderdriften (Ursache des D240-Bild-Gaps).
+ * Liefert "" wenn nichts vorhanden — join-freundlich.
+ */
+export function snapshotBildBelege(
+  snapshot: {
+    bilderText?: Array<{ slot: number; typ?: string | null; textImBild: string[]; inhalt: string; claims: string[] }> | null;
+    aplusContent?: string | null;
+    importantInfo?: string | null;
+  } | null | undefined,
+): string {
+  if (!snapshot) return "";
+  return [
+    bilderAlsText(snapshot.bilderText),
+    snapshot.aplusContent,
+    typeof snapshot.importantInfo === "string" ? snapshot.importantInfo : "",
+  ]
+    .map((s) => (s ?? "").trim())
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 /** Auslese als Quelltext für Feature-Ranking/Wahrheits-Filter (Quelle „Bilder", D133). */
 export function bilderAlsText(bilder: Array<{ slot: number; typ?: string | null; textImBild: string[]; inhalt: string; claims: string[] }> | null | undefined): string {
   if (!bilder?.length) return "";

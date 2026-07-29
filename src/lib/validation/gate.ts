@@ -106,12 +106,15 @@ export function unbelegteZahlen(text: string, quellen: string): ZahlBefund[] {
 }
 
 export function pruefeZahlenTreue(text: string, quellen: string, rulePrefix: string): ValidationIssue[] {
+  // Klartext-Findings (D243, Nutzer): mit „Text sagt …" beginnen; Bilder ausdrücklich
+  // als gültige Quelle nennen (Status-quo-Bilder belegen Zahlen, D231/D240). Der Beleg-
+  // Hinweis bleibt drin — die Meldung ist auch Korrektur-Auftrag an das LLM.
   return unbelegteZahlen(text, quellen).map((b) =>
     b.art === "widerspruch"
       ? issue(`${rulePrefix}.zahl-widerspruch`, "error",
-          `Zahlen-Widerspruch: Text sagt „${b.roh}", die Quellen nennen dort ${b.umfeld.slice(0, 3).join("/")} — Spezifikationen NIE verändern.`)
+          `Text sagt „${b.roh}" — die Produktdaten nennen dort ${b.umfeld.slice(0, 3).join("/")}; Spezifikation nicht verändern.`)
       : issue(`${rulePrefix}.zahl-ohne-quelle`, "error",
-          `Zahl ohne Quelle: „${b.roh}" kommt in keiner Daten-Quelle vor (Produkt-Wahrheit, Listing, Zusatz-Infos, Keywords) — nichts erfinden.`),
+          `Text sagt „${b.roh}" — nicht durch Produkt-Wahrheit, Listing, Bilder, Zusatz-Infos oder Keywords belegt; nichts erfinden.`),
   );
 }
 
@@ -336,8 +339,9 @@ export function validateTitle(title: string, ctx: Ctx = {}): ValidationIssue[] {
   const chars = charLength(t);
   if (chars > RULES.title.maxChars)
     issues.push(issue("title.max-length", "error", `Titel ${chars} Zeichen > ${RULES.title.maxChars} (Amazon-Limit 07/2026).`));
-  // Pflichtband 70–75 (Nutzer-Regel 23.07., D190): unter 70 ist verschenkter
+  // Pflichtband 60–75 (Nutzer-Regel 28.07., D240): unter 60 ist verschenkter
   // Platz und damit FEHLER (erzwingt Regenerierung), nicht mehr nur Warnung.
+  // Untergrenze von 68 auf 60 gesenkt für abgeleitete Varianten-Titel (s. rules.ts).
   if (chars < RULES.title.targetMinChars && chars <= RULES.title.maxChars)
     issues.push(issue("title.budget", "error", `Titel nur ${chars} Zeichen — Pflichtband ${RULES.title.targetMinChars}–${RULES.title.maxChars}: das Budget MUSS ausgenutzt werden (weiteres belegtes Attribut/Nutzen ergänzen).`));
 

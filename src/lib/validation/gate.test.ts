@@ -82,11 +82,22 @@ describe("validateTitle", () => {
     const long = "AquaNova Edelstahl-Trinkflasche 750 ml, auslaufsicher, doppelwandig isoliert und robust";
     expect(validateTitle(long, ctx).map((i) => i.rule)).toContain("title.max-length");
   });
-  it("unter 68 Zeichen ist FEHLER (Pflichtband 68–75, Nutzer-Regel 23.07./D190+D192)", () => {
-    const short = "AquaNova Edelstahl-Trinkflasche 750 ml";
+  it("unter 60 Zeichen ist FEHLER (Pflichtband 60–75, Nutzer-Regel 28.07./D240)", () => {
+    const short = "AquaNova Edelstahl-Trinkflasche 750 ml"; // 38 Zeichen
     const hits = validateTitle(short, ctx).filter((i) => i.rule === "title.budget");
     expect(hits).toHaveLength(1);
     expect(hits[0].severity).toBe("error");
+  });
+  it("im Band 60–75 ist OK, darunter FEHLER — Untergrenze für abgeleitete Varianten-Titel (D240)", () => {
+    const imBand = "AquaNova Edelstahl-Trinkflasche 750 ml isoliert BPA-frei robust";
+    const zuKurz = "AquaNova Edelstahl-Trinkflasche 750 ml auslaufsicher BPA";
+    expect(charLength(imBand)).toBeGreaterThanOrEqual(60);
+    expect(charLength(imBand)).toBeLessThanOrEqual(75);
+    expect(charLength(zuKurz)).toBeLessThan(60);
+    // Titel im neuen Band → KEIN Budget-Fehler; alter 68er-Grenzfall wäre hier durchgefallen.
+    expect(validateTitle(imBand, ctx).some((i) => i.rule === "title.budget")).toBe(false);
+    // Gegenprobe: unter 60 schlägt title.budget weiter an.
+    expect(validateTitle(zuKurz, ctx).some((i) => i.rule === "title.budget")).toBe(true);
   });
   it("fehlendes Hauptkeyword ist ERROR", () => {
     expect(validateTitle("AquaNova Flasche 750 ml, auslaufsicher, isoliert, BPA-frei, mattschwarz", ctx).map((i) => i.rule)).toContain("title.keyword-window");

@@ -97,8 +97,50 @@ export function ListingKontrolle({
         </div>
       )}
 
+      {/* Score-Übersicht (D242, Nutzer: „visuell starke Zusammenfassung" — die Sektions-Scores
+          Titel/Bullets/Beschreibung/Bewertungs-Basis gehören PROMINENT nach vorne, nicht erst
+          ins Dropdown. Befunde/KI/Live bleiben darunter aufklappbar. */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {textSektionen.map((key) => {
+          const det = detByKey[key];
+          const score = det?.measured ? det.score : null;
+          const farbe = score === null ? "text-muted" : score >= 80 ? "text-emerald-600" : score >= 60 ? "text-amber-600" : "text-red-600";
+          const bar = score === null ? "bg-hair" : score >= 80 ? "bg-emerald-500" : score >= 60 ? "bg-amber-500" : "bg-red-500";
+          return (
+            <div key={key} className="rounded-xl border border-hair p-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{labelFuer[key]}</div>
+              <div className="mt-1 leading-none">
+                <span className={`text-2xl font-bold tabular-nums ${farbe}`}>{score ?? "—"}</span>
+                {score !== null && <span className="text-xs text-neutral-400">/100</span>}
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-hair">
+                <div className={`h-full ${bar}`} style={{ width: `${score ?? 0}%` }} />
+              </div>
+            </div>
+          );
+        })}
+        {(() => {
+          const d = kiByKey["reviews"];
+          const s = d?.score10 ?? null;
+          const farbe = s === null ? "text-muted" : s >= 8 ? "text-emerald-600" : s >= 5 ? "text-amber-600" : "text-red-600";
+          const bar = s === null ? "bg-hair" : s >= 8 ? "bg-emerald-500" : s >= 5 ? "bg-amber-500" : "bg-red-500";
+          return (
+            <div className="rounded-xl border border-hair p-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Bewertungs-Basis</div>
+              <div className="mt-1 leading-none">
+                <span className={`text-2xl font-bold tabular-nums ${farbe}`}>{s === null ? "—" : fmt1(s)}</span>
+                {s !== null && <span className="text-xs text-neutral-400">/10</span>}
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-hair">
+                <div className={`h-full ${bar}`} style={{ width: `${s === null ? 0 : s * 10}%` }} />
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+
       {/* Sektionen im Detail (D126) — standardmäßig EINGEKLAPPT (D234, Nutzer: nicht mit Text
-          erschlagen): Die Score-Karten oben genügen als Überblick; Befunde/KI/Live erst per Dropdown. */}
+          erschlagen): Die Score-Übersicht oben genügt als Überblick; Befunde/KI/Live erst per Dropdown. */}
       <details>
         <summary className="cursor-pointer text-sm font-medium text-primary-strong hover:underline">
           Details je Sektion anzeigen (Befunde · KI-Bewertung · Live-Abgleich)

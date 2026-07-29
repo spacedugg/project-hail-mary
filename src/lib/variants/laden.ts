@@ -62,6 +62,7 @@ export type FamilienKind = {
   id: string;
   asin: string | null;
   name: string;
+  marketplace: string; // für den „auf Amazon öffnen"-Link (D241)
   titel: string | null;
   bildUrl: string | null; // Hauptbild (Thumbnail in der Familien-Tabelle, D231)
   axisValues: Record<string, string>;
@@ -112,6 +113,7 @@ export async function ladeFamilie(db: Db, parentId: string): Promise<FamilienDat
       id: k.id,
       asin: k.asin,
       name: k.name,
+      marketplace: k.marketplace,
       titel: snaps.get(k.id)?.titel ?? (k.name && k.name !== k.asin ? k.name : null),
       bildUrl: snaps.get(k.id)?.bildUrl ?? null,
       axisValues: k.variantAxisValues ?? {},

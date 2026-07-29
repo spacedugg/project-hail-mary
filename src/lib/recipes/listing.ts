@@ -481,7 +481,7 @@ function templateDraft(section: ListingSection, inputs: RecipeInputs): Record<st
   const kw = inputs.keywords;
   switch (section) {
     case "title": {
-      // 70–75-Zeichen-Budget deterministisch füllen: Marke → Hauptkeyword → Attribute → USP-Kürzel
+      // 60–75-Zeichen-Budget deterministisch füllen: Marke → Hauptkeyword → Attribute → USP-Kürzel
       const parts: Array<{ text: string; source: string }> = [
         { text: inputs.brand, source: "Marke (Stammdaten)" },
         { text: kw.primary[0] ?? inputs.productName, source: "Hauptkeyword aus Keyword-Analyse" },
