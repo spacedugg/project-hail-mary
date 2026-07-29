@@ -30,6 +30,7 @@ import { bereinigeBildUrls } from "@/lib/scrape/bilder";
 import type { SovAudit } from "@/lib/sov/audit";
 import { ladeFamilie } from "@/lib/variants/laden";
 import { FamilieManager } from "@/components/familie-manager";
+import { FamilieStruktur } from "@/components/familie-struktur";
 
 export const dynamic = "force-dynamic";
 // Apify-Scrapes & LLM-Generierung: sonnet-5 denkt adaptiv und braucht bei
@@ -113,7 +114,12 @@ export default async function ProductPage({
       </main>
     );
   }
-  const familiePanel = product.variantRole === "parent" ? await ladeFamilie(db, product.id) : null;
+  // Familien-Kontext (D256): Struktur-Tabelle auf JEDER Parent- UND Child-ASIN.
+  // Für ein Child wird die Familie über seinen Parent geladen. Die VERWALTUNG
+  // (Master ableiten · Slots · Übertragen) bleibt dem Parent vorbehalten.
+  const familieAnkerId = product.variantRole === "parent" ? product.id : product.parentProductId;
+  const familie = familieAnkerId ? await ladeFamilie(db, familieAnkerId) : null;
+  const familiePanel = product.variantRole === "parent" ? familie : null;
 
   // Unabhängige Queries parallel (Review-Fix): jeder Reiter-Wechsel zahlte
   // vorher 8+ serielle Roundtrips.
@@ -646,6 +652,21 @@ export default async function ProductPage({
           />
         )}
 
+        {/* Familien-Kontext GANZ OBEN im Content-Bereich (D256) — auf Parent UND Child,
+            damit immer sichtbar ist, in welcher Variantenstruktur man sich befindet.
+            Parent: der Manager (seine Tabelle IST die Struktur + Verwaltung) — keine
+            doppelte Tabelle. Child: die rein lesende Struktur-Tabelle. */}
+        {bereit && tab === "content" && familiePanel && (
+          <section className="card mb-4 p-5">
+            <FamilieManager familie={familiePanel} />
+          </section>
+        )}
+        {bereit && tab === "content" && !familiePanel && familie && (
+          <div className="mb-4">
+            <FamilieStruktur familie={familie} aktuellId={product.id} />
+          </div>
+        )}
+
         {bereit && tab === "content" && (
         <section className="card p-5">
           <CardHead
@@ -812,13 +833,7 @@ export default async function ProductPage({
         </section>
         )}
 
-        {/* Variations-Familie (D245): Master ableiten · Slots · Übertragen auf die Child-ASINs
-            — bewusst UNTER dem Parent-Content und NUR im Content-Reiter (kein Reiter-Überhang). */}
-        {bereit && tab === "content" && familiePanel && (
-          <section className="card mt-4 p-5">
-            <FamilieManager familie={familiePanel} />
-          </section>
-        )}
+        {/* (Familien-Panel steht jetzt GANZ OBEN im Content-Bereich — D256.) */}
 
         {bereit && tab === "marge" && (
         <section className="card p-5">
