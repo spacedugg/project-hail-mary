@@ -222,6 +222,39 @@ function fehlendeAchsen(axisValues: Record<string, string> | null | undefined, t
   return theme.filter((a) => typeof axisValues?.[a] !== "string" || !axisValues![a].trim());
 }
 
+// Harte Amazon-Limits (Zeichen/Bytes/leer/Anzahl): bleiben IMMER scharf — auch auf
+// kopierten Slots —, sonst entstünde ein technisch un-publishbares Listing.
+const HARTE_LIMITS = new Set([
+  "title.max-length", "title.empty",
+  "bullets.hard-max", "bullets.empty", "bullets.count",
+  "description.max-bytes", "description.empty",
+]);
+
+/**
+ * Slot-abhängiges Gate (D247, Nutzer-Vorgabe): Der QM-Umfang hängt an der Slot-Rolle
+ * des Masters — nur pro Variante NEU getextete (regenerate) Slots durchlaufen das
+ * VOLLE inhaltliche QM. locked-Slots (wortgleich) und token-Slots (nur Achsenwert
+ * eingesetzt) sind bereits mit der Base freigegeben und werden inhaltlich NICHT
+ * erneut geprüft; ihre strukturelle Treue sichern familie.locked-konsistent,
+ * familie.token-unaufgeloest und familie.achsenwert-fehlt ab. Ausnahme: harte
+ * Amazon-Limits bleiben immer scharf.
+ */
+function filtereNachSlotRolle(issues: ValidationIssue[], master: ContentMaster): ValidationIssue[] {
+  const titelRegen = master.slots.some((s) => s.quelle === "title" && s.kind === "regenerate");
+  const regenBullets = new Set(master.slots.filter((s) => s.quelle === "bullet" && s.kind === "regenerate").map((s) => s.index));
+  const descRegen = master.slots.some((s) => s.quelle === "description" && s.kind === "regenerate");
+  return issues.filter((i) => {
+    if (i.rule.startsWith("familie.") || HARTE_LIMITS.has(i.rule)) return true;
+    if (i.rule.startsWith("title.")) return titelRegen;
+    if (i.rule.startsWith("description.")) return descRegen;
+    if (i.rule.startsWith("bullets.")) {
+      const m = i.message.match(/^Bullet (\d+):/);
+      return m ? regenBullets.has(Number(m[1])) : regenBullets.size > 0;
+    }
+    return true; // Unbekanntes konservativ behalten
+  });
+}
+
 async function persistiereChildContent(
   db: Db,
   productId: string,
@@ -299,7 +332,8 @@ export async function propagiereFamilieKern(
       issues.push({ rule: "familie.token-unaufgeloest", severity: "error", evidence: "deterministic", message: `Child ${asin}: unaufgelöster Platzhalter im abgeleiteten Content.` });
 
     const ctx = await baueGateCtxKern(db, k, basisZahlenQuellen);
-    issues.push(...validateTitle(content.title, ctx), ...validateBullets(content.bullets, ctx), ...validateDescription(content.description, content.bullets, ctx));
+    const gate = [...validateTitle(content.title, ctx), ...validateBullets(content.bullets, ctx), ...validateDescription(content.description, content.bullets, ctx)];
+    issues.push(...filtereNachSlotRolle(gate, master)); // nur regenerate-Slots inhaltlich prüfen (D247)
 
     await persistiereChildContent(db, k.id, content, issues, `variants.master:${parentId}${mock ? ":mock" : ""}`);
     ergebnisse.push({ asin, productId: k.id, issues, passed: !issues.some((i) => i.severity === "error") });
@@ -382,7 +416,8 @@ export async function propagiereChildKern(
   const baseRow = findeBaseVariante(parent.variantParentContainer ? kinder : [parent, ...kinder], master);
   const basisZahlenQuellen = baseRow ? await leseZahlenQuellen(db, baseRow) : "";
   const ctx = await baueGateCtxKern(db, child, basisZahlenQuellen);
-  issues.push(...validateTitle(content.title, ctx), ...validateBullets(content.bullets, ctx), ...validateDescription(content.description, content.bullets, ctx));
+  const gate = [...validateTitle(content.title, ctx), ...validateBullets(content.bullets, ctx), ...validateDescription(content.description, content.bullets, ctx)];
+  issues.push(...filtereNachSlotRolle(gate, master)); // nur regenerate-Slots inhaltlich prüfen (D247)
   await persistiereChildContent(db, child.id, content, issues, `variants.master:${parentId}${mock ? ":mock" : ""}`);
 
   // Cross-Child-Gate über den JETZT persistierten Content — nur für dieses Child.

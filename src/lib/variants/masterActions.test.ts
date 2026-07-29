@@ -356,22 +356,77 @@ describe("Master-Flow (Ableiten → Freigeben → Propagieren)", () => {
     await mk("bullets", { items: bullets });
     await mk("description", { text: "Kompakt mit 10,2 x 10,1 cm und in 30 Sekunden fertig angerührt." });
 
-    const entwurf = await baueMasterEntwurfKern(db, grp.parentId, "z-base", keinRegenerate);
+    // Bullet 5 (mit der erfundenen 42) wird als REGENERATE markiert → es durchläuft
+    // das volle QM (D247). Bullets 1–4 + Beschreibung bleiben locked → keine erneute Prüfung.
+    const markiereBullet5: SlotKlassifikator = async () => ({ regenerateIds: ["bullet.5"], mock: false });
+    const regenBehaeltText: SlotRegenerator = async (slot) => slot.template; // Referenztext (inkl. „42 Grad")
+    const entwurf = await baueMasterEntwurfKern(db, grp.parentId, "z-base", markiereBullet5);
+    expect(entwurf.ok).toBe(true);
+    if (!entwurf.ok) return;
+    await gibMasterFreiKern(db, grp.parentId, entwurf.master);
+
+    const prop = await propagiereFamilieKern(db, grp.parentId, regenBehaeltText);
+    expect(prop.ok).toBe(true);
+    const kiwi = prop.kinder.find((k) => k.productId === "z-kiwi")!;
+
+    // Base-belegte Zahlen dürfen im Geschwister NICHT als ohne-quelle/widerspruch anschlagen
+    // (locked-Bullets werden ohnehin nicht mehr geprüft; zusätzlich sind sie via D240 belegt).
+    const zahlMeldungen = kiwi.issues.filter((i) => i.rule.includes("zahl")).map((i) => i.message).join(" | ");
+    expect(zahlMeldungen).not.toContain("10,1");
+    expect(zahlMeldungen).not.toContain("10,2");
+    expect(zahlMeldungen).not.toContain("30 Sekunden");
+    // Gegenprobe: die ERFUNDENE Zahl (42) im REGENERATE-Bullet MUSS anschlagen — QM bleibt dort scharf.
+    expect(kiwi.issues.some((i) => i.rule === "bullets.zahl-ohne-quelle" && i.message.includes("42"))).toBe(true);
+  });
+
+  it("kopierte Slots (locked/token) werden nicht erneut geprüft — Budget-Unterschreitung blockt nicht (D247)", async () => {
+    const { getDb, schema } = await import("../../db/client");
+    const { gruppiereZuFamilieKern } = await import("./gruppieren");
+    const { baueMasterEntwurfKern, gibMasterFreiKern, propagiereFamilieKern } = await import("./masterActions");
+    const db = await getDb();
+    await db.insert(schema.clients).values({ id: "sc", name: "K", slug: "k-slot" });
+    await db.insert(schema.brands).values({ id: "sb", clientId: "sc", name: "M" });
+    await db.insert(schema.products).values({ id: "s-base", brandId: "sb", name: "Erdbeere", asin: "B0SLOT01", marke: "Freaky Joe", marketplace: "de", facts: {} });
+    await db.insert(schema.products).values({ id: "s-kiwi", brandId: "sb", name: "Kiwi", asin: "B0SLOT02", marke: "Freaky Joe", marketplace: "de", facts: {} });
+    const grp = await gruppiereZuFamilieKern(db, {
+      brandId: "sb",
+      parent: { modus: "container", name: "Fam" },
+      theme: ["flavor"],
+      children: [
+        { productId: "s-base", axisValues: { flavor: "Erdbeere" } },
+        { productId: "s-kiwi", axisValues: { flavor: "Kiwi" } },
+      ],
+    });
+    expect(grp.ok).toBe(true);
+    if (!grp.ok) return;
+    // Kurze Bullets (<300 B) → im vollen Gate budget-Warnungen; als locked kopiert dürfen sie NICHT
+    // anschlagen. Titel im gültigen Band (kein hartes Limit), damit der Test nur die Unterschreitung prüft.
+    const bullets = [
+      "PRAKTISCH: Kompakt und leicht.",
+      "VEGAN: Ohne tierische Zutaten.",
+      "SCHNELL: Fix angerührt.",
+      "DABEI: Passt in die Tasche.",
+      "DEUTSCH: Made in Germany.",
+    ];
+    const mk = (type: "title" | "bullets" | "description", payload: Record<string, unknown>) =>
+      db.insert(schema.contentVersions).values({ id: crypto.randomUUID(), productId: "s-base", type, version: 1, payload, status: "approved" });
+    await mk("title", { text: "Freaky Joe Elektrolytpulver Erdbeere vegan zuckerfrei zum Anmischen" });
+    await mk("bullets", { items: bullets });
+    await mk("description", { text: "Kurze Beschreibung zum Anmischen mit Wasser." });
+
+    const entwurf = await baueMasterEntwurfKern(db, grp.parentId, "s-base", keinRegenerate);
     expect(entwurf.ok).toBe(true);
     if (!entwurf.ok) return;
     await gibMasterFreiKern(db, grp.parentId, entwurf.master);
 
     const prop = await propagiereFamilieKern(db, grp.parentId, regeneratorVerboten);
     expect(prop.ok).toBe(true);
-    const kiwi = prop.kinder.find((k) => k.productId === "z-kiwi")!;
-
-    // Base-belegte Zahlen dürfen im Geschwister NICHT als ohne-quelle/widerspruch anschlagen.
-    const zahlMeldungen = kiwi.issues.filter((i) => i.rule.includes("zahl")).map((i) => i.message).join(" | ");
-    expect(zahlMeldungen).not.toContain("10,1");
-    expect(zahlMeldungen).not.toContain("10,2");
-    expect(zahlMeldungen).not.toContain("30 Sekunden");
-    // Gegenprobe: die ERFUNDENE Zahl (42, in keiner Quelle) MUSS weiter anschlagen — Check bleibt scharf.
-    expect(kiwi.issues.some((i) => i.rule === "bullets.zahl-ohne-quelle" && i.message.includes("42"))).toBe(true);
+    const kiwi = prop.kinder.find((k) => k.productId === "s-kiwi")!;
+    // Unterschreitungs-/Qualitäts-Findings kopierter Slots dürfen NICHT erscheinen …
+    expect(kiwi.issues.some((i) => i.rule === "bullets.budget")).toBe(false);
+    expect(kiwi.issues.some((i) => i.rule.startsWith("title.") || i.rule.startsWith("description."))).toBe(false);
+    // … und ohne echten Fehler ist das Kind freigabefähig.
+    expect(kiwi.passed).toBe(true);
   });
 
   it("Zahl nur auf dem Base-Bild gilt im Geschwister als belegt (D240 Bild-Beleg fließt in die Familien-Wahrheit)", async () => {
