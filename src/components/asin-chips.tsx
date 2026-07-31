@@ -18,13 +18,21 @@ export function AsinChips({
   name,
   mainAsin,
   placeholder = "ASIN eingeben …",
+  vorbelegt = [],
 }: {
   name: string;
   mainAsin?: string | null;
   placeholder?: string;
+  /**
+   * Zusätzliche Vorbelegung — z. B. die Vergleichsprodukte aus dem
+   * Keyword-Export (D268). Sie sind normale Chips: abwählbar, nichts erzwungen.
+   */
+  vorbelegt?: string[];
 }) {
   const main = mainAsin?.trim().toUpperCase() ?? null;
-  const [chips, setChips] = useState<string[]>(main ? [main] : []);
+  const [chips, setChips] = useState<string[]>(() => [
+    ...new Set([...(main ? [main] : []), ...vorbelegt.map((a) => a.trim().toUpperCase()).filter(Boolean)]),
+  ]);
   const [draft, setDraft] = useState("");
   const [warnung, setWarnung] = useState<string | null>(null);
 

@@ -78,3 +78,46 @@ describe("normalisierePayload (Lese-Schutz fürs Dashboard)", () => {
     expect(p.painPoints).toEqual([]);
   });
 });
+
+describe("Zuständigkeits-Gate im Payload (D266)", () => {
+  /**
+   * Das Gate läuft einmal beim Speichern; die Felder müssen den Lese-Weg
+   * überleben. Sonst wäre das Produkt-Feedback nach dem ersten Reload weg —
+   * genau die stille Datenvernichtung, die D266 ausschließt.
+   */
+  it("Produkt-Feedback und ausgeschlossene Amazon-Themen überleben das Lesen", () => {
+    const p = normalisierePayload({
+      stats: { reviewsTotal: 182 },
+      painPoints: [{ label: "wackelt bei voller Höhe", mentionCount: 9, quotes: [] }],
+      buyingTriggers: [],
+      produktFeedback: [
+        { label: "Karton eingedrückt", typ: "painPoint", mentionCount: 3 },
+        { label: "Verpackung hochwertig", typ: "buyingTrigger", mentionCount: 2 },
+      ],
+      ausgeschlossenAmazon: ["Versand dauerte zu lange"],
+      qualitaetsNotizen: ["Zuständigkeits-Gate: 1 Thema betrifft Versand"],
+    });
+    expect(p.produktFeedback).toHaveLength(2);
+    expect(p.produktFeedback![0]).toEqual({ label: "Karton eingedrückt", typ: "painPoint", mentionCount: 3 });
+    expect(p.produktFeedback![1].typ).toBe("buyingTrigger");
+    expect(p.ausgeschlossenAmazon).toEqual(["Versand dauerte zu lange"]);
+    expect(p.qualitaetsNotizen).toHaveLength(1);
+  });
+
+  it("ohne die Felder bleibt der Payload unverändert gültig (Altbestand)", () => {
+    const p = normalisierePayload({ stats: { reviewsTotal: 5 }, painPoints: [], buyingTriggers: [] });
+    expect(p.produktFeedback).toBeUndefined();
+    expect(p.ausgeschlossenAmazon).toBeUndefined();
+  });
+
+  it("kaputte Einträge fliegen, ohne zu werfen", () => {
+    const p = normalisierePayload({
+      produktFeedback: [null, { typ: "painPoint" }, { label: "  " }, { label: "echt", typ: "quatsch", mentionCount: "x" }],
+      ausgeschlossenAmazon: [null, 42, "Versand"],
+    });
+    expect(p.produktFeedback).toEqual([{ label: "echt", typ: "painPoint", mentionCount: null }]);
+    // `strings()` verwirft null/leer und wandelt Zahlen um — dasselbe Verhalten
+    // wie bei allen anderen String-Listen des Payloads, kein Sonderfall hier.
+    expect(p.ausgeschlossenAmazon).toEqual(["42", "Versand"]);
+  });
+});

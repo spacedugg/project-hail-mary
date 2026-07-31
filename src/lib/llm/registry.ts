@@ -148,6 +148,17 @@ export const RECIPE_MODELS: Record<string, { provider: string; model: string }> 
   "reviews.uebertragbarkeit": { provider: "anthropic", model: "claude-opus-4-8" },
   // Wettbewerber-Listing-Abgleich (D199): fehlende, übertragbare Informationen
   "reviews.wettbewerb-texte": { provider: "anthropic", model: "claude-opus-4-8" },
+  // Conversion-Driver-Ernte (D265): je Quelle ein eigener, enger Lauf — nie ein
+  // Sammel-Prompt. Der Code stempelt die erlaubten Quellen und rechnet danach.
+  "driver.motive": { provider: "anthropic", model: "claude-opus-4-8" },
+  "driver.wettbewerb": { provider: "anthropic", model: "claude-opus-4-8" },
+  "driver.reviews": { provider: "anthropic", model: "claude-opus-4-8" },
+  "driver.bilder": { provider: "anthropic", model: "claude-opus-4-8" },
+  "driver.keywords": { provider: "anthropic", model: "claude-opus-4-8" },
+  // Bilder-Briefing (D269): Konzept-Ideen je Kaufgrund + sinngemäße
+  // Lokalisierung ins Englische. Zwei kleine Schritte, beide mit Gate.
+  "briefing.konzepte": { provider: "anthropic", model: "claude-opus-4-8" },
+  "briefing.lokalisierung": { provider: "anthropic", model: "claude-opus-4-8" },
   // Variations-Master (D221): Slot-Klassifikator (schlägt „sprachlich-neu" vor) + Regenerator (textet einen Slot je Achsenwert neu)
   "variants.klassifikator": { provider: "anthropic", model: "claude-opus-4-8" },
   "variants.regenerator": { provider: "anthropic", model: "claude-opus-4-8" },

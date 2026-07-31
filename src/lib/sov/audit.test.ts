@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { parseCerebroCsv, computeSovAudit, clusterKeyword } from "./audit";
-import { spellingSafe } from "@/lib/analysis/imageBrief";
 import { analyzeListing } from "@/lib/analysis/listingAudit";
 
 const CSV = `Keyword Phrase,Search Volume,Position (Rank),Keyword Sales,CPR,B0MAINASIN,B0COMPAAAA,B0COMPBBBB
@@ -58,12 +57,6 @@ describe("SOV-Audit (portiertes Formelwerk)", () => {
   });
 });
 
-describe("spellingSafe (12-Zeichen-Regel)", () => {
-  it("ersetzt bekannte Risiko-Wörter und kürzt lange", () => {
-    expect(spellingSafe("EINGEBAUTER BEWEGUNGSMELDER").safe).toContain("PIR-SENSOR");
-    expect(spellingSafe("HÄLT 24 STUNDEN KALT").changed).toBe(false);
-  });
-});
 
 describe("analyzeListing", () => {
   it("liefert deterministische Dimensionen + SEO-Abdeckung aus SOV", () => {

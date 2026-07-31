@@ -160,6 +160,17 @@ export const REGELN: Regel[] = [
     text:
       "Die fünf Bullets decken unterschiedliche Kauf-Fragen ab (Slot-Logik HOOK · PROBLEM→BENEFIT · TRUST · USAGE · CLOSE) — nicht vier Varianten desselben Themas.",
   },
+  // ── Fakten-Sperre: Steigerung über den Messwert (D265) ───────────────────────
+  {
+    // Deterministisch erzwungen von pruefeClaimStaerke (gate.ts) UND im Prompt,
+    // damit der Fehler nicht erst korrigiert, sondern vermieden wird.
+    id: "fakten.claim-staerke",
+    sektionen: ["title", "bullets", "highlights", "description", "qa"],
+    art: "deterministisch",
+    severity: "error",
+    text:
+      "Ein Intensitäts-Wort darf den gemessenen Wert nicht überbieten: bei einem belegten dB-Wert gilt „flüsterleise/lautlos/unhörbar“ nur bis 30 dB, „sehr leise“ bis 40 dB, „leise“ bis 50 dB, „angenehm leise/geräuscharm“ bis 55 dB. Die Zahl ist belegt, die Steigerung darüber ist erfunden — bei ≤ 55 dB ist „angenehm leise“ die belegbare Formulierung, nicht „flüsterleise“.",
+  },
   // ── Variations-Familie (D221) ────────────────────────────────────────────────
   {
     // Deterministisch erzwungen von pruefeLockedKonsistenz (master.ts), NICHT im

@@ -134,6 +134,20 @@ export function normalisierePayload(raw: unknown): ReviewInsightsPayload {
     insightCards: karten(o.insightCards),
     kernThese: kernThese || null,
     verworfeneKarten: num(o.verworfeneKarten) ?? undefined,
+    // Zuständigkeits-Gate (D266) — beim Lesen NICHT verlieren, sonst wäre das
+    // Produkt-Feedback nach dem ersten Reload weg.
+    produktFeedback: Array.isArray(o.produktFeedback)
+      ? o.produktFeedback
+          .map((x) => {
+            const f = (x ?? {}) as Record<string, unknown>;
+            const label = String(f.label ?? "").trim();
+            return label
+              ? { label, typ: f.typ === "buyingTrigger" ? ("buyingTrigger" as const) : ("painPoint" as const), mentionCount: num(f.mentionCount) }
+              : null;
+          })
+          .filter((f): f is NonNullable<typeof f> => f !== null)
+      : undefined,
+    ausgeschlossenAmazon: strings(o.ausgeschlossenAmazon).length ? strings(o.ausgeschlossenAmazon) : undefined,
     entfernteBildIdeen: Array.isArray(o.entfernteBildIdeen)
       ? o.entfernteBildIdeen
           .map((x) => {

@@ -379,3 +379,48 @@ details > summary {
 details > summary:hover {
   text-decoration: underline;
 }
+
+/* ── Insights-Dokument (D267) ──────────────────────────────────────────────
+   Dieselbe Seite ist der Ausdruck: EIN Layout für Bildschirm und Papier, damit
+   beide nie auseinanderlaufen. Kein Server-PDF, kein zweiter Renderer.        */
+.dok-seite {
+  padding: 1.5rem 0;
+}
+.dok-seite + .dok-seite {
+  border-top: 1px solid var(--hair);
+}
+
+@media print {
+  /* Nur das Dokument drucken — Navigation und Aktionsleiste tragen .kein-druck */
+  .kein-druck {
+    display: none !important;
+  }
+  @page {
+    size: A4;
+    margin: 16mm 14mm;
+  }
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .dok-seite {
+    /* Jedes Kapitel beginnt auf einer neuen Seite und wird nicht zerrissen */
+    break-before: page;
+    break-inside: avoid;
+    border-top: 0 !important;
+    padding: 0 !important;
+  }
+  .dok-seite:first-of-type {
+    break-before: auto;
+  }
+  /* Tabellenzeilen nie über den Seitenumbruch trennen */
+  tr,
+  li,
+  blockquote {
+    break-inside: avoid;
+  }
+  a[href]::after {
+    content: "";
+  }
+}

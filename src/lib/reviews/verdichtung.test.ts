@@ -75,21 +75,38 @@ describe("normalisiereInsightCards — LLM generiert, Code erzwingt", () => {
     expect(cards[0].bildIdeen).toContain("GIF: Hund nimmt Drops");
   });
 
-  it("sortiert nach Relevanz absteigend, klemmt Relevanz auf 1–5", () => {
+  it("ignoriert die LLM-Relevanz vollständig und rechnet sie aus den Beleg-Aspekten (D266)", () => {
+    // Vorher übernahm der Code die LLM-Zahl (nur geklemmt) — damit hatten
+    // Verdichtung, Feature-Ranking und Blocker-Lauf zwei verschiedene Maßstäbe.
     const { cards } = normalisiereInsightCards(
       {
         insights: [
-          { titel: "B", beschreibung: "x", relevanz: 99, belegAspekte: ["Natürliche Inhaltsstoffe"] },
-          { titel: "A", beschreibung: "x", relevanz: -3, belegAspekte: ["Hund frisst die Drops nicht"] },
+          { titel: "Ein Beleg", beschreibung: "x", relevanz: 99, belegAspekte: ["Natürliche Inhaltsstoffe"] },
+          { titel: "Zwei Belege", beschreibung: "x", relevanz: -3, belegAspekte: ["Produkt hilft gegen Sodbrennen", "Produkt zeigt keine Wirkung"] },
         ],
       },
       aspekte,
       QUELLEN,
     );
+    // 2 Beleg-Aspekte → 4 · 1 Beleg-Aspekt → 3; absteigend sortiert
     expect(cards.map((c) => [c.titel, c.relevanz])).toEqual([
-      ["B", 5],
-      ["A", 1],
+      ["Zwei Belege", 4],
+      ["Ein Beleg", 3],
     ]);
+  });
+
+  it("bei gleicher Relevanz entscheiden die verifizierten Fundstellen", () => {
+    const { cards } = normalisiereInsightCards(
+      {
+        insights: [
+          { titel: "Schwächer belegt", beschreibung: "x", belegAspekte: ["Natürliche Inhaltsstoffe"] },
+          { titel: "Stärker belegt", beschreibung: "x", belegAspekte: ["Produkt hilft gegen Sodbrennen"] },
+        ],
+      },
+      aspekte,
+      QUELLEN,
+    );
+    expect(cards.map((c) => c.titel)).toEqual(["Stärker belegt", "Schwächer belegt"]);
   });
 
   it("kaputte Antwort → keine Karten, nichts geraten", () => {

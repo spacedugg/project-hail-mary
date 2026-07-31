@@ -19,6 +19,35 @@ export type DatenpunktAnalyse = {
   outcome: string;
 };
 
+/**
+ * Feld-Ebene der Kette (D265, Nutzer-Vorgabe 30.07.: „es sollen keine Daten in
+ * unserer Datenbank entstehen, die dann ungenutzt dort liegen bleiben").
+ *
+ * Warum das nötig war: Die Datenpunkt-Prüfung unten erzwingt nur, dass ein
+ * Datenpunkt IRGENDEINE Verwendung und Anzeige deklariert — als Prosa. Einzelne
+ * Payload-FELDER liegen unterhalb dieser Granularität, und genau dort sind
+ * Karteileichen entstanden (`bildBefunde`, `qualitaetsNotizen`: erzeugt,
+ * gespeichert, nie gelesen). Diese Deklaration ist maschinell geprüft: jeder
+ * Consumer muss existieren UND das Feld wirklich enthalten.
+ */
+export type FeldKette = {
+  /** Payload-Pfad, z. B. "review_insights.payload.painPoints[].herkunft". */
+  feld: string;
+  /** Dateien, die es LESEN — Existenz und Vorkommen werden im Test erzwungen. */
+  consumer: string[];
+};
+
+/**
+ * Bekannte Karteileiche mit Bau-Auftrag (D182-Geist: ein Befund ist ein
+ * Auftrag, kein Vermerk). Steht ein Feld hier, ist es ehrlich als ungenutzt
+ * deklariert — es darf nicht gleichzeitig als genutzt geführt werden.
+ */
+export type OffenesFeld = {
+  feld: string;
+  /** Was gebaut werden muss, damit das Feld eine Verwendung bekommt. */
+  bauauftrag: string;
+};
+
 export type Datenpunkt = {
   id: string;
   name: string;
@@ -31,6 +60,10 @@ export type Datenpunkt = {
   verwendung: string[];
   /** Wo sie im Tool sichtbar sind. */
   anzeige: string[];
+  /** Feld-genaue Kette (D265) — optional, wird aber erzwungen, wo deklariert. */
+  felder?: FeldKette[];
+  /** Ungenutzte Felder mit Bau-Auftrag (D265) — ehrlich statt still. */
+  offeneFelder?: OffenesFeld[];
 };
 
 export const DATENFLUSS: Datenpunkt[] = [
@@ -61,13 +94,26 @@ export const DATENFLUSS: Datenpunkt[] = [
     speicher: "listing_snapshots (bilder_text, bild_befunde)",
     analysen: [
       { name: "Bildanalyse (Vision)", modul: "src/lib/analysis/bildAuslese.ts", outcome: "Text-im-Bild WORTWÖRTLICH, ein objektiver Inhalts-Satz, gezeigte Claims je Bild" },
+      { name: "Bild-Audit", modul: "src/lib/analysis/bildAudit.ts", outcome: "Noten 0–5 je Bild für Design · Botschaft · Klarheit, mit „was wir sehen / warum / wie besser“ (D242)" },
+      { name: "Bildbeweis-Abdeckung", modul: "src/lib/analysis/abdeckung.ts", outcome: "je Nutzen-Baustein: belegt · schwach · fehlt · nicht bewertet — die Grundlage der Conversion-Blocker (D265)" },
     ],
     verwendung: [
       "Feature-Ranking (verbatim-verifizierbare Quelle „Bilder“, D133)",
       "Verdichtungs-Beleg-Texte und Bild-Ideen-Wahrheitsfilter",
-      "Conversion-Blocker (beantwortet ein Bild das Kunden-Thema?)",
+      "Conversion-Blocker: Botschafts-Note entscheidet zwischen „kein Bildbeweis“ und „unzureichender Bildbeweis“ (D265)",
+      "Bilder-Briefing: heutiger Stand je Bild + „wie besser“ als Ausgangspunkt der Konzepte (D269)",
     ],
-    anzeige: ["Status-Zeile „Bildanalyse: N Bilder erfasst“ (D165 — Details fließen nur in den Informationspool)"],
+    anzeige: ["Status-Zeile „Bildanalyse: N Bilder erfasst“ (D165 — Details fließen nur in den Informationspool)", "Bild-Kacheln im Listing-Reiter"],
+    felder: [
+      { feld: "listing_snapshots.bilder_text[].faktoren", consumer: ["src/lib/analysis/abdeckung.ts", "src/components/bild-kacheln.tsx"] },
+    ],
+    offeneFelder: [
+      {
+        feld: "listing_snapshots.bild_befunde",
+        bauauftrag:
+          "Wird von der Bild-Auslese gefüllt (actions.ts) und nirgends gelesen. Ziel: Bild-Kapitel des Insights-Dokuments (D265) — die Befunde sind fertige Handlungsempfehlungen für die neuen Bilder.",
+      },
+    ],
   },
   {
     id: "keywords",
@@ -84,8 +130,20 @@ export const DATENFLUSS: Datenpunkt[] = [
       "Gate-Checks: keyword-echo, Fremdmarken-Blacklist, Keyword-Dedup (D181/D97)",
       "Keyword-Abdeckungs-Score der Listing-Kontrolle (D176)",
       "Zahlen-Herkunfts-Quellen (D114)",
+      "Vergleichs-ASINs für Review-Scrape UND Wettbewerber-Listing-Abgleich (D268): die Rang-Spalten des Exports SIND die Wettbewerber — kein zweiter, manueller Eintrag",
+      "Suchnachfrage-Anteil im Conversion-Driver-Score (D265) — der einzige gemessene Vorkauf-Datenpunkt",
     ],
-    anzeige: ["Keywords-Reiter (aktive Chips + durchsuchbare Aussortierten-Liste)", "SOV-Audit kompakt inline (D161)"],
+    anzeige: [
+      "Keywords-Reiter (aktive Chips + durchsuchbare Aussortierten-Liste)",
+      "SOV-Audit kompakt inline (D161)",
+      "Vergleichs-ASIN-Chips in der Analyse-Maske (vorbelegt, abwählbar) + Notiz in der Scrape-Datenbasis",
+    ],
+    felder: [
+      {
+        feld: "report_uploads.parsed.wettbewerberAsins",
+        consumer: ["src/app/actions.ts", "src/app/(app)/produkte/[id]/page.tsx"],
+      },
+    ],
   },
   {
     id: "reviews",
@@ -103,8 +161,72 @@ export const DATENFLUSS: Datenpunkt[] = [
       "Content-Prompts: strategische Blöcke nach Herkunft × Übertragbarkeit — Kern-Content (eigene Kaufauslöser), fehlender Kern-Content (übertragbare Wettbewerbs-Kaufauslöser), Angriffs-Lücken (nicht-übertragbare Wettbewerbs-Pain-Points), Erwartungsmanagement (eigene + übertragbare Pain Points); geteilte Themen nur auf ihrer Mehrheits-Seite (D196). NIE als Zahlen-/Spec-Quelle (D114)",
       "Conversion-Blocker & Conversion Drivers (D167/D178)",
       "Briefings (Bild-Ideen aus Gegenmaßnahmen, D171)",
+      "Zuständigkeits-Gate EINMAL beim Speichern der Roh-Analyse (D266, src/lib/analysis/zustaendigkeit.ts): Versand-/Zustell-Themen fallen raus (Amazon-Sache), Verpackungs-/Transportschaden wird Produkt-Feedback. Damit arbeiten Verdichtung, Feature-Ranking, Blocker, Driver UND analyzeListing() automatisch auf bereinigten Aspekten",
     ],
-    anzeige: ["Bewertungen-Reiter (Analyse-Dashboard)", "Analyse-Reiter (vier Bereiche, D178)"],
+    anzeige: ["Bewertungen-Reiter (Analyse-Dashboard, inkl. „Grenzen dieser Auswertung“)", "Analyse-Reiter: Conversion Driver, Blocker, Ballast, Erwartungs-/Produktrisiken (D265/D266)"],
+    felder: [
+      { feld: "review_insights.payload.kernThese", consumer: ["src/components/bewertungs-dashboard.tsx", "src/lib/recipes/listing.ts"] },
+      { feld: "review_insights.payload.verworfeneKarten", consumer: ["src/components/bewertungs-dashboard.tsx"] },
+      { feld: "review_insights.payload.entfernteBildIdeen", consumer: ["src/components/bewertungs-dashboard.tsx"] },
+      // Auch der Risiko-Block speist sich hieraus (D266): page.tsx filtert die
+      // Karten mit negativer/ausgeglichener Tendenz heraus und übergibt sie.
+      { feld: "review_insights.payload.insightCards", consumer: ["src/app/(app)/produkte/[id]/page.tsx", "src/lib/recipes/listing.ts"] },
+      { feld: "review_insights.payload.painPoints[].herkunft", consumer: ["src/lib/recipes/listing.ts"] },
+      { feld: "review_insights.payload.painPoints[].uebertragbarkeit", consumer: ["src/lib/recipes/listing.ts"] },
+      // D269: Der Bild-Brief ist kein Markdown-String mehr — die Kundensprache
+      // steht jetzt strukturiert im Briefing und ist damit keine Karteileiche.
+      { feld: "review_insights.payload.languageToBorrow", consumer: ["src/lib/analysis/briefingErzeugung.ts", "src/lib/recipes/listing.ts"] },
+      // D266: aus Karteileichen wurden Konsumenten.
+      { feld: "review_insights.payload.qualitaetsNotizen", consumer: ["src/components/bewertungs-dashboard.tsx"] },
+      { feld: "review_insights.payload.produktFeedback", consumer: ["src/app/actions.ts", "src/components/driver-karten.tsx"] },
+      { feld: "review_insights.payload.ausgeschlossenAmazon", consumer: ["src/app/actions.ts"] },
+    ],
+    offeneFelder: [
+    ],
+  },
+  {
+    id: "bild-briefing",
+    name: "Bilder-Briefing (Designer)",
+    quelle: "Knopf im Briefings-Reiter, je Sprache — keine eigene Erhebung: Projektion des Driver-Laufs (D269)",
+    speicher: "bild_briefings (je Produkt und Sprache, neueste Zeile gilt)",
+    analysen: [
+      { name: "Assemblierung", modul: "src/lib/analysis/bildBriefing.ts", outcome: "je unbewiesenem Kaufgrund ein Konzept mit Status (neu · ersetzen · nachschärfen), Findings aus dem Befund, Produkt-Wahrheit, Verbote, heutiger Bildstand" },
+      { name: "Konzept-Ideen", modul: "src/lib/analysis/bildBriefingLauf.ts", outcome: "je Kaufgrund EINE Idee, was ankommen soll — Gate gegen vorgeschriebene Bildtexte und Szenen-Regie (pruefeKonzeptFreiheit)" },
+      { name: "Lokalisierung", modul: "src/lib/analysis/bildBriefingLauf.ts", outcome: "englische Fassung sinngemäß aus der deutschen; sprachgebundene Felder (Produktangaben, Kundenstimmen, Bildinhalt) bleiben unangetastet" },
+      { name: "Erzeugung", modul: "src/lib/analysis/briefingErzeugung.ts", outcome: "sammelt die Analyse-Zeilen und speichert die Fassung je Sprache" },
+    ],
+    verwendung: [
+      "Designer-Briefing für neue oder überarbeitete Listing-Bilder — deutsch fürs eigene Team, englisch für externe Gestalter",
+    ],
+    anzeige: ["Briefings-Reiter: strukturierte Ansicht mit Sprach-Schalter (Deutsch Standard) statt Markdown-Textwand"],
+    felder: [
+      { feld: "bild_briefings.payload", consumer: ["src/app/(app)/produkte/[id]/briefs/page.tsx", "src/components/bild-briefing-ansicht.tsx"] },
+      { feld: "bild_briefings.sprache", consumer: ["src/lib/analysis/briefingErzeugung.ts", "src/app/(app)/produkte/[id]/briefs/page.tsx"] },
+      { feld: "bild_briefings.hinweise", consumer: ["src/app/(app)/produkte/[id]/briefs/page.tsx"] },
+    ],
+  },
+  {
+    id: "insights-dokument",
+    name: "Insights-Dokument (Kunden-Report)",
+    quelle: "Knopf im Analyse-Reiter — keine eigene Erhebung: eine Projektion vorhandener Analyse-Zeilen (D267)",
+    speicher: "insights_reports (eingefroren je Version, eigener öffentlicher Token)",
+    analysen: [
+      { name: "Projektion", modul: "src/lib/reports/insightsDokument.ts", outcome: "Kopf, Datenbasis, Kern-These, Kaufgrund-Matrix mit Abdeckungs-Ampel, Listing-Status, Handlungsplan aus den Blockern, Risiken, Grenzen — ohne LLM" },
+      { name: "Auslieferungs-Gate", modul: "src/lib/reports/insightsDokument.ts", outcome: "kein Dokument ohne Datenbasis, ohne Kaufgrund, ohne Beleg-Quelle je Zeile oder mit Maßnahme ohne Kaufgrund-Referenz — bei Verstoß wird NICHTS gespeichert (D182)" },
+      { name: "Erzeugung & Einfrieren", modul: "src/lib/reports/insightsLauf.ts", outcome: "Version + Token; alte Links bleiben gültig und zeigen weiter ihren Stand" },
+    ],
+    verwendung: [
+      "Kundenkommunikation vor der Content-Erstellung: Begründung der Optimierung",
+      "Bild-Briefing: die Bild-Maßnahmen tragen „wie besser“ aus dem Bild-Audit",
+    ],
+    anzeige: ["Analyse-Reiter (Karte mit Öffnen · Link kopieren · Versionen)", "öffentliche Seite /insights/[token] mit Druck-Layout (dieselbe Seite ist das PDF)"],
+    felder: [
+      { feld: "insights_reports.token", consumer: ["src/app/insights/[token]/page.tsx", "src/app/(app)/produkte/[id]/page.tsx"] },
+      // Die Darstellung bekommt den Payload als Prop — gelesen wird er beim Laden
+      // und in der öffentlichen Route. Der Test prüft das ehrlich am Vorkommen.
+      { feld: "insights_reports.payload", consumer: ["src/lib/reports/insightsLauf.ts", "src/app/insights/[token]/page.tsx"] },
+      { feld: "insights_reports.version", consumer: ["src/app/insights/[token]/page.tsx", "src/app/(app)/produkte/[id]/page.tsx"] },
+    ],
   },
   {
     id: "wettbewerber-listings",
@@ -118,7 +240,18 @@ export const DATENFLUSS: Datenpunkt[] = [
     verwendung: [
       "Content-Prompts: ÜBERTRAGBARE WETTBEWERBER-INFORMATIONEN — fehlende Themen mit EIGENEN belegten Angaben besetzen, nie fremde Specs übernehmen (D199)",
     ],
-    anzeige: ["Analyse-Reiter (übertragbare Informationslücken)"],
+    // Ehrlich korrigiert (D265): Es gibt KEINE Ansicht dafür. Die frühere
+    // Angabe „Analyse-Reiter (übertragbare Informationslücken)" war eine
+    // Deklaration ohne Deckung — genau die Selbstbescheinigung, die die
+    // Feld-Prüfung künftig verhindert.
+    anzeige: ["(noch keine — nur Content-Prompt, siehe offeneFelder)"],
+    offeneFelder: [
+      {
+        feld: "competitor_info_gaps.payload.gaps",
+        bauauftrag:
+          "Fließt in die Content-Generierung (actions.ts), ist aber in keiner Ansicht sichtbar und in keiner Analyse verwertet. Ziel: Motiv-Quelle der Conversion Driver (D265) — Wettbewerber-Listings sagen, welche Resultate die Kategorie bewirbt; plus Anzeige im Analyse-Reiter.",
+      },
+    ],
   },
   {
     id: "stammdaten",

@@ -2,6 +2,7 @@ import { resolveRecipe } from "@/lib/llm/registry";
 import { llmJsonLauf } from "@/lib/llm/qmLauf";
 import { filtereEinzelnennungen, findeAspekt, type RoheAspekte } from "@/lib/reviews/verdichtung";
 import { pruefeBildIdeen } from "@/lib/analysis/bildideen";
+import { belegRelevanz } from "@/lib/analysis/relevanz";
 import type { FeatureRankingPayload, InsightCard } from "@/db/schema";
 
 /**
@@ -57,12 +58,11 @@ export function quellTexte(q: FeatureQuellen): Record<string, string> {
 
 /**
  * Relevanz DETERMINISTISCH aus der ANZAHL zugeordneter Review-Aspekte
- * (echter Wert; LLM-Zählwerte sind seit D154 verbannt):
- * 0 Aspekte → 1 · 1 → 3 · 2 → 4 · ≥3 → 5.
+ * (echter Wert; LLM-Zählwerte sind seit D154 verbannt). Die Formel selbst liegt
+ * seit D266 in `relevanz.ts`, weil sie auch die Verdichtung braucht und ein
+ * Import von dort hierher ein Laufzeit-Zyklus wäre.
  */
-export function featureRelevanz(anzahlBelegAspekte: number): number {
-  return anzahlBelegAspekte >= 3 ? 5 : anzahlBelegAspekte === 2 ? 4 : anzahlBelegAspekte === 1 ? 3 : 1;
-}
+export { belegRelevanz as featureRelevanz };
 
 type RawFeature = {
   titel?: unknown;
@@ -122,7 +122,7 @@ export function normalisiereFeatureKarten(
     cards.push({
       titel: titel.slice(0, 120),
       beschreibung: beschreibung.slice(0, 800),
-      relevanz: featureRelevanz(beleg.length),
+      relevanz: belegRelevanz(beleg.length),
       quellen: quellTags,
       bildIdeen,
       belegAspekte: beleg,
@@ -153,7 +153,7 @@ ${quellBlock}
 ROH-THEMEN AUS DEN KUNDENREZENSIONEN (ausgezählt):
 ${aspektBlock || "(keine — Review-Analyse fehlt)"}
 
-AUFGABE: Extrahiere 5–10 PRODUKT-FEATURES aus den Listing-Quelltexten (Sprache "${sprache}") und ordne jedem die passenden Kunden-Themen zu.
+AUFGABE: Extrahiere die PRODUKT-FEATURES (KEINE Mindest- oder Zielmenge, D266 — nur was wirklich im Listing steht) aus den Listing-Quelltexten (Sprache "${sprache}") und ordne jedem die passenden Kunden-Themen zu.
 REGELN:
 1. titel: das Feature in Klartext (max. 8 Wörter, z. B. "Gezielte Wirkung bei Sodbrennen & Grasfressen") — nur Features, die WIRKLICH im Listing stehen.
 2. beschreibung: 2–3 Sätze, was das Feature ist und leistet — nur Belegtes, keine Erfindungen.
@@ -202,7 +202,7 @@ export async function rankeFeatures(input: {
         {
           titel: `Mock-Feature: ${bullet.slice(0, 80)}`,
           beschreibung: "Mock-Ranking — in Produktion stehen hier die Listing-Features nach Kunden-Relevanz.",
-          relevanz: featureRelevanz(0),
+          relevanz: belegRelevanz(0),
           quellen: [input.quellen.bullets.length ? "Bullets" : "Titel"],
           bildIdeen: [],
           belegAspekte: [],

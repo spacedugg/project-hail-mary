@@ -9,6 +9,12 @@ import {
   uniqueIndex,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
+// Ausnahme von „Payload-Typen leben hier" (D265): Der Driver-Kontrakt verweist
+// auf Stufen, die in den Analyse-Modulen berechnet werden — eine zweite
+// Definition wäre eine zweite Wahrheit (D183). Reiner Typ-Import, kein Laufzeit-Zyklus.
+import type { ConversionDriverPayload } from "@/lib/analysis/driverTypen";
+import type { InsightsReportPayload } from "@/lib/reports/insightsDokument";
+import type { BildBriefingPayload } from "@/lib/analysis/bildBriefing";
 
 /**
  * Entity-Hierarchie (D16): Kunde → Marke → Marktplatz/Land → Produktgruppe → Produkt (ASIN).
@@ -435,6 +441,78 @@ export type ConversionBlockerPayload = {
   stats: { reviewsGesamt: number };
 };
 
+/**
+ * Conversion Driver (D265) — die Neufassung von Driver UND Blocker in EINER
+ * Tabelle, weil ein Blocker keine eigene Analyse ist, sondern ein Driver-
+ * Baustein ohne ausreichenden Beweis. Zwei getrennte Läufe auf demselben
+ * Aspekt-Pool waren die Ursache dafür, dass beide Listen dieselbe Erkenntnis
+ * unter zwei Überschriften ausgaben.
+ *
+ * Der Payload-Typ liegt in `src/lib/analysis/driverTypen.ts`: er verweist auf
+ * Abdeckungs- und Fall-Stufen, die dort BERECHNET werden — eine zweite
+ * Definition derselben Union wäre eine zweite Wahrheit (D183).
+ */
+export const conversionDrivers = pgTable("conversion_drivers", {
+  id: text("id").primaryKey(),
+  productId: text("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  payload: jsonb("payload").$type<ConversionDriverPayload>().notNull(),
+  /** Was tatsächlich eingeflossen ist (Transparenz, Anti-Blackbox). */
+  dataBasis: jsonb("data_basis").$type<string[]>().notNull(),
+  createdAt: ts("created_at").notNull(),
+});
+
+/**
+ * Insights-Dokument (D267) — der eingefrorene Kunden-Report.
+ *
+ * Eingefroren, weil der Kundenlink sonst nach jedem neuen Analyse-Lauf etwas
+ * anderes zeigt und „Stand 30.07." eine Lüge wäre. Ein neuer Lauf erzeugt eine
+ * neue Version; alte Links bleiben gültig.
+ *
+ * Eigener Token statt `content_shares`: Das Content-Portal hat einen
+ * Freigabe-Ablauf (Kunde gibt frei oder wünscht Änderungen) — dieses Dokument
+ * ist rein lesend. Ein gemeinsamer Token würde zwei verschiedene Rechte
+ * vermischen.
+ */
+export const insightsReports = pgTable(
+  "insights_reports",
+  {
+    id: text("id").primaryKey(),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    /** Öffentlicher Zugriffsschlüssel — nur damit ist der Report erreichbar. */
+    token: text("token").notNull(),
+    payload: jsonb("payload").$type<InsightsReportPayload>().notNull(),
+    /** Fortlaufend je Produkt, damit „Version 2" im Gespräch eindeutig ist. */
+    version: integer("version").notNull().default(1),
+    expiresAt: tsNull("expires_at"),
+    createdAt: ts("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("insights_reports_token").on(t.token)],
+);
+
+/**
+ * Bilder-Briefing (D269) — je Produkt und Sprache eine Fassung.
+ *
+ * Gespeichert statt bei jedem Seitenaufruf erzeugt: die englische Fassung
+ * kostet einen LLM-Lauf, und ein Briefing, das sich beim Neuladen ändert, ist
+ * für den Designer unbrauchbar. Append-only wie die anderen Läufe — die neueste
+ * Zeile je Sprache gilt.
+ */
+export const bildBriefings = pgTable("bild_briefings", {
+  id: text("id").primaryKey(),
+  productId: text("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  sprache: text("sprache").notNull().default("de"),
+  payload: jsonb("payload").$type<BildBriefingPayload>().notNull(),
+  /** Was eingeflossen ist + Gate-Hinweise (Anti-Blackbox). */
+  hinweise: jsonb("hinweise").$type<string[]>().notNull(),
+  createdAt: ts("created_at").notNull(),
+});
+
 export const reviewInsights = pgTable("review_insights", {
   id: text("id").primaryKey(),
   productId: text("product_id")
@@ -551,6 +629,19 @@ export type ReviewInsightsPayload = {
   entfernteBildIdeen?: Array<{ idee: string; grund: string }>;
   /** Beleg-Prüfung der Roh-Analyse (D152): Verbatim-Gate, verworfene Aspekte, Sentiment-Hinweise. */
   qualitaetsNotizen?: string[];
+  /**
+   * Zuständigkeits-Gate (D266): Das Gate läuft EINMAL beim Speichern der
+   * Roh-Analyse, nicht in jedem Konsumenten. Damit arbeiten Verdichtung,
+   * Feature-Ranking, Blocker, Driver UND `analyzeListing()` automatisch auf
+   * bereinigten Aspekten — vorher erzeugte ein Versand-Pain-Point eine
+   * Maßnahme für etwas, das kein Text der Welt lösen kann.
+   *
+   * Seller-Sache, aber nicht über den Listing-Text lösbar (Produktverpackung,
+   * Transportschaden) — Produkt-Feedback statt Text-Maßnahme.
+   */
+  produktFeedback?: Array<{ label: string; typ: "painPoint" | "buyingTrigger"; mentionCount: number | null }>;
+  /** Amazon-Zuständigkeit (Versand, Zustellung) — ausgewiesen, nie still entfernt. */
+  ausgeschlossenAmazon?: string[];
 };
 
 /** Beleg-Aspekt einer Insight-Karte (D137): Rückverweis auf ein Roh-Thema MIT Zählwert — vom Code gesetzt, nie vom LLM behauptet. */

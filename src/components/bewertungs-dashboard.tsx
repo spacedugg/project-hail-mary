@@ -67,6 +67,21 @@ export function BewertungsDashboard({
             <b>Kern-These:</b> {p.kernThese}
           </blockquote>
         )}
+        {/* Qualitäts-Notizen (D152) waren bis D266 erzeugt und nirgends gelesen.
+            Sie tragen das Verbatim-Gate, die verworfenen Aspekte und das
+            Zuständigkeits-Gate — die ehrlichen Grenzen der Roh-Analyse. */}
+        {(p.qualitaetsNotizen?.length ?? 0) > 0 && (
+          <details className="mt-3">
+            <summary className="cursor-pointer text-xs text-muted hover:text-foreground">
+              Grenzen dieser Auswertung ({p.qualitaetsNotizen!.length})
+            </summary>
+            <ul className="mt-1.5 space-y-1">
+              {p.qualitaetsNotizen!.map((n, i) => (
+                <li key={i} className="text-[11px] text-muted">ℹ {n}</li>
+              ))}
+            </ul>
+          </details>
+        )}
       </div>
 
       {/* Review Insights (D178): Findings gegliedert nach positiv/negativ/gemischt —

@@ -1,7 +1,8 @@
 import { resolveRecipe } from "@/lib/llm/registry";
 import { llmJsonLauf } from "@/lib/llm/qmLauf";
 import { filtereEinzelnennungen, findeAspekt, type RoheAspekte } from "@/lib/reviews/verdichtung";
-import { featureRelevanz, quellTexte, type FeatureQuellen } from "@/lib/analysis/featureRanking";
+import { quellTexte, type FeatureQuellen } from "@/lib/analysis/featureRanking";
+import { belegRelevanz } from "@/lib/analysis/relevanz";
 import type { ConversionBlockerPayload, InsightCard } from "@/db/schema";
 
 /**
@@ -13,7 +14,7 @@ import type { ConversionBlockerPayload, InsightCard } from "@/db/schema";
  *   der Match ist die Existenzberechtigung; ohne aufgelösten Aspekt fliegt
  *   die Karte und wird GEZÄHLT verworfen (nie still).
  * - Relevanz (1–5) rechnet der CODE aus der Anzahl der Beleg-Aspekte
- *   (Formel featureRelevanz, D154) — nie die KI.
+ *   (Formel belegRelevanz, D154/D266) — nie die KI.
  * - Quellen-Tags stempelt der CODE aus der tatsächlichen Datenbasis (D133):
  *   ein Fehlen lässt sich nicht verbatim zitieren, also behauptet die KI
  *   auch keine Quellen.
@@ -55,7 +56,7 @@ export function normalisiereBlockerKarten(
     cards.push({
       titel: titel.slice(0, 120),
       beschreibung: problem.slice(0, 800),
-      relevanz: featureRelevanz(beleg.length),
+      relevanz: belegRelevanz(beleg.length),
       quellen: quellenTags,
       bildIdeen: [],
       belegAspekte: beleg,
@@ -87,7 +88,7 @@ ${quellBlock}
 KUNDEN-THEMEN AUS DEN REZENSIONEN (ausgezählt, echt):
 ${aspektBlock || "(keine — Review-Analyse fehlt)"}
 
-AUFGABE: Finde 3–8 CONVERSION-BLOCKER (Sprache "${sprache}"): Kunden-Themen von oben, die das Listing NICHT oder nur schwach beantwortet. Ein Blocker existiert NUR, wenn beides zusammenkommt — das Thema ist Kunden nachweislich wichtig UND die Antwort darauf fehlt in den Quelltexten.
+AUFGABE: Finde die CONVERSION-BLOCKER (KEINE Mindest- oder Zielmenge, D266 — so viele, wie wirklich belegt sind; oft sind es zwei bis vier, manchmal keiner) (Sprache "${sprache}"): Kunden-Themen von oben, die das Listing NICHT oder nur schwach beantwortet. Ein Blocker existiert NUR, wenn beides zusammenkommt — das Thema ist Kunden nachweislich wichtig UND die Antwort darauf fehlt in den Quelltexten.
 REGELN:
 1. titel: der Blocker in Klartext (max. 8 Wörter, z. B. "Dosierung im Listing unbeantwortet").
 2. problem: 2–3 Sätze — WAS Kunden erwarten (aus den Themen oben), WO im Listing die Antwort fehlt oder zu schwach ist und warum das den Kauf bremst. Nur auf die Quelltexte oben stützen, nichts erfinden.
@@ -136,7 +137,7 @@ export async function findeBlocker(input: {
         {
           titel: `Mock-Blocker: ${aspekt.label.slice(0, 80)}`,
           beschreibung: "Mock-Lauf — in Produktion stehen hier die Kunden-Themen ohne Listing-Antwort.",
-          relevanz: featureRelevanz(1),
+          relevanz: belegRelevanz(1),
           quellen: quellenTags,
           bildIdeen: [],
           belegAspekte: [findeAspekt(aspekt.label, input.aspekte)!],

@@ -61,7 +61,7 @@ const SEKTIONEN = [
 ] as const;
 
 type Etappe = {
-  stufe: "listing" | "scrape" | "auswertung" | "wettbewerb-texte" | "verdichtung" | "blocker" | "features" | "audit" | "content";
+  stufe: "listing" | "scrape" | "auswertung" | "wettbewerb-texte" | "verdichtung" | "blocker" | "features" | "driver" | "audit" | "content";
   section?: string;
   label: string;
   status: "offen" | "laeuft" | "fertig" | "fehler";
@@ -76,11 +76,18 @@ export function AnalyseStart({
   productId,
   mainAsin,
   nurAnalyse = false,
+  vergleichsAsins = [],
 }: {
   productId: string;
   mainAsin: string | null;
   /** true (Analyse-Reiter): Lauf ohne Content-Generierung — „Neu scrapen & analysieren". */
   nurAnalyse?: boolean;
+  /**
+   * Vergleichsprodukte aus dem Keyword-Export (D268) — Vorbelegung, kein Zwang.
+   * Der Scrape ergänzt sie ohnehin serverseitig; hier sind sie sichtbar und
+   * abwählbar, damit die Automatik nachvollziehbar bleibt.
+   */
+  vergleichsAsins?: string[];
 }) {
   const router = useRouter();
   const [etappen, setEtappen] = useState<Etappe[]>([]);
@@ -158,8 +165,16 @@ export function AnalyseStart({
       { stufe: "auswertung", label: "Reviews auswerten (Pain Points, Kaufauslöser)", status: "offen", hart: !ohneAnalyse },
       { stufe: "wettbewerb-texte", label: "Wettbewerber-Listings abgleichen (fehlende Infos)", status: "offen", hart: false },
       { stufe: "verdichtung", label: "Erkenntnisse verdichten", status: "offen", hart: false },
-      { stufe: "blocker", label: "Conversion-Blocker finden", status: "offen", hart: false },
+      // Die Alt-Etappe „blocker" (D167) läuft NICHT mehr mit (D266): Der
+      // Driver-Lauf leitet die Blocker aus den Kaufgründen ab. Zwei Läufe für
+      // dieselbe Liste wären fünf LLM-Aufrufe für Daten, die keine Ansicht mehr
+      // zeigt. Bestehende Blocker-Zeilen bleiben lesbar, solange ein Produkt
+      // noch keinen Driver-Lauf hat; die Etappe ist über runPipelineStufe
+      // weiterhin einzeln aufrufbar.
       { stufe: "features", label: "Produkt-Features ranken", status: "offen", hart: false },
+      // D265: nach den Features, weil deren Liste den Ballast-Abgleich trägt
+      // (Merkmal im Listing, das keinem Kaufgrund zuarbeitet).
+      { stufe: "driver", label: "Conversion Driver ermitteln (Kaufgründe + Beweislücken)", status: "offen", hart: false },
       { stufe: "audit", label: "KI-Bewertung des Listings", status: "offen", hart: false },
       ...sections.map((s) => ({
         stufe: "content" as const,
@@ -276,12 +291,21 @@ export function AnalyseStart({
       <div>
         <h3 className="text-sm font-semibold">Vergleichs-ASINs</h3>
         <p className="mt-0.5 text-xs text-muted">
-          Deine Produkt-ASIN ist vorbelegt. Trag hier zusätzlich die ASINs direkter Wettbewerber ein — genau
-          diese Eintragung meint die Analyse-Checkliste. Sie fließen in die Bewertungs-Analyse <b>und</b> in den
-          Wettbewerber-Listing-Abgleich („fehlende Infos“). Ohne Zusatz-ASIN läuft der Abgleich nicht.
+          {vergleichsAsins.length > 0 ? (
+            <>
+              Aus deinem Keyword-Export übernommen — es sind dieselben Produkte, gegen die die Keyword-Recherche
+              gelaufen ist. Du musst hier nichts eintragen; abwählen oder ergänzen kannst du trotzdem.
+            </>
+          ) : (
+            <>
+              Deine Produkt-ASIN ist vorbelegt. Lade einen Keyword-Export mit Wettbewerber-Spalten hoch, dann stehen
+              die Vergleichsprodukte automatisch hier. Sonst hier eintragen.
+            </>
+          )}{" "}
+          Sie fließen in die Bewertungs-Analyse <b>und</b> in den Wettbewerber-Listing-Abgleich („fehlende Infos“).
         </p>
         <div className="mt-2">
-          <AsinChips name="asins" mainAsin={mainAsin} placeholder="Wettbewerber-ASIN eingeben …" />
+          <AsinChips name="asins" mainAsin={mainAsin} placeholder="Wettbewerber-ASIN eingeben …" vorbelegt={vergleichsAsins} />
         </div>
       </div>
       {!nurAnalyse && (

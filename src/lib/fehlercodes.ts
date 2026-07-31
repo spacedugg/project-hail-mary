@@ -48,6 +48,20 @@ export const FEHLER_CODES: Record<string, FehlerInfo> = {
     bedeutung: "Der Conversion-Blocker-Lauf braucht Listing-Inhalt (Import) UND die Kunden-Themen der Bewertungs-Analyse — der Match aus beidem ist der Blocker. Oder der Lauf selbst ist abgebrochen (Detail-Meldung oben).",
     loesung: "Erst Listing importieren und Reviews analysieren, dann erneut starten. Bestehende Daten bleiben unberührt.",
   },
+  "INS-01": {
+    titel: "Insights-Dokument nicht erzeugt",
+    bedeutung:
+      "Das Kunden-Dokument ist eine Projektion des Conversion-Driver-Laufs — ohne diesen Lauf gibt es nichts zu projizieren. Oder das Auslieferungs-Gate hat abgewiesen: keine Datenbasis, kein Kaufgrund in der Matrix, eine Zeile ohne Beleg-Quelle oder eine Maßnahme ohne Kaufgrund-Referenz. In diesem Fall wurde bewusst NICHTS gespeichert — ein halbes Dokument beim Kunden wäre schlimmer als keines.",
+    loesung:
+      "Analyse-Lauf durchlaufen lassen (Listing-Import, Bewertungen, Driver). Die Detail-Meldung oben nennt die verletzte Regel; jeder Block ist ein Bau-Auftrag, kein Bedienfehler.",
+  },
+  "DRV-01": {
+    titel: "Driver-Lauf nicht möglich",
+    bedeutung:
+      "Der Conversion-Driver-Lauf braucht mindestens den Listing-Import — er misst, ob ein Kaufgrund im Listing überhaupt bewiesen ist. Ohne Bewertungs-Analyse läuft er, aber dünner (dann tragen nur Produkt-Wahrheit, Listing, Wettbewerber und Suchnachfrage). Oder der Lauf selbst ist abgebrochen (Detail-Meldung oben).",
+    loesung:
+      "Erst das Listing importieren, dann erneut starten. Für belastbare Kaufgründe zusätzlich Reviews analysieren, Vergleichs-ASINs angeben und den Keyword-Export laden — Suchvolumen ist der einzige gemessene Vorkauf-Datenpunkt. Bestehende Daten bleiben unberührt.",
+  },
   "VER-01": {
     titel: "Insight-Verdichtung fehlgeschlagen",
     bedeutung: "Die Verdichtungs-Etappe (Roh-Themen → benannte Erkenntnisse) ist abgebrochen. Scrape und Roh-Analyse sind unversehrt gespeichert — nur die Karten fehlen.",

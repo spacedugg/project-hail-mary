@@ -15,6 +15,27 @@
       "when": 1785343334356,
       "tag": "0001_amazon_fundament",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785417190172,
+      "tag": "0002_conversion_driver",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785504120409,
+      "tag": "0003_insights_dokument",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785508807834,
+      "tag": "0004_bild_briefing",
+      "breakpoints": true
     }
   ]
 }

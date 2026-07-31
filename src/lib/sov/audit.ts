@@ -161,6 +161,32 @@ const parseRank = (s: string | undefined): number => {
   return n > 0 ? Math.round(n) : 0;
 };
 
+/**
+ * Wettbewerber-ASINs aus dem Keyword-Export (D268, Nutzer-Vorgabe 31.07.).
+ *
+ * Wer eine Cerebro-CSV hochlädt, hat die Vergleichsprodukte dort schon gewählt —
+ * sie stehen als eigene Rang-Spalten in der Kopfzeile. Sie danach für den
+ * Review-Scrape NOCH EINMAL von Hand eintragen zu müssen, ist ein
+ * überflüssiger Zwischenschritt: es sind dieselben Produkte.
+ *
+ * Bedingung „mindestens ein echter Rang": Eine ASIN-Spalte, die durchgehend „-"
+ * enthält, war im Export nur formal dabei — sie zu scrapen würde Zeitbudget für
+ * ein Produkt verbrennen, mit dem gar nicht verglichen wurde.
+ *
+ * Sortiert nach Anzahl gerankter Keywords: der Wettbewerber, der auf den
+ * meisten Suchbegriffen auftaucht, ist der relevanteste — das entscheidet, wer
+ * bei einer Obergrenze überlebt.
+ */
+export function wettbewerberAsinsAusRows(rows: CerebroRow[]): string[] {
+  const treffer = new Map<string, number>();
+  for (const r of rows) {
+    for (const [asin, rank] of Object.entries(r.compRanks)) {
+      if (rank > 0) treffer.set(asin, (treffer.get(asin) ?? 0) + 1);
+    }
+  }
+  return [...treffer.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([asin]) => asin);
+}
+
 export function parseCerebroCsv(
   text: string,
   mainAsin?: string | null,

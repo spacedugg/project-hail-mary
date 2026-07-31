@@ -1,5 +1,6 @@
 import { resolveRecipe } from "@/lib/llm/registry";
 import { llmJsonLauf } from "@/lib/llm/qmLauf";
+import { belegRelevanz } from "@/lib/analysis/relevanz";
 import type { BelegAspekt, InsightCard, ReviewInsightsPayload } from "@/db/schema";
 
 /**
@@ -156,8 +157,10 @@ export function normalisiereInsightCards(
       verworfen++;
       continue;
     }
-    const rel = Number(c.relevanz ?? c.relevance);
-    const relevanz = Number.isFinite(rel) ? Math.min(5, Math.max(1, Math.round(rel))) : 3;
+    // Relevanz rechnet der CODE (D266): dieselbe Formel wie Feature-Ranking und
+    // Blocker-Lauf. Vorher kam sie aus der LLM-Antwort — zwei Listen, zwei
+    // Maßstäbe, nicht vergleichbar (Verstoß gegen D154/D170/D178).
+    const relevanz = belegRelevanz(beleg.length);
     const bildIdeen = (Array.isArray(c.bildIdeen) ? c.bildIdeen : [])
       .map((s) => String(s ?? "").trim())
       .filter(Boolean)
@@ -208,19 +211,20 @@ function prompt(aspekte: RoheAspekte, sprache: string): string {
 ${fmt(aspekte.buyingTriggers, "Kaufauslöser") || "(keine Kaufauslöser)"}
 ${fmt(aspekte.painPoints, "Pain Point") || "(keine Pain Points)"}
 
-AUFGABE: Verdichte diese Roh-Themen zu 4–8 benannten Erkenntnissen (Insight-Karten) in Sprache "${sprache}".
+AUFGABE: Verdichte diese Roh-Themen zu benannten Erkenntnissen (Insight-Karten) in Sprache "${sprache}".
 REGELN:
+0. KEINE Mindest- oder Zielmenge (D266): Liefere so viele Erkenntnisse, wie die Roh-Themen wirklich tragen — oft sind es zwei bis vier. Nichts auffüllen; ein Roh-Thema ohne eigene Erkenntnis bleibt lieber weg, als dass eine dünne Karte entsteht.
 1. Der Titel ist ein prägnanter Kaufgrund/Befund in Klartext (max. 10 Wörter) — KEIN wörtliches Kundenzitat, sondern die Abstraktion dahinter (Beispiel-Muster: "Stoppt Grasfressen & Sodbrennen schnell").
 2. Die Beschreibung (2–4 Sätze) erklärt nutzenorientiert, was dahintersteckt und warum es Kaufentscheidungen beeinflusst. Titel und Beschreibung dürfen NUR behaupten, was die O-Töne der Beleg-Aspekte wörtlich stützen — keine Steigerungen (aus „Bekannte haben es empfohlen" wird KEIN „Tierarzt-Tipp").
 3. GEGENSATZ-PFLICHT: Positive und negative Roh-Themen zum SELBEN Aspekt (z. B. "riecht gut" 8× + "riecht unangenehm" 19×) MÜSSEN zu GENAU EINER Erkenntnis gebündelt werden — NIE dasselbe Thema als getrennte positive UND negative Erkenntnis, damit kann niemand arbeiten. Beide Seiten kommen in belegAspekte. Der Titel folgt der Seite mit MEHR belegten Fundstellen (Zählwerte oben) und benennt die Gegenseite ehrlich mit (Beispiel-Muster: "Hohe Akzeptanz bei vielen Hunden, aber für wählerische Fresser eine Herausforderung").
 4. GEGENMASSNAHME: Bei so gebündelten Erkenntnissen leiten Beschreibung und bildIdeen aus der negativen Seite eine KONKRETE, durch O-Töne gedeckte Maßnahme ab (Beispiel-Muster: Hunde verweigern die Drops → Galeriebild, das das Untermischen ins Futter zeigt) — aus der negativen Erfahrung wird ein umsetzbarer Listing-Hebel.
-5. relevanz: 1–5 (5 = kaufentscheidend) — nach den Zählwerten oben, nicht nach Bauchgefühl.
+5. KEINE Relevanz-Angabe (D266): Die Relevanz rechnet der Code aus den verifizierten Zählwerten der Beleg-Aspekte. Liefere sie nicht mit.
 6. belegAspekte: die WORTGLEICHEN Labels der Roh-Themen oben, auf denen die Erkenntnis beruht (mindestens 1) — nichts erfinden, keine neuen Labels.
 7. bildIdeen: 2–3 konkrete visuelle Umsetzungsideen fürs Listing (Galeriebild, Infografik, A+-Modul). VERBOTEN: erfundene Autoritäts-Belege (Experten-Zitate, Testimonials, Siegel, Zertifikate, Zahlen), die nicht in den Roh-Themen belegt sind.
 8. kernThese: EIN Satz, der die wichtigste Erkenntnis der gesamten Analyse zusammenfasst.
 
 JSON-Schema:
-{"kernThese":"...","insights":[{"titel":"...","beschreibung":"...","relevanz":N,"bildIdeen":["..."],"belegAspekte":["wortgleiches Label", "..."]}]}`;
+{"kernThese":"...","insights":[{"titel":"...","beschreibung":"...","bildIdeen":["..."],"belegAspekte":["wortgleiches Label", "..."]}]}`;
 }
 
 export async function verdichteInsights(
@@ -251,10 +255,10 @@ export async function verdichteInsights(
       ...aspekte.painPoints.slice(0, 1).map((a) => ({ a, typ: "painPoint" as const })),
     ];
     return {
-      cards: top.map(({ a, typ }, i) => ({
+      cards: top.map(({ a, typ }) => ({
         titel: `Mock-Erkenntnis: ${a.label.slice(0, 90)}`,
         beschreibung: `Mock-Verdichtung aus dem Roh-Thema „${a.label}" (${a.mentionCount ?? "?"}× erwähnt) — in Produktion steht hier die abstrahierte Erkenntnis.`,
-        relevanz: 5 - i,
+        relevanz: belegRelevanz(1),
         quellen: opts.quellen,
         bildIdeen: ["Mock-Bildidee: Galeriebild zum Thema"],
         belegAspekte: [{ label: a.label, typ, mentionCount: a.mentionCount }],

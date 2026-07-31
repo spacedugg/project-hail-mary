@@ -1001,15 +1001,20 @@ export async function uploadCerebro(formData: FormData) {
     await db.update(schema.products).set({ price: Math.round(formPreis * 100) }).where(eq(schema.products.id, productId));
   }
 
-  const { parseCerebroCsv, computeSovAudit } = await import("@/lib/sov/audit");
+  const { parseCerebroCsv, computeSovAudit, wettbewerberAsinsAusRows } = await import("@/lib/sov/audit");
   let parseStatus = "ok", parseError: string | null = null, audit = null;
   let keywordCount = 0, aussortiert = 0, hasCompetitors = false, uebernommen = 0;
+  // Vergleichsprodukte stehen als Rang-Spalten im Export (D268): wer die CSV
+  // hochlädt, hat sie dort schon gewählt — sie danach für den Review-Scrape
+  // noch einmal von Hand einzutragen wäre derselbe Schritt zweimal.
+  let wettbewerberAsins: string[] = [];
   try {
     // keepUnranked: für die Keyword-Basis zählen auch Keywords OHNE Ranking
     // und OHNE Suchvolumen (SV 0 = Helium 10 kennt keins, D92)
     const alleRows = parseCerebroCsv(await file.text(), product.asin, { keepUnranked: true });
     if (alleRows.length === 0) throw new Error("Keine Keyword-Zeilen gefunden — ist das der Cerebro-Export?");
     hasCompetitors = alleRows.some((r) => Object.keys(r.compRanks).length > 0);
+    wettbewerberAsins = wettbewerberAsinsAusRows(alleRows);
 
     // Zusammenführung statt Ersetzen (D93, Nutzer-Vorgabe): eine bestehende
     // Basis geht durch einen weiteren Upload NIE verloren. Keywords aus
@@ -1073,7 +1078,7 @@ export async function uploadCerebro(formData: FormData) {
     marketplace: product.marketplace,
     reportType: "cerebro",
     fileName: file.name,
-    parsed: parseStatus === "ok" ? { productId, audit, hasCompetitors, keywordCount } : null,
+    parsed: parseStatus === "ok" ? { productId, audit, hasCompetitors, keywordCount, wettbewerberAsins } : null,
     parseStatus,
     parseError,
   });
@@ -1081,11 +1086,14 @@ export async function uploadCerebro(formData: FormData) {
   if (parseStatus === "error") {
     redirect(`/produkte/${productId}?fehler=${encodeURIComponent(`Keyword-Export: ${parseError}`)}&code=KW-01`);
   }
+  const asinInfo = wettbewerberAsins.length
+    ? ` Vergleichsprodukte aus dem Export übernommen (${wettbewerberAsins.length}): ${wettbewerberAsins.join(", ")} — der Review-Scrape zieht sie automatisch mit, keine Extra-Eingabe nötig.`
+    : "";
   const sovInfo = hasCompetitors
     ? "SOV-Audit erstellt (Sichtbarkeit & Analyse)."
     : "Kein SOV-Audit — der Export enthält keine Wettbewerber-ASIN-Spalten (für SOV in Cerebro Wettbewerber mitexportieren).";
   const mergeInfo = uebernommen > 0 ? ` Zusammengeführt: ${uebernommen} Keywords aus früheren Uploads übernommen, Duplikate nur einmal.` : "";
-  redirect(`/produkte/${productId}?hinweis=${encodeURIComponent(`Keyword-Basis ${uebernommen > 0 ? "zusammengeführt" : "erstellt"}: ${keywordCount} Keywords, davon ${aussortiert} als irrelevant aussortiert (unten prüfbar).${mergeInfo} ${sovInfo}`)}`);
+  redirect(`/produkte/${productId}?hinweis=${encodeURIComponent(`Keyword-Basis ${uebernommen > 0 ? "zusammengeführt" : "erstellt"}: ${keywordCount} Keywords, davon ${aussortiert} als irrelevant aussortiert (unten prüfbar).${mergeInfo} ${sovInfo}${asinInfo}`)}`);
 }
 
 /**
@@ -1371,6 +1379,192 @@ async function blockerKern(
 
 
 /**
+ * Conversion-Driver-Kern (D265): Ernte je Quelle → Verschmelzung → Gewichtung →
+ * Auswahl → Blocker + Ballast. Läuft NACH dem Feature-Ranking, weil dessen
+ * Features die Ballast-Bestimmung tragen (Merkmal im Listing ohne Resultat).
+ *
+ * Das Zuständigkeits-Gate läuft hier VOR jeder Zählung: Versand-Themen dürfen
+ * die Gewichtung nicht verschieben, und was nur die Produktverpackung betrifft,
+ * wird Produkt-Feedback statt Listing-Maßnahme.
+ */
+async function driverKern(
+  db: Awaited<ReturnType<typeof getDb>>,
+  product: NonNullable<Awaited<ReturnType<Awaited<ReturnType<typeof getDb>>["query"]["products"]["findFirst"]>>>,
+): Promise<string | null> {
+  const productId = product.id;
+  const snapshot = await db.query.listingSnapshots.findFirst({
+    where: eq(schema.listingSnapshots.productId, productId),
+    orderBy: desc(schema.listingSnapshots.createdAt),
+  });
+  if (!snapshot) throw new GenFehler("Der Driver-Lauf braucht den Listing-Import — er misst, ob ein Kaufgrund dort bewiesen ist.", "DRV-01");
+
+  const insight = await db.query.reviewInsights.findFirst({
+    where: eq(schema.reviewInsights.productId, productId),
+    orderBy: desc(schema.reviewInsights.createdAt),
+  });
+
+  // Redundanz-Guard (D81-Muster): dieselbe Datenbasis wird nicht doppelt geerntet.
+  const last = await db.query.conversionDrivers.findFirst({
+    where: eq(schema.conversionDrivers.productId, productId),
+    orderBy: desc(schema.conversionDrivers.createdAt),
+  });
+  const stand = Math.max(snapshot.createdAt.getTime(), insight?.createdAt.getTime() ?? 0);
+  if (last && stand <= last.createdAt.getTime()) {
+    return "Die Datenbasis ist seit dem letzten Driver-Lauf unverändert — das Ergebnis ist aktuell.";
+  }
+
+  const { normalisierePayload } = await import("@/lib/reviews/insights");
+  const { teileNachZustaendigkeit } = await import("@/lib/analysis/zustaendigkeit");
+  const { bildBelegeAusSnapshot } = await import("@/lib/analysis/abdeckung");
+  const { ernteDriverKandidaten } = await import("@/lib/analysis/driverErnte");
+  const { baueDriver } = await import("@/lib/analysis/driverAufbau");
+
+  // Ohne Bewertungs-Analyse trägt der Lauf trotzdem: Produkt-Wahrheit, Listing,
+  // Wettbewerber und Suchnachfrage reichen für Kandidaten (der Kaufgrund einer
+  // Kategorie steht nicht in Rezensionen).
+  const p = insight ? normalisierePayload(insight.payload) : null;
+  // Das Gate läuft seit D266 EINMAL beim Speichern der Roh-Analyse. Für
+  // Altbestand (Analyse vor D266) wird es hier nachgezogen — sonst zählten dort
+  // weiter Versand-Themen mit. Zweimal filtern ist unschädlich (idempotent).
+  const gate = teileNachZustaendigkeit({ painPoints: p?.painPoints ?? [], buyingTriggers: p?.buyingTriggers ?? [] });
+  const zustaendig = {
+    aspekte: gate.aspekte,
+    produktFeedback: p?.produktFeedback?.length ? p.produktFeedback : gate.produktFeedback,
+    hinweise: [
+      ...(p?.ausgeschlossenAmazon?.length
+        ? [`Zuständigkeits-Gate: ${p.ausgeschlossenAmazon.length} Versand-/Zustell-Thema/Themen sind nicht eingeflossen — dafür ist Amazon zuständig.`]
+        : gate.hinweise),
+    ],
+  };
+
+  const [kws, comps, featureRanking] = await Promise.all([
+    db.query.keywords.findMany({ where: eq(schema.keywords.productId, productId) }),
+    db.query.competitorListings.findMany({
+      where: eq(schema.competitorListings.productId, productId),
+      orderBy: desc(schema.competitorListings.createdAt),
+    }),
+    db.query.featureRankings.findFirst({
+      where: eq(schema.featureRankings.productId, productId),
+      orderBy: desc(schema.featureRankings.createdAt),
+    }),
+  ]);
+
+  // Je ASIN nur das neueste Listing — sonst zählt derselbe Wettbewerber doppelt.
+  const jeAsin = new Map<string, (typeof comps)[number]>();
+  for (const c of comps) if (!jeAsin.has(c.asin)) jeAsin.set(c.asin, c);
+  const wettbewerberListings = [...jeAsin.values()].map((c) => ({
+    asin: c.asin,
+    title: c.title,
+    bullets: c.bullets,
+    description: c.description,
+  }));
+
+  const f = product.facts;
+  const faktenText = [
+    f.productType, f.dimensions, ...(f.materials ?? []), ...(f.usps ?? []),
+    f.targetAudience, ...(f.certifications ?? []), product.zusatzKontext,
+  ].filter(Boolean).join("\n");
+
+  const quellen = {
+    title: snapshot.title,
+    bullets: snapshot.bullets ?? [],
+    description: snapshot.description,
+    attributes: snapshot.attributes,
+    importantInfo: snapshot.importantInfo,
+    aplusContent: snapshot.aplusContent,
+    bilder: (await import("@/lib/analysis/bildAuslese")).bilderAlsText(snapshot.bilderText) || null,
+  };
+
+  try {
+    const ernte = await ernteDriverKandidaten({
+      produktName: product.name,
+      kategorie: f.productType ?? null,
+      faktenText,
+      quellen,
+      wettbewerberListings,
+      aspekte: zustaendig.aspekte,
+      bilder: bildBelegeAusSnapshot(snapshot.bilderText),
+      keywords: kws.filter((k) => !k.ausgeschlossen).map((k) => ({ keyword: k.keyword, searchVolume: k.searchVolume })),
+      sprache: product.contentSprache,
+    });
+
+    // Kein Leer-Datensatz (Mock-Modus, zu dünne Quellen): eine Zeile ohne
+    // Driver wäre genau die Karteileiche, die D265 ausschließt.
+    if (ernte.kandidaten.length === 0) {
+      return [
+        "Der Driver-Lauf hat keine belegten Kandidaten gefunden — nichts gespeichert.",
+        ...ernte.hinweise,
+      ].join(" ");
+    }
+
+    const payload = baueDriver(ernte.kandidaten, {
+      quellen,
+      bilder: bildBelegeAusSnapshot(snapshot.bilderText),
+      keywords: kws.filter((k) => !k.ausgeschlossen).map((k) => ({ keyword: k.keyword, searchVolume: k.searchVolume })),
+      wettbewerberGesamt: wettbewerberListings.length,
+      stichprobe: p?.stats.reviewsTotal ?? 0,
+      aspekte: zustaendig.aspekte,
+      featureBegriffe: featureRanking?.payload.cards.map((c) => c.titel) ?? [],
+    });
+    payload.produktFeedback = zustaendig.produktFeedback;
+    payload.hinweise = [...zustaendig.hinweise, ...ernte.hinweise, ...payload.hinweise];
+    payload.verworfen += ernte.verworfen;
+
+    const dataBasis = [
+      `Listing-Import (${snapshot.source}, ${snapshot.createdAt.toLocaleDateString("de-DE")})`,
+      insight ? `Review-Insights (${insight.dataBasis}, ${p!.stats.reviewsTotal} Reviews)` : "ohne Bewertungs-Analyse",
+      `${wettbewerberListings.length} Wettbewerber-Listing(s)`,
+      `${kws.filter((k) => !k.ausgeschlossen && (k.searchVolume ?? 0) > 0).length} Keywords mit Suchvolumen`,
+      featureRanking ? "Feature-Ranking (Ballast-Abgleich)" : "ohne Feature-Ranking (kein Ballast-Abgleich)",
+    ];
+    await db.insert(schema.conversionDrivers).values({ id: id(), productId, payload, dataBasis });
+  } catch (e) {
+    if (e instanceof GenFehler) throw e;
+    throw new GenFehler(`Driver-Lauf: ${e instanceof Error ? e.message : String(e)}`, "DRV-01");
+  }
+  return null;
+}
+
+/**
+ * Bilder-Briefing erzeugen (D269) — je Sprache eine Fassung. Die englische
+ * entsteht immer aus der deutschen, damit beide dasselbe Briefing sind.
+ */
+export async function erzeugeBildBriefingAction(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const sprache = String(formData.get("sprache") ?? "de") === "en" ? "en" : "de";
+  const { erzeugeBildBriefing } = await import("@/lib/analysis/briefingErzeugung");
+  const res = await erzeugeBildBriefing(productId, sprache);
+  revalidatePath(`/produkte/${productId}/briefs`);
+  if (!res.ok) {
+    redirect(`/produkte/${productId}/briefs?sprache=${sprache}&fehler=${encodeURIComponent(res.grund)}`);
+  }
+  redirect(`/produkte/${productId}/briefs?sprache=${sprache}`);
+}
+
+/**
+ * Insights-Dokument erzeugen (D267): eine deterministische Projektion der
+ * vorhandenen Analyse-Zeilen, eingefroren und über einen eigenen Token
+ * erreichbar. Kein LLM. Scheitert das Auslieferungs-Gate, entsteht KEIN
+ * Dokument — ein halbes Dokument beim Kunden wäre schlimmer als keines.
+ */
+export async function erzeugeInsightsDokument(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const { erzeugeInsightsReport } = await import("@/lib/reports/insightsLauf");
+  const res = await erzeugeInsightsReport(productId);
+
+  if (!res.ok) {
+    const detail = res.verstoesse?.length ? ` ${res.verstoesse.join(" ")}` : "";
+    redirect(
+      `/produkte/${productId}?tab=analyse&fehler=${encodeURIComponent(`${res.grund}${detail}`)}&code=INS-01`,
+    );
+  }
+  revalidatePath(`/produkte/${productId}`);
+  redirect(
+    `/produkte/${productId}?tab=analyse&hinweis=${encodeURIComponent(`Insights-Dokument Version ${res.version} erzeugt — Link ist bereit.`)}`,
+  );
+}
+
+/**
  * Ein-Klick-Pipeline (D172): EINE Etappe je Aufruf — der Client-Runner reiht
  * die Etappen und bleibt so unterm Vercel-Request-Limit (D136). Fehler kommen
  * als Wert zurück (kein Redirect), damit der Runner sie anzeigen und die
@@ -1380,7 +1574,7 @@ export type PipelineErgebnis = { ok: boolean; hinweis?: string; fehler?: string;
 
 export async function runPipelineStufe(
   productId: string,
-  stufe: "listing" | "scrape" | "auswertung" | "wettbewerb-texte" | "verdichtung" | "blocker" | "features" | "audit" | "content",
+  stufe: "listing" | "scrape" | "auswertung" | "wettbewerb-texte" | "verdichtung" | "blocker" | "features" | "driver" | "audit" | "content",
   extra?: { asins?: string[]; section?: string; force?: boolean; ohneAnalyseBestaetigt?: boolean; aplusBilder?: import("@/lib/analysis/bildAuslese").AplusBild[] },
 ): Promise<PipelineErgebnis> {
   const db = await getDb();
@@ -1415,6 +1609,8 @@ export async function runPipelineStufe(
         return { ok: true, hinweis: (await blockerKern(db, product)) ?? undefined };
       case "features":
         return { ok: true, hinweis: (await featuresKern(db, product)) ?? undefined };
+      case "driver":
+        return { ok: true, hinweis: (await driverKern(db, product)) ?? undefined };
       case "audit":
         return { ok: true, hinweis: (await auditKern(db, product)) ?? undefined };
       case "content": {
@@ -1441,7 +1637,8 @@ export async function runPipelineStufe(
     }
   } catch (e) {
     if (e instanceof GenFehler) return { ok: false, fehler: e.message, code: e.code };
-    const fallback = stufe === "verdichtung" ? "VER-01" : stufe === "content" ? "GEN-01" : "ALG-00";
+    const fallback =
+      stufe === "verdichtung" ? "VER-01" : stufe === "driver" ? "DRV-01" : stufe === "content" ? "GEN-01" : "ALG-00";
     return { ok: false, fehler: e instanceof Error ? e.message : String(e), code: fallback };
   }
   // BEWUSST kein revalidatePath je Etappe (Review-Fix): der neue RSC-Baum
@@ -1454,6 +1651,33 @@ export async function runPipelineStufe(
  * Code, gibt bei Redundanz-Guard einen Hinweis zurück. KEINE Auswertung —
  * die ist eine eigene Etappe (auswertungKern).
  */
+/**
+ * Vergleichs-ASINs eines Produkts aus dem letzten Keyword-Export (D268).
+ *
+ * Eine Quelle, kein zweiter Eintrag: Die Wettbewerber, gegen die die
+ * Keyword-Recherche gelaufen ist, sind dieselben, deren Bewertungen wir lesen
+ * wollen. Der Scrape holt sie sich daher selbst, statt sie von der Maske zu
+ * verlangen — der manuelle Zwischenschritt fällt weg.
+ */
+export async function vergleichsAsinsAusKeywordExport(
+  db: Awaited<ReturnType<typeof getDb>>,
+  product: { id: string; brandId: string; asin: string | null },
+): Promise<string[]> {
+  const uploads = await db.query.reportUploads.findMany({
+    where: and(eq(schema.reportUploads.brandId, product.brandId), eq(schema.reportUploads.reportType, "cerebro")),
+    orderBy: desc(schema.reportUploads.createdAt),
+  });
+  const eigene = uploads.find(
+    (u) => u.parseStatus === "ok" && (u.parsed as { productId?: string } | null)?.productId === product.id,
+  );
+  const asins = (eigene?.parsed as { wettbewerberAsins?: unknown } | null)?.wettbewerberAsins;
+  if (!Array.isArray(asins)) return [];
+  const eigeneAsin = product.asin?.trim().toUpperCase();
+  return [...new Set(asins.map((a) => String(a ?? "").trim().toUpperCase()).filter(Boolean))].filter(
+    (a) => a !== eigeneAsin,
+  );
+}
+
 async function scrapeKern(
   db: Awaited<ReturnType<typeof getDb>>,
   product: NonNullable<Awaited<ReturnType<Awaited<ReturnType<typeof getDb>>["query"]["products"]["findFirst"]>>>,
@@ -1462,8 +1686,22 @@ async function scrapeKern(
   force = false,
 ): Promise<string | null> {
   const productId = product.id;
+
+  // Vergleichsprodukte automatisch aus dem Keyword-Export (D268): Sie stehen
+  // dort als Rang-Spalten und sind dieselben Produkte, deren Bewertungen wir
+  // lesen wollen. Ausdrücklich übergebene ASINs gewinnen und werden ergänzt,
+  // nicht ersetzt — eine Hand-Eingabe darf der Automatik nie zum Opfer fallen.
+  const ausExport = await vergleichsAsinsAusKeywordExport(db, product);
+  const eigene = product.asin ? [product.asin.trim().toUpperCase()] : [];
+  const zusammen = [...new Set([...eigene, ...asins.map((a) => a.trim().toUpperCase()).filter(Boolean), ...ausExport])];
+  const ergaenzt = ausExport.filter((a) => !asins.some((x) => x.trim().toUpperCase() === a));
+  asins = zusammen;
+
   if (asins.length === 0) {
-    throw new GenFehler("Review-Scrape: keine ASIN angegeben — mindestens einen ASIN-Chip stehen lassen.", "REV-04");
+    throw new GenFehler(
+      "Review-Scrape: keine ASIN vorhanden — das Produkt braucht eine ASIN, oder der Keyword-Export muss Vergleichsprodukte enthalten.",
+      "REV-04",
+    );
   }
 
   // Redundanz-Guard (D81): identische ASIN-Menge, jünger als 24 h → kein
@@ -1495,6 +1733,13 @@ async function scrapeKern(
   const scrapeMarkt = marktPasst ? product.marketplace : marktplatzFuerSprache(product.contentSprache);
   try {
     ({ reviews, notes } = await scrapeReviews(asins, { domain: amazonDomain(scrapeMarkt) }));
+    // Automatik sichtbar machen (D268): Was der Lauf selbst ergänzt hat, steht
+    // in der Datenbasis — sonst wüsste niemand, woher die ASINs kommen.
+    if (ergaenzt.length) {
+      notes.unshift(
+        `Vergleichsprodukte automatisch aus dem Keyword-Export übernommen (${ergaenzt.length}): ${ergaenzt.join(", ")}.`,
+      );
+    }
     if (!marktPasst) {
       notes.unshift(`Sprach-Gate: Scrape lief gegen amazon.${amazonDomain(scrapeMarkt)} — der Marktplatz der Content-Sprache (${SPRACH_NAMEN[product.contentSprache]}), nicht amazon.${amazonDomain(product.marketplace)}.`);
     }
@@ -1713,6 +1958,25 @@ async function auswertungKern(
       // Nicht-blockierend: ohne Urteil gelten Wettbewerbs-Aspekte als „unbekannt"
       console.error("[TRANSFER-CHECK] übersprungen:", transferFehler instanceof Error ? transferFehler.message : transferFehler);
     }
+    // Zuständigkeits-Gate EINMAL an der Quelle (D266): Versand-/Zustell-Themen
+    // gehören Amazon — sie dürfen weder Zählwerte verschieben noch über
+    // `analyzeListing()` eine Maßnahme erzeugen, die kein Text lösen kann.
+    // Verpackungs-/Transportschaden bleibt Seller-Sache, aber als
+    // Produkt-Feedback getrennt von allem Listing-Wirksamen.
+    const { teileNachZustaendigkeit } = await import("@/lib/analysis/zustaendigkeit");
+    const gate = teileNachZustaendigkeit({
+      painPoints: res.payload.painPoints,
+      buyingTriggers: res.payload.buyingTriggers,
+    });
+    res.payload = {
+      ...res.payload,
+      painPoints: gate.aspekte.painPoints,
+      buyingTriggers: gate.aspekte.buyingTriggers,
+      produktFeedback: gate.produktFeedback.length ? gate.produktFeedback : undefined,
+      ausgeschlossenAmazon: gate.ausgeschlossen.length ? gate.ausgeschlossen : undefined,
+      qualitaetsNotizen: [...(res.payload.qualitaetsNotizen ?? []), ...gate.hinweise],
+    };
+
     await db.insert(schema.reviewInsights).values({
       id: id(), productId, scrapeId: scrape.id, dataBasis, confidence: res.confidence, payload: res.payload,
     });

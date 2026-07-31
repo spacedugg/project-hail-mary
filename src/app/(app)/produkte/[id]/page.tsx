@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { saveKeywords, deriveKeywordsFromSov, generateContent, deleteProductAction, uploadCerebro, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, resetContentChain, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarke, saveContentPlan } from "@/app/actions";
+import { erzeugeInsightsDokument, saveKeywords, deriveKeywordsFromSov, generateContent, deleteProductAction, uploadCerebro, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, resetContentChain, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarke, saveContentPlan } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
@@ -14,6 +15,8 @@ import { amazonDomain, SPRACH_NAMEN } from "@/lib/text/sprache";
 import { GenerierSperre, GenerierButton } from "@/components/generier-sperre";
 import { BewertungsDashboard } from "@/components/bewertungs-dashboard";
 import { InsightKarte } from "@/components/insight-karte";
+import { DriverBlock } from "@/components/driver-karten";
+import { CopyLink } from "@/components/copy-link";
 import { fehlerInfo } from "@/lib/fehlercodes";
 import { normalisierePayload } from "@/lib/reviews/insights";
 import { kartenKlasse } from "@/lib/reviews/verdichtung";
@@ -124,7 +127,7 @@ export default async function ProductPage({
 
   // Unabhängige Queries parallel (Review-Fix): jeder Reiter-Wechsel zahlte
   // vorher 8+ serielle Roundtrips.
-  const [kws, insights, scrape, uploads, versions, snapshot, blockerLauf, deepAudit, featureRanking, parentBrand] = await Promise.all([
+  const [kws, insights, scrape, uploads, versions, snapshot, blockerLauf, deepAudit, featureRanking, parentBrand, driverLauf, insightsReports] = await Promise.all([
     db.query.keywords.findMany({ where: eq(schema.keywords.productId, id) }),
     db.query.reviewInsights.findFirst({ where: eq(schema.reviewInsights.productId, id), orderBy: desc(schema.reviewInsights.createdAt) }),
     db.query.reviewScrapes.findFirst({ where: eq(schema.reviewScrapes.productId, id), orderBy: desc(schema.reviewScrapes.createdAt) }),
@@ -135,7 +138,32 @@ export default async function ProductPage({
     db.query.deepAudits.findFirst({ where: eq(schema.deepAudits.productId, id), orderBy: desc(schema.deepAudits.createdAt) }),
     db.query.featureRankings.findFirst({ where: eq(schema.featureRankings.productId, id), orderBy: desc(schema.featureRankings.createdAt) }),
     db.query.brands.findFirst({ where: eq(schema.brands.id, product.brandId) }),
+    // Conversion Driver (D265) — löst die getrennten Driver-/Blocker-Listen ab,
+    // sobald für dieses Produkt ein Lauf existiert.
+    db.query.conversionDrivers.findFirst({
+      where: eq(schema.conversionDrivers.productId, id),
+      orderBy: desc(schema.conversionDrivers.createdAt),
+    }),
+    // Insights-Dokument (D267): eingefrorene Kunden-Versionen, neueste zuerst.
+    db.query.insightsReports.findMany({
+      where: eq(schema.insightsReports.productId, id),
+      orderBy: desc(schema.insightsReports.version),
+      limit: 5,
+    }),
   ]);
+  // Vergleichsprodukte aus dem Keyword-Export (D268): dieselben Produkte, gegen
+  // die die Keyword-Recherche gelaufen ist — sie werden vorbelegt, statt sie ein
+  // zweites Mal von Hand zu verlangen.
+  const vergleichsAsins = (() => {
+    const eigen = uploads.find(
+      (u) => u.reportType === "cerebro" && u.parseStatus === "ok" && (u.parsed as { productId?: string })?.productId === id,
+    );
+    const rohe = (eigen?.parsed as { wettbewerberAsins?: unknown } | null)?.wettbewerberAsins;
+    if (!Array.isArray(rohe)) return [] as string[];
+    const eigeneAsin = product.asin?.trim().toUpperCase();
+    return [...new Set(rohe.map((a) => String(a ?? "").trim().toUpperCase()).filter(Boolean))].filter((a) => a !== eigeneAsin);
+  })();
+
   const sovUpload = uploads.find(
     (u) => u.reportType === "cerebro" && u.parseStatus === "ok" && (u.parsed as { productId?: string })?.productId === id,
   );
@@ -146,6 +174,14 @@ export default async function ProductPage({
   const fmt = (n: number) => new Intl.NumberFormat("de-DE").format(n);
   const fmtEur = (n: number) => `${new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)} €`;
   const fmtPct = (n: number) => `${new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(n)} %`;
+
+  // Basis-URL für den Kunden-Link des Insights-Dokuments (D267) — dieselbe
+  // Herleitung wie beim Freigabe-Portal, damit Links in allen Umgebungen stimmen.
+  const kopfzeilen = await headers();
+  const headersListe = {
+    proto: kopfzeilen.get("x-forwarded-proto") ?? "http",
+    host: kopfzeilen.get("host") ?? "localhost:3000",
+  };
 
   const backHref = parentBrand?.kind === "workbench" ? "/optimizer" : `/marke/${product.brandId}/katalog`;
   // Der aktuelle Scrape ist analysiert (D79) → kein Analyse-Button mehr, nur Dashboard.
@@ -528,7 +564,7 @@ export default async function ProductPage({
               <SubmitButton className="mt-2 btn-dark text-xs">Produktbeschreibung speichern</SubmitButton>
             </form>
           </details>
-          <AnalyseStart productId={product.id} mainAsin={product.asin} />
+          <AnalyseStart productId={product.id} mainAsin={product.asin} vergleichsAsins={vergleichsAsins} />
         </section>
         )}
 
@@ -543,7 +579,7 @@ export default async function ProductPage({
 
           {/* EIN Weg zum Aktualisieren (D177): derselbe Etappen-Lauf wie beim Start,
               nur ohne Content — hält auch Blocker, Features und KI-Bewertung frisch */}
-          <AnalyseStart productId={product.id} mainAsin={product.asin} nurAnalyse />
+          <AnalyseStart productId={product.id} mainAsin={product.asin} nurAnalyse vergleichsAsins={vergleichsAsins} />
           {!product.asin && <p className="mt-2 text-xs text-warn">△ Dafür braucht das Produkt eine ASIN.</p>}
           {scrape && (() => {
             // Zahlen-Basen NIE mischen (D129, Nutzer-Befund): Die Amazon-Gesamtzahl
@@ -634,9 +670,79 @@ export default async function ProductPage({
         {insights && <BewertungsDashboard insight={insights} scrape={scrape ?? null} productId={product.id} productAsin={product.asin} />}
         </>)}
 
-        {/* Conversion Drivers (D178): was Kunden kaufen lässt — Insight-Karten
-            mit code-gerechneter positiver Klasse, nach Relevanz sortiert */}
-        {insights && tab === "analyse" && (() => {
+        {/* Conversion Driver & Blocker (D265): EIN Modell, zwei Projektionen —
+            jeder Blocker trägt seine Driver-ID. Ersetzt die beiden getrennten
+            Listen unten, sobald ein Lauf vorliegt. */}
+        {/* Insights-Dokument (D267): herunterladbar UND als Link für den Kunden —
+            dieselbe Seite ist der Ausdruck, kein zweites Layout. */}
+        {driverLauf && tab === "analyse" && (() => {
+          const h = headersListe;
+          const basisUrl = `${h.proto}://${h.host}`;
+          const neuester = insightsReports[0] ?? null;
+          const veraltet = neuester ? neuester.createdAt < driverLauf.createdAt : false;
+          return (
+            <section className="card p-5">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="text-sm font-semibold">Insights-Dokument für den Kunden</h2>
+                {neuester && <span className="text-[11px] text-muted">Version {neuester.version} · {neuester.createdAt.toLocaleDateString("de-DE")}</span>}
+              </div>
+              <p className="mt-1 text-xs text-muted">
+                Vier Seiten aus dieser Analyse — Kaufgründe, Abdeckung, Handlungsplan, Grenzen. Eingefroren: der Link
+                zeigt immer denselben Stand. „Als PDF speichern“ steckt in der Seite selbst.
+              </p>
+              {neuester && (
+                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-hair p-3">
+                  <a href={`/insights/${neuester.token}`} target="_blank" rel="noopener noreferrer" className="btn-primary text-xs">
+                    Dokument öffnen ↗
+                  </a>
+                  <CopyLink url={`${basisUrl}/insights/${neuester.token}`} className="btn-ghost text-xs" />
+                  <span className="font-mono text-[11px] text-muted">/insights/{neuester.token.slice(0, 12)}…</span>
+                  {veraltet && (
+                    <span className="pill pill-warn">Analyse ist neuer als dieses Dokument — neue Version erzeugen</span>
+                  )}
+                </div>
+              )}
+              <form action={erzeugeInsightsDokument} className="mt-3">
+                <input type="hidden" name="productId" value={product.id} />
+                <SubmitButton className={neuester ? "btn-dark text-xs" : "btn-primary text-xs"} pendingLabel="Baut Dokument…">
+                  {neuester ? "Neue Version erzeugen" : "Dokument erzeugen"}
+                </SubmitButton>
+              </form>
+              {insightsReports.length > 1 && (
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-xs text-muted hover:text-foreground">
+                    Frühere Versionen ({insightsReports.length - 1})
+                  </summary>
+                  <ul className="mt-1.5 space-y-1">
+                    {insightsReports.slice(1).map((r) => (
+                      <li key={r.id} className="flex items-baseline gap-2 text-[11px]">
+                        <span className="text-muted">Version {r.version} · {r.createdAt.toLocaleDateString("de-DE")}</span>
+                        <a href={`/insights/${r.token}`} target="_blank" rel="noopener noreferrer" className="text-primary-strong hover:underline">öffnen ↗</a>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </section>
+          );
+        })()}
+
+        {driverLauf && tab === "analyse" && (
+          <DriverBlock
+            lauf={driverLauf}
+            /* Karten mit negativer/ausgeglichener Tendenz waren seit D243 in
+               keinem Reiter sichtbar (D266) — sie sind kein Kaufgrund, sondern
+               Erwartungs-Management, und gehören in den Risiko-Block. */
+            risiken={(insights ? normalisierePayload(insights.payload).insightCards ?? [] : []).filter(
+              (k) => kartenKlasse(k) !== "positiv",
+            )}
+          />
+        )}
+
+        {/* Alt-Ansicht (D178) — nur solange für dieses Produkt kein Driver-Lauf
+            existiert. Beides gleichzeitig wäre genau die Doppelung, die D265
+            abstellt. */}
+        {!driverLauf && insights && tab === "analyse" && (() => {
           const treiber = (normalisierePayload(insights.payload).insightCards ?? []).filter((k) => kartenKlasse(k) === "positiv");
           if (treiber.length === 0) return null;
           return (
@@ -651,7 +757,7 @@ export default async function ProductPage({
           );
         })()}
 
-        {bereit && tab === "analyse" && (
+        {!driverLauf && bereit && tab === "analyse" && (
         <section className="card p-5">
           <CardHead
             icon={<IconSichtbarkeit />}

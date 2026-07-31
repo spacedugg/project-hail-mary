@@ -190,6 +190,52 @@ export function pruefeZahlenTreue(text: string, quellen: string, rulePrefix: str
 }
 
 /**
+ * Claim-Stärke gegen Messwert (D265, Nutzer-Befund 30.07. am Referenz-Muster):
+ * Ein Listing bewarb „flüsterleiser Motor", die eigene Spezifikation nennt
+ * ≤ 55 dB — das ist Gesprächslautstärke, Flüstern liegt bei etwa 30 dB. Die
+ * Zahl ist belegt, die Steigerung darüber ist erfunden; `pruefeZahlenTreue`
+ * konnte das nie fassen, weil im Claim gar keine Zahl steht.
+ *
+ * Deshalb hier: Intensitäts-Wort gegen den gemessenen Wert derselben Dimension.
+ * Ohne Messwert in den Quellen bleibt der Check ehrlich passiv — behauptet also
+ * nie einen Verstoß, den er nicht belegen kann. Die Struktur ist auf weitere
+ * Dimensionen erweiterbar (Gewicht, Geschwindigkeit), sobald belastbare
+ * Schwellen dafür im Wissens-Layer stehen.
+ *
+ * Reihenfolge ist bedeutungstragend: „angenehm leise" enthält „leise" und muss
+ * VOR dem nackten „leise" greifen, sonst urteilt die strengere Stufe falsch.
+ */
+const CLAIM_BAENDER: Array<{ muster: RegExp; einheit: "dB"; maxWert: number; belegbar: string }> = [
+  { muster: /flüsterleise|flüsterleis\w*|lautlos|geräuschlos|unhörbar|kaum hörbar|nicht hörbar/i, einheit: "dB", maxWert: 30, belegbar: "angenehm leise" },
+  { muster: /(sehr|besonders|extrem|super)\s+leise/i, einheit: "dB", maxWert: 40, belegbar: "leise" },
+  { muster: /angenehm leise|geräuscharm|leiselauf/i, einheit: "dB", maxWert: 55, belegbar: "hörbar, aber unauffällig" },
+  { muster: /\bleise[rnms]?\b/i, einheit: "dB", maxWert: 50, belegbar: "angenehm leise" },
+];
+
+/** Höchster belegter Messwert einer Einheit in den Quellen („≤ 55 dB" → 55). */
+function messwertAusQuellen(quellen: string, einheit: "dB"): number | null {
+  const re = new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*${einheit}\\b`, "gi");
+  const werte = [...quellen.matchAll(re)].map((m) => Number(m[1].replace(",", ".")));
+  return werte.length ? Math.max(...werte) : null;
+}
+
+export function pruefeClaimStaerke(text: string, quellen: string, rulePrefix: string): ValidationIssue[] {
+  if (!quellen.trim()) return []; // ohne Quellen ehrlich passiv
+  const band = CLAIM_BAENDER.find((b) => b.muster.test(text));
+  if (!band) return [];
+  const wert = messwertAusQuellen(quellen, band.einheit);
+  if (wert === null || wert <= band.maxWert) return [];
+  const wort = text.match(band.muster)?.[0] ?? "";
+  return [
+    issue(
+      `${rulePrefix}.claim-staerke`,
+      "error",
+      `Text sagt „${wort}" — die Produktdaten nennen ${wert.toLocaleString("de-DE")} ${band.einheit}; das trägt diese Steigerung nicht (belegbar bis ${band.maxWert} ${band.einheit}). Belegbare Formulierung: „${band.belegbar}".`,
+    ),
+  ];
+}
+
+/**
  * Deterministischer Fakten-Fixer (D198, Nutzer-Befund 23.07.: „sieben
  * Bestandteile"/„einer Woche" blockten 3× in Folge): Sätze mit erfundener oder
  * widersprüchlicher Zahl werden GESTRICHEN — Zahlen entscheidet der Code, nicht
@@ -425,6 +471,7 @@ export function validateTitle(title: string, ctx: Ctx = {}): ValidationIssue[] {
     issues.push(issue("title.keyword-window", "error", `Hauptkeyword „${primary}" ist im Titel nicht abgedeckt — jeder Wortstamm muss vorkommen (Flexion/Komposita zählen: „Ulmenrinde-Drops für Hunde" deckt „ulmenrinde für hunde").`));
 
   issues.push(...pruefeZahlenTreue(t, ctx.zahlenQuellen ?? "", "title"));
+  issues.push(...pruefeClaimStaerke(t, ctx.zahlenQuellen ?? "", "title"));
 
   // Keyword-Wiederholung: kein signifikantes Wort >1× (Stamm-Vergleich); Zahlen/Kurzwörter ok
   const tokens = t.split(/\s+/).map(normalizeToken).filter((w) => w.length >= 4);
@@ -511,6 +558,7 @@ export function validateBullets(bullets: string[], ctx: Ctx = {}): ValidationIss
   bullets.forEach((b, i) => {
     const n = i + 1;
     issues.push(...pruefeZahlenTreue(b, ctx.zahlenQuellen ?? "", "bullets").map((x) => ({ ...x, message: `Bullet ${n}: ${x.message}` })));
+    issues.push(...pruefeClaimStaerke(b, ctx.zahlenQuellen ?? "", "bullets").map((x) => ({ ...x, message: `Bullet ${n}: ${x.message}` })));
     issues.push(...pruefeKeywordEcho(b, ctx.alleKeywords ?? [], "bullets").map((x) => ({ ...x, message: `Bullet ${n}: ${x.message}` })));
   });
   issues.push(...pruefeBulletDopplung(bullets));
@@ -581,6 +629,7 @@ export function validateDescription(description: string, bullets: string[] = [],
   const t = description.trim();
   if (!t) return [issue("description.empty", "error", "Beschreibung fehlt.")];
   issues.push(...pruefeZahlenTreue(t, ctx.zahlenQuellen ?? "", "description"));
+  issues.push(...pruefeClaimStaerke(t, ctx.zahlenQuellen ?? "", "description"));
   issues.push(...pruefeKeywordEcho(t, ctx.alleKeywords ?? [], "description"));
 
   // Keine Frage-Sätze in der Beschreibung (D203): Fragen gehören in die
@@ -614,6 +663,7 @@ export function validateItemHighlights(text: string, ctx: Ctx = {}): ValidationI
   const t = text.trim();
   if (!t) return [issue("highlights.empty", "error", "Item Highlights fehlen.")];
   issues.push(...pruefeZahlenTreue(t, ctx.zahlenQuellen ?? "", "highlights"));
+  issues.push(...pruefeClaimStaerke(t, ctx.zahlenQuellen ?? "", "highlights"));
   issues.push(...pruefeKeywordEcho(t, ctx.alleKeywords ?? [], "highlights"));
   issues.push(...pruefeTitelDopplung(t, ctx.freigegebenerTitel ?? "", "highlights"));
   const chars = charLength(t);
@@ -649,6 +699,7 @@ export function validateQa(pairs: Array<{ q: string; a: string }>, ctx: Ctx = {}
     issues.push(...findCompetitorBrands(`${p.q} ${p.a}`, ctx, "qa"));
   });
   issues.push(...pruefeZahlenTreue(pairs.map((p) => `${p.q} ${p.a}`).join("\n"), ctx.zahlenQuellen ?? "", "qa"));
+  issues.push(...pruefeClaimStaerke(pairs.map((p) => `${p.q} ${p.a}`).join("\n"), ctx.zahlenQuellen ?? "", "qa"));
   return issues;
 }
 
