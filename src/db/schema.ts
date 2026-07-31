@@ -215,6 +215,18 @@ export const products = pgTable(
     contentPlan: jsonb("content_plan").$type<
       import("@/lib/recipes/listing").ListingSection[]
     >(),
+    /**
+     * Werk-Auswahl (D270): WELCHE Werke für dieses Produkt überhaupt entstehen
+     * sollen — Listing-Texte, Bilder-Briefing, A+ Basic, A+ Premium,
+     * Brand-Store. Eine Ebene ÜBER `contentPlan` (der die Bausteine innerhalb
+     * des Werks „Listing" wählt).
+     *
+     * `null` = keine Entscheidung ⇒ `WERKE_STANDARD` (nur Listing), damit
+     * laufende Ketten weiterlaufen. Leeres Array = bewusst „nichts erstellen".
+     * Vorher wurden A+ Basic, A+ Premium und Store bei jedem Aufruf des
+     * Briefings-Reiters gebaut — ungefragt, auch ohne Premium-Zugang.
+     */
+    werkePlan: jsonb("werke_plan").$type<import("@/lib/content/werke").Werk[]>(),
     createdAt: ts("created_at").notNull(),
   },
   (t) => [uniqueIndex("products_brand_asin_mp").on(t.brandId, t.asin, t.marketplace)],

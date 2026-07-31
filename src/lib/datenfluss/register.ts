@@ -279,6 +279,64 @@ export const DATENFLUSS: Datenpunkt[] = [
     anzeige: ["Produkt-Arbeitsplatz — sichtbar in der Analyse-Start-Maske vor dem Lauf"],
   },
   {
+    id: "werk-auswahl",
+    name: "Auftragsumfang (welche Werke · welche Listing-Sektionen)",
+    quelle:
+      "Haken-Auswahl „Was soll erstellt werden?“ — im Produkt-Arbeitsplatz, in der Übertragungs-Maske einer Variations-Familie (D261) und im Briefings-Reiter (D270)",
+    speicher: "products (werke_plan = Werke D270, content_plan = Sektionen D257)",
+    analysen: [
+      {
+        name: "Wirksame Auswahl",
+        modul: "src/lib/content/werke.ts",
+        outcome:
+          "Werke in Code-Reihenfolge, dedupliziert; keine Entscheidung (null) ⇒ nur Listing-Texte, leere Auswahl ⇒ bewusst nichts — A+ Basic, A+ Premium, Store und Bilder-Briefing entstehen NIE ungefragt",
+      },
+      {
+        name: "Wirksamer Sektions-Plan",
+        modul: "src/lib/content/plan.ts",
+        outcome: "geplante Sektionen, nächste geplante Sektion, geplante Vorgänger — Abgewähltes blockiert die Kette nie",
+      },
+      {
+        name: "Durchsetzung am Generierungs-Eingang",
+        modul: "src/app/actions.ts",
+        outcome:
+          "Listing-Texte ohne gewähltes Werk ⇒ GEN-06-Block; Bilder-Briefing ohne Werk ⇒ Banner statt Lauf; die Freigabe-Kette taktet bei abgewähltem Listing NICHT weiter (D181: Auswahl ist Gesetz, kein UI-Grau)",
+      },
+    ],
+    verwendung: [
+      "Generierungs-Eingang: Was nicht beauftragt ist, wird nicht erzeugt — auch nicht per Direkt-POST",
+      "Taktgeber der geführten Kette (D195/D257): nächste Sektion und blockierende Vorgänger",
+      "Umfang der Varianten-Ableitung auf einem Parent (D261)",
+      "Briefings-Reiter: entscheidet, welche Briefs überhaupt assembliert werden",
+    ],
+    anzeige: [
+      "Produkt-Arbeitsplatz (Content-Reiter): Auswahl + Hinweis „Werk nicht ausgewählt“ statt Generier-Knopf; bereits erzeugte Texte bleiben als Archiv sichtbar",
+      "Briefings-Reiter: nur beauftragte Briefings, sonst ehrlicher Leerzustand",
+    ],
+    felder: [
+      // Absichtlich der Property-Name (nicht die Spalte „werke_plan"): so prüft der
+      // Test wirklich die lesenden Code-Stellen, nicht nur die Schema-Definition.
+      {
+        feld: "products.werkePlan",
+        consumer: [
+          "src/app/actions.ts",
+          "src/components/werk-auswahl.tsx",
+          "src/app/(app)/produkte/[id]/page.tsx",
+          "src/app/(app)/produkte/[id]/briefs/page.tsx",
+        ],
+      },
+      {
+        feld: "products.contentPlan",
+        consumer: [
+          "src/app/actions.ts",
+          "src/components/werk-auswahl.tsx",
+          "src/app/(app)/produkte/[id]/page.tsx",
+          "src/lib/variants/laden.ts",
+        ],
+      },
+    ],
+  },
+  {
     id: "content",
     name: "Generierter Content (Titel, Bullets, Highlights, Backend, Beschreibung, Q&A)",
     quelle: "Ein-Klick-Lauf oder Einzel-Generierung je Sektion — entsteht NUR über die QM-Schleife (D182)",

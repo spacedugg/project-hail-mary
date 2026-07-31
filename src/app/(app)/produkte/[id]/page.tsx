@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { erzeugeInsightsDokument, saveKeywords, deriveKeywordsFromSov, generateContent, deleteProductAction, uploadCerebro, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, resetContentChain, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarke, saveContentPlan } from "@/app/actions";
+import { erzeugeInsightsDokument, saveKeywords, deriveKeywordsFromSov, generateContent, deleteProductAction, uploadCerebro, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, resetContentChain, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarke } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
@@ -29,6 +29,8 @@ import { AnalyseHintergrund } from "@/components/analyse-hintergrund";
 import { analyzeListing, wirksamesListing } from "@/lib/analysis/listingAudit";
 import { snapshotBildBelege } from "@/lib/analysis/bildAuslese";
 import { dbTypFuer, geplanteVorgaenger, wirksamerPlan, SEKTIONS_LABEL } from "@/lib/content/plan";
+import { wirksameWerke, WERK_LABEL } from "@/lib/content/werke";
+import { WerkAuswahl } from "@/components/werk-auswahl";
 import { BildKacheln } from "@/components/bild-kacheln";
 import { bereinigeBildUrls } from "@/lib/scrape/bilder";
 import type { SovAudit } from "@/lib/sov/audit";
@@ -219,30 +221,19 @@ export default async function ProductPage({
   const planAktiv = wirksamerPlan(product.contentPlan);
   const sektionSoll = { title: wirksam.title, bullets: wirksam.bullets.join(" "), description: wirksam.description };
 
-  // Content-Plan-Auswahl (D257/D261) — EIN Formular, zwei Einsatzorte:
-  // bei einer Variations-Familie in der Übertragungs-Maske (dort gilt sie für alle
-  // Varianten), bei einer Einzel-ASIN direkt über der Ketten-Oberfläche.
-  // VORHER auswählen, welche Bausteine überhaupt entstehen sollen. Die Kette
-  // überspringt Abgewähltes — vorher wurde nach jeder Freigabe blind die nächste
-  // Sektion generiert, auch eine nie gewollte, und Q&A hing an einer Beschreibung,
-  // die niemand wollte (D257).
+  // Wirksame Werk-Auswahl (D270): null ⇒ nur Listing-Texte.
+  const werkeAktiv = wirksameWerke(product.werkePlan);
+  const listingGewaehlt = werkeAktiv.includes("listing");
+  // Schon erzeugte Listing-Texte bleiben sichtbar, auch wenn das Werk später
+  // abgewählt wird — Abwählen heißt „nichts Neues erzeugen", nicht „Arbeit verstecken".
+  const hatListingVersionen = SECTIONS.some(({ key }) => Boolean(latestOf(dbTypFuer(key))));
+
+  // Auftragsumfang-Auswahl (D257/D261/D270) — EIN Formular, drei Einsatzorte
+  // (hier, Übertragungs-Maske der Familie, Briefings-Reiter): siehe
+  // `components/werk-auswahl.tsx`. Die Kette überspringt Abgewähltes, und ein
+  // nicht gewähltes Werk wird serverseitig geblockt (GEN-06) — nicht ausgegraut.
   const planAuswahl = (
-    <form action={saveContentPlan} className="mt-3 rounded-xl border border-hair p-3">
-      <input type="hidden" name="productId" value={product.id} />
-      <p className="text-xs font-semibold">Was soll erstellt werden?</p>
-      <p className="mt-0.5 text-[11px] text-muted">
-        Nur Angehaktes wird generiert und in der Kette verlangt. {product.contentPlan?.length ? "" : "Aktuell: alles."}
-      </p>
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
-        {SECTIONS.map(({ key, label }) => (
-          <label key={key} className="flex items-center gap-1.5 text-xs">
-            <input type="checkbox" name="sections" value={key} defaultChecked={planAktiv.includes(key)} />
-            {label}
-          </label>
-        ))}
-      </div>
-      <SubmitButton className="btn-dark mt-2 text-xs">Auswahl speichern</SubmitButton>
-    </form>
+    <WerkAuswahl productId={product.id} werkePlan={product.werkePlan} contentPlan={product.contentPlan} />
   );
 
   return (
@@ -564,7 +555,15 @@ export default async function ProductPage({
               <SubmitButton className="mt-2 btn-dark text-xs">Produktbeschreibung speichern</SubmitButton>
             </form>
           </details>
-          <AnalyseStart productId={product.id} mainAsin={product.asin} vergleichsAsins={vergleichsAsins} />
+          {/* D270/D257: Der Ein-Klick-Lauf textet nur, was beauftragt ist — die
+              Maske erbt Werk- und Sektions-Auswahl statt eine zweite zu führen. */}
+          <AnalyseStart
+            productId={product.id}
+            mainAsin={product.asin}
+            vergleichsAsins={vergleichsAsins}
+            listingGewaehlt={listingGewaehlt}
+            geplanteSektionen={planAktiv}
+          />
         </section>
         )}
 
@@ -875,12 +874,24 @@ export default async function ProductPage({
               unten (D261) — dort wird der Content für ALLE Varianten festgelegt.
               Nur ohne Familie (Einzel-ASIN) gehört sie hierher. */}
           {!familiePanel && planAuswahl}
+          {/* Werk abgewählt (D270): keine Generier-Oberfläche. Vorhandene Texte
+              bleiben unten sichtbar — Abwählen stoppt neue Arbeit, versteckt aber
+              keine geleistete. */}
+          {!listingGewaehlt && (
+            <p className="mt-3 rounded-xl border border-hair px-3 py-2 text-xs text-muted">
+              „{WERK_LABEL.listing}“ sind für dieses Produkt nicht ausgewählt — es wird nichts generiert.
+              {hatListingVersionen
+                ? " Bereits erzeugte Texte stehen unten."
+                : " Oben anhaken, speichern, dann erzeugen."}
+            </p>
+          )}
           {/* Geführte Kette (D195): Sektion generieren → bearbeiten/freigeben →
               die Freigabe generiert automatisch die nächste GEPLANTE. Nach der
               Freigabe gibt es bewusst KEINE Einzel-Regenerierung mehr (die
               Sektionen bauen aufeinander auf) — nur Neu-aufsetzen für alle. */}
+          {(listingGewaehlt || hatListingVersionen) && (
           <GenerierSperre>
-          {SECTIONS.some(({ key }) => {
+          {listingGewaehlt && SECTIONS.some(({ key }) => {
             const t = key === "backend" ? "backend_keywords" : key === "highlights" ? "item_highlights" : key;
             return latestOf(t)?.status === "approved";
           }) && (
@@ -890,7 +901,11 @@ export default async function ProductPage({
             </form>
           )}
           <div className="mt-4 space-y-3">
-            {SECTIONS.filter(({ key }) => planAktiv.includes(key)).map(({ key, label }) => {
+            {/* Werk gewählt → der Plan bestimmt die Liste. Werk abgewählt (D270) →
+                nur noch das, was wirklich existiert (Archiv-Ansicht, keine Auftragsliste). */}
+            {SECTIONS.filter(({ key }) =>
+              listingGewaehlt ? planAktiv.includes(key) : Boolean(latestOf(dbTypFuer(key))),
+            ).map(({ key, label }) => {
               const dbType = dbTypFuer(key);
               const v = latestOf(dbType);
               // Ketten-Status (D257): nur GEPLANTE Vorgänger blockieren — eine
@@ -914,7 +929,11 @@ export default async function ProductPage({
                       {/* Geführte Kette (D195): Warten auf Vorgänger → Hinweis statt Knopf;
                           Entwurf → Freigeben (löst die nächste Sektion aus) + Neu generieren;
                           freigegeben → keine Einzel-Regenerierung mehr (nur manuell bearbeiten). */}
-                      {wartetAuf ? (
+                      {!listingGewaehlt ? (
+                        /* D270: Werk abgewählt — kein Generieren, kein Freigeben.
+                           Der Text bleibt lesbar, die Kette bleibt stehen. */
+                        <span className="pill pill-neutral">Werk nicht ausgewählt</span>
+                      ) : wartetAuf ? (
                         <span className="pill pill-neutral">wartet auf Freigabe: {wartetAuf.label}</span>
                       ) : v?.status === "approved" ? null : (
                         <>
@@ -1025,6 +1044,7 @@ export default async function ProductPage({
             })}
           </div>
           </GenerierSperre>
+          )}
         </section>
         )}
 

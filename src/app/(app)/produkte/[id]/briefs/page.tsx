@@ -8,6 +8,8 @@ import { MarkdownBlock } from "@/components/markdown-block";
 import { BildBriefingAnsicht } from "@/components/bild-briefing-ansicht";
 import { ladeBildBriefing } from "@/lib/analysis/briefingErzeugung";
 import { buildAplusBrief, buildStoreConcept } from "@/lib/analysis/creativeBriefs";
+import { WerkAuswahl } from "@/components/werk-auswahl";
+import { istWerkGewaehlt, WERK_LABEL } from "@/lib/content/werke";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -67,26 +69,31 @@ export default async function BriefsPage({
     reviewInsights: insights?.payload ?? null,
   };
 
+  // Werk-Auswahl (D270, Nutzer-Vorgabe 31.07.): Vorher wurden A+ Basic, A+ Premium
+  // UND Store bei JEDEM Aufruf dieser Seite gebaut — ungefragt, auch ohne
+  // Premium-Zugang. Jetzt entsteht nur, was beauftragt ist. Die Briefs sind
+  // deterministisch assembliert; sie hier zu bauen IST ihre Erzeugung.
+  const bildBriefingGewaehlt = istWerkGewaehlt(product.werkePlan, "bilder-briefing");
   const textBriefs = [
-    {
+    istWerkGewaehlt(product.werkePlan, "aplus-basic") && {
       key: "aplus-basic",
       titel: "A+ Content Brief — Basic",
       hinweis: "Design-Guide-Specs (1940×1200, 6 Module, weißer Trenner).",
       text: buildAplusBrief(briefInputs, "basic"),
     },
-    {
+    istWerkGewaehlt(product.werkePlan, "aplus-premium") && {
       key: "aplus-premium",
       titel: "A+ Content Brief — Premium",
       hinweis: "Full Image 2196×900, nahtlos, Karussells/Hotspots — nur bei Premium-Zugang.",
       text: buildAplusBrief(briefInputs, "premium"),
     },
-    {
+    istWerkGewaehlt(product.werkePlan, "brand-store") && {
       key: "store",
       titel: "Brand-Store-Konzept",
       hinweis: "Seitenstruktur, Kachel-Plan, Specs und Guidelines.",
       text: buildStoreConcept(briefInputs),
     },
-  ];
+  ].filter((b): b is { key: string; titel: string; hinweis: string; text: string } => Boolean(b));
 
   const veraltet = briefing && driverLauf ? briefing.createdAt < driverLauf.createdAt : false;
 
@@ -101,7 +108,20 @@ export default async function BriefsPage({
 
       {fehler && <p className="mt-4 rounded-xl bg-[rgb(220_38_38/0.1)] px-3 py-2 text-sm text-bad print:hidden">{fehler}</p>}
 
+      {/* Auftragsumfang (D270): hier wird entschieden, welche Briefings dieses
+          Produkt überhaupt bekommt — direkt an der Stelle, wo sie entstehen.
+          Beim Drucken raus: das Briefing selbst ist das Dokument, nicht die Auswahl. */}
+      <div className="print:hidden">
+        <WerkAuswahl
+          productId={product.id}
+          werkePlan={product.werkePlan}
+          contentPlan={product.contentPlan}
+          ueberschrift="Was soll für dieses Produkt erstellt werden?"
+        />
+      </div>
+
       {/* ── Bilder-Briefing ──────────────────────────────────────────────── */}
+      {bildBriefingGewaehlt && (
       <section className="mt-6">
         <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
           <h2 className="text-base font-semibold">Bilder-Briefing</h2>
@@ -155,8 +175,10 @@ export default async function BriefsPage({
           )}
         </div>
       </section>
+      )}
 
       {/* ── Text-Briefs (eigenes Team) ───────────────────────────────────── */}
+      {textBriefs.length > 0 && (
       <section className="mt-8">
         <h2 className="text-base font-semibold">A+ &amp; Brand Store</h2>
         <p className="mt-0.5 text-xs text-muted">Für das eigene Team — deshalb ohne Sprach-Schalter.</p>
@@ -174,6 +196,16 @@ export default async function BriefsPage({
           ))}
         </div>
       </section>
+      )}
+
+      {/* Ehrlicher Leerzustand (D270): Nichts gewählt heißt nichts erzeugt — und
+          das wird gesagt, statt die Seite leer zu lassen. */}
+      {!bildBriefingGewaehlt && textBriefs.length === 0 && (
+        <p className="card mt-6 p-5 text-sm text-muted print:hidden">
+          Für dieses Produkt ist kein Briefing beauftragt. Oben auswählen — {WERK_LABEL["bilder-briefing"]},{" "}
+          {WERK_LABEL["aplus-basic"]}, {WERK_LABEL["aplus-premium"]} oder {WERK_LABEL["brand-store"]} — und speichern.
+        </p>
+      )}
     </main>
   );
 }

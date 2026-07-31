@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { generateSection, QmBlockFehler, type ListingSection, type RecipeInputs } from "@/lib/recipes/listing";
-import { dbTypFuer, geplanteVorgaenger, naechsteGeplant, normalisierePlan, sektionVonDbTyp } from "@/lib/content/plan";
+import { dbTypFuer, geplanteVorgaenger, istGeplant, naechsteGeplant, normalisierePlan, sektionVonDbTyp } from "@/lib/content/plan";
+import { istWerkGewaehlt, normalisiereWerke, werkNichtGewaehltGrund } from "@/lib/content/werke";
 import type { ContentSprache, Marketplace, ProductFacts } from "@/db/schema";
 import { amazonDomain, erkenneSprache, marktplatzFuerSprache, marktplatzSprache, SPRACH_NAMEN } from "@/lib/text/sprache";
 import { contentMarkenKontext } from "@/lib/text/marken";
@@ -504,7 +505,11 @@ export async function approveContent(formData: FormData) {
     return;
   }
   const planProdukt = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
-  const naechste = naechsteGeplant(planProdukt?.contentPlan, aktuelle);
+  // D270: Ist das Werk „Listing-Texte" abgewählt, taktet die Kette NICHT weiter.
+  // Sonst würde die Freigabe eines Alt-Entwurfs neue, nie beauftragte Texte erzeugen.
+  const naechste = istWerkGewaehlt(planProdukt?.werkePlan, "listing")
+    ? naechsteGeplant(planProdukt?.contentPlan, aktuelle)
+    : null;
   if (naechste) {
     const schonFreigegeben = await db.query.contentVersions.findFirst({
       where: and(
@@ -528,21 +533,31 @@ export async function approveContent(formData: FormData) {
 }
 
 /**
- * Content-Plan speichern (D257): welche Sektionen für dieses Produkt entstehen
- * sollen. Leere Auswahl wird NICHT gespeichert (das hieße „nichts erstellen") —
- * dann bleibt der Plan `null` = alle Sektionen. Auf einem Parent ist der Plan
- * zugleich der Umfang der Varianten-Ableitung.
+ * Auftragsumfang speichern — beide Ebenen in EINEM Formular:
+ *
+ *  - WERKE (D270): welche Werke überhaupt entstehen (Listing-Texte,
+ *    Bilder-Briefing, A+ Basic, A+ Premium, Brand-Store). Hier wird eine leere
+ *    Auswahl SEHR WOHL gespeichert — „nichts erstellen" ist eine legitime
+ *    Entscheidung, und ohne sie gäbe es kein Zurück aus dem Standard.
+ *  - SEKTIONEN (D257): welche Bausteine innerhalb des Werks „Listing" entstehen.
+ *    Leere Auswahl bleibt `null` = alle Sektionen (das Werk Listing ohne eine
+ *    einzige Sektion ergäbe keinen Sinn — dann wird das Werk selbst abgewählt).
+ *
+ * Auf einem Parent ist der Sektions-Plan zugleich der Umfang der
+ * Varianten-Ableitung.
  */
 export async function saveContentPlan(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
   if (!productId) return;
   const plan = normalisierePlan(formData.getAll("sections").map(String));
+  const werke = normalisiereWerke(formData.getAll("werke").map(String));
   const db = await getDb();
   await db
     .update(schema.products)
-    .set({ contentPlan: plan.length > 0 ? plan : null })
+    .set({ contentPlan: plan.length > 0 ? plan : null, werkePlan: werke })
     .where(eq(schema.products.id, productId));
   revalidatePath(`/produkte/${productId}`);
+  revalidatePath(`/produkte/${productId}/briefs`);
 }
 
 /**
@@ -682,8 +697,9 @@ export async function generateContent(formData: FormData) {
   revalidatePath(`/produkte/${productId}`);
 }
 
-/** Ketten-Reihenfolge (D195; Backend vor Beschreibung ab D204): Titel → Highlights → Bullets → Backend → Beschreibung → Q&A — Freigaben fließen als Kontext in jede Folge-Sektion. */
-const SEKTIONS_REIHENFOLGE: ListingSection[] = ["title", "highlights", "bullets", "backend", "description", "qa"];
+// Die Ketten-Reihenfolge lag hier als zweite Kopie neben `content/plan.ts` und
+// wurde nach D270 (Vorgänger kommen jetzt aus `geplanteVorgaenger`) nirgends mehr
+// gelesen — entfernt, damit es EINE Reihenfolge gibt und nicht zwei.
 const SEKTIONS_LABEL: Record<string, string> = {
   title: "Titel", bullets: "Bullet Points", highlights: "Item Highlights",
   backend: "Backend-Keywords", description: "Beschreibung", qa: "Q&A",
@@ -698,6 +714,14 @@ async function generiereSektionKern(
 ) {
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return;
+
+  // Werk-Gate (D270, Nutzer-Vorgabe 31.07.): Listing-Texte entstehen NUR, wenn
+  // das Werk „Listing-Texte" beauftragt ist. Serverseitig, nicht nur in der UI —
+  // eine Auswahl, die ein Direkt-POST umgehen kann, ist keine Regel (D181).
+  if (!istWerkGewaehlt(product.werkePlan, "listing")) {
+    throw new GenFehler(werkNichtGewaehltGrund("listing"), "GEN-06");
+  }
+
   const brand = await db.query.brands.findFirst({ where: eq(schema.brands.id, product.brandId) });
   // Nur relevante Keywords fließen in die Generierung (D87) — in Tiering-Reihenfolge (D97)
   const alleKws = await db.query.keywords.findMany({ where: eq(schema.keywords.productId, productId) });
@@ -1532,6 +1556,16 @@ async function driverKern(
 export async function erzeugeBildBriefingAction(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
   const sprache = String(formData.get("sprache") ?? "de") === "en" ? "en" : "de";
+
+  // Werk-Gate (D270): auch das Bilder-Briefing entsteht nur auf Auftrag.
+  const db = await getDb();
+  const produkt = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  if (produkt && !istWerkGewaehlt(produkt.werkePlan, "bilder-briefing")) {
+    redirect(
+      `/produkte/${productId}/briefs?sprache=${sprache}&fehler=${encodeURIComponent(werkNichtGewaehltGrund("bilder-briefing"))}`,
+    );
+  }
+
   const { erzeugeBildBriefing } = await import("@/lib/analysis/briefingErzeugung");
   const res = await erzeugeBildBriefing(productId, sprache);
   revalidatePath(`/produkte/${productId}/briefs`);
@@ -1617,14 +1651,25 @@ export async function runPipelineStufe(
         const section = String(extra?.section ?? "");
         const gueltig = ["title", "bullets", "description", "backend", "highlights", "qa"];
         if (!gueltig.includes(section)) return { ok: false, fehler: `Unbekannte Sektion: ${section}`, code: "GEN-01" };
+        // Werk-/Plan-Gate (D270/D257) als HINWEIS, nicht als Fehler: Nicht
+        // beauftragt ist kein Scheitern — der Lauf soll ruhig weiterlaufen und
+        // ehrlich sagen, dass diese Etappe übersprungen wurde.
+        if (!istWerkGewaehlt(product.werkePlan, "listing")) {
+          return { ok: true, hinweis: werkNichtGewaehltGrund("listing") };
+        }
+        if (!istGeplant(product.contentPlan, section as ListingSection)) {
+          return { ok: true, hinweis: `${SEKTIONS_LABEL[section]} ist nicht Teil der Auswahl — übersprungen.` };
+        }
         // Geführte Kette (D195): Der Ein-Klick-Lauf generiert nur, was in der
         // Kette dran ist — Sektionen mit nicht freigegebenen Vorgängern werden
         // als Hinweis übersprungen (kein Fehler): die Freigabe im Content-
         // Reiter generiert sie automatisch, sobald sie dran sind.
         const dbT = (s: ListingSection) => (s === "backend" ? "backend_keywords" : s === "highlights" ? "item_highlights" : s);
         const vorhandene = await db.query.contentVersions.findMany({ where: eq(schema.contentVersions.productId, productId) });
-        const offenerVorgaenger = SEKTIONS_REIHENFOLGE
-          .slice(0, SEKTIONS_REIHENFOLGE.indexOf(section as ListingSection))
+        // D257 auch hier: nur GEPLANTE Vorgänger blockieren. Vorher lief diese
+        // Stelle über die feste Reihenfolge — eine abgewählte Sektion hielt den
+        // Ein-Klick-Lauf auf, obwohl sie nie entstehen sollte.
+        const offenerVorgaenger = geplanteVorgaenger(product.contentPlan, section as ListingSection)
           .find((s) => !vorhandene.some((v) => v.type === dbT(s) && v.status === "approved"));
         if (offenerVorgaenger) {
           return { ok: true, hinweis: `${SEKTIONS_LABEL[section]} wartet in der Kette auf die Freigabe von „${SEKTIONS_LABEL[offenerVorgaenger]}" — Freigabe im Content-Reiter generiert automatisch weiter.` };

@@ -77,6 +77,8 @@ export function AnalyseStart({
   mainAsin,
   nurAnalyse = false,
   vergleichsAsins = [],
+  listingGewaehlt = true,
+  geplanteSektionen,
 }: {
   productId: string;
   mainAsin: string | null;
@@ -88,6 +90,15 @@ export function AnalyseStart({
    * abwählbar, damit die Automatik nachvollziehbar bleibt.
    */
   vergleichsAsins?: string[];
+  /**
+   * Werk-Auswahl (D270): Ist „Listing-Texte" nicht beauftragt, textet der
+   * Ein-Klick-Lauf NICHT mit — die Maske analysiert dann nur. Vorher hatte
+   * diese Maske eine eigene, immer voll angehakte Sektions-Liste und ignorierte
+   * die gespeicherte Entscheidung komplett.
+   */
+  listingGewaehlt?: boolean;
+  /** Geplante Listing-Sektionen (D257) — bestimmen, was hier angeboten und vorbelegt ist. */
+  geplanteSektionen?: readonly string[];
 }) {
   const router = useRouter();
   const [etappen, setEtappen] = useState<Etappe[]>([]);
@@ -97,6 +108,9 @@ export function AnalyseStart({
   const [aplus, setAplus] = useState<AplusBildClient[]>([]);
   const [ziehtDrueber, setZiehtDrueber] = useState(false);
   const dateiRef = useRef<HTMLInputElement>(null);
+  // Ohne übergebenen Plan (Alt-Aufrufer) bleibt es bei allen Sektionen — die
+  // Entscheidung fällt dann wie bisher hier in der Maske.
+  const angeboteneSektionen: readonly string[] = geplanteSektionen ?? SEKTIONEN.map((s) => s.key);
 
   const nimmDateien = async (dateien: FileList | null) => {
     if (!dateien?.length) return;
@@ -155,7 +169,9 @@ export function AnalyseStart({
 
   const starte = async (fd: FormData) => {
     const liste = [...new Set(String(fd.get("asins") ?? "").split(/[\s,;]+/).map((a) => a.trim().toUpperCase()).filter(Boolean))];
-    const sections = fd.getAll("sections").map(String);
+    // D270: Ohne beauftragtes Werk „Listing-Texte" entstehen keine Content-Etappen —
+    // unabhängig davon, was ein Formular mitschickt.
+    const sections = listingGewaehlt ? fd.getAll("sections").map(String).filter((s) => angeboteneSektionen.includes(s)) : [];
     // Bewusste Bestätigung (GEN-02/Review-Fix): Produkte ohne Reviews kommen
     // nur so zu Content — die Review-Etappen werden dann weiche Etappen.
     const ohneAnalyse = fd.get("ohneAnalyse") === "on";
@@ -308,11 +324,14 @@ export function AnalyseStart({
           <AsinChips name="asins" mainAsin={mainAsin} placeholder="Wettbewerber-ASIN eingeben …" vorbelegt={vergleichsAsins} />
         </div>
       </div>
-      {!nurAnalyse && (
+      {/* Content-Teil nur, wenn das Werk „Listing-Texte" beauftragt ist (D270) und
+          nur mit den GEPLANTEN Sektionen (D257) — vorher stand hier eine zweite,
+          immer voll angehakte Liste, die die gespeicherte Auswahl überstimmte. */}
+      {!nurAnalyse && listingGewaehlt && (
         <div>
           <h3 className="text-sm font-semibold">Content</h3>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
-            {SEKTIONEN.map(({ key, label }) => (
+            {SEKTIONEN.filter(({ key }) => angeboteneSektionen.includes(key)).map(({ key, label }) => (
               <label key={key} className="flex cursor-pointer items-center gap-1.5 text-xs">
                 <input type="checkbox" name="sections" value={key} defaultChecked />
                 {label}
@@ -325,8 +344,14 @@ export function AnalyseStart({
           </label>
         </div>
       )}
+      {!nurAnalyse && !listingGewaehlt && (
+        <p className="text-xs text-muted">
+          „Listing-Texte“ sind nicht als Werk ausgewählt — dieser Lauf analysiert nur. Zum Texten unter „Was soll
+          erstellt werden?“ anhaken.
+        </p>
+      )}
       <button type="submit" disabled={!mainAsin} className="btn-primary disabled:opacity-40">
-        {nurAnalyse ? "Neu scrapen & analysieren" : "Analysieren & Texte erstellen"}
+        {nurAnalyse || !listingGewaehlt ? "Neu scrapen & analysieren" : "Analysieren & Texte erstellen"}
       </button>
       {!mainAsin && <p className="text-xs text-warn">△ Dafür braucht das Produkt eine ASIN.</p>}
     </form>

@@ -36,6 +36,13 @@
       "when": 1785508807834,
       "tag": "0004_bild_briefing",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785511871567,
+      "tag": "0005_werke_plan",
+      "breakpoints": true
     }
   ]
 }
