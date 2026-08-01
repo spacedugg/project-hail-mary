@@ -1,5 +1,5 @@
 import { reviewInsights, reviewScrapes } from "@/db/schema";
-import { normalisierePayload } from "@/lib/reviews/insights";
+import { normalisierePayload, wichtigsteFindings } from "@/lib/reviews/insights";
 import { kartenKlasse } from "@/lib/reviews/verdichtung";
 import { InsightKarte } from "@/components/insight-karte";
 import { verdichteInsightsAction } from "@/app/actions";
@@ -29,6 +29,10 @@ export function BewertungsDashboard({
   const p = normalisierePayload(insight.payload);
   const rohThemen = p.painPoints.length + p.buyingTriggers.length;
   const karten = p.insightCards ?? [];
+  // Anzeige-Deckel (D273): die wichtigsten 8 je Seite, ausgewählt nach echten
+  // Fundstellen-Zählwerten. Gespeichert bleibt alles.
+  const negative = wichtigsteFindings(p.painPoints);
+  const positive = wichtigsteFindings(p.buyingTriggers);
 
   return (
     <div className="mt-3 space-y-3">
@@ -44,7 +48,7 @@ export function BewertungsDashboard({
           <div className="rounded-xl border border-hair p-3">
             <div className="text-[11px] uppercase tracking-wide text-muted">Etappe 2 · Roh-Analyse</div>
             <div className="mt-1 text-2xl font-semibold tabular-nums">{fmt(rohThemen)}</div>
-            <div className="text-xs text-muted">{p.painPoints.length} Pain Points · {p.buyingTriggers.length} Kaufauslöser</div>
+            <div className="text-xs text-muted">{p.painPoints.length} negative · {p.buyingTriggers.length} positive Findings</div>
           </div>
           <div className="rounded-xl border border-hair p-3">
             <div className="text-[11px] uppercase tracking-wide text-muted">Etappe 3 · Verdichtung</div>
@@ -122,12 +126,24 @@ export function BewertungsDashboard({
         </div>
       )}
 
-      {/* Pain Points & Kaufauslöser */}
+      {/* Roh-Findings aus den Bewertungen (D273, Nutzer-Vorgabe 01.08.).
+          Umbenannt: In Review-Texten stehen KEINE Kaufauslöser — dort stehen
+          positive und negative Aussagen über das Erlebnis. Der Kaufgrund
+          entsteht erst eine Abstraktionsstufe höher im Conversion-Driver-Lauf
+          („Wir finden ja nicht direkt die Kaufauslöser in den Bewertungs-Texten,
+          richtig?"). Die alte Beschriftung „Kaufauslöser" behauptete genau das.
+          Gedeckelt auf die wichtigsten 8 je Seite — der Code wählt nach
+          verifizierten Fundstellen aus, nicht das LLM (D184). */}
       <div className="grid gap-3 lg:grid-cols-2">
         <div className="rounded-xl border border-hair p-4">
-          <h3 className="text-sm font-semibold text-bad">Pain Points</h3>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className="text-sm font-semibold text-bad">Negative Findings</h3>
+            {p.painPoints.length > negative.length && (
+              <span className="text-[11px] text-muted">Top {negative.length} von {p.painPoints.length}</span>
+            )}
+          </div>
           <div className="mt-3 space-y-3">
-            {p.painPoints.map((x, i) => (
+            {negative.map((x, i) => (
               <div key={i} className="rounded-xl border border-hair p-3">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-sm font-medium">{x.label}</span>
@@ -143,9 +159,14 @@ export function BewertungsDashboard({
           </div>
         </div>
         <div className="rounded-xl border border-hair p-4">
-          <h3 className="text-sm font-semibold text-good">Kaufauslöser</h3>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className="text-sm font-semibold text-good">Positive Findings</h3>
+            {p.buyingTriggers.length > positive.length && (
+              <span className="text-[11px] text-muted">Top {positive.length} von {p.buyingTriggers.length}</span>
+            )}
+          </div>
           <div className="mt-3 space-y-3">
-            {p.buyingTriggers.map((x, i) => (
+            {positive.map((x, i) => (
               <div key={i} className="rounded-xl border border-hair p-3">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-sm font-medium">{x.label}</span>
@@ -160,7 +181,10 @@ export function BewertungsDashboard({
           </div>
         </div>
       </div>
-
+      <p className="text-[11px] text-muted">
+        Das sind Roh-Findings aus den Review-Texten — noch keine Kaufgründe. Welche davon tatsächlich kaufentscheidend
+        sind, leitet der Conversion-Driver-Lauf eine Stufe höher ab.
+      </p>
     </div>
   );
 }

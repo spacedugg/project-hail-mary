@@ -575,6 +575,22 @@ export const competitorListings = pgTable("competitor_listings", {
   bullets: jsonb("bullets").$type<string[]>(),
   description: text("description"),
   attributes: jsonb("attributes").$type<Record<string, string> | null>(),
+  /**
+   * Bild-URLs des Wettbewerber-Listings (D276, Nutzer-Vorgabe 01.08.2026).
+   * Kommen aus demselben Scrape wie Titel/Bullets — sie wurden bisher einfach
+   * weggeworfen.
+   */
+  imageUrls: jsonb("image_urls").$type<string[]>(),
+  /**
+   * Vision-Auslese der Wettbewerber-Bilder (D276): dieselbe Struktur wie
+   * `listing_snapshots.bilder_text`. Läuft als EIGENE Etappe je ASIN, weil
+   * „alle Bilder je Wettbewerber" (Nutzer-Entscheidung) sonst das
+   * 300-Sekunden-Limit eines Requests sprengt.
+   *
+   * `null` = noch nicht ausgelesen · `[]` = ausgelesen, nichts gefunden.
+   * Der Unterschied entscheidet, ob die Etappe erneut laufen muss.
+   */
+  bilderText: jsonb("bilder_text").$type<import("@/lib/analysis/bildAuslese").BildAuslese[]>(),
   createdAt: ts("created_at").notNull(),
 });
 
@@ -661,6 +677,24 @@ export type BelegAspekt = {
   label: string;
   typ: "painPoint" | "buyingTrigger";
   mentionCount: number | null;
+  /**
+   * Herkunft der Fundstellen (D275, Nutzer-Frage 01.08.2026: „ob du wirklich
+   * noch im Kopf hast, welche Bewertungen von unserem Produkt stammen und welche
+   * bei Fremdprodukten entstehen").
+   *
+   * Die Roh-Aspekte tragen die Aufschlüsselung seit D196 — beim Bau der Karten
+   * ging sie verloren (`findeAspekt` übernahm nur label/typ/mentionCount).
+   * Folge: `mentionCount` auf einer Karte war eine SUMME aus eigenen und
+   * Wettbewerber-Reviews, ohne dass man es sehen konnte. Genau der Verdacht des
+   * Nutzers beim Produkt-Feature „überwiegend negativ" — die Kritik konnte von
+   * einem Fremdprodukt stammen.
+   *
+   * Optional, weil Alt-Payloads sie nicht haben; fehlt sie, wird nichts
+   * behauptet statt „alles eigen" zu unterstellen.
+   */
+  herkunft?: AspektHerkunft;
+  /** Übertragbarkeits-Urteil (D196/D199), wenn die Fundstellen fremd sind. */
+  uebertragbarkeit?: AspektUebertragbarkeit;
 };
 
 /**

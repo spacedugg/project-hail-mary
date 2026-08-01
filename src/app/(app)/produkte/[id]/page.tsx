@@ -3,11 +3,12 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { erzeugeInsightsDokument, saveKeywords, deriveKeywordsFromSov, generateContent, deleteProductAction, uploadCerebro, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, resetContentChain, saveMarginCalc, toggleKeywordRelevanz, deleteKeywordBasis, saveZusatzKontext, saveMarke } from "@/app/actions";
+import { erzeugeInsightsDokument, saveKeywords, deriveKeywordsFromSov, generateContent, deleteProductAction, uploadCerebro, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, resetContentChain, saveMarginCalc, toggleKeywordRelevanz, schliesseKeywordsAus, deleteKeywordBasis, saveZusatzKontext, saveMarke } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
 import { AussortierteKeywords } from "@/components/aussortierte-keywords";
+import { AktiveKeywords } from "@/components/aktive-keywords";
 import { FehlerPopup } from "@/components/fehler-popup";
 import { LoeschButton } from "@/components/loesch-button";
 import { MarkeFeld } from "@/components/marke-feld";
@@ -25,7 +26,7 @@ import { AnalyseStart } from "@/components/analyse-start";
 import { TabLeiste } from "@/components/tab-leiste";
 import { KopierFeld } from "@/components/kopier-feld";
 import { ListingKontrolle, MassnahmenBlock } from "@/components/listing-kontrolle";
-import { AnalyseHintergrund } from "@/components/analyse-hintergrund";
+import { ProduktFeatures, ZielgruppeUndPositionierung, MarktPosition } from "@/components/analyse-hintergrund";
 import { analyzeListing, wirksamesListing } from "@/lib/analysis/listingAudit";
 import { snapshotBildBelege } from "@/lib/analysis/bildAuslese";
 import { dbTypFuer, geplanteVorgaenger, wirksamerPlan, SEKTIONS_LABEL } from "@/lib/content/plan";
@@ -474,29 +475,16 @@ export default async function ProductPage({
                 </div>
               );
             })()}
-            {(["primary", "secondary", "tertiary", "backend"] as const).map((tier) => {
-              const inTier = kws.filter((k) => k.tier === tier && k.source !== "manual" && !k.ausgeschlossen);
-              if (inTier.length === 0) return null;
-              return (
-                <div key={tier} className="mt-3">
-                  <div className="text-[10px] uppercase tracking-wide text-neutral-400">{tier} · {inTier.length}</div>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {/* ALLE aktiven Chips sichtbar + abwählbar (Nutzer 23.07., D190) — kein „+N"-Abschneiden: Kuratieren braucht die volle Liste. */}
-                    {inTier.map((k) => (
-                      <form key={k.id} action={toggleKeywordRelevanz} className="inline-flex">
-                        <input type="hidden" name="keywordId" value={k.id} />
-                        <input type="hidden" name="productId" value={product.id} />
-                        <input type="hidden" name="aktion" value="ausschliessen" />
-                        <span className="group/kw inline-flex items-center gap-1 rounded-full bg-[rgb(47_158_143/0.12)] px-2.5 py-1 text-xs text-good">
-                          {k.keyword}{k.searchVolume ? ` · ${fmt(k.searchVolume)}` : ""}
-                          <button title="Als irrelevant ausschließen" className="text-neutral-400 transition hover:text-bad">×</button>
-                        </span>
-                      </form>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+            {/* Aktive Keywords durchsuchbar (D274, Nutzer 01.08.): filtern und die
+                Treffer einzeln oder gesammelt ausschließen. */}
+            <AktiveKeywords
+              productId={product.id}
+              eintraege={kws
+                .filter((k) => k.source !== "manual" && !k.ausgeschlossen && k.tier)
+                .map((k) => ({ id: k.id, keyword: k.keyword, searchVolume: k.searchVolume, tier: k.tier! }))}
+              toggleAction={toggleKeywordRelevanz}
+              sammelAction={schliesseKeywordsAus}
+            />
             {/* Aussortierte Keywords (D87/D165): sichtbar + durchsuchbar, EIN Klick zur Wiederaufnahme */}
             <AussortierteKeywords
               eintraege={kws.filter((k) => k.ausgeschlossen).map((k) => ({ id: k.id, keyword: k.keyword, searchVolume: k.searchVolume, grund: k.ausschlussGrund }))}
@@ -567,6 +555,145 @@ export default async function ProductPage({
         </section>
         )}
 
+        {/* ══ Analyse-Reiter, Reihenfolge nach Nutzer-Vorgabe 01.08. (D272) ══
+            1 Kunden-Dokument (prominent ganz oben)  2 Produkt-Features
+            3 Conversion Driver  4 Conversion Blocker  5 Zielgruppe/Positionierung/USPs
+            6 Bewertungen (Lauf + Findings)  7 Keywords/SOV  8 Grenzen (eingeklappt).
+            Vorher standen Bewertungen oben, Features ganz unten und das
+            Kunden-Dokument als kleiner lila Knopf irgendwo in der Mitte. */}
+
+        {/* 1 · Insights-Dokument (D267/D272): das Ergebnis, das zum Kunden geht —
+            deshalb die erste Karte und ein großer Knopf, kein Mittelchen. */}
+        {tab === "analyse" && (() => {
+          const h = headersListe;
+          const basisUrl = `${h.proto}://${h.host}`;
+          const neuester = insightsReports[0] ?? null;
+          const veraltet = neuester && driverLauf ? neuester.createdAt < driverLauf.createdAt : false;
+          return (
+            <section className="card border-l-4 border-l-[var(--primary)] p-5">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="text-base font-semibold">Analyse-Dokument für den Kunden</h2>
+                {neuester && (
+                  <span className="text-[11px] text-muted">
+                    Version {neuester.version} · {neuester.createdAt.toLocaleDateString("de-DE")}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-muted">
+                Vier Seiten aus dieser Analyse — Kaufgründe, Abdeckung, Handlungsplan, Grenzen. Eingefroren: der Link
+                zeigt immer denselben Stand. „Als PDF speichern“ steckt in der Seite selbst.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {driverLauf ? (
+                  <form action={erzeugeInsightsDokument}>
+                    <input type="hidden" name="productId" value={product.id} />
+                    <SubmitButton className="btn-primary" pendingLabel="Baut Dokument…" progress>
+                      {neuester ? "Neue Version erzeugen" : "Dokument erzeugen"}
+                    </SubmitButton>
+                  </form>
+                ) : (
+                  <p className="text-xs text-warn">
+                    △ Dafür braucht es den Conversion-Driver-Lauf — das Dokument ist seine Projektion.
+                  </p>
+                )}
+                {neuester && (
+                  <>
+                    <a href={`/insights/${neuester.token}`} target="_blank" rel="noopener noreferrer" className="btn-dark">
+                      Dokument öffnen ↗
+                    </a>
+                    <CopyLink url={`${basisUrl}/insights/${neuester.token}`} className="btn-ghost text-xs" />
+                  </>
+                )}
+              </div>
+              {veraltet && (
+                <p className="mt-2 text-xs text-warn">△ Die Analyse ist neuer als dieses Dokument — neue Version erzeugen.</p>
+              )}
+              {insightsReports.length > 1 && (
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-xs text-muted hover:text-foreground">
+                    Frühere Versionen ({insightsReports.length - 1})
+                  </summary>
+                  <ul className="mt-1.5 space-y-1">
+                    {insightsReports.slice(1).map((r) => (
+                      <li key={r.id} className="flex items-baseline gap-2 text-[11px]">
+                        <span className="text-muted">Version {r.version} · {r.createdAt.toLocaleDateString("de-DE")}</span>
+                        <a href={`/insights/${r.token}`} target="_blank" rel="noopener noreferrer" className="text-primary-strong hover:underline">öffnen ↗</a>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </section>
+          );
+        })()}
+
+        {/* 2 · Produkt-Features — laut Nutzer „ziemlich weit oben", weil das die
+            erste Frage beim Analysieren eines Listings ist. */}
+        {bereit && tab === "analyse" && <ProduktFeatures featureRanking={featureRanking ?? null} />}
+
+        {/* 3 · Conversion Driver  ·  4 · Conversion Blocker */}
+        {/* Conversion Driver & Blocker (D265): EIN Modell, zwei Projektionen —
+            jeder Blocker trägt seine Driver-ID. Ersetzt die beiden getrennten
+            Listen unten, sobald ein Lauf vorliegt. */}
+
+        {driverLauf && tab === "analyse" && (
+          <DriverBlock
+            /* D272: „Erwartungs- & Produktrisiken" trugen zusätzlich die
+               verdichteten negativen Karten — dieselbe Information wie die
+               negativen Bewertungs-Findings (Nutzer-Befund). Raus; das
+               Produkt-Feedback aus dem Zuständigkeits-Gate bleibt. */
+            lauf={driverLauf}
+          />
+        )}
+
+        {/* Alt-Ansicht (D178) — nur solange für dieses Produkt kein Driver-Lauf
+            existiert. Beides gleichzeitig wäre genau die Doppelung, die D265
+            abstellt. */}
+        {!driverLauf && insights && tab === "analyse" && (() => {
+          const treiber = (normalisierePayload(insights.payload).insightCards ?? []).filter((k) => kartenKlasse(k) === "positiv");
+          if (treiber.length === 0) return null;
+          return (
+            <section className="card p-5">
+              <CardHead icon={<IconCheck />} chip="chip-teal" title="Conversion Drivers" />
+              <div className="mt-4 space-y-2">
+                {treiber.map((k, i) => (
+                  <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={normalisierePayload(insights.payload).stats.reviewsTotal} />
+                ))}
+              </div>
+            </section>
+          );
+        })()}
+
+        {!driverLauf && bereit && tab === "analyse" && (
+        <section className="card p-5">
+          <CardHead
+            icon={<IconSichtbarkeit />}
+            chip="chip-amber"
+            title="Conversion-Blocker"
+          />
+          {(!snapshot || !insights) && (
+            <p className="mt-3 text-xs text-warn">△ Dafür braucht es das importierte Listing und die Bewertungs-Analyse.</p>
+          )}
+          {blockerLauf && (
+            <>
+              <div className="stagger mt-4 space-y-2">
+                {blockerLauf.payload.cards.map((k, i) => (
+                  <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={blockerLauf.payload.stats.reviewsGesamt} />
+                ))}
+                {blockerLauf.payload.cards.length === 0 && (
+                  <p className="text-sm">✓ Kein Blocker gefunden. Die wichtigen Kunden-Themen sind im Listing beantwortet.</p>
+                )}
+              </div>
+            </>
+          )}
+        </section>
+        )}
+
+        {/* 5 · Zielgruppe · Positionierung · USPs — laut Nutzer „unterhalb der
+            anderen Main-Sachen" (D272). */}
+        {bereit && tab === "analyse" && <ZielgruppeUndPositionierung deepAudit={deepAudit ?? null} />}
+
+        {/* 6 · Bewertungen: Analyse-Lauf und Findings (D272) */}
         {bereit && tab === "analyse" && (<>
         <section id="reviews" className="card p-5">
           <CardHead
@@ -669,126 +796,10 @@ export default async function ProductPage({
         {insights && <BewertungsDashboard insight={insights} scrape={scrape ?? null} productId={product.id} productAsin={product.asin} />}
         </>)}
 
-        {/* Conversion Driver & Blocker (D265): EIN Modell, zwei Projektionen —
-            jeder Blocker trägt seine Driver-ID. Ersetzt die beiden getrennten
-            Listen unten, sobald ein Lauf vorliegt. */}
-        {/* Insights-Dokument (D267): herunterladbar UND als Link für den Kunden —
-            dieselbe Seite ist der Ausdruck, kein zweites Layout. */}
-        {driverLauf && tab === "analyse" && (() => {
-          const h = headersListe;
-          const basisUrl = `${h.proto}://${h.host}`;
-          const neuester = insightsReports[0] ?? null;
-          const veraltet = neuester ? neuester.createdAt < driverLauf.createdAt : false;
-          return (
-            <section className="card p-5">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 className="text-sm font-semibold">Insights-Dokument für den Kunden</h2>
-                {neuester && <span className="text-[11px] text-muted">Version {neuester.version} · {neuester.createdAt.toLocaleDateString("de-DE")}</span>}
-              </div>
-              <p className="mt-1 text-xs text-muted">
-                Vier Seiten aus dieser Analyse — Kaufgründe, Abdeckung, Handlungsplan, Grenzen. Eingefroren: der Link
-                zeigt immer denselben Stand. „Als PDF speichern“ steckt in der Seite selbst.
-              </p>
-              {neuester && (
-                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-hair p-3">
-                  <a href={`/insights/${neuester.token}`} target="_blank" rel="noopener noreferrer" className="btn-primary text-xs">
-                    Dokument öffnen ↗
-                  </a>
-                  <CopyLink url={`${basisUrl}/insights/${neuester.token}`} className="btn-ghost text-xs" />
-                  <span className="font-mono text-[11px] text-muted">/insights/{neuester.token.slice(0, 12)}…</span>
-                  {veraltet && (
-                    <span className="pill pill-warn">Analyse ist neuer als dieses Dokument — neue Version erzeugen</span>
-                  )}
-                </div>
-              )}
-              <form action={erzeugeInsightsDokument} className="mt-3">
-                <input type="hidden" name="productId" value={product.id} />
-                <SubmitButton className={neuester ? "btn-dark text-xs" : "btn-primary text-xs"} pendingLabel="Baut Dokument…">
-                  {neuester ? "Neue Version erzeugen" : "Dokument erzeugen"}
-                </SubmitButton>
-              </form>
-              {insightsReports.length > 1 && (
-                <details className="mt-3">
-                  <summary className="cursor-pointer text-xs text-muted hover:text-foreground">
-                    Frühere Versionen ({insightsReports.length - 1})
-                  </summary>
-                  <ul className="mt-1.5 space-y-1">
-                    {insightsReports.slice(1).map((r) => (
-                      <li key={r.id} className="flex items-baseline gap-2 text-[11px]">
-                        <span className="text-muted">Version {r.version} · {r.createdAt.toLocaleDateString("de-DE")}</span>
-                        <a href={`/insights/${r.token}`} target="_blank" rel="noopener noreferrer" className="text-primary-strong hover:underline">öffnen ↗</a>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-            </section>
-          );
-        })()}
+        {/* 7 · Keywords / Markt-Position ganz unten (D272, Nutzer): „nicht so
+            wichtig wie alle anderen Bewertungen". */}
+        {bereit && tab === "analyse" && analysis && <MarktPosition analysis={analysis} />}
 
-        {driverLauf && tab === "analyse" && (
-          <DriverBlock
-            lauf={driverLauf}
-            /* Karten mit negativer/ausgeglichener Tendenz waren seit D243 in
-               keinem Reiter sichtbar (D266) — sie sind kein Kaufgrund, sondern
-               Erwartungs-Management, und gehören in den Risiko-Block. */
-            risiken={(insights ? normalisierePayload(insights.payload).insightCards ?? [] : []).filter(
-              (k) => kartenKlasse(k) !== "positiv",
-            )}
-          />
-        )}
-
-        {/* Alt-Ansicht (D178) — nur solange für dieses Produkt kein Driver-Lauf
-            existiert. Beides gleichzeitig wäre genau die Doppelung, die D265
-            abstellt. */}
-        {!driverLauf && insights && tab === "analyse" && (() => {
-          const treiber = (normalisierePayload(insights.payload).insightCards ?? []).filter((k) => kartenKlasse(k) === "positiv");
-          if (treiber.length === 0) return null;
-          return (
-            <section className="card p-5">
-              <CardHead icon={<IconCheck />} chip="chip-teal" title="Conversion Drivers" />
-              <div className="mt-4 space-y-2">
-                {treiber.map((k, i) => (
-                  <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={normalisierePayload(insights.payload).stats.reviewsTotal} />
-                ))}
-              </div>
-            </section>
-          );
-        })()}
-
-        {!driverLauf && bereit && tab === "analyse" && (
-        <section className="card p-5">
-          <CardHead
-            icon={<IconSichtbarkeit />}
-            chip="chip-amber"
-            title="Conversion-Blocker"
-          />
-          {(!snapshot || !insights) && (
-            <p className="mt-3 text-xs text-warn">△ Dafür braucht es das importierte Listing und die Bewertungs-Analyse.</p>
-          )}
-          {blockerLauf && (
-            <>
-              <div className="stagger mt-4 space-y-2">
-                {blockerLauf.payload.cards.map((k, i) => (
-                  <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={blockerLauf.payload.stats.reviewsGesamt} />
-                ))}
-                {blockerLauf.payload.cards.length === 0 && (
-                  <p className="text-sm">✓ Kein Blocker gefunden. Die wichtigen Kunden-Themen sind im Listing beantwortet.</p>
-                )}
-              </div>
-            </>
-          )}
-        </section>
-        )}
-
-        {/* Restliches Hintergrundwissen (D172): Zielgruppe/USPs, Sterne-Gruppen, SOV, Feature-Ranking, Stärken & Schwächen */}
-        {bereit && tab === "analyse" && analysis && (
-          <AnalyseHintergrund
-            analysis={analysis}
-            deepAudit={deepAudit ?? null}
-            featureRanking={featureRanking ?? null}
-          />
-        )}
 
         {/* Familien-Kontext GANZ OBEN im Content-Bereich (D256) — auf Parent UND Child,
             damit immer sichtbar ist, in welcher Variantenstruktur man sich befindet.

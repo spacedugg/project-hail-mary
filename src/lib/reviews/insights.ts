@@ -103,7 +103,17 @@ function karten(v: unknown): ReviewInsightsPayload["insightCards"] {
           const label = String(a.label ?? "").trim();
           if (!label) return null;
           const typ = a.typ === "painPoint" ? ("painPoint" as const) : ("buyingTrigger" as const);
-          return { label, typ, mentionCount: num(a.mentionCount) };
+          // D275: Herkunft/Übertragbarkeit beim Lesen NICHT verlieren — sonst
+          // wäre die Aufschlüsselung nach dem ersten Reload wieder weg.
+          const herkunft = normHerkunft(a.herkunft);
+          const uebertragbarkeit = normUebertragbarkeit(a.uebertragbarkeit);
+          return {
+            label,
+            typ,
+            mentionCount: num(a.mentionCount),
+            ...(herkunft ? { herkunft } : {}),
+            ...(uebertragbarkeit ? { uebertragbarkeit } : {}),
+          };
         })
         .filter((b): b is NonNullable<typeof b> => b !== null);
       const rel = num(c.relevanz);
@@ -158,4 +168,33 @@ export function normalisierePayload(raw: unknown): ReviewInsightsPayload {
           .filter((e): e is NonNullable<typeof e> => e !== null)
       : undefined,
   };
+}
+
+/**
+ * Anzeige-Deckel für Roh-Findings (D273, Nutzer-Vorgabe 01.08.2026).
+ *
+ * „Nicht mehr als 10 negative oder 10 positive Bewertungs-Findings auflisten,
+ * weil das irgendwann viel zu viel wird und ich gar nicht mehr weiß: Was ist
+ * jetzt wirklich wichtig? Vielleicht auf acht beschränken und dann natürlich
+ * die WICHTIGSTEN acht nehmen."
+ *
+ * Wichtig = am häufigsten in Reviews mit verifizierter Fundstelle belegt
+ * (`mentionCount`, D170 — ein echter Zählwert, keine LLM-Schätzung). Findings
+ * ohne Zählwert landen hinten, aber nicht im Nichts: bei gleichem Rang bleibt
+ * die ursprüngliche Reihenfolge erhalten (stabile Sortierung).
+ *
+ * Der Code entscheidet, nicht das LLM (D184): Die Analyse darf ruhig mehr
+ * Themen finden — gespeichert bleibt alles, angezeigt wird die Spitze.
+ */
+export const FINDINGS_ANZEIGE_MAX = 8;
+
+export function wichtigsteFindings<T extends { mentionCount: number | null }>(
+  liste: T[],
+  max: number = FINDINGS_ANZEIGE_MAX,
+): T[] {
+  return [...liste]
+    .map((f, i) => ({ f, i }))
+    .sort((a, b) => (b.f.mentionCount ?? -1) - (a.f.mentionCount ?? -1) || a.i - b.i)
+    .slice(0, Math.max(0, max))
+    .map((x) => x.f);
 }

@@ -203,3 +203,61 @@ describe("filtereEinzelnennungen — Signifikanz-Gate (D170)", () => {
     expect(filtereEinzelnennungen({ painPoints: [ohneZahl], buyingTriggers: [] }, 1000).aspekte.painPoints).toHaveLength(1);
   });
 });
+
+/**
+ * Herkunfts-Kette (D275, Nutzer-Frage 01.08.2026: „ob du wirklich noch im Kopf
+ * hast, welche Bewertungen von unserem Produkt stammen und welche bei
+ * Fremdprodukten entstehen").
+ *
+ * Die Roh-Aspekte tragen die Aufschlüsselung seit D196 — `findeAspekt` ließ sie
+ * fallen. Ergebnis war ein `mentionCount` auf jeder Karte, der eigene und
+ * Wettbewerber-Fundstellen stillschweigend summierte.
+ */
+describe("Review-Herkunft überlebt die Verdichtung (D275)", () => {
+  const mitHerkunft = {
+    painPoints: [
+      {
+        label: "Undichte Anschlüsse",
+        frequencyPct: 20,
+        mentionCount: 15,
+        quotes: [],
+        herkunft: { eigene: 3, fremde: 12, jeAsin: { B0EIGEN: 3, B0FREMD: 12 } },
+        uebertragbarkeit: { urteil: "unbekannt" as const, grund: "Gleiche Anschlussnorm, andere Dichtung." },
+      },
+    ],
+    buyingTriggers: [
+      { label: "Erwärmt zuverlässig", frequencyPct: 10, mentionCount: 9, quotes: [] },
+    ],
+  };
+
+  it("findeAspekt reicht herkunft und uebertragbarkeit an die Karte durch", () => {
+    const { cards } = normalisiereInsightCards(
+      { insights: [{ titel: "Dichtungen", beschreibung: "…", belegAspekte: ["Undichte Anschlüsse"] }] },
+      mitHerkunft,
+      QUELLEN,
+    );
+    const beleg = cards[0].belegAspekte[0];
+    expect(beleg.mentionCount).toBe(15);
+    expect(beleg.herkunft).toEqual({ eigene: 3, fremde: 12, jeAsin: { B0EIGEN: 3, B0FREMD: 12 } });
+    expect(beleg.uebertragbarkeit?.urteil).toBe("unbekannt");
+  });
+
+  it("die Summe bleibt nachvollziehbar: eigene + fremde ergeben den Zählwert", () => {
+    const { cards } = normalisiereInsightCards(
+      { insights: [{ titel: "Dichtungen", beschreibung: "…", belegAspekte: ["Undichte Anschlüsse"] }] },
+      mitHerkunft,
+      QUELLEN,
+    );
+    const b = cards[0].belegAspekte[0];
+    expect((b.herkunft!.eigene + b.herkunft!.fremde)).toBe(b.mentionCount);
+  });
+
+  it("Aspekte ohne Herkunft behaupten nichts (Alt-Payloads bleiben ehrlich leer)", () => {
+    const { cards } = normalisiereInsightCards(
+      { insights: [{ titel: "Wärme", beschreibung: "…", belegAspekte: ["Erwärmt zuverlässig"] }] },
+      mitHerkunft,
+      QUELLEN,
+    );
+    expect(cards[0].belegAspekte[0].herkunft).toBeUndefined();
+  });
+});

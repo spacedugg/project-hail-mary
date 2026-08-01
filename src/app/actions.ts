@@ -634,6 +634,31 @@ export async function toggleKeywordRelevanz(formData: FormData) {
   revalidatePath(`/produkte/${productId}`);
 }
 
+/**
+ * Mehrere Keywords auf einmal ausschließen (D274, Nutzer-Vorgabe 01.08.):
+ * „Dann kann ich Keywords suchen, die ich noch ausschließen möchte." Wer nach
+ * einem Störwort filtert, will die Treffer nicht einzeln wegklicken — die Suche
+ * liefert die Menge, dieser Aufruf entscheidet sie in einem Schritt.
+ *
+ * Wie die Einzel-Entscheidung trägt jedes Keyword danach den Grund-Präfix
+ * „manuell" und ist damit vor Auto-Läufen geschützt (D87).
+ */
+export async function schliesseKeywordsAus(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const ids = formData.getAll("keywordIds").map(String).filter(Boolean);
+  const suchbegriff = String(formData.get("suchbegriff") ?? "").trim();
+  if (!productId || ids.length === 0) return;
+  const db = await getDb();
+  await db
+    .update(schema.keywords)
+    .set({
+      ausgeschlossen: true,
+      ausschlussGrund: suchbegriff ? `manuell ausgeschlossen (Suche „${suchbegriff}")` : "manuell ausgeschlossen",
+    })
+    .where(and(eq(schema.keywords.productId, productId), inArray(schema.keywords.id, ids)));
+  revalidatePath(`/produkte/${productId}`);
+}
+
 /** Optionale Produktbeschreibung speichern (D108/D219) — fließt in jede Text-Generierung UND (als Fallback) in die Beschreibungs-Dimension des Tiefen-Audits ein. */
 export async function saveZusatzKontext(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
@@ -1604,12 +1629,24 @@ export async function erzeugeInsightsDokument(formData: FormData) {
  * als Wert zurück (kein Redirect), damit der Runner sie anzeigen und die
  * Etappe erneut anstoßen kann.
  */
-export type PipelineErgebnis = { ok: boolean; hinweis?: string; fehler?: string; code?: string };
+export type PipelineErgebnis = {
+  ok: boolean;
+  hinweis?: string;
+  fehler?: string;
+  code?: string;
+  /**
+   * Nächste zu verarbeitende Wettbewerber-ASIN (D276). Nur die Etappe
+   * `wettbewerb-bilder` setzt das: Sie arbeitet eine ASIN je Request ab und sagt
+   * dem Runner, ob noch eine folgt — so bleibt jeder Request unter dem Zeitlimit,
+   * ohne dass der Client die Wettbewerber-Liste kennen muss.
+   */
+  naechsteAsin?: string | null;
+};
 
 export async function runPipelineStufe(
   productId: string,
-  stufe: "listing" | "scrape" | "auswertung" | "wettbewerb-texte" | "verdichtung" | "blocker" | "features" | "driver" | "audit" | "content",
-  extra?: { asins?: string[]; section?: string; force?: boolean; ohneAnalyseBestaetigt?: boolean; aplusBilder?: import("@/lib/analysis/bildAuslese").AplusBild[] },
+  stufe: "listing" | "scrape" | "auswertung" | "wettbewerb-texte" | "wettbewerb-bilder" | "verdichtung" | "blocker" | "features" | "driver" | "audit" | "content",
+  extra?: { asins?: string[]; section?: string; force?: boolean; ohneAnalyseBestaetigt?: boolean; aplusBilder?: import("@/lib/analysis/bildAuslese").AplusBild[]; asin?: string },
 ): Promise<PipelineErgebnis> {
   const db = await getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
@@ -1627,6 +1664,11 @@ export async function runPipelineStufe(
         return { ok: true, hinweis: (await auswertungKern(db, product)) ?? undefined };
       case "wettbewerb-texte":
         return { ok: true, hinweis: (await wettbewerbsTexteKern(db, product)) ?? undefined };
+      // D276: eine Wettbewerber-ASIN je Aufruf, der Runner kettet weiter.
+      case "wettbewerb-bilder": {
+        const r = await wettbewerbsBilderKern(db, product, extra?.asin ?? null);
+        return { ok: true, hinweis: r.hinweis, naechsteAsin: r.naechsteAsin };
+      }
       case "verdichtung": {
         const insight = await db.query.reviewInsights.findFirst({
           where: eq(schema.reviewInsights.productId, productId),
@@ -1894,8 +1936,62 @@ async function scrapeWettbewerberListings(
     await db.insert(schema.competitorListings).values({
       id: id(), productId: product.id, asin, source: src,
       title: snap.title, bullets: snap.bullets, description: snap.description, attributes: snap.attributes,
+      // D276 (Nutzer-Vorgabe 01.08.): Die Bild-URLs kamen im selben Scrape immer
+      // schon mit und wurden weggeworfen — „diese Listinginformationen von den
+      // Competitor-Listings sind sehr hilfreich … als auch die Bilder". Die
+      // Vision-Auslese läuft danach als eigene Etappe je ASIN (siehe
+      // wettbewerbsBilderKern): alle Bilder eines Wettbewerbers in EINEM Request,
+      // sonst reißt das 300-Sekunden-Limit.
+      imageUrls: snap.imageUrls ?? [],
     });
   }
+}
+
+/**
+ * Wettbewerber-Bildanalyse (D276) — EINE ASIN je Aufruf.
+ *
+ * Warum gestückelt: Der Nutzer will „alle Bilder je Wettbewerber" (bis zu 9,
+ * `MAX_VISION_BILDER`). Bei vier Vergleichs-ASINs sind das ~36 Bilder — in einem
+ * Request unmöglich (Vercel: 300 s). Der Client-Runner reiht deshalb eine Etappe
+ * PRO ASIN, wie bei den Content-Sektionen.
+ *
+ * Rückgabe: die ASIN, die als Nächstes dran wäre (oder null = fertig). So kann
+ * der Runner die Kette bilden, ohne die Wettbewerber-Liste selbst zu kennen.
+ */
+async function wettbewerbsBilderKern(
+  db: Awaited<ReturnType<typeof getDb>>,
+  product: { id: string; contentSprache: ContentSprache },
+  asin: string | null,
+): Promise<{ hinweis?: string; naechsteAsin: string | null }> {
+  const offen = await db.query.competitorListings.findMany({
+    where: eq(schema.competitorListings.productId, product.id),
+    orderBy: desc(schema.competitorListings.createdAt),
+  });
+  // Je ASIN zählt der neueste Scrape — ältere Zeilen sind Historie.
+  const neueste = offen.filter((z, i, arr) => arr.findIndex((x) => x.asin === z.asin) === i);
+  const zuTun = neueste.filter((z) => z.bilderText === null && (z.imageUrls?.length ?? 0) > 0);
+
+  const ziel = asin ? zuTun.find((z) => z.asin === asin) : zuTun[0];
+  if (!ziel) return { naechsteAsin: null };
+
+  const { leseBilderAus } = await import("@/lib/analysis/bildAuslese");
+  const ergebnis = await leseBilderAus(ziel.imageUrls!, product.contentSprache);
+  // Ohne Vision-Key liefert die Auslese null (ehrlich „nicht ausgelesen", D158).
+  // Dann NICHT [] schreiben — sonst gälte die ASIN als erledigt und würde nie
+  // nachgeholt, wenn der Key da ist.
+  if (ergebnis === null) {
+    return { hinweis: `Bildanalyse ${ziel.asin}: keine Vision-Auslese möglich (kein Key) — übersprungen.`, naechsteAsin: null };
+  }
+  await db
+    .update(schema.competitorListings)
+    .set({ bilderText: ergebnis.bilder })
+    .where(eq(schema.competitorListings.id, ziel.id));
+
+  const rest = zuTun.filter((z) => z.id !== ziel.id);
+  return {
+    hinweis: `Bildanalyse ${ziel.asin}: ${ergebnis.bilder.length} von ${ziel.imageUrls!.length} Bildern ausgelesen.`,
+    naechsteAsin: rest[0]?.asin ?? null,
+  };
 }
 
 /**
@@ -1938,9 +2034,22 @@ async function wettbewerbsTexteKern(
       produktName: product.name,
       facts: product.facts,
       eigenesListing: { title: snapshot?.title ?? null, bullets: snapshot?.bullets ?? null, description: snapshot?.description ?? null },
-      wettbewerber: [...jeAsin.values()].map((l) => ({ asin: l.asin, title: l.title, bullets: l.bullets, description: l.description, attributes: l.attributes })),
+      // D276: Bildinhalte gehoeren zum Listing-Zustand der Konkurrenz. Der
+      // Text-Scrape sieht Infografiken nicht — ohne sie war die
+      // Informationsluecke systematisch zu klein gemessen.
+      wettbewerber: [...jeAsin.values()].map((l) => ({
+        asin: l.asin,
+        title: l.title,
+        bullets: l.bullets,
+        description: l.description,
+        attributes: l.attributes,
+        bilder: l.bilderText?.map((b) => ({ slot: b.slot, inhalt: b.inhalt, textImBild: b.textImBild, claims: b.claims })) ?? null,
+      })),
     });
-    const dataBasis = [...jeAsin.keys()].map((a) => `Wettbewerber-Listing ${a}`);
+    // Datenbasis nennt ehrlich, ob die Bilder mit drin waren (D133).
+    const dataBasis = [...jeAsin.values()].map(
+      (l) => `Wettbewerber-Listing ${l.asin}${l.bilderText?.length ? ` (+ ${l.bilderText.length} Bilder ausgelesen)` : " (Text ohne Bilder)"}`,
+    );
     await db.insert(schema.competitorInfoGaps).values({ id: id(), productId, payload, dataBasis });
   } catch (e) {
     throw new GenFehler(`Wettbewerber-Abgleich: ${e instanceof Error ? e.message : String(e)}`, "WB-01");

@@ -261,9 +261,16 @@ export function pruefeInsightsReport(p: InsightsReportPayload): { ok: boolean; v
     }
   }
 
-  // Ein Score von 0 ist fast immer „nicht bewertbar“ und wäre eine Falschaussage (D70).
+  // D271 (Nutzer-Befund 01.08., Screenshot INS-01): Die Untergrenze stand auf 1,
+  // weil „0 = nicht bewertbar“ als Falschaussage galt (D70). Das war ein
+  // Denkfehler: „nicht bewertbar“ trägt bereits `measured=false` und kommt hier
+  // als `null` an (siehe Projektion oben). Eine 0 in diesem Feld ist eine ECHTE
+  // Messung — `scoreFromIssues` (listingAudit.ts) klemmt bei 0, und ab vier
+  // Fehlern in einer Dimension ist 0 der korrekte Wert. Ergebnis: Genau die
+  // Listings mit dem größten Optimierungsbedarf konnten kein Kunden-Dokument
+  // bekommen. Erlaubt ist jetzt der volle Messbereich 0–100.
   for (const dim of p.listing.dimensionen) {
-    if (dim.score !== null && (dim.score < 1 || dim.score > 100)) {
+    if (dim.score !== null && (dim.score < 0 || dim.score > 100)) {
       verstoesse.push(`Dimension „${dim.label}“ mit unmöglichem Score ${dim.score}.`);
     }
   }

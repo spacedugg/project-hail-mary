@@ -134,7 +134,7 @@ export const DATENFLUSS: Datenpunkt[] = [
       "Suchnachfrage-Anteil im Conversion-Driver-Score (D265) — der einzige gemessene Vorkauf-Datenpunkt",
     ],
     anzeige: [
-      "Keywords-Reiter (aktive Chips + durchsuchbare Aussortierten-Liste)",
+      "Keywords-Reiter: aktive Chips UND aussortierte Liste jeweils durchsuchbar, Treffer einzeln oder gesammelt ausschließbar (D274)",
       "SOV-Audit kompakt inline (D161)",
       "Vergleichs-ASIN-Chips in der Analyse-Maske (vorbelegt, abwählbar) + Notiz in der Scrape-Datenbasis",
     ],
@@ -163,14 +163,16 @@ export const DATENFLUSS: Datenpunkt[] = [
       "Briefings (Bild-Ideen aus Gegenmaßnahmen, D171)",
       "Zuständigkeits-Gate EINMAL beim Speichern der Roh-Analyse (D266, src/lib/analysis/zustaendigkeit.ts): Versand-/Zustell-Themen fallen raus (Amazon-Sache), Verpackungs-/Transportschaden wird Produkt-Feedback. Damit arbeiten Verdichtung, Feature-Ranking, Blocker, Driver UND analyzeListing() automatisch auf bereinigten Aspekten",
     ],
-    anzeige: ["Bewertungen-Reiter (Analyse-Dashboard, inkl. „Grenzen dieser Auswertung“)", "Analyse-Reiter: Conversion Driver, Blocker, Ballast, Erwartungs-/Produktrisiken (D265/D266)"],
+    anzeige: ["Bewertungen-Block im Analyse-Reiter: Analyse-Lauf, „Grenzen dieser Auswertung“ und die wichtigsten 8 negativen bzw. positiven Roh-Findings (D273)", "Analyse-Reiter: Conversion Driver, Blocker, Ballast, Produkt-Feedback (D265/D266/D272)"],
     felder: [
       { feld: "review_insights.payload.kernThese", consumer: ["src/components/bewertungs-dashboard.tsx", "src/lib/recipes/listing.ts"] },
       { feld: "review_insights.payload.verworfeneKarten", consumer: ["src/components/bewertungs-dashboard.tsx"] },
       { feld: "review_insights.payload.entfernteBildIdeen", consumer: ["src/components/bewertungs-dashboard.tsx"] },
-      // Auch der Risiko-Block speist sich hieraus (D266): page.tsx filtert die
-      // Karten mit negativer/ausgeglichener Tendenz heraus und übergibt sie.
       { feld: "review_insights.payload.insightCards", consumer: ["src/app/(app)/produkte/[id]/page.tsx", "src/lib/recipes/listing.ts"] },
+      // D275: Die Herkunft (eigene vs. Wettbewerber-Reviews) endete bis dahin an
+      // der Karten-Grenze — `findeAspekt` übernahm nur label/typ/mentionCount.
+      // Jetzt trägt jeder Beleg-Aspekt sie mit und die Karte weist sie aus.
+      { feld: "review_insights.payload.insightCards[].belegAspekte[].herkunft", consumer: ["src/lib/reviews/verdichtung.ts", "src/lib/reviews/insights.ts", "src/components/insight-karte.tsx"] },
       { feld: "review_insights.payload.painPoints[].herkunft", consumer: ["src/lib/recipes/listing.ts"] },
       { feld: "review_insights.payload.painPoints[].uebertragbarkeit", consumer: ["src/lib/recipes/listing.ts"] },
       // D269: Der Bild-Brief ist kein Markdown-String mehr — die Kundensprache
@@ -231,20 +233,29 @@ export const DATENFLUSS: Datenpunkt[] = [
   {
     id: "wettbewerber-listings",
     name: "Wettbewerber-Listings (Texte der Vergleichs-ASINs)",
-    quelle: "Optionale Vergleichs-ASINs am Analyse-Start (D199) — werden beim Review-Scrape zusätzlich als Listing gescrapt",
-    speicher: "competitor_listings → competitor_info_gaps",
+    quelle: "Optionale Vergleichs-ASINs am Analyse-Start (D199), vorbelegt aus dem Keyword-Export (D268) — beim Review-Scrape wird zusätzlich das ganze Listing erfasst: Texte UND Bilder (D276)",
+    speicher: "competitor_listings (Texte, image_urls, bilder_text) → competitor_info_gaps",
     analysen: [
       { name: "Listing-Scrape je Wettbewerber", modul: "src/lib/scrape/anthropicProduct.ts", outcome: "Titel, Bullets, Beschreibung, Attribute der Konkurrenz-ASINs" },
+      { name: "Wettbewerber-Bildanalyse (Vision)", modul: "src/lib/analysis/bildAuslese.ts", outcome: "alle Bilder je Vergleichs-ASIN: Text-im-Bild wortwörtlich, Bildinhalt, gezeigte Claims — läuft als eigene Etappe EINE ASIN je Request, weil bis zu 9 Auslesen × N Wettbewerber das Zeitlimit sprengen (D276)" },
       { name: "Wettbewerber-Abgleich", modul: "src/lib/analysis/wettbewerbsTexte.ts", outcome: "Infos, die die Konkurrenz nennt und unser Listing NICHT — mit Übertragbarkeits-Urteil ja/nein/unbekannt gegen unsere Produkt-Wahrheit (nein = verworfen)" },
     ],
     verwendung: [
       "Content-Prompts: ÜBERTRAGBARE WETTBEWERBER-INFORMATIONEN — fehlende Themen mit EIGENEN belegten Angaben besetzen, nie fremde Specs übernehmen (D199)",
+      "Informationslücken-Abgleich: Bildinhalte der Konkurrenz gehen als eigener, als BILD gekennzeichneter Block in den Prompt — Infografiken sind für Text-Scrapes unsichtbar, ohne sie wurde die Lücke systematisch zu klein gemessen (D276)",
     ],
     // Ehrlich korrigiert (D265): Es gibt KEINE Ansicht dafür. Die frühere
     // Angabe „Analyse-Reiter (übertragbare Informationslücken)" war eine
     // Deklaration ohne Deckung — genau die Selbstbescheinigung, die die
     // Feld-Prüfung künftig verhindert.
     anzeige: ["(noch keine — nur Content-Prompt, siehe offeneFelder)"],
+    felder: [
+      // D276: Bild-URLs und Vision-Auslese der Vergleichs-ASINs. Beide werden in
+      // actions.ts geschrieben UND gelesen (wettbewerbsBilderKern füllt sie,
+      // wettbewerbsTexteKern gibt sie in den Abgleich-Prompt).
+      { feld: "competitor_listings.imageUrls", consumer: ["src/app/actions.ts"] },
+      { feld: "competitor_listings.bilderText", consumer: ["src/app/actions.ts"] },
+    ],
     offeneFelder: [
       {
         feld: "competitor_info_gaps.payload.gaps",

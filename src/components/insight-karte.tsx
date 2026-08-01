@@ -13,6 +13,7 @@ export function InsightKarte({
   rang,
   reviewsGesamt,
   belegHinweis,
+  ohneTendenz = false,
 }: {
   karte: InsightCard;
   rang: number;
@@ -20,13 +21,20 @@ export function InsightKarte({
   reviewsGesamt: number;
   /** Ersetzt die Review-Beleg-Stufe, wenn die Karte NICHT aus Reviews stammt (z. B. Audit, D135). */
   belegHinweis?: string;
+  /**
+   * Tendenz-Spalte unterdrücken (D272, Nutzer-Befund 01.08.): Bei Produkt-Features
+   * ist „überwiegend negativ · 12× vs. 15×" fehl am Platz — ein Feature ist ein
+   * Feature; die Zufriedenheit damit steht in den Bewertungs-Findings und den
+   * Conversion-Blockern. Dort bleibt die Tendenz sichtbar.
+   */
+  ohneTendenz?: boolean;
 }) {
   // Ehrliche Beleg-Angabe (D154): Anzahl der Beleg-Aspekte ist ein echter
   // Wert — LLM-geschätzte Erwähnungs-Zahlen werden nicht mehr angezeigt.
   const beleg = { text: belegHinweis ?? `${karte.belegAspekte.length} Beleg-Aspekt${karte.belegAspekte.length === 1 ? "" : "e"}` };
   // Tendenz bei Gegensatz-Bündelung (D171): rechnet der Code aus den
   // verifizierten Zählwerten beider Seiten — nie die KI.
-  const tendenz = kartenTendenz(karte);
+  const tendenz = ohneTendenz ? null : kartenTendenz(karte);
 
   return (
     <details className="rounded-xl border border-hair bg-background">
@@ -59,15 +67,29 @@ export function InsightKarte({
               <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-muted">Belege</div>
               <ul className="mt-1 space-y-1">
                 {karte.belegAspekte.map((b, i) => (
-                  <li key={i} className="flex items-baseline justify-between gap-2 text-xs">
-                    <span>
-                      <span className={b.typ === "painPoint" ? "text-bad" : "text-good"}>
-                        {b.typ === "painPoint" ? "−" : "+"}
-                      </span>{" "}
-                      {b.label}
-                    </span>
-                    {/* Echter Zählwert (D170): Reviews mit verifizierter Fundstelle */}
-                    {b.mentionCount !== null && <span className="flex-none tabular-nums text-muted" title="Reviews mit verifizierter Fundstelle">{b.mentionCount}×</span>}
+                  <li key={i} className="text-xs">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span>
+                        <span className={b.typ === "painPoint" ? "text-bad" : "text-good"}>
+                          {b.typ === "painPoint" ? "−" : "+"}
+                        </span>{" "}
+                        {b.label}
+                      </span>
+                      {/* Echter Zählwert (D170): Reviews mit verifizierter Fundstelle */}
+                      {b.mentionCount !== null && <span className="flex-none tabular-nums text-muted" title="Reviews mit verifizierter Fundstelle">{b.mentionCount}×</span>}
+                    </div>
+                    {/* Herkunft (D275, Nutzer-Frage 01.08.): Ein Befund, der nur an
+                        Wettbewerber-Produkten entstanden ist, darf nicht wie eigenes
+                        Kunden-Feedback aussehen. Ausgewiesen, sobald fremde
+                        Fundstellen dabei sind — samt Übertragbarkeits-Urteil (D199). */}
+                    {b.herkunft && b.herkunft.fremde > 0 && (
+                      <p className="mt-0.5 text-[11px] text-warn">
+                        {b.herkunft.eigene > 0
+                          ? `${b.herkunft.eigene}× am eigenen Produkt, ${b.herkunft.fremde}× bei Wettbewerbern`
+                          : `Nur bei Wettbewerbern belegt (${b.herkunft.fremde}×) — am eigenen Produkt nicht gefunden`}
+                        {b.uebertragbarkeit && ` · übertragbar: ${b.uebertragbarkeit.urteil}`}
+                      </p>
+                    )}
                   </li>
                 ))}
               </ul>

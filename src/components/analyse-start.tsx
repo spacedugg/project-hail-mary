@@ -61,7 +61,7 @@ const SEKTIONEN = [
 ] as const;
 
 type Etappe = {
-  stufe: "listing" | "scrape" | "auswertung" | "wettbewerb-texte" | "verdichtung" | "blocker" | "features" | "driver" | "audit" | "content";
+  stufe: "listing" | "scrape" | "auswertung" | "wettbewerb-texte" | "wettbewerb-bilder" | "verdichtung" | "blocker" | "features" | "driver" | "audit" | "content";
   section?: string;
   label: string;
   status: "offen" | "laeuft" | "fertig" | "fehler";
@@ -156,6 +156,37 @@ export function AnalyseStart({
         continue;
       }
       setzeStatus(i, "fertig", res.hinweis);
+
+      /**
+       * Wettbewerber-Bilder (D276): Diese Etappe verarbeitet EINE ASIN je
+       * Request — „alle Bilder je Wettbewerber" (Nutzer-Entscheidung 01.08.)
+       * sind bis zu 9 Vision-Auslesen und bei vier Vergleichs-ASINs unmöglich in
+       * einem Aufruf (Vercel: 300 s). Der Server sagt, ob noch eine ASIN folgt;
+       * hier wird sie direkt hinterhergeschickt, bis die Kette leer ist.
+       * Die Obergrenze ist eine Notbremse gegen eine kaputte Server-Antwort,
+       * nicht der Normalfall.
+       */
+      if (e.stufe === "wettbewerb-bilder") {
+        let naechste = res.naechsteAsin ?? null;
+        const meldungen = res.hinweis ? [res.hinweis] : [];
+        for (let runde = 0; naechste && runde < 20; runde++) {
+          let weiter: PipelineErgebnis;
+          try {
+            weiter = await runPipelineStufe(productId, "wettbewerb-bilder", { asin: naechste });
+          } catch (err) {
+            weiter = { ok: false, fehler: err instanceof Error ? err.message : String(err), code: "ALG-00" };
+          }
+          if (!weiter.ok) {
+            // Weiche Etappe: Der Rest des Laufs darf daran nicht scheitern.
+            meldungen.push(`${naechste}: ${weiter.fehler ?? "fehlgeschlagen"}`);
+            break;
+          }
+          if (weiter.hinweis) meldungen.push(weiter.hinweis);
+          naechste = weiter.naechsteAsin ?? null;
+          setzeStatus(i, "laeuft", meldungen.join(" · "));
+        }
+        setzeStatus(i, "fertig", meldungen.join(" · ") || undefined);
+      }
       // KEIN router.refresh() je Etappe: sobald die Analyse existiert, würde
       // die Server-Seite diese Start-Maske abbauen und der Fortschritt
       // verschwände mitten im Lauf.
@@ -179,6 +210,10 @@ export function AnalyseStart({
       { stufe: "listing", label: "Amazon Listing laden (Texte, Bilder, Bildanalyse)", status: "offen", hart: true },
       { stufe: "scrape", label: `Reviews scrapen (${liste.length} ASIN${liste.length === 1 ? "" : "s"})`, status: "offen", hart: !ohneAnalyse },
       { stufe: "auswertung", label: "Reviews auswerten (Pain Points, Kaufauslöser)", status: "offen", hart: !ohneAnalyse },
+      // D276: Bilder der Vergleichs-ASINs auslesen — eine ASIN je Request,
+      // der Runner kettet selbst weiter. Weiche Etappe: ohne Vision-Key oder
+      // ohne Wettbewerber laeuft der Rest normal durch.
+      { stufe: "wettbewerb-bilder", label: "Wettbewerber-Bilder auslesen", status: "offen", hart: false },
       { stufe: "wettbewerb-texte", label: "Wettbewerber-Listings abgleichen (fehlende Infos)", status: "offen", hart: false },
       { stufe: "verdichtung", label: "Erkenntnisse verdichten", status: "offen", hart: false },
       // Die Alt-Etappe „blocker" (D167) läuft NICHT mehr mit (D266): Der

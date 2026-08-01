@@ -33,7 +33,24 @@ export type WettbewerbsTexteKontext = {
   produktName: string;
   facts: ProductFacts;
   eigenesListing: { title: string | null; bullets: string[] | null; description: string | null };
-  wettbewerber: Array<{ asin: string; title: string | null; bullets: string[] | null; description: string | null; attributes?: Record<string, string> | null }>;
+  wettbewerber: Array<{
+    asin: string;
+    title: string | null;
+    bullets: string[] | null;
+    description: string | null;
+    attributes?: Record<string, string> | null;
+    /**
+     * Vision-Auslese der Wettbewerber-Bilder (D276, Nutzer-Vorgabe 01.08.:
+     * „ein 100 % volles Bild ueber den Zustand der Konkurrenz-Listings und die
+     * Informationen, die diese kommunizieren").
+     *
+     * Der Text-Scrape sieht Infografiken nicht — genau dort steht bei vielen
+     * Kategorien die halbe Argumentation (Masse, Vergleichstabellen,
+     * Anwendungsschritte). Ohne die Bilder war die Informationsluecke
+     * systematisch zu klein gemessen.
+     */
+    bilder?: Array<{ slot: number; inhalt: string; textImBild: string[]; claims: string[] }> | null;
+  }>;
 };
 
 function block(l: WettbewerbsTexteKontext["wettbewerber"][number]): string {
@@ -43,6 +60,21 @@ function block(l: WettbewerbsTexteKontext["wettbewerber"][number]): string {
     l.bullets?.length ? `Bullets: ${l.bullets.join(" • ")}` : "",
     l.description ? `Beschreibung: ${l.description.slice(0, 1500)}` : "",
     l.attributes ? `Attribute: ${Object.entries(l.attributes).map(([k, v]) => `${k}: ${v}`).join("; ")}` : "",
+    // D276: Bildinhalte als eigener, klar getrennter Abschnitt — das LLM muss
+    // wissen, dass diese Aussagen aus einem BILD stammen und nicht aus dem Text.
+    l.bilder?.length
+      ? `Bildinhalte (per Vision ausgelesen, KEIN Listing-Text):\n${l.bilder
+          .slice(0, 9)
+          .map((b) => {
+            const teile = [
+              b.inhalt,
+              b.textImBild.length ? `Text im Bild: ${b.textImBild.join(" | ").slice(0, 400)}` : "",
+              b.claims.length ? `Aussagen: ${b.claims.join(" | ").slice(0, 400)}` : "",
+            ].filter(Boolean);
+            return `  - Bild ${b.slot}: ${teile.join(" — ")}`;
+          })
+          .join("\n")}`
+      : "",
   ].filter(Boolean).join("\n");
 }
 

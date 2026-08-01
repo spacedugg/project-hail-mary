@@ -1,4 +1,3 @@
-import type { InsightCard } from "@/db/schema";
 import { KANAL_LABEL, type AbdeckungsStufe, type BildStufe } from "@/lib/analysis/abdeckung";
 import { MOTIV_LABELS } from "@/lib/analysis/motive";
 import { QUELL_LABEL, type ConversionDriverPayload, type NutzenBaustein } from "@/lib/analysis/driverTypen";
@@ -80,19 +79,23 @@ function Baustein({ b }: { b: NutzenBaustein }) {
 
 export function DriverBlock({
   lauf,
-  risiken = [],
 }: {
   lauf: { payload: ConversionDriverPayload; dataBasis: string[]; createdAt: Date };
-  /**
-   * Verdichtete Erkenntnisse mit negativer oder ausgeglichener Tendenz (D266).
-   * Sie waren seit D243 in keinem Reiter mehr sichtbar — die Verdichtung wurde
-   * bezahlt und ein Teil des Ergebnisses verworfen. Hier sind sie am richtigen
-   * Platz: kein Kaufgrund, sondern Erwartungs-Management.
-   */
-  risiken?: InsightCard[];
 }) {
   const p = lauf.payload;
-  const hatRisiken = risiken.length > 0 || p.produktFeedback.length > 0;
+  /**
+   * D272 (Nutzer-Befund 01.08., Screenshot „Erwartungs- & Produktrisiken"):
+   * Hier standen zusätzlich die verdichteten Karten mit negativer Tendenz
+   * (`risiken`, D266) — „lediglich die Informationen, die wir schon bei unseren
+   * negativen Bewertungsanalysen herausfiltern, eins zu eins dieselbe
+   * Information". Sie sind raus; sichtbar bleiben sie als negative
+   * Bewertungs-Findings und, soweit sie im Listing unbeantwortet sind, als
+   * Conversion-Blocker.
+   *
+   * `produktFeedback` bleibt: Das ist KEINE Dopplung, sondern das Ergebnis des
+   * Zuständigkeits-Gates (D266) — Themen, die kein Listing-Text lösen kann.
+   */
+  const hatRisiken = p.produktFeedback.length > 0;
 
   return (
     <>
@@ -191,27 +194,14 @@ export function DriverBlock({
             )}
             {hatRisiken && (
               <div>
-                <h2 className="text-sm font-semibold">Erwartungs- &amp; Produktrisiken</h2>
+                <h2 className="text-sm font-semibold">Produkt-Feedback</h2>
                 <p className="mt-1 text-xs text-muted">
-                  Kein Kaufgrund, sondern Erwartungs-Management: Themen, die kein Werbetext wegversprechen darf.
-                  Sie wirken auf Retouren und Bewertungen.
+                  Themen, die kein Listing-Text löst — Produkt, Verpackung, Transport. Sie wirken auf Retouren und
+                  Bewertungen und gehören zum Hersteller, nicht in den Werbetext.
                 </p>
-                {risiken.length > 0 && (
-                  <ul className="mt-2 space-y-1.5">
-                    {risiken.map((r, i) => (
-                      <li key={i} className="rounded-lg border border-hair p-2">
-                        <div className="text-xs font-medium">{r.titel}</div>
-                        <p className="mt-0.5 text-[11px] text-muted">{r.beschreibung}</p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
                 {p.produktFeedback.length > 0 && (
                   <>
-                    <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                      Produkt-Feedback — nicht über den Listing-Text lösbar
-                    </div>
-                    <ul className="mt-1 space-y-1">
+                    <ul className="mt-2 space-y-1">
                       {p.produktFeedback.map((f, i) => (
                         <li key={i} className="flex items-baseline justify-between gap-2 text-xs">
                           <span>

@@ -84,7 +84,19 @@ export function findeAspekt(ref: string, aspekte: RoheAspekte): BelegAspekt | nu
   ): BelegAspekt | null => {
     const exakt = liste.find((a) => norm(a.label) === n);
     const enthalten = exakt ?? liste.find((a) => norm(a.label).includes(n) || n.includes(norm(a.label)));
-    return enthalten ? { label: enthalten.label, typ, mentionCount: enthalten.mentionCount } : null;
+    // D275: Herkunft und Übertragbarkeit MITNEHMEN. Vorher endete die
+    // Aufschlüsselung eigene/fremde Reviews (D196) hier — jede Karte trug danach
+    // nur noch eine Summe, und niemand konnte mehr sehen, ob ein Befund
+    // überhaupt am eigenen Produkt entstanden ist.
+    return enthalten
+      ? {
+          label: enthalten.label,
+          typ,
+          mentionCount: enthalten.mentionCount,
+          herkunft: enthalten.herkunft,
+          uebertragbarkeit: enthalten.uebertragbarkeit,
+        }
+      : null;
   };
   return suche(aspekte.buyingTriggers, "buyingTrigger") ?? suche(aspekte.painPoints, "painPoint");
 }

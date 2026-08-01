@@ -197,4 +197,25 @@ describe("Auslieferungs-Gate (D267)", () => {
     expect(r.verstoesse.join(" ")).toContain("unmöglicher Relevanz");
     expect(r.verstoesse.join(" ")).toContain("unmöglichem Score");
   });
+
+  /**
+   * D271 (Nutzer-Befund 01.08., Screenshot „Dimension Bullet Points mit
+   * unmöglichem Score 0"): Score 0 ist eine ECHTE Messung — `scoreFromIssues`
+   * klemmt bei 0, ab vier Fehlern in einer Dimension ist 0 korrekt. „Nicht
+   * bewertbar" trägt `measured=false` und kommt als `null` an. Vorher blockierte
+   * genau das Listing mit dem größten Optimierungsbedarf sein Kunden-Dokument.
+   */
+  it("Score 0 ist ein gültiger Messwert und blockt das Dokument NICHT", () => {
+    const p = baueInsightsReport(eingabe());
+    p.listing.dimensionen[0].score = 0;
+    const r = pruefeInsightsReport(p);
+    expect(r.verstoesse.join(" ")).not.toContain("unmöglichem Score");
+    expect(r.ok).toBe(true);
+  });
+
+  it("negative Scores bleiben unmöglich", () => {
+    const p = baueInsightsReport(eingabe());
+    p.listing.dimensionen[0].score = -1;
+    expect(pruefeInsightsReport(p).verstoesse.join(" ")).toContain("unmöglichem Score");
+  });
 });
