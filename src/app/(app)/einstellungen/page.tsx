@@ -6,6 +6,8 @@ import { OsShell } from "@/components/shell";
 import { IconUsers, IconSearch, IconArrowRight } from "@/components/icons";
 import { SubmitButton } from "@/components/submit-button";
 import { FehlerPopup } from "@/components/fehler-popup";
+import { LoeschButton } from "@/components/loesch-button";
+import { deleteTeamMember } from "@/app/auth-actions";
 import { fehlerInfo } from "@/lib/fehlercodes";
 import { regelAendern, regelZuruecksetzen, regelaenderungenSuchen, vorschlagVerwerfen } from "@/app/regel-actions";
 import { ladeRegelUebersicht, ladeRegelHistorie, ladeWaechterStand } from "@/lib/validation/regelstand-db";
@@ -231,10 +233,32 @@ export default async function EinstellungenPage({
                     <div className="truncate text-xs text-muted">{u.email}</div>
                   </div>
                   <span className="tag uppercase">{u.role}</span>
+                  {/* Konto löschen (D279, Nutzer-Vorgabe 02.08.): Vergessene Zugänge
+                      sind ein Alltagsfall — bisher war die Liste reine Anzeige und
+                      ein Konto nur direkt in der Datenbank entfernbar. Das eigene
+                      Konto bleibt bewusst ohne Knopf: Sich mitten in der Sitzung
+                      selbst zu löschen, sperrt einen aus. */}
+                  {u.id !== session.id ? (
+                    <LoeschButton
+                      action={deleteTeamMember}
+                      felder={{ userId: u.id }}
+                      frage={`Konto „${u.email}" endgültig löschen?\n\nMarken, Produkte, Analysen und Content bleiben vollständig erhalten — sie hängen an der Marke, nicht am Konto. Kommentare dieser Person bleiben stehen, verlieren aber die Namenszuordnung.\n\nDie E-Mail-Adresse ist danach wieder frei und kann neu angelegt werden.`}
+                      title={`Konto ${u.email} löschen`}
+                    />
+                  ) : (
+                    <span className="w-7 flex-none" aria-hidden />
+                  )}
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-xs text-muted">Neue Team-Mitglieder legen ihr Konto selbst über die Anmelde-Seite an („Konto anlegen").</p>
+            <p className="mt-3 text-xs text-muted">
+              Neue Team-Mitglieder legen ihr Konto selbst über die Anmelde-Seite an („Konto anlegen").
+              Ein gelöschtes Konto gibt seine E-Mail-Adresse sofort wieder frei.
+            </p>
+            <p className="mt-1.5 text-xs text-muted">
+              Eigenes Passwort vergessen? Mit einer anderen Adresse ein Konto anlegen, damit anmelden, hier das alte
+              Konto löschen — danach lässt sich die gewohnte Adresse neu registrieren.
+            </p>
           </section>
         </div>
       </main>
