@@ -2,7 +2,8 @@ import { normalizeToken } from "@/lib/text/bytes";
 import { adressiert } from "@/lib/analysis/listingAudit";
 import { findeAspekt, type RoheAspekte } from "@/lib/reviews/verdichtung";
 import { quellTexte, type FeatureQuellen } from "@/lib/analysis/featureRanking";
-import { bildAbdeckung, textAbdeckung, type BildBeleg } from "@/lib/analysis/abdeckung";
+import { bildAbdeckung, textAbdeckung, type AbdeckungsStufe, type BildBeleg, type KanalTreffer } from "@/lib/analysis/abdeckung";
+import { verschmelzeAbdeckung, type SemantischerTreffer } from "@/lib/analysis/semantischeAbdeckung";
 import { bestimmeBlockerFall, blockerBegruendung, blockerScore, blockerTitel } from "@/lib/analysis/blockerFall";
 import { MOTIV_LABELS } from "@/lib/analysis/motive";
 import {
@@ -56,6 +57,13 @@ export type AufbauKontext = {
   aspekte: RoheAspekte;
   /** Features des Listings (Feature-Ranking) — Basis der Ballast-Bestimmung. */
   featureBegriffe: string[];
+  /**
+   * Verifizierte semantische Treffer (D281, optional). Sie loesen falsche
+   * Luecken auf, die der reine Wortstamm-Abgleich erzeugt — „praezise
+   * Sonnenausrichtung" im Listing deckt „optimale Ausrichtung zur Sonne" ab.
+   * Fehlt die Pruefung (kein Key, Zeitlimit), bleibt es exakt beim Wortabgleich.
+   */
+  semantisch?: SemantischerTreffer[];
 };
 
 const norm = (s: string) => normalizeToken(s.replace(/\s+/g, " ").trim());
@@ -187,6 +195,31 @@ export function reviewEvidenz(
 const alleBelege = (k: DriverKandidat): DriverBeleg[] => k.bausteine.flatMap((b) => b.belege);
 
 /** Steht mindestens ein Feature des Bausteins im Listing-Text? Trennt „gar nichts“ von „nur das Merkmal“. */
+/**
+ * Wort-Abdeckung + semantische Treffer zu EINER Bewertung (D281).
+ * Die Gesamtstufe wird nach dem Verschmelzen neu bestimmt, sonst bliebe ein
+ * hochgestufter Kanal ohne Wirkung auf das Ergebnis.
+ */
+function veredelteAbdeckung(
+  roh: { kanaele: KanalTreffer[]; stufe: AbdeckungsStufe },
+  semantisch: SemantischerTreffer[],
+  nutzen: string[] | string,
+): { kanaele: KanalTreffer[]; stufe: AbdeckungsStufe } {
+  const key = (String(Array.isArray(nutzen) ? nutzen[0] : nutzen)).toLowerCase().trim();
+  const treffer = semantisch.filter((t) => t.nutzen.toLowerCase().trim() === key);
+  if (treffer.length === 0) return roh;
+  const kanaele = verschmelzeAbdeckung(roh.kanaele, treffer);
+  const hat = (st: AbdeckungsStufe) => kanaele.some((k) => k.stufe === st);
+  const stufe: AbdeckungsStufe = hat("prominent")
+    ? "prominent"
+    : hat("erwaehnt")
+      ? "erwaehnt"
+      : hat("fehlt")
+        ? "fehlt"
+        : "nicht_erfasst";
+  return { kanaele, stufe };
+}
+
 function featureGenannt(features: string[], quellText: string): boolean {
   return features.some((f) => f.trim() && adressiert(quellText, f).ok);
 }
@@ -229,7 +262,9 @@ export function baueDriver(kandidaten: DriverKandidat[], kontext: AufbauKontext)
 
     // Abdeckung je Baustein (Code)
     const bausteine: NutzenBaustein[] = k.bausteine.map((b) => {
-      const text = textAbdeckung(kontext.quellen, b.nutzen);
+      const roh = textAbdeckung(kontext.quellen, b.nutzen);
+      // D281: semantische Treffer DIESES Bausteins additiv einweben — nie abstufen.
+      const text = veredelteAbdeckung(roh, kontext.semantisch ?? [], b.nutzen);
       const bild = bildAbdeckung(kontext.bilder, b.nutzen);
       return {
         nutzen: b.nutzen,

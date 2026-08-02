@@ -1,6 +1,7 @@
 import type { InsightCard } from "@/db/schema";
 import type { ConversionDriverPayload } from "@/lib/analysis/driverTypen";
 import { MOTIV_LABELS } from "@/lib/analysis/motive";
+import { kartenTendenz } from "@/lib/reviews/verdichtung";
 import { QUELL_LABEL } from "@/lib/analysis/driverTypen";
 
 /**
@@ -39,6 +40,18 @@ export type VierEintrag = {
   notiz?: string;
   /** Zusatzzeilen im aufgeklappten Zustand (Belege, Kanäle, Zitate). */
   belege?: string[];
+  /**
+   * Eindeutige Einordnung aus den Zählwerten (D280, Nutzer-Befund 02.08.:
+   * „Qualität polarisiert von top bis Plastikmüll — was soll ich damit
+   * anfangen? … dementsprechend musst du doch zählen und sagen: Ist das eher
+   * ein positives oder ein negatives Feedback?").
+   *
+   * Der Code summiert die belegten Fundstellen beider Seiten und entscheidet.
+   * Eine Karte, die beides bündelt, bleibt gebündelt (D171 — sonst stünde
+   * dasselbe Thema zweimal da), bekommt aber ein klares Vorzeichen statt eines
+   * Achselzuckens.
+   */
+  sentiment?: { richtung: "positiv" | "negativ" | "ausgeglichen"; positiv: number; negativ: number };
 };
 
 function Eintrag({ e, rang }: { e: VierEintrag; rang: number }) {
@@ -53,6 +66,26 @@ function Eintrag({ e, rang }: { e: VierEintrag; rang: number }) {
           <span className="flex-none text-[11px] tracking-[0.15em] text-primary-strong" title={`Relevanz ${e.relevanz}/5`}>
             {"●".repeat(e.relevanz)}
             <span className="opacity-25">{"●".repeat(Math.max(0, 5 - e.relevanz))}</span>
+          </span>
+        )}
+        {e.sentiment && (
+          <span
+            className={`flex-none rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+              e.sentiment.richtung === "positiv"
+                ? "bg-[rgb(47_158_143/0.18)] text-good"
+                : e.sentiment.richtung === "negativ"
+                  ? "bg-[rgb(220_38_38/0.14)] text-bad"
+                  : "bg-hair text-muted"
+            }`}
+            title={`${e.sentiment.positiv} positive vs. ${e.sentiment.negativ} negative Fundstellen`}
+          >
+            {/* D281: Klartext statt Kleinschreibung — der Nutzer will auf einen
+                Blick sehen, ob ein Insight positiv oder negativ ist. */}
+            {e.sentiment.richtung === "positiv" ? "▲ Positiv" : e.sentiment.richtung === "negativ" ? "▼ Negativ" : "= Ausgeglichen"}
+            {" "}
+            <span className="font-normal tabular-nums opacity-75">
+              {e.sentiment.positiv}+ / {e.sentiment.negativ}−
+            </span>
           </span>
         )}
         {e.notiz && <span className="flex-none text-[11px] tabular-nums text-muted">{e.notiz}</span>}
@@ -81,6 +114,7 @@ export function VierBlock({
   eintraege,
   leerText,
   kopfZusatz,
+  fussZusatz,
 }: {
   nr: number;
   kuerzel: string;
@@ -93,6 +127,8 @@ export function VierBlock({
   leerText: string;
   /** Optional über der Liste — z. B. der Trichter bei den Review Insights. */
   kopfZusatz?: React.ReactNode;
+  /** Optional unter der Liste — z. B. der Ballast bei den Blockern (D280). */
+  fussZusatz?: React.ReactNode;
 }) {
   return (
     <section className="card p-5">
@@ -117,6 +153,7 @@ export function VierBlock({
         ))}
         {eintraege.length === 0 && <p className="text-sm text-muted">{leerText}</p>}
       </div>
+      {fussZusatz}
     </section>
   );
 }
@@ -172,28 +209,42 @@ export function ReviewTrichter({
   );
 }
 
-/** Driver → Eintrag. Der Fließtext entsteht aus Motiv, Bausteinen und Belegen. */
+/**
+ * Driver → Eintrag (entschlackt in D280).
+ *
+ * Vorher stand hier ein generierter Fliesstext, der mit dem Titel begann und ihn
+ * praktisch wiederholte („X — das ist das Ergebnis, das Käufer erreichen wollen,
+ * nicht das Merkmal, das es dafür mitbringt"), gefolgt von den Score-Anteilen als
+ * grauer Block. Beides ist raus (Nutzer-Befund 02.08.: „die Beschreibung ist fast
+ * komplett identisch … den grauen Text darunter kannst du auch komplett löschen,
+ * bringt keinen Mehrwert").
+ *
+ * Was bleibt, ist das, was der Titel NICHT schon sagt: die inhaltliche
+ * Begründung der Motiv-Einordnung und die Nutzen-Bausteine, die den Kaufgrund
+ * tragen. Keine Wiederholung, keine Rechenprotokolle.
+ */
 export function driverEintraege(p: ConversionDriverPayload): VierEintrag[] {
   return p.driver.map((d) => {
     const nutzen = d.bausteine.map((b) => b.nutzen).filter(Boolean);
     const quellen = [...new Set(d.bausteine.flatMap((b) => b.belege).map((b) => QUELL_LABEL[b.quelle]))];
     const text = [
-      `${d.resultat} — das ist das Ergebnis, das Käufer mit diesem Produkt erreichen wollen, nicht das Merkmal, das es dafür mitbringt.`,
-      d.motivBegruendung?.trim() ? `Eingeordnet als ${MOTIV_LABELS[d.motivKlasse]}: ${d.motivBegruendung.trim()}` : `Eingeordnet als ${MOTIV_LABELS[d.motivKlasse]}.`,
-      nutzen.length ? `Getragen wird der Kaufgrund von ${nutzen.length === 1 ? "diesem Nutzen" : "diesen Nutzen-Bausteinen"}: ${nutzen.join(" · ")}.` : "",
-      quellen.length ? `Belegt über ${quellen.join(", ")}.` : "",
+      d.motivBegruendung?.trim(),
       d.nurKategorie
-        ? "Achtung: Dieser Kaufgrund steht als Pflicht-Driver der Kategorie im Set — die eigene Datenlage dafür ist dünn."
+        ? "Dieser Kaufgrund steht als Pflicht-Driver der Kategorie im Set — die eigene Datenlage dafür ist dünn."
         : "",
     ]
       .filter(Boolean)
       .join(" ");
     return {
       titel: d.resultat,
-      text,
+      text: text || "Für diesen Kaufgrund liegt keine ausformulierte Einordnung vor.",
       relevanz: d.relevanz,
       notiz: MOTIV_LABELS[d.motivKlasse],
-      belege: d.anteile.map((a) => `${a.quelle}: ${a.punkte} Punkte — ${a.beleg}`),
+      // Nur die Nutzen-Bausteine und Belegquellen — keine Score-Anteile.
+      belege: [
+        ...nutzen.map((n) => `Nutzen: ${n}`),
+        quellen.length ? `Belegt über ${quellen.join(", ")}` : "",
+      ].filter(Boolean),
     };
   });
 }
@@ -217,17 +268,59 @@ export function blockerEintraege(p: ConversionDriverPayload): VierEintrag[] {
   }));
 }
 
-/** Insight-/Feature-Karten → Eintrag. `beschreibung` IST der Fließtext (D132). */
-export function kartenEintraege(karten: InsightCard[]): VierEintrag[] {
-  return karten.map((k) => ({
-    titel: k.titel,
-    text: k.beschreibung,
-    relevanz: k.relevanz,
-    notiz: k.belegAspekte.length ? `${k.belegAspekte.length} Beleg${k.belegAspekte.length === 1 ? "" : "e"}` : undefined,
-    belege: k.belegAspekte.map((b) => {
-      const zahl = b.mentionCount !== null ? ` (${b.mentionCount}×)` : "";
-      const fremd = b.herkunft && b.herkunft.eigene === 0 && b.herkunft.fremde > 0 ? " — nur bei Wettbewerbern belegt" : "";
-      return `${b.typ === "painPoint" ? "−" : "+"} ${b.label}${zahl}${fremd}`;
-    }),
-  }));
+/**
+ * Insight-/Feature-Karten → Eintrag. `beschreibung` IST der Fließtext (D132).
+ *
+ * `mitSentiment` nur für Review Insights (D280): Dort will der Nutzer eine klare
+ * Einordnung, weil eine Karte wie „Qualität polarisiert — von top bis
+ * Plastikmüll" ohne Vorzeichen unbrauchbar ist. Bei Produkt-Features bleibt es
+ * bewusst aus (D272): Ein Merkmal ist ein Merkmal.
+ */
+export function kartenEintraege(karten: InsightCard[], mitSentiment = false): VierEintrag[] {
+  return karten.map((k) => {
+    const t = mitSentiment ? kartenTendenz(k) : null;
+    return {
+      titel: k.titel,
+      text: k.beschreibung,
+      relevanz: k.relevanz,
+      notiz: k.belegAspekte.length ? `${k.belegAspekte.length} Beleg${k.belegAspekte.length === 1 ? "" : "e"}` : undefined,
+      sentiment: t ?? undefined,
+      belege: k.belegAspekte.map((b) => {
+        const zahl = b.mentionCount !== null ? ` (${b.mentionCount}×)` : "";
+        const fremd = b.herkunft && b.herkunft.eigene === 0 && b.herkunft.fremde > 0 ? " — nur bei Wettbewerbern belegt" : "";
+        return `${b.typ === "painPoint" ? "−" : "+"} ${b.label}${zahl}${fremd}`;
+      }),
+    };
+  });
+}
+
+/**
+ * Ballast: Merkmale im Listing, die keinem Kaufgrund zuarbeiten (D280).
+ *
+ * Steht bewusst IM Blocker-Block statt als eigene Kachel (Nutzer-Frage: „Was
+ * sagt uns die Kachel ‚Ballast im Listing'?"): Ein Merkmal, das Platz belegt,
+ * ohne einen Kaufgrund zu stützen, ist dieselbe Art von Problem wie ein
+ * unbewiesener Kaufgrund — es kostet Aufmerksamkeit an einer Stelle, an der ein
+ * Kaufargument stehen könnte. Allein stehend sagte die Kachel niemandem, was sie
+ * bedeutet.
+ */
+export function BallastListe({ ballast }: { ballast: ConversionDriverPayload["ballast"] }) {
+  if (ballast.length === 0) return null;
+  return (
+    <div className="mt-5 border-t border-hair pt-4">
+      <h3 className="text-sm font-semibold">Merkmale ohne Kaufgrund</h3>
+      <p className="mt-1 text-xs leading-relaxed text-muted">
+        Diese Angaben stehen im Listing, zahlen aber auf keinen der Kaufgründe oben ein. Sie kosten Aufmerksamkeit an
+        einer Stelle, an der ein Kaufargument stehen könnte — besonders, wenn sie prominent platziert sind.
+      </p>
+      <ul className="mt-2 space-y-1">
+        {ballast.map((b, i) => (
+          <li key={i} className="text-sm leading-snug">
+            · {b.feature}
+            {b.fundstelle === "prominent" && <span className="ml-1.5 text-[11px] text-bad">an prominenter Stelle</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }

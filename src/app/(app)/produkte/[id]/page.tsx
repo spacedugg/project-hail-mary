@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import { erzeugeInsightsDokument, saveKeywords, deriveKeywordsFromSov, generateContent, deleteProductAction, uploadCerebro, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, resetContentChain, saveMarginCalc, toggleKeywordRelevanz, schliesseKeywordsAus, deleteKeywordBasis, saveZusatzKontext, saveMarke } from "@/app/actions";
+import { erzeugeInsightsDokument, saveKeywords, deriveKeywordsFromSov, generateContent, deleteProductAction, uploadCerebro, analyzeReviewsAction, importListingFromAmazon, uploadListingCsv, saveContentManual, approveContent, resetContentChain, saveMarginCalc, toggleKeywordRelevanz, schliesseKeywordsAus, deleteKeywordBasis, saveZusatzKontext, saveMarke, holeWettbewerbsBilderNach } from "@/app/actions";
 import type { ValidationIssue } from "@/db/schema";
 import { AMAZON_CATEGORIES } from "@/lib/margin/fees";
 import { SubmitButton } from "@/components/submit-button";
@@ -15,7 +15,7 @@ import { MarkeFeld } from "@/components/marke-feld";
 import { amazonDomain, SPRACH_NAMEN } from "@/lib/text/sprache";
 import { GenerierSperre, GenerierButton } from "@/components/generier-sperre";
 import { BewertungsDashboard, GrenzenDerAnalyse } from "@/components/bewertungs-dashboard";
-import { DriverBlock } from "@/components/driver-karten";
+import { ProduktFeedbackKachel } from "@/components/driver-karten";
 import { CopyLink } from "@/components/copy-link";
 import { fehlerInfo } from "@/lib/fehlercodes";
 import { normalisierePayload } from "@/lib/reviews/insights";
@@ -26,11 +26,11 @@ import { TabLeiste } from "@/components/tab-leiste";
 import { KopierFeld } from "@/components/kopier-feld";
 import { ListingKontrolle, MassnahmenBlock } from "@/components/listing-kontrolle";
 import { ZielgruppeUndPositionierung, MarktPosition } from "@/components/analyse-hintergrund";
-import { VierBlock, ReviewTrichter, driverEintraege, blockerEintraege, kartenEintraege } from "@/components/analyse-vier";
+import { VierBlock, ReviewTrichter, BallastListe, driverEintraege, blockerEintraege, kartenEintraege } from "@/components/analyse-vier";
 import { analyzeListing, wirksamesListing } from "@/lib/analysis/listingAudit";
 import { snapshotBildBelege } from "@/lib/analysis/bildAuslese";
 import { dbTypFuer, geplanteVorgaenger, wirksamerPlan, SEKTIONS_LABEL } from "@/lib/content/plan";
-import { wirksameWerke, WERK_LABEL } from "@/lib/content/werke";
+import { wirksameWerke, istWerkGewaehlt, WERK_LABEL } from "@/lib/content/werke";
 import { WerkAuswahl } from "@/components/werk-auswahl";
 import { BildKacheln } from "@/components/bild-kacheln";
 import { bereinigeBildUrls } from "@/lib/scrape/bilder";
@@ -154,6 +154,21 @@ export default async function ProductPage({
       limit: 5,
     }),
   ]);
+  /**
+   * Wie viele Vergleichs-ASINs warten noch auf die Bild-Auslese (D281)?
+   * `bilderText === null` heisst „noch nicht ausgelesen"; `[]` heisst
+   * „ausgelesen, nichts gefunden" — nur der erste Fall ist offen. Je ASIN zaehlt
+   * der juengste Scrape.
+   */
+  const wettbewerbsBilderOffen = await (async () => {
+    const zeilen = await db.query.competitorListings.findMany({
+      where: eq(schema.competitorListings.productId, id),
+      orderBy: desc(schema.competitorListings.createdAt),
+    });
+    const neueste = zeilen.filter((z, i, arr) => arr.findIndex((x) => x.asin === z.asin) === i);
+    return neueste.filter((z) => z.bilderText === null && (z.imageUrls?.length ?? 0) > 0).length;
+  })();
+
   // Vergleichsprodukte aus dem Keyword-Export (D268): dieselben Produkte, gegen
   // die die Keyword-Recherche gelaufen ist — sie werden vorbelegt, statt sie ein
   // zweites Mal von Hand zu verlangen.
@@ -410,7 +425,12 @@ export default async function ProductPage({
 
         {/* Keywords: in der Start-Phase der Prüf-Schritt vor dem Lauf (D172),
             danach Teil des gebündelten Analyse-Reiters */}
-        {(!bereit || tab === "analyse") && (
+        {/* D280: Die Start-Maske erscheint NUR noch, solange das Produkt nicht
+            analysiert ist. Vorher stand sie zusätzlich im Analyse-Reiter und bot
+            dort dauerhaft „neu scrapen & analysieren" samt A+-Upload an — ein
+            Wiederholungs-Angebot für einen Schritt, den man einmal macht
+            (Nutzer: „dann lege ich im Notfall wieder ein Projekt an"). */}
+        {!bereit && (
         <section className="card p-5">
             <CardHead
               icon={<IconSearch />}
@@ -627,6 +647,12 @@ export default async function ProductPage({
           );
         })()}
 
+        {/* Zielgruppe & Positionierung als ERSTER Analyse-Inhalt (D280,
+            Nutzer: „im Analyse-Reiter ist das erste, was du siehst: Zielgruppe
+            und Positionierung, darunter geht es weiter mit 01"). Sie sind der
+            Rahmen, in dem alles Folgende gelesen wird. */}
+        {bereit && tab === "analyse" && <ZielgruppeUndPositionierung deepAudit={deepAudit ?? null} />}
+
         {/* ══ Die VIER Hauptaspekte (D278, Nutzer-Vorgabe 02.08.2026) ═══════
             In genau dieser Reihenfolge ganz oben: Conversion Drivers → Review
             Insights → Product Features → Conversion Blockers. Vorher lagen sie
@@ -669,7 +695,7 @@ export default async function ProductPage({
                 titel="Was der Kundschaft wichtig ist"
                 claim="What matters to customers."
                 erklaerung="Aus den Bewertungen abgeleitet und nach Bedeutung sortiert. Insights sind ausdrücklich keine zusammengefassten Reviews: Sie benennen, was sich aus den Roh-Aspekten für die Kaufentscheidung ableiten lässt — der Trichter zeigt diesen Weg."
-                eintraege={kartenEintraege(karten)}
+                eintraege={kartenEintraege(karten, true)}
                 leerText="Noch keine Insights verdichtet — die Verdichtung ist eine eigene Etappe des Analyse-Laufs."
                 kopfZusatz={
                   ins ? (
@@ -695,6 +721,7 @@ export default async function ProductPage({
                 claim="What shoppers don’t see but care about."
                 erklaerung="Die Lücke zwischen Interesse und Listing: Themen, die für die Kaufentscheidung zählen, die Text und Bilder heute aber nicht beantworten. Jeder Eintrag nennt den Kaufgrund, an dem er hängt — das sind die größten Hebel für die Conversion."
                 eintraege={blockerEintr}
+                fussZusatz={driverLauf ? <BallastListe ballast={driverLauf.payload.ballast} /> : undefined}
                 leerText={
                   driverLauf
                     ? "✓ Kein Blocker gefunden — jeder belegte Kaufgrund ist im Listing bewiesen."
@@ -705,14 +732,35 @@ export default async function ProductPage({
           );
         })()}
 
-        {/* Produkt-Feedback aus dem Zuständigkeits-Gate (D266/D272): nicht über
-            den Listing-Text lösbar, deshalb getrennt von den vier Aspekten. */}
-        {driverLauf && tab === "analyse" && <DriverBlock lauf={driverLauf} />}
+        {/* Wettbewerber-Bilder nachholen (D281): Die Etappe haengt am Analyse-Lauf,
+            und der ist seit D280 nur noch vor der ERSTEN Analyse erreichbar.
+            Ohne diesen Knopf bekaeme kein bestehendes Produkt je Bilddaten der
+            Konkurrenz — der Code waere fuer genau die Produkte tot, die taeglich
+            benutzt werden. Sichtbar nur, wenn es wirklich etwas nachzuholen gibt. */}
+        {bereit && tab === "analyse" && istWerkGewaehlt(product.werkePlan, "wettbewerber-bilder") && wettbewerbsBilderOffen > 0 && (
+          <section className="card p-5">
+            <h2 className="text-sm font-semibold">Wettbewerber-Bilder auslesen</h2>
+            <p className="mt-1 text-xs text-muted">
+              Für {wettbewerbsBilderOffen} Vergleichs-ASIN{wettbewerbsBilderOffen === 1 ? "" : "s"} sind die Bilder noch
+              nicht ausgelesen. Infografiken der Konkurrenz sind für Text-Scrapes unsichtbar — dort steht oft die halbe
+              Argumentation. Ein Klick liest eine ASIN aus.
+            </p>
+            <form action={holeWettbewerbsBilderNach} className="mt-3">
+              <input type="hidden" name="productId" value={product.id} />
+              <SubmitButton className="btn-dark text-xs" pendingLabel="Liest Bilder aus…" progress>
+                Nächste ASIN auslesen
+              </SubmitButton>
+            </form>
+          </section>
+        )}
 
+        {/* Produkt-Feedback aus dem Zuständigkeits-Gate (D266): nicht über den
+            Listing-Text lösbar, deshalb getrennt von den vier Aspekten. Der
+            frühere `DriverBlock` rendert NICHT mehr die ganze Analyse ein zweites
+            Mal (D280) — Driver, Blocker, Ballast und Grenzen stehen jeweils an
+            genau einer Stelle. */}
+        {driverLauf && tab === "analyse" && <ProduktFeedbackKachel lauf={driverLauf} />}
 
-        {/* 5 · Zielgruppe · Positionierung · USPs — laut Nutzer „unterhalb der
-            anderen Main-Sachen" (D272). */}
-        {bereit && tab === "analyse" && <ZielgruppeUndPositionierung deepAudit={deepAudit ?? null} />}
 
         {/* 6 · Bewertungen: Analyse-Lauf und Findings (D272) */}
         {bereit && tab === "analyse" && (<>
@@ -724,10 +772,6 @@ export default async function ProductPage({
             right={insights ? <span className="pill pill-good">✓ analysiert · {insights.confidence}</span> : undefined}
           />
 
-          {/* EIN Weg zum Aktualisieren (D177): derselbe Etappen-Lauf wie beim Start,
-              nur ohne Content — hält auch Blocker, Features und KI-Bewertung frisch */}
-          <AnalyseStart productId={product.id} mainAsin={product.asin} nurAnalyse vergleichsAsins={vergleichsAsins} />
-          {!product.asin && <p className="mt-2 text-xs text-warn">△ Dafür braucht das Produkt eine ASIN.</p>}
           {scrape && (() => {
             // Zahlen-Basen NIE mischen (D129, Nutzer-Befund): Die Amazon-Gesamtzahl
             // und die %-Verteilung gehören zum PRODUKT — daneben dürfen nur die
@@ -826,7 +870,12 @@ export default async function ProductPage({
             Bündelt die Qualitäts-Notizen der Roh-Analyse (D152) und die
             Hinweise des Driver-Laufs an EINER Stelle statt an zweien. */}
         {bereit && tab === "analyse" && (
-          <GrenzenDerAnalyse insight={insights ?? null} driverHinweise={driverLauf?.payload.hinweise ?? []} />
+          <GrenzenDerAnalyse
+            insight={insights ?? null}
+            driverHinweise={driverLauf?.payload.hinweise ?? []}
+            datenbasis={driverLauf?.dataBasis ?? []}
+            stats={driverLauf?.payload.stats}
+          />
         )}
 
 

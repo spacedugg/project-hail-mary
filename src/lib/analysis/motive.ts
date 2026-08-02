@@ -30,11 +30,25 @@ import { normalizeToken } from "@/lib/text/bytes";
 export const MOTIV_KLASSEN = ["kern", "entscheidung", "absicherung", "hygiene"] as const;
 export type MotivKlasse = (typeof MOTIV_KLASSEN)[number];
 
+/**
+ * Kurzform fuer Listen und Chips (D280). Das lange Label stand vorher als
+ * Randnotiz an JEDEM Driver — bei fuenf Eintraegen fuenfmal derselbe
+ * Erklaersatz, der nichts ueber den einzelnen Kaufgrund aussagt
+ * (Nutzer-Befund 02.08.: „die Texte kannst du bitte loeschen, die bringen nichts").
+ */
 export const MOTIV_LABELS: Record<MotivKlasse, string> = {
-  kern: "Kernmotiv — warum diese Produktkategorie überhaupt gekauft wird",
-  entscheidung: "Entscheidungsmotiv — warum dieses Produkt statt eines anderen",
-  absicherung: "Absicherungsmotiv — was die Angst vor dem Fehlkauf nimmt",
-  hygiene: "Hygienefaktor — wird erst nach dem Kauf relevant, treibt keine Conversion",
+  kern: "Kernmotiv",
+  entscheidung: "Entscheidungsmotiv",
+  absicherung: "Absicherungsmotiv",
+  hygiene: "Hygienefaktor",
+};
+
+/** Langform — nur dort, wo die Klassen EINMAL erklaert werden, nie je Eintrag. */
+export const MOTIV_ERKLAERUNG: Record<MotivKlasse, string> = {
+  kern: "warum diese Produktkategorie überhaupt gekauft wird",
+  entscheidung: "warum dieses Produkt statt eines anderen",
+  absicherung: "was die Angst vor dem Fehlkauf nimmt",
+  hygiene: "wird erst nach dem Kauf relevant, treibt keine Conversion",
 };
 
 /**

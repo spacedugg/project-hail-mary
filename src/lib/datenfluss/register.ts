@@ -237,6 +237,7 @@ export const DATENFLUSS: Datenpunkt[] = [
     speicher: "competitor_listings (Texte, image_urls, bilder_text) → competitor_info_gaps",
     analysen: [
       { name: "Listing-Scrape je Wettbewerber", modul: "src/lib/scrape/anthropicProduct.ts", outcome: "Titel, Bullets, Beschreibung, Attribute der Konkurrenz-ASINs" },
+      { name: "Semantische Abdeckungs-Pruefung", modul: "src/lib/analysis/semantischeAbdeckung.ts", outcome: "je Nutzen-Baustein: welche Listing-Kanäle ihn INHALTLICH ansprechen — mit wörtlichem Zitat, das der Code gegen den Quelltext verifiziert. Löst falsche Lücken auf, die der Wortstamm-Abgleich erzeugt (D281); additiv, stuft nie ab" },
       { name: "Wettbewerber-Bildanalyse (Vision)", modul: "src/lib/analysis/bildAuslese.ts", outcome: "alle Bilder je Vergleichs-ASIN: Text-im-Bild wortwörtlich, Bildinhalt, gezeigte Claims — läuft als eigene Etappe EINE ASIN je Request, weil bis zu 9 Auslesen × N Wettbewerber das Zeitlimit sprengen (D276)" },
       { name: "Wettbewerber-Abgleich", modul: "src/lib/analysis/wettbewerbsTexte.ts", outcome: "Infos, die die Konkurrenz nennt und unser Listing NICHT — mit Übertragbarkeits-Urteil ja/nein/unbekannt gegen unsere Produkt-Wahrheit (nein = verworfen)" },
     ],

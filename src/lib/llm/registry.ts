@@ -139,6 +139,10 @@ export const RECIPE_MODELS: Record<string, { provider: string; model: string }> 
   "keywords.brands": { provider: "anthropic", model: "claude-opus-4-8" },
   "facts.extract": { provider: "anthropic", model: "claude-opus-4-8" },
   "listing.bild-auslese": { provider: "anthropic", model: "claude-opus-4-8" },
+  // D281: Semantische Abdeckung — versteht Synonyme und Umschreibungen, wo der
+  // Wortstamm-Abgleich scheitert. Liefert nur Treffer MIT wörtlichem Zitat,
+  // das der Code gegen den Quelltext verifiziert.
+  "listing.semantische-abdeckung": { provider: "anthropic", model: "claude-opus-4-8" },
   // Bild-Audit (D211): 4-Faktoren-Einschätzung bestehender Listing-Bilder (Vision)
   "listing.bild-audit": { provider: "anthropic", model: "claude-opus-4-8" },
   "listing.blocker": { provider: "anthropic", model: "claude-opus-4-8" },

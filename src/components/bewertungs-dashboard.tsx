@@ -155,30 +155,71 @@ export function BewertungsDashboard({
 
 
 /**
- * Grenzen der Analyse (D278) — der letzte Block der Analyse-Seite.
+ * Datenbasis & Grenzen der Analyse (D278, konsolidiert in D280) — der LETZTE
+ * Block der Analyse-Seite.
+ *
+ * D280: Es gab zwei Blöcke mit demselben Zweck — diesen hier und „Datenbasis &
+ * Grenzen dieser Analyse" im Driver-Block weiter oben (Nutzer-Befund: „das ist
+ * doch wahrscheinlich redundant, versuche das zu konsolidieren"). Jetzt einer,
+ * der Stichprobe, Datenbasis-Zeilen, Qualitäts-Notizen der Roh-Analyse UND die
+ * Hinweise des Driver-Laufs trägt.
  *
  * Inhaltlich unverändert (Qualitäts-Notizen D152: Verbatim-Gate, verworfene
  * Aspekte, Zuständigkeits-Gate) und weiterhin eingeklappt. Neu ist nur der Ort:
  * ganz unten statt mitten im Bewertungs-Block. Ehrlichkeit gehört ins Tool, aber
  * nicht zwischen die Befunde.
  */
-export function GrenzenDerAnalyse({ insight, driverHinweise = [] }: { insight: InsightRow | null; driverHinweise?: string[] }) {
+export function GrenzenDerAnalyse({
+  insight,
+  driverHinweise = [],
+  datenbasis = [],
+  stats,
+}: {
+  insight: InsightRow | null;
+  driverHinweise?: string[];
+  /** Datenbasis-Zeilen des Driver-Laufs (D280) — vorher ein zweiter Block weiter oben. */
+  datenbasis?: string[];
+  stats?: { stichprobe: number; wettbewerberGesamt: number; suchvolumenGesamt: number };
+}) {
   const notizen = insight ? normalisierePayload(insight.payload).qualitaetsNotizen ?? [] : [];
-  const alle = [...new Set([...notizen, ...driverHinweise])];
-  if (alle.length === 0) return null;
+  const grenzen = [...new Set([...notizen, ...driverHinweise])];
+  const basis = [...new Set(datenbasis)];
+  if (grenzen.length === 0 && basis.length === 0 && !stats) return null;
+
   return (
     <details className="card p-5">
       <summary className="cursor-pointer text-sm font-semibold text-muted hover:text-foreground">
-        Grenzen dieser Analyse ({alle.length})
+        Datenbasis &amp; Grenzen dieser Analyse{grenzen.length > 0 ? ` (${grenzen.length})` : ""}
       </summary>
-      <p className="mt-2 text-xs text-muted">
-        Was wir nicht messen konnten, sagen wir — nur so ist der Rest belastbar.
-      </p>
-      <ul className="mt-2 space-y-1">
-        {alle.map((n, i) => (
-          <li key={i} className="text-[11px] leading-snug text-muted">ℹ {n}</li>
-        ))}
-      </ul>
+
+      {stats && (
+        <p className="mt-2 text-xs text-muted">
+          {new Intl.NumberFormat("de-DE").format(stats.stichprobe)} analysierte Bewertungen ·{" "}
+          {stats.wettbewerberGesamt} Wettbewerber-Listing(s) ·{" "}
+          {new Intl.NumberFormat("de-DE").format(stats.suchvolumenGesamt)} Suchvolumen in der Keyword-Basis
+        </p>
+      )}
+
+      {basis.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {basis.map((d, i) => (
+            <li key={i} className="text-[11px] leading-snug text-muted">· {d}</li>
+          ))}
+        </ul>
+      )}
+
+      {grenzen.length > 0 && (
+        <>
+          <p className="mt-3 border-t border-hair pt-2 text-xs text-muted">
+            Was wir nicht messen konnten, sagen wir — nur so ist der Rest belastbar.
+          </p>
+          <ul className="mt-1.5 space-y-1">
+            {grenzen.map((n, i) => (
+              <li key={i} className="text-[11px] leading-snug text-muted">ℹ {n}</li>
+            ))}
+          </ul>
+        </>
+      )}
     </details>
   );
 }

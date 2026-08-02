@@ -1546,7 +1546,21 @@ async function driverKern(
       ].join(" ");
     }
 
+    /**
+     * Semantische Abdeckungs-Pruefung (D281) VOR dem Aufbau: Sie loest falsche
+     * Luecken auf, die der Wortstamm-Abgleich erzeugt („praezise
+     * Sonnenausrichtung" im Listing vs. Nutzen „optimale Ausrichtung zur
+     * Sonne"). Ein Ausfall ist unkritisch — dann bleibt es beim Wortabgleich.
+     */
+    const { pruefeSemantischeAbdeckung } = await import("@/lib/analysis/semantischeAbdeckung");
+    const semantischLauf = await pruefeSemantischeAbdeckung(
+      quellen,
+      ernte.kandidaten.flatMap((k) => k.bausteine.map((b) => b.nutzen)),
+      product.contentSprache,
+    );
+
     const payload = baueDriver(ernte.kandidaten, {
+      semantisch: semantischLauf?.treffer ?? [],
       quellen,
       bilder: bildBelegeAusSnapshot(snapshot.bilderText),
       keywords: kws.filter((k) => !k.ausgeschlossen).map((k) => ({ keyword: k.keyword, searchVolume: k.searchVolume })),
@@ -1555,6 +1569,17 @@ async function driverKern(
       aspekte: zustaendig.aspekte,
       featureBegriffe: featureRanking?.payload.cards.map((c) => c.titel) ?? [],
     });
+    // Ehrlich ausweisen, wenn die inhaltliche Pruefung nicht lief (D281/D145):
+    // ohne sie beruhen die Luecken auf reinem Wortabgleich.
+    if (!semantischLauf) {
+      payload.hinweise.push(
+        "Die inhaltliche Abdeckungs-Pruefung lief nicht — die Luecken beruhen auf Wortabgleich und koennen Umschreibungen uebersehen.",
+      );
+    } else if (semantischLauf.treffer.length > 0) {
+      payload.hinweise.push(
+        `Inhaltliche Abdeckungs-Pruefung: ${semantischLauf.treffer.length} Nutzen sind sinngemaess im Listing belegt, obwohl der Wortabgleich sie nicht fand.`,
+      );
+    }
     payload.produktFeedback = zustaendig.produktFeedback;
     payload.hinweise = [...zustaendig.hinweise, ...ernte.hinweise, ...payload.hinweise];
     payload.verworfen += ernte.verworfen;
@@ -1598,6 +1623,33 @@ export async function erzeugeBildBriefingAction(formData: FormData) {
     redirect(`/produkte/${productId}/briefs?sprache=${sprache}&fehler=${encodeURIComponent(res.grund)}`);
   }
   redirect(`/produkte/${productId}/briefs?sprache=${sprache}`);
+}
+
+/**
+ * Wettbewerber-Bilder nachholen (D281) — fuer Produkte, die vor D276 analysiert
+ * wurden.
+ *
+ * Warum es diesen eigenen Weg braucht: Die Bild-Etappe haengt am Analyse-Lauf,
+ * und der ist seit D280 nur noch vor der ERSTEN Analyse erreichbar. Ohne diesen
+ * Knopf bekaeme kein bestehendes Produkt je Wettbewerber-Bilddaten — der Code
+ * waere fuer genau die Produkte tot, die der Nutzer taeglich benutzt.
+ *
+ * Arbeitet dieselbe Warteschlange ab wie die Pipeline-Etappe, eine ASIN je
+ * Aufruf; der Client-Runner ist hier nicht noetig, weil der Knopf einzeln
+ * gedrueckt wird und die Rueckmeldung sagt, ob noch etwas offen ist.
+ */
+export async function holeWettbewerbsBilderNach(formData: FormData) {
+  const productId = String(formData.get("productId") ?? "");
+  const db = await getDb();
+  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
+  if (!product) redirect(`/produkte/${productId}?tab=analyse`);
+
+  const r = await wettbewerbsBilderKern(db, product!, null);
+  const meldung = r.naechsteAsin
+    ? `${r.hinweis ?? ""} Noch offen: ${r.naechsteAsin} — nochmal klicken.`
+    : (r.hinweis ?? "Alle Wettbewerber-Bilder sind ausgelesen.");
+  revalidatePath(`/produkte/${productId}`);
+  redirect(`/produkte/${productId}?tab=analyse&hinweis=${encodeURIComponent(meldung.trim())}`);
 }
 
 /**
@@ -1960,9 +2012,14 @@ async function scrapeWettbewerberListings(
  */
 async function wettbewerbsBilderKern(
   db: Awaited<ReturnType<typeof getDb>>,
-  product: { id: string; contentSprache: ContentSprache },
+  product: { id: string; contentSprache: ContentSprache; werkePlan: import("@/lib/content/werke").Werk[] | null },
   asin: string | null,
 ): Promise<{ hinweis?: string; naechsteAsin: string | null }> {
+  // Werk-Gate (D281): Die Auslese kostet je Wettbewerber bis zu neun
+  // Vision-Aufrufe — sie laeuft nur, wenn sie ausgewaehlt ist.
+  if (!istWerkGewaehlt(product.werkePlan, "wettbewerber-bilder")) {
+    return { hinweis: werkNichtGewaehltGrund("wettbewerber-bilder"), naechsteAsin: null };
+  }
   const offen = await db.query.competitorListings.findMany({
     where: eq(schema.competitorListings.productId, product.id),
     orderBy: desc(schema.competitorListings.createdAt),

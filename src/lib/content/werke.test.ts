@@ -15,7 +15,10 @@ import {
 describe("Werk-Auswahl (D270)", () => {
   it("keine Entscheidung (null) ⇒ nur Listing — A+ und Store entstehen NICHT ungefragt", () => {
     expect(wirksameWerke(null)).toEqual([...WERKE_STANDARD]);
-    expect(wirksameWerke(undefined)).toEqual(["listing"]);
+    // D281: Die Wettbewerber-Bildanalyse gehoert zum Standard — sie ist kein
+    // Deliverable, sondern Analyse-Tiefe, und schliesst die groesste Datenluecke.
+    expect(wirksameWerke(undefined)).toEqual(["listing", "wettbewerber-bilder"]);
+    expect(istWerkGewaehlt(null, "wettbewerber-bilder")).toBe(true);
     // Der Kern des Nutzer-Befunds: kein A+, kein Premium-A+, kein Store ohne Auftrag.
     expect(istWerkGewaehlt(null, "aplus-basic")).toBe(false);
     expect(istWerkGewaehlt(null, "aplus-premium")).toBe(false);

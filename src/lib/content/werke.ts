@@ -22,7 +22,14 @@
  * Regeln sind Gesetze, keine Empfehlungen (D181).
  */
 
-export type Werk = "listing" | "bilder-briefing" | "aplus-basic" | "aplus-premium" | "brand-store";
+export type Werk =
+  | "listing"
+  | "bilder-briefing"
+  | "aplus-basic"
+  | "aplus-premium"
+  | "brand-store"
+  /** Analyse-Option, kein Deliverable (D281) — siehe Kommentar bei WERK_HINWEIS. */
+  | "wettbewerber-bilder";
 
 /** Anzeige-/Verarbeitungs-Reihenfolge — der Code bestimmt sie, nicht die Klick-Folge. */
 export const WERKE_REIHENFOLGE: readonly Werk[] = [
@@ -31,6 +38,7 @@ export const WERKE_REIHENFOLGE: readonly Werk[] = [
   "aplus-basic",
   "aplus-premium",
   "brand-store",
+  "wettbewerber-bilder",
 ] as const;
 
 export const WERK_LABEL: Record<Werk, string> = {
@@ -39,6 +47,7 @@ export const WERK_LABEL: Record<Werk, string> = {
   "aplus-basic": "A+ Content (Basic)",
   "aplus-premium": "A+ Content (Premium)",
   "brand-store": "Brand-Store-Konzept",
+  "wettbewerber-bilder": "Wettbewerber-Bilder auslesen",
 };
 
 export const WERK_HINWEIS: Record<Werk, string> = {
@@ -47,19 +56,30 @@ export const WERK_HINWEIS: Record<Werk, string> = {
   "aplus-basic": "Brief für den Standard-A+ (1940×1200, Module, weißer Trenner).",
   "aplus-premium": "Brief für Premium-A+ (Full Image, Karussells/Hotspots) — nur bei Premium-Zugang.",
   "brand-store": "Seitenstruktur, Kachel-Plan, Specs und Guidelines des Brand Stores.",
+  /**
+   * Einziger Eintrag, der kein Deliverable ist, sondern eine Analyse-Tiefe
+   * (D281, Nutzer: „Das kann man auch mit der Komponente auswählen"). Er steht
+   * hier, weil er echtes Geld und Laufzeit kostet — pro Wettbewerber bis zu
+   * neun Vision-Auslesen — und deshalb eine bewusste Entscheidung verdient.
+   */
+  "wettbewerber-bilder":
+    "Alle Bilder der Vergleichs-ASINs per Vision auslesen — zeigt, was die Konkurrenz in Infografiken kommuniziert. Kostet je Wettbewerber bis zu neun Auslesen.",
 };
 
 /**
  * Standard-Auswahl für Produkte OHNE gespeicherte Entscheidung (`null`).
  *
- * Bewusst NUR das Listing: Es ist das Werk, an dem die geführte Kette (D195)
- * hängt und das bei laufenden Produkten schon in Arbeit ist — es hier
- * abzuschalten würde bestehende Ketten stillstellen. Alles andere (A+ Basic,
- * A+ Premium, Store, Bilder-Briefing) ist ab jetzt AUS, bis es gewählt wird:
- * genau der Punkt der Nutzer-Vorgabe — „nicht immer muss jeder Content
- * generiert werden". Auch das Listing bleibt abwählbar.
+ * Enthalten sind die Listing-Texte (das Werk, an dem die geführte Kette D195
+ * hängt — es hier abzuschalten würde laufende Ketten stillstellen) und seit D281
+ * die Wettbewerber-Bildanalyse. Alle DELIVERABLES (A+ Basic, A+ Premium, Store,
+ * Bilder-Briefing) bleiben AUS, bis sie gewählt werden: genau der Punkt der
+ * Nutzer-Vorgabe — „nicht immer muss jeder Content generiert werden". Beides
+ * bleibt abwählbar.
  */
-export const WERKE_STANDARD: readonly Werk[] = ["listing"] as const;
+// D281: Die Wettbewerber-Bildanalyse ist im Standard AN — sie schliesst die
+// groesste verbliebene Datenluecke (Infografiken der Konkurrenz sind fuer
+// Text-Scrapes unsichtbar). Abwaehlbar bleibt sie, weil sie Laufzeit kostet.
+export const WERKE_STANDARD: readonly Werk[] = ["listing", "wettbewerber-bilder"] as const;
 
 /**
  * Die wirksame Auswahl. `null`/undefined ⇒ `WERKE_STANDARD` (Alt-Produkte
