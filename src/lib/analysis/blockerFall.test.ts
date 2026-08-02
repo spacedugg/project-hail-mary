@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { bestimmeBlockerFall, blockerScore, blockerTitel, FALL_GEWICHT } from "./blockerFall";
+import { bestimmeBlockerFall, blockerBegruendung, blockerScore, blockerTitel, BLOCKER_FAELLE, FALL_GEWICHT } from "./blockerFall";
 import type { KanalTreffer } from "./abdeckung";
 
 describe("Blocker-Fall-Bestimmung (D265)", () => {
@@ -94,5 +94,63 @@ describe("Blocker-Score (D265)", () => {
 
   it("ein unbewiesener starker Kaufgrund wiegt mehr als ein schwach bebilderter", () => {
     expect(blockerScore(80, "bildbeweis_fehlt")).toBeGreaterThan(blockerScore(80, "beweis_schwach"));
+  });
+});
+
+
+/**
+ * Blocker-Fließtext (D278, Nutzer-Vorgabe 02.08.2026: „wenn ich draufklicke, dann
+ * habe ich dort das Problem noch mal mit Fließtext beschrieben").
+ *
+ * Deterministisch statt LLM (D184): Jeder Satz steht auf einem berechneten Wert.
+ * Diese Tests halten fest, dass der Text (a) für JEDEN Fall entsteht, (b) den
+ * konkreten Befund nennt statt allgemein zu bleiben und (c) den Kaufgrund
+ * einordnet — genau die drei Dinge, die im alten Titelsatz fehlten.
+ */
+describe("Blocker-Fließtext (D278)", () => {
+  const basis = {
+    resultat: "Ohne Rückenbeschwerden durch den Arbeitstag",
+    baustein: "Sitzen und Stehen im Wechsel",
+    relevanz: 5,
+    motiv: "Kernmotiv",
+  };
+
+  it("jeder Blocker-Fall erzeugt einen mehrsätzigen Text — nie ein Fragment", () => {
+    for (const fall of BLOCKER_FAELLE) {
+      const t = blockerBegruendung({ ...basis, fall });
+      expect(t.length, `zu kurz bei ${fall}`).toBeGreaterThan(120);
+      // Mindestens drei Sätze: Ist-Zustand, Wirkung, Einordnung.
+      expect(t.split(". ").length, `zu wenige Sätze bei ${fall}`).toBeGreaterThanOrEqual(3);
+      expect(t.trim().endsWith(".")).toBe(true);
+    }
+  });
+
+  it("nennt den konkreten Befund statt allgemein zu bleiben", () => {
+    const bild = blockerBegruendung({ ...basis, fall: "beweis_schwach", slot: 3, note: 2 });
+    expect(bild).toContain("Bild 3");
+    expect(bild).toContain("2 von 5");
+
+    const merkmal = blockerBegruendung({ ...basis, fall: "nutzen_nicht_benannt", features: ["stufenlose Höhe"] });
+    expect(merkmal).toContain("stufenlose Höhe");
+  });
+
+  it("ordnet den Kaufgrund ein — starke Kaufgründe werden als vorrangig benannt", () => {
+    const stark = blockerBegruendung({ ...basis, fall: "bildbeweis_fehlt", relevanz: 5 });
+    expect(stark).toContain("besonders schwer");
+    expect(stark).toContain("5/5");
+
+    const schwach = blockerBegruendung({ ...basis, fall: "bildbeweis_fehlt", relevanz: 2 });
+    expect(schwach).toContain("Einordnung");
+    expect(schwach).not.toContain("besonders schwer");
+  });
+
+  /**
+   * Die Abgrenzung, auf der der Nutzer besteht: „Conversion Blocker sind nicht
+   * einfach nur Conversion Driver." Der Text muss die LÜCKE beschreiben, nicht
+   * den Kaufgrund wiederholen.
+   */
+  it("beschreibt die Lücke, nicht den Kaufgrund", () => {
+    const t = blockerBegruendung({ ...basis, fall: "bildbeweis_fehlt" });
+    expect(t).toMatch(/zeigt es nicht|keinen sichtbaren Beweis/);
   });
 });

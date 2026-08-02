@@ -1,6 +1,5 @@
 import type { analyzeListing } from "@/lib/analysis/listingAudit";
-import type { DeepAuditPayload, FeatureRankingPayload } from "@/db/schema";
-import { InsightKarte } from "@/components/insight-karte";
+import type { DeepAuditPayload } from "@/db/schema";
 
 /**
  * Bausteine des Analyse-Reiters — EINZELN exportiert (D272, Nutzer-Vorgabe
@@ -18,49 +17,16 @@ import { InsightKarte } from "@/components/insight-karte";
 
 type Analysis = ReturnType<typeof analyzeListing>;
 type DeepAuditRow = { payload: DeepAuditPayload; dataBasis: string[]; createdAt: Date } | null;
-type FeatureRow = { payload: FeatureRankingPayload; dataBasis: string[]; createdAt: Date } | null;
 
 const fmt = (n: number) => new Intl.NumberFormat("de-DE").format(n);
 
-/**
- * Produkt-Features (D141/D146) — im Analyse-Reiter GANZ OBEN (D272): Wer ein
- * Listing analysiert, will zuerst wissen, was das Produkt kann.
- *
- * Ohne Sentiment-Spalte (D272, Nutzer-Befund Screenshot „überwiegend negativ ·
- * 12× vs. 15×“): Ein Feature ist ein Feature. Ob Käufer damit zufrieden sind,
- * ist eine ANDERE Frage und steht bereits in den Bewertungs-Findings und den
- * Conversion-Blockern — hier war es eine dritte Darstellung derselben Zahlen,
- * noch dazu ohne sichtbare Herkunft (eigene vs. Wettbewerber-Reviews).
+/*
+ * Die frueheren `ProduktFeatures` sind hier RAUS (D278): Die vier Hauptaspekte
+ * des Analyse-Reiters — Driver, Review Insights, Product Features, Blocker —
+ * werden jetzt einheitlich in `components/analyse-vier.tsx` dargestellt. Zwei
+ * Feature-Darstellungen nebeneinander waeren genau die Dopplung, die D272
+ * abgestellt hat.
  */
-export function ProduktFeatures({ featureRanking }: { featureRanking: FeatureRow }) {
-  return (
-    <section className="card p-5">
-      {/* Kein manueller CTA (D177): das Ranking läuft als Etappe des Analyse-Laufs */}
-      <h2 className="text-sm font-semibold">Produkt-Features</h2>
-      <p className="mt-0.5 text-xs text-muted">
-        Was das Produkt kann — nach Kunden-Relevanz sortiert, mit Beleg-Aspekten aus den Daten.
-      </p>
-      {featureRanking ? (
-        <div className="stagger mt-3 space-y-2">
-          {featureRanking.payload.cards.map((k, i) => (
-            <InsightKarte
-              key={i}
-              karte={k}
-              rang={i + 1}
-              reviewsGesamt={featureRanking.payload.stats.reviewsGesamt}
-              ohneTendenz
-            />
-          ))}
-          {featureRanking.payload.cards.length === 0 && (
-            <p className="text-sm text-muted">Keine belegten Features gefunden.</p>
-          )}
-        </div>
-      ) : (
-        <p className="mt-2 text-sm text-muted">Steht nach dem nächsten Analyse-Lauf hier.</p>
-      )}
-    </section>
-  );
-}
 
 /**
  * Zielgruppe · Positionierung · USPs (D126) — laut Nutzer „unterhalb der

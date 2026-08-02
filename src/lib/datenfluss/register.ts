@@ -163,7 +163,7 @@ export const DATENFLUSS: Datenpunkt[] = [
       "Briefings (Bild-Ideen aus Gegenmaßnahmen, D171)",
       "Zuständigkeits-Gate EINMAL beim Speichern der Roh-Analyse (D266, src/lib/analysis/zustaendigkeit.ts): Versand-/Zustell-Themen fallen raus (Amazon-Sache), Verpackungs-/Transportschaden wird Produkt-Feedback. Damit arbeiten Verdichtung, Feature-Ranking, Blocker, Driver UND analyzeListing() automatisch auf bereinigten Aspekten",
     ],
-    anzeige: ["Bewertungen-Block im Analyse-Reiter: Analyse-Lauf, „Grenzen dieser Auswertung“ und die wichtigsten 8 negativen bzw. positiven Roh-Findings (D273)", "Analyse-Reiter: Conversion Driver, Blocker, Ballast, Produkt-Feedback (D265/D266/D272)"],
+    anzeige: ["Analyse-Reiter, Block 2 der vier Hauptaspekte: „Review Insights“ mit Trichter Bewertungen → Roh-Aspekte → Insights, jeder Eintrag aufklappbar mit Fließtext (D278)", "Bewertungs-Block weiter unten: Analyse-Lauf und die wichtigsten 8 negativen bzw. positiven Roh-Findings (D273)", "Grenzen der Analyse als letzter, eingeklappter Block der Seite (D278)"],
     felder: [
       { feld: "review_insights.payload.kernThese", consumer: ["src/components/bewertungs-dashboard.tsx", "src/lib/recipes/listing.ts"] },
       { feld: "review_insights.payload.verworfeneKarten", consumer: ["src/components/bewertungs-dashboard.tsx"] },

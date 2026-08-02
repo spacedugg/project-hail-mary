@@ -14,19 +14,19 @@ import { LoeschButton } from "@/components/loesch-button";
 import { MarkeFeld } from "@/components/marke-feld";
 import { amazonDomain, SPRACH_NAMEN } from "@/lib/text/sprache";
 import { GenerierSperre, GenerierButton } from "@/components/generier-sperre";
-import { BewertungsDashboard } from "@/components/bewertungs-dashboard";
-import { InsightKarte } from "@/components/insight-karte";
+import { BewertungsDashboard, GrenzenDerAnalyse } from "@/components/bewertungs-dashboard";
 import { DriverBlock } from "@/components/driver-karten";
 import { CopyLink } from "@/components/copy-link";
 import { fehlerInfo } from "@/lib/fehlercodes";
 import { normalisierePayload } from "@/lib/reviews/insights";
 import { kartenKlasse } from "@/lib/reviews/verdichtung";
-import { IconUpload, IconCheck, IconSearch, IconReviews, IconContent, IconEuro, IconSichtbarkeit, IconSparkle } from "@/components/icons";
+import { IconUpload, IconSearch, IconReviews, IconContent, IconEuro, IconSparkle } from "@/components/icons";
 import { AnalyseStart } from "@/components/analyse-start";
 import { TabLeiste } from "@/components/tab-leiste";
 import { KopierFeld } from "@/components/kopier-feld";
 import { ListingKontrolle, MassnahmenBlock } from "@/components/listing-kontrolle";
-import { ProduktFeatures, ZielgruppeUndPositionierung, MarktPosition } from "@/components/analyse-hintergrund";
+import { ZielgruppeUndPositionierung, MarktPosition } from "@/components/analyse-hintergrund";
+import { VierBlock, ReviewTrichter, driverEintraege, blockerEintraege, kartenEintraege } from "@/components/analyse-vier";
 import { analyzeListing, wirksamesListing } from "@/lib/analysis/listingAudit";
 import { snapshotBildBelege } from "@/lib/analysis/bildAuslese";
 import { dbTypFuer, geplanteVorgaenger, wirksamerPlan, SEKTIONS_LABEL } from "@/lib/content/plan";
@@ -627,67 +627,88 @@ export default async function ProductPage({
           );
         })()}
 
-        {/* 2 · Produkt-Features — laut Nutzer „ziemlich weit oben", weil das die
-            erste Frage beim Analysieren eines Listings ist. */}
-        {bereit && tab === "analyse" && <ProduktFeatures featureRanking={featureRanking ?? null} />}
+        {/* ══ Die VIER Hauptaspekte (D278, Nutzer-Vorgabe 02.08.2026) ═══════
+            In genau dieser Reihenfolge ganz oben: Conversion Drivers → Review
+            Insights → Product Features → Conversion Blockers. Vorher lagen sie
+            über die ganze Seite verstreut, in wechselnder Darstellung.
 
-        {/* 3 · Conversion Driver  ·  4 · Conversion Blocker */}
-        {/* Conversion Driver & Blocker (D265): EIN Modell, zwei Projektionen —
-            jeder Blocker trägt seine Driver-ID. Ersetzt die beiden getrennten
-            Listen unten, sobald ein Lauf vorliegt. */}
+            Die Logik der Reihenfolge ist die Ableitungskette selbst: WARUM
+            gekauft wird (Driver) → WAS Kunden davon sagen (Insights) → WOMIT das
+            Produkt es einlöst (Features) → WAS davon im Listing fehlt (Blocker).
+            Ein Blocker ist deshalb ausdrücklich KEIN umformulierter Driver — er
+            ist die Lücke zwischen dem, was Käufer wissen wollen, und dem, was
+            Listing und Bilder zeigen. */}
 
-        {driverLauf && tab === "analyse" && (
-          <DriverBlock
-            /* D272: „Erwartungs- & Produktrisiken" trugen zusätzlich die
-               verdichteten negativen Karten — dieselbe Information wie die
-               negativen Bewertungs-Findings (Nutzer-Befund). Raus; das
-               Produkt-Feedback aus dem Zuständigkeits-Gate bleibt. */
-            lauf={driverLauf}
-          />
-        )}
-
-        {/* Alt-Ansicht (D178) — nur solange für dieses Produkt kein Driver-Lauf
-            existiert. Beides gleichzeitig wäre genau die Doppelung, die D265
-            abstellt. */}
-        {!driverLauf && insights && tab === "analyse" && (() => {
-          const treiber = (normalisierePayload(insights.payload).insightCards ?? []).filter((k) => kartenKlasse(k) === "positiv");
-          if (treiber.length === 0) return null;
+        {bereit && tab === "analyse" && (() => {
+          const ins = insights ? normalisierePayload(insights.payload) : null;
+          const karten = ins?.insightCards ?? [];
+          const rohAspekte = (ins?.painPoints.length ?? 0) + (ins?.buyingTriggers.length ?? 0);
+          // Ohne Driver-Lauf tragen die Alt-Läufe die beiden Rubriken weiter
+          // (D178/D167) — sonst wären ihre Zeilen unsichtbar gespeicherte Daten.
+          const driverEintr = driverLauf
+            ? driverEintraege(driverLauf.payload)
+            : kartenEintraege(karten.filter((k) => kartenKlasse(k) === "positiv"));
+          const blockerEintr = driverLauf
+            ? blockerEintraege(driverLauf.payload)
+            : kartenEintraege(blockerLauf?.payload.cards ?? []);
           return (
-            <section className="card p-5">
-              <CardHead icon={<IconCheck />} chip="chip-teal" title="Conversion Drivers" />
-              <div className="mt-4 space-y-2">
-                {treiber.map((k, i) => (
-                  <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={normalisierePayload(insights.payload).stats.reviewsTotal} />
-                ))}
-              </div>
-            </section>
+            <div className="space-y-4">
+              <VierBlock
+                nr={1}
+                kuerzel="Conversion Drivers"
+                titel="Warum Menschen kaufen"
+                claim="What makes people buy."
+                erklaerung="Welche Wirkung das Produkt im Alltag der Kundschaft hat. Diese Kaufgründe sind die Grundlage für emotionale Anknüpfung in Text und Bild — sie zeigen das Ergebnis, das zählt, nicht die Merkmale, die dahinterstecken."
+                eintraege={driverEintr}
+                leerText="Noch keine Kaufgründe ermittelt — dafür braucht es den Analyse-Lauf."
+              />
+
+              <VierBlock
+                nr={2}
+                kuerzel="Review Insights"
+                titel="Was der Kundschaft wichtig ist"
+                claim="What matters to customers."
+                erklaerung="Aus den Bewertungen abgeleitet und nach Bedeutung sortiert. Insights sind ausdrücklich keine zusammengefassten Reviews: Sie benennen, was sich aus den Roh-Aspekten für die Kaufentscheidung ableiten lässt — der Trichter zeigt diesen Weg."
+                eintraege={kartenEintraege(karten)}
+                leerText="Noch keine Insights verdichtet — die Verdichtung ist eine eigene Etappe des Analyse-Laufs."
+                kopfZusatz={
+                  ins ? (
+                    <ReviewTrichter reviews={ins.stats.reviewsTotal} aspekte={rohAspekte} insights={karten.length} />
+                  ) : undefined
+                }
+              />
+
+              <VierBlock
+                nr={3}
+                kuerzel="Product Features"
+                titel="Merkmale, die zur Kaufentscheidung beitragen"
+                claim="Features that drive purchase decisions."
+                erklaerung="Nüchtern aufgezählt, was das Produkt mitbringt — nach Kunden-Relevanz sortiert. Hier steht bewusst keine Zufriedenheits-Bewertung: Ein Merkmal ist ein Merkmal, wie es ankommt, steht in den Review Insights."
+                eintraege={kartenEintraege(featureRanking?.payload.cards ?? [])}
+                leerText="Noch keine Features gerankt — läuft als Etappe des Analyse-Laufs."
+              />
+
+              <VierBlock
+                nr={4}
+                kuerzel="Conversion Blockers"
+                titel="Was Kaufende nicht sehen, aber wissen wollen"
+                claim="What shoppers don’t see but care about."
+                erklaerung="Die Lücke zwischen Interesse und Listing: Themen, die für die Kaufentscheidung zählen, die Text und Bilder heute aber nicht beantworten. Jeder Eintrag nennt den Kaufgrund, an dem er hängt — das sind die größten Hebel für die Conversion."
+                eintraege={blockerEintr}
+                leerText={
+                  driverLauf
+                    ? "✓ Kein Blocker gefunden — jeder belegte Kaufgrund ist im Listing bewiesen."
+                    : "Noch keine Blocker ermittelt — dafür braucht es den Analyse-Lauf."
+                }
+              />
+            </div>
           );
         })()}
 
-        {!driverLauf && bereit && tab === "analyse" && (
-        <section className="card p-5">
-          <CardHead
-            icon={<IconSichtbarkeit />}
-            chip="chip-amber"
-            title="Conversion-Blocker"
-          />
-          {(!snapshot || !insights) && (
-            <p className="mt-3 text-xs text-warn">△ Dafür braucht es das importierte Listing und die Bewertungs-Analyse.</p>
-          )}
-          {blockerLauf && (
-            <>
-              <div className="stagger mt-4 space-y-2">
-                {blockerLauf.payload.cards.map((k, i) => (
-                  <InsightKarte key={i} karte={k} rang={i + 1} reviewsGesamt={blockerLauf.payload.stats.reviewsGesamt} />
-                ))}
-                {blockerLauf.payload.cards.length === 0 && (
-                  <p className="text-sm">✓ Kein Blocker gefunden. Die wichtigen Kunden-Themen sind im Listing beantwortet.</p>
-                )}
-              </div>
-            </>
-          )}
-        </section>
-        )}
+        {/* Produkt-Feedback aus dem Zuständigkeits-Gate (D266/D272): nicht über
+            den Listing-Text lösbar, deshalb getrennt von den vier Aspekten. */}
+        {driverLauf && tab === "analyse" && <DriverBlock lauf={driverLauf} />}
+
 
         {/* 5 · Zielgruppe · Positionierung · USPs — laut Nutzer „unterhalb der
             anderen Main-Sachen" (D272). */}
@@ -799,6 +820,14 @@ export default async function ProductPage({
         {/* 7 · Keywords / Markt-Position ganz unten (D272, Nutzer): „nicht so
             wichtig wie alle anderen Bewertungen". */}
         {bereit && tab === "analyse" && analysis && <MarktPosition analysis={analysis} />}
+
+        {/* GANZ UNTEN: Grenzen der Analyse (D278, Nutzer: „ganz ganz unten am
+            Ende von allen Content"). Eingeklappt — ehrlich, aber nicht im Weg.
+            Bündelt die Qualitäts-Notizen der Roh-Analyse (D152) und die
+            Hinweise des Driver-Laufs an EINER Stelle statt an zweien. */}
+        {bereit && tab === "analyse" && (
+          <GrenzenDerAnalyse insight={insights ?? null} driverHinweise={driverLauf?.payload.hinweise ?? []} />
+        )}
 
 
         {/* Familien-Kontext GANZ OBEN im Content-Bereich (D256) — auf Parent UND Child,

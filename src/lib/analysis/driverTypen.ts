@@ -92,6 +92,13 @@ export type ConversionBlockerNeu = {
   fall: BlockerFall;
   /** Vom CODE aus dem Template gebaut, nicht vom LLM formuliert (D184). */
   titel: string;
+  /**
+   * Fliesstext zum Aufklappen (D278, Nutzer 02.08.): was das Listing heute zeigt,
+   * was fehlt, was das beim Kaeufer ausloest und warum die Luecke hier wiegt.
+   * Ebenfalls deterministisch (blockerBegruendung) — jeder Satz steht auf einem
+   * berechneten Wert. Optional, weil Alt-Laeufe ihn nicht haben.
+   */
+  begruendung?: string;
   /** Driver-Score × Lücken-Gewicht. */
   score: number;
   /**

@@ -1,7 +1,5 @@
 import { reviewInsights, reviewScrapes } from "@/db/schema";
 import { normalisierePayload, wichtigsteFindings } from "@/lib/reviews/insights";
-import { kartenKlasse } from "@/lib/reviews/verdichtung";
-import { InsightKarte } from "@/components/insight-karte";
 import { verdichteInsightsAction } from "@/app/actions";
 
 type InsightRow = typeof reviewInsights.$inferSelect;
@@ -71,58 +69,24 @@ export function BewertungsDashboard({
             <b>Kern-These:</b> {p.kernThese}
           </blockquote>
         )}
-        {/* Qualitäts-Notizen (D152) waren bis D266 erzeugt und nirgends gelesen.
-            Sie tragen das Verbatim-Gate, die verworfenen Aspekte und das
-            Zuständigkeits-Gate — die ehrlichen Grenzen der Roh-Analyse. */}
-        {(p.qualitaetsNotizen?.length ?? 0) > 0 && (
-          <details className="mt-3">
-            <summary className="cursor-pointer text-xs text-muted hover:text-foreground">
-              Grenzen dieser Auswertung ({p.qualitaetsNotizen!.length})
-            </summary>
-            <ul className="mt-1.5 space-y-1">
-              {p.qualitaetsNotizen!.map((n, i) => (
-                <li key={i} className="text-[11px] text-muted">ℹ {n}</li>
-              ))}
-            </ul>
-          </details>
-        )}
+        {/* D278: Die „Grenzen dieser Auswertung" standen hier mitten im Trichter.
+            Der Nutzer will sie „ganz ganz unten am Ende von allen Content" —
+            sie leben jetzt als eigene Komponente `GrenzenDerAnalyse` und werden
+            von der Seite als letzter Block gerendert. */}
       </div>
 
-      {/* Review Insights (D178): Findings gegliedert nach positiv/negativ/gemischt —
-          Klasse rechnet der Code aus den Beleg-Aspekten */}
-      {karten.length > 0 && (
+      {/* D278: Die Insight-Karten standen hier ein ZWEITES Mal — sie sind jetzt
+          Block 2 der vier Hauptaspekte („Review Insights") ganz oben auf der
+          Seite. Was hier bleibt, sind die ROH-Findings darunter: die Stufe, aus
+          der die Insights erst abgeleitet werden. */}
+      {(p.entfernteBildIdeen?.length ?? 0) > 0 && (
         <div className="rounded-xl border border-hair p-4">
-          <h3 className="text-sm font-semibold">Review Insights</h3>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {([["positiv", "text-good"], ["negativ", "text-bad"], ["gemischt", "text-muted"]] as const).map(([klasse, farbe]) => {
-              const n = karten.filter((k) => kartenKlasse(k) === klasse).length;
-              return <span key={klasse} className={`rounded-full bg-hair px-2.5 py-1 text-xs tabular-nums ${farbe}`}>{n} {klasse}</span>;
-            })}
-          </div>
-          {([["positiv", "Positiv", "text-good"], ["negativ", "Negativ", "text-bad"], ["gemischt", "Gemischt", "text-muted"]] as const).map(([klasse, label, farbe]) => {
-            const gruppe = karten.filter((k) => kartenKlasse(k) === klasse);
-            if (gruppe.length === 0) return null;
-            return (
-              <div key={klasse} className="mt-3">
-                <h4 className={`text-xs font-semibold uppercase tracking-wide ${farbe}`}>{label}</h4>
-                <div className="mt-1.5 space-y-2">
-                  {gruppe.map((k, i) => (
-                    <InsightKarte key={i} karte={k} rang={karten.indexOf(k) + 1} reviewsGesamt={p.stats.reviewsTotal} />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-          {(p.entfernteBildIdeen?.length ?? 0) > 0 && (
-            <div className="mt-3 rounded-xl border border-hair p-3">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-warn">Entfernte Bild-Ideen</div>
-              <ul className="mt-1 space-y-1">
-                {p.entfernteBildIdeen!.map((e, i) => (
-                  <li key={i} className="text-[11px] text-muted">✕ „{e.idee}" — {e.grund}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-warn">Entfernte Bild-Ideen</div>
+          <ul className="mt-1 space-y-1">
+            {p.entfernteBildIdeen!.map((e, i) => (
+              <li key={i} className="text-[11px] text-muted">✕ „{e.idee}" — {e.grund}</li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -186,5 +150,35 @@ export function BewertungsDashboard({
         sind, leitet der Conversion-Driver-Lauf eine Stufe höher ab.
       </p>
     </div>
+  );
+}
+
+
+/**
+ * Grenzen der Analyse (D278) — der letzte Block der Analyse-Seite.
+ *
+ * Inhaltlich unverändert (Qualitäts-Notizen D152: Verbatim-Gate, verworfene
+ * Aspekte, Zuständigkeits-Gate) und weiterhin eingeklappt. Neu ist nur der Ort:
+ * ganz unten statt mitten im Bewertungs-Block. Ehrlichkeit gehört ins Tool, aber
+ * nicht zwischen die Befunde.
+ */
+export function GrenzenDerAnalyse({ insight, driverHinweise = [] }: { insight: InsightRow | null; driverHinweise?: string[] }) {
+  const notizen = insight ? normalisierePayload(insight.payload).qualitaetsNotizen ?? [] : [];
+  const alle = [...new Set([...notizen, ...driverHinweise])];
+  if (alle.length === 0) return null;
+  return (
+    <details className="card p-5">
+      <summary className="cursor-pointer text-sm font-semibold text-muted hover:text-foreground">
+        Grenzen dieser Analyse ({alle.length})
+      </summary>
+      <p className="mt-2 text-xs text-muted">
+        Was wir nicht messen konnten, sagen wir — nur so ist der Rest belastbar.
+      </p>
+      <ul className="mt-2 space-y-1">
+        {alle.map((n, i) => (
+          <li key={i} className="text-[11px] leading-snug text-muted">ℹ {n}</li>
+        ))}
+      </ul>
+    </details>
   );
 }

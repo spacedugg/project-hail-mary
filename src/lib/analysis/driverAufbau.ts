@@ -3,7 +3,8 @@ import { adressiert } from "@/lib/analysis/listingAudit";
 import { findeAspekt, type RoheAspekte } from "@/lib/reviews/verdichtung";
 import { quellTexte, type FeatureQuellen } from "@/lib/analysis/featureRanking";
 import { bildAbdeckung, textAbdeckung, type BildBeleg } from "@/lib/analysis/abdeckung";
-import { bestimmeBlockerFall, blockerScore, blockerTitel } from "@/lib/analysis/blockerFall";
+import { bestimmeBlockerFall, blockerBegruendung, blockerScore, blockerTitel } from "@/lib/analysis/blockerFall";
+import { MOTIV_LABELS } from "@/lib/analysis/motive";
 import {
   driverScore,
   pruefeResultatFeatureFrei,
@@ -322,6 +323,19 @@ export function baueDriver(kandidaten: DriverKandidat[], kontext: AufbauKontext)
           kanaele: b.kanaele,
           slot: b.bildSlot,
           note: b.bildNote,
+        }),
+        // D278: derselbe Datensatz, zweite Ausgabestufe — Titel fuer die Liste,
+        // Begruendung fuer das Aufklappen.
+        begruendung: blockerBegruendung({
+          fall,
+          resultat: d.resultat,
+          baustein: b.nutzen,
+          features: b.features,
+          kanaele: b.kanaele,
+          slot: b.bildSlot,
+          note: b.bildNote,
+          relevanz: d.relevanz,
+          motiv: MOTIV_LABELS[d.motivKlasse],
         }),
         score: blockerScore(d.score, fall),
         bildSlot: b.bildSlot,

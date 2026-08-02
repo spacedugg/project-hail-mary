@@ -210,6 +210,9 @@ export function InsightsDokument({ p, version }: { p: InsightsReportPayload; ver
                     <div className="mt-0.5 text-[11px] leading-snug text-muted">
                       {z.motiv} · belegt durch {z.quellen.join(", ")}
                     </div>
+                    {/* D278: Warum das ein Kaufgrund ist — ein Satz statt nur einer
+                        Klassen-Bezeichnung, sonst bleibt die Matrix behauptend. */}
+                    {z.einordnung && <div className="mt-1 text-[11px] leading-snug text-muted">{z.einordnung}</div>}
                     {z.zitat && <div className="mt-1 text-[11px] italic leading-snug text-muted">„{z.zitat}“</div>}
                   </td>
                   <td className="text-[11px] tracking-[0.15em] text-primary-strong" title={`Relevanz ${z.relevanz}/5`}>
@@ -257,7 +260,7 @@ export function InsightsDokument({ p, version }: { p: InsightsReportPayload; ver
           unter="Kaufgründe, für die das Listing keinen Beweis liefert — und Merkmale, die Platz belegen, ohne einen Kaufgrund zu stützen."
         >
           {p.blocker.length > 0 && (
-            <ul className="mt-4 space-y-2.5">
+            <ul className="mt-4 space-y-3">
               {p.blocker.map((b, i) => (
                 <li key={i} className="dok-finding rounded-xl border border-hair p-4">
                   <div className="flex flex-wrap items-baseline gap-2">
@@ -267,7 +270,11 @@ export function InsightsDokument({ p, version }: { p: InsightsReportPayload; ver
                       {b.art === "bild" ? "Bild" : "Text"}
                     </span>
                   </div>
-                  {b.resultat && <p className="mt-1 text-[11px] leading-snug text-muted">Betrifft den Kaufgrund: {b.resultat}</p>}
+                  {/* D278: Der Fließtext ist der eigentliche Inhalt — vorher stand
+                      hier nur der Titelsatz, und das Dokument las sich entsprechend
+                      dünn („vermisst eigentlich sämtliche Informationen"). */}
+                  {b.begruendung && <p className="mt-2 text-sm leading-relaxed">{b.begruendung}</p>}
+                  {b.resultat && <p className="mt-1.5 text-[11px] leading-snug text-muted">Betrifft den Kaufgrund: {b.resultat}</p>}
                 </li>
               ))}
             </ul>

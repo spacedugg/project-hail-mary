@@ -73,6 +73,8 @@ export type InsightsReportPayload = {
     text: Ampel;
     bild: Ampel;
     zitat: string | null;
+    /** Ein Satz: warum diese Motiv-Klasse — macht den Kaufgrund nachvollziehbar (D278). */
+    einordnung: string | null;
   }>;
   /**
    * Was Kunden sagen (D277, Nutzer-Vorgabe 02.08.: „Was natürlich wichtig ist,
@@ -99,7 +101,19 @@ export type InsightsReportPayload = {
    * was wir dagegen tun. `ballast` gehört fachlich dazu — Merkmale, die Platz
    * belegen, ohne einen Kaufgrund zu stützen.
    */
-  blocker: Array<{ titel: string; driverId: string; resultat: string | null; art: "text" | "bild" }>;
+  blocker: Array<{
+    titel: string;
+    driverId: string;
+    resultat: string | null;
+    art: "text" | "bild";
+    /**
+     * Fliesstext (D278): warum das eine Luecke ist und was sie beim Kaeufer
+     * ausloest. Derselbe deterministische Text wie im Tool — das Kundendokument
+     * war „sehr kurz und vermisst eigentlich saemtliche Informationen"
+     * (Nutzer 02.08.), weil hier nur der Titelsatz stand.
+     */
+    begruendung: string | null;
+  }>;
   ballast: Array<{ feature: string; prominent: boolean }>;
   handlungsplan: {
     text: Array<{ massnahme: string; driverIds: string[] }>;
@@ -194,6 +208,9 @@ export function baueInsightsReport(e: ReportEingabe): InsightsReportPayload {
       text: schlechteste(drv.bausteine.map((b) => TEXT_AMPEL[b.textStufe])),
       bild: schlechteste(drv.bausteine.map((b) => BILD_AMPEL[b.bildStufe])),
       zitat: zitatFuer(drv, e.insights),
+      // D278: Der Kaufgrund braucht im Dokument mehr als eine Zeile — die
+      // Motiv-Einordnung erklaert, WARUM er als Kaufgrund gilt.
+      einordnung: drv.motivBegruendung?.trim() || null,
     };
   });
 
@@ -244,6 +261,7 @@ export function baueInsightsReport(e: ReportEingabe): InsightsReportPayload {
     driverId: b.driverId,
     resultat: resultatVon.get(b.driverId) ?? null,
     art: (istBildFall(b.fall) ? "bild" : "text") as "text" | "bild",
+    begruendung: b.begruendung?.trim() || null,
   }));
 
   const kennzahlen: Array<{ label: string; wert: string }> = [];

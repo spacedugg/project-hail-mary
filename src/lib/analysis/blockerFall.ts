@@ -138,3 +138,77 @@ export function blockerTitel(e: TitelEingabe): string {
 export function blockerScore(driverScore: number, fall: BlockerFall): number {
   return Math.round(driverScore * FALL_GEWICHT[fall]);
 }
+
+/**
+ * Fließtext zum Blocker (D278, Nutzer-Vorgabe 02.08.2026).
+ *
+ * „Wenn ich draufklicke, dann habe ich dort das Problem noch mal mit Fließtext
+ * beschrieben … der beschreibt, wie es dazu kommt, dass der aktuell in den
+ * Bildern nicht abgebildet ist … er kann sogar abstrahieren, was auf den Bildern
+ * schon zu sehen ist, aber wo uns das noch fehlt."
+ *
+ * Bewusst DETERMINISTISCH (D184) statt per LLM: Jeder Satz steht auf einem
+ * berechneten Wert — Fall, Text-Kanäle, Bild-Slot, Botschafts-Note, Motiv-Klasse,
+ * Relevanz. Ein LLM würde hier nur umformulieren, was der Code bereits weiß, und
+ * könnte dabei Dinge behaupten, die nicht belegt sind. Der Text folgt in jedem
+ * Fall derselben Dramaturgie:
+ *   1. Was das Listing HEUTE zeigt   2. Was genau fehlt
+ *   3. Was das beim Käufer auslöst   4. Warum es hier besonders wiegt
+ */
+export type BegruendungsEingabe = TitelEingabe & {
+  /** Relevanz des zugehörigen Drivers (1–5) — trägt den Prioritäts-Satz. */
+  relevanz: number;
+  /** Klartext der Motiv-Klasse, z. B. „Kernmotiv". */
+  motiv: string;
+};
+
+export function blockerBegruendung(e: BegruendungsEingabe): string {
+  const r = (e.baustein.trim() || e.resultat.trim()).replace(/^„|"$/g, "");
+  const saetze: string[] = [];
+
+  switch (e.fall) {
+    case "fehlt_komplett":
+      saetze.push(
+        `Zu „${r}" findet sich im Listing derzeit nichts — weder im Text noch in den Bildern.`,
+        `Käufer, die genau danach suchen, bekommen auf der Detailseite keine Antwort und müssen annehmen, dass das Produkt es nicht leistet.`,
+      );
+      break;
+    case "nutzen_nicht_benannt":
+      saetze.push(
+        e.features?.length
+          ? `Das Merkmal steht im Listing (${listeKurz(e.features)}) — der Nutzen daraus, „${r}", wird nirgends ausgesprochen.`
+          : `Das Merkmal steht im Listing — der Nutzen daraus, „${r}", wird nirgends ausgesprochen.`,
+        `Käufer müssen den Schluss vom Merkmal auf ihren eigenen Vorteil selbst ziehen. Genau diesen Schritt macht die Mehrheit auf einer Produktseite nicht.`,
+      );
+      break;
+    case "nur_kleingedruckt":
+      saetze.push(
+        `„${r}" kommt vor, aber nur in ${schwacheKanaele(e.kanaele ?? [])} — nicht im Titel und nicht vorn in den Bullets.`,
+        `An dieser Stelle liest es kaum jemand: Die Kaufentscheidung fällt in den ersten Sekunden über Titel, Hauptbild und die ersten Bullet-Zeilen.`,
+      );
+      break;
+    case "bildbeweis_fehlt":
+      saetze.push(
+        `Der Text nennt „${r}" bereits — das Bildset zeigt es nicht.`,
+        `Käufer lesen damit ein Versprechen, für das sie keinen sichtbaren Beweis bekommen. Das Argument bleibt abstrakt und muss geglaubt statt gesehen werden.`,
+      );
+      break;
+    case "beweis_schwach":
+      saetze.push(
+        e.slot !== undefined && e.note !== null && e.note !== undefined
+          ? `Bild ${e.slot} adressiert „${r}", transportiert die Botschaft aber nur schwach (${e.note.toLocaleString("de-DE")} von 5).`
+          : `Ein Bild adressiert „${r}", transportiert die Botschaft aber nur schwach.`,
+        `Das Motiv ist vorhanden, es beweist den Punkt jedoch nicht auf einen Blick — beim Durchwischen der Galerie geht die Aussage verloren.`,
+      );
+      break;
+  }
+
+  // Prioritäts-Satz: Warum ausgerechnet diese Lücke zuerst geschlossen gehört.
+  saetze.push(
+    e.relevanz >= 4
+      ? `Das wiegt hier besonders schwer: „${e.resultat}" ist ein ${e.motiv} mit Relevanz ${e.relevanz}/5 — einer der stärksten Kaufgründe dieses Produkts.`
+      : `Einordnung: „${e.resultat}" ist ein ${e.motiv} mit Relevanz ${e.relevanz}/5 — die Lücke lohnt sich, sobald die stärkeren Kaufgründe belegt sind.`,
+  );
+
+  return saetze.join(" ");
+}
