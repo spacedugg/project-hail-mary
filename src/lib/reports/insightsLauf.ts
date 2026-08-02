@@ -2,7 +2,6 @@ import { eq, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { amazonDomain } from "@/lib/text/sprache";
 import { normalisierePayload } from "@/lib/reviews/insights";
-import { kartenKlasse } from "@/lib/reviews/verdichtung";
 import { analyzeListing, wirksamesListing } from "@/lib/analysis/listingAudit";
 import { snapshotBildBelege } from "@/lib/analysis/bildAuslese";
 import { baueInsightsReport, pruefeInsightsReport, type InsightsReportPayload } from "@/lib/reports/insightsDokument";
@@ -98,7 +97,13 @@ export async function erzeugeInsightsReport(productId: string): Promise<LaufErge
     driver: driverLauf.payload,
     insights,
     analysis,
-    risikoKarten: (insights?.insightCards ?? []).filter((k) => kartenKlasse(k) !== "positiv"),
+    /**
+     * USPs fürs Kunden-Dokument (D277). Quelle ist die gepflegte Produkt-Wahrheit
+     * (`facts.usps`) — dort landen auch die vom Tiefen-Audit abgeleiteten USPs
+     * (actions.ts füllt `facts.usps` aus `deepAudit.derived.usps`, wenn leer).
+     * Damit gibt es EINE Quelle statt zweier konkurrierender Listen.
+     */
+    usps: product.facts.usps ?? [],
     amazonTotals: scrape?.amazonTotals
       ? { reviewsTotal: scrape.amazonTotals.reviewsTotal, ratingAvg: scrape.amazonTotals.ratingAvg }
       : snapshot

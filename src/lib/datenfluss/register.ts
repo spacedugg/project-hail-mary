@@ -213,7 +213,7 @@ export const DATENFLUSS: Datenpunkt[] = [
     quelle: "Knopf im Analyse-Reiter — keine eigene Erhebung: eine Projektion vorhandener Analyse-Zeilen (D267)",
     speicher: "insights_reports (eingefroren je Version, eigener öffentlicher Token)",
     analysen: [
-      { name: "Projektion", modul: "src/lib/reports/insightsDokument.ts", outcome: "Kopf, Datenbasis, Kern-These, Kaufgrund-Matrix mit Abdeckungs-Ampel, Listing-Status, Handlungsplan aus den Blockern, Risiken, Grenzen — ohne LLM" },
+      { name: "Projektion", modul: "src/lib/reports/insightsDokument.ts", outcome: "Titelblock (Kern-These, Kennzahlen, Datenbasis) · Findings aus Bewertungen nach gut/schlecht mit Beleg-Zahl und O-Ton · belegbare USPs · Kaufgrund-Matrix mit Abdeckungs-Ampel · Blocker samt Merkmalen ohne Kaufgrund · Handlungsplan — ohne LLM. Grenzen, Erwartungs-Risiken und Bild-Noten sind bewusst NICHT im Kundendokument (D277); die Bild-Noten wirken nur als „wieBesser“ in den Bild-Maßnahmen" },
       { name: "Auslieferungs-Gate", modul: "src/lib/reports/insightsDokument.ts", outcome: "kein Dokument ohne Datenbasis, ohne Kaufgrund, ohne Beleg-Quelle je Zeile oder mit Maßnahme ohne Kaufgrund-Referenz — bei Verstoß wird NICHTS gespeichert (D182)" },
       { name: "Erzeugung & Einfrieren", modul: "src/lib/reports/insightsLauf.ts", outcome: "Version + Token; alte Links bleiben gültig und zeigen weiter ihren Stand" },
     ],

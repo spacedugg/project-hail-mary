@@ -2,19 +2,28 @@ import type { ListingAnalysis } from "@/lib/analysis/listingAudit";
 import type { ConversionDriverPayload } from "@/lib/analysis/driverTypen";
 import { QUELL_LABEL } from "@/lib/analysis/driverTypen";
 import type { AbdeckungsStufe, BildStufe } from "@/lib/analysis/abdeckung";
-import type { InsightCard, ReviewInsightsPayload } from "@/db/schema";
+import type { ReviewInsightsPayload } from "@/db/schema";
 
 /**
- * Insights-Dokument (D267) — das Kunden-Dokument als DETERMINISTISCHE PROJEKTION
- * vorhandener Analyse-Zeilen. Kein LLM-Aufruf zur Report-Zeit (D184): Es wird
- * kein Kapitel „getextet“. Fehlt eine Etappe, fällt das Kapitel weg und wird in
- * den Grenzen benannt — niemals ein Platzhalter, niemals geschätzt.
+ * Insights-Dokument (D267, Kapitel neu geschnitten in D277) — das Kunden-Dokument
+ * als DETERMINISTISCHE PROJEKTION vorhandener Analyse-Zeilen. Kein LLM-Aufruf zur
+ * Report-Zeit (D184): Es wird kein Kapitel „getextet“. Fehlt eine Etappe, fällt
+ * das Kapitel ersatzlos weg — niemals ein Platzhalter, niemals geschätzt.
  *
- * Anti-Redundanz-Prinzip (Nutzer-Vorgabe): Jede Erkenntnis ist GENAU EINMAL
- * ausformuliert — in der Driver-Matrix. Danach wird nur über die Driver-ID
- * referenziert. Deshalb gibt es kein eigenes Blocker-Kapitel: ein Blocker ist
- * eine Zeile mit roter Ampel, und der Handlungsplan entsteht aus genau diesen
- * Zeilen.
+ * Kapitelfolge (Nutzer-Vorgabe 02.08.2026), vom Befund zur Maßnahme:
+ * Titelblock → Findings aus Bewertungen → USPs → Kaufgründe → Blocker →
+ * Handlungsplan.
+ *
+ * NICHT im Dokument (bewusst, Nutzer-Vorgabe): „Grenzen dieser Analyse“,
+ * „Erwartungen, die wir ehrlich setzen sollten“ und die Noten-Tabelle der
+ * aktuellen Bilder. Alles drei bleibt intern erhalten und im Tool sichtbar —
+ * beim Kunden lenkte es von den Befunden ab. Die Bild-Noten wirken weiter, aber
+ * nur dort, wo sie handlungsrelevant sind: als „wieBesser“ in den Bild-Maßnahmen.
+ *
+ * Anti-Redundanz-Prinzip (D267, weiter gültig): Jeder Kaufgrund ist GENAU EINMAL
+ * ausformuliert — in der Matrix. Blocker und Handlungsplan referenzieren ihn nur
+ * noch über die Driver-ID; das Blocker-Kapitel wiederholt keine Analyse, es
+ * bündelt die roten Zeilen.
  */
 
 export type Ampel = "gut" | "teil" | "fehlt" | "unbekannt";
@@ -65,23 +74,53 @@ export type InsightsReportPayload = {
     bild: Ampel;
     zitat: string | null;
   }>;
+  /**
+   * Was Kunden sagen (D277, Nutzer-Vorgabe 02.08.: „Was natürlich wichtig ist,
+   * sind so Findings aus Bewertungen. Da gerne die Aufschlüsselung, was ist gut,
+   * was ist schlecht und wie das belegt ist.").
+   *
+   * Vorher tauchten die Roh-Findings im Kunden-Dokument NICHT auf — nur als
+   * einzelnes Zitat in einer Matrix-Zeile. Damit fehlte dem Kunden genau die
+   * Ebene, die er selbst nachlesen kann: die Stimmen seiner Käufer.
+   */
+  findings: {
+    positiv: Array<{ label: string; nennungen: number | null; zitat: string | null; nurFremd: boolean }>;
+    negativ: Array<{ label: string; nennungen: number | null; zitat: string | null; nurFremd: boolean }>;
+  };
+  /** Belegbare USPs (D277) — was das Produkt auszeichnet, aus der Produkt-Wahrheit. */
+  usps: string[];
   listing: {
     overall: number | null;
     dimensionen: Array<{ label: string; score: number | null; befund: string | null }>;
-    bilder: Array<{ slot: number; design: number | null; botschaft: number | null; klarheit: number | null }>;
-    ballast: Array<{ feature: string; prominent: boolean }>;
   };
+  /**
+   * Conversion-Blocker als EIGENES Kapitel (D277): Bisher waren sie nur implizit
+   * im Handlungsplan sichtbar. Der Kunde soll erst sehen, WAS blockiert, dann
+   * was wir dagegen tun. `ballast` gehört fachlich dazu — Merkmale, die Platz
+   * belegen, ohne einen Kaufgrund zu stützen.
+   */
+  blocker: Array<{ titel: string; driverId: string; resultat: string | null; art: "text" | "bild" }>;
+  ballast: Array<{ feature: string; prominent: boolean }>;
   handlungsplan: {
     text: Array<{ massnahme: string; driverIds: string[] }>;
     bild: Array<{ slot: number | null; massnahme: string; driverIds: string[] }>;
   };
-  risiken: Array<{ titel: string; beschreibung: string }>;
-  /** Ehrliche Grenzen — der stärkste Vertrauensbeweis, nicht das Kleingedruckte. */
-  grenzen: string[];
 };
 
-/** Harte Obergrenzen (Nutzer-Vorgabe): das Dokument darf mit der Datenmenge nicht mitwachsen. */
-export const GRENZEN = { matrix: 10, textMassnahmen: 6, bildMassnahmen: 5, risiken: 4, grenzenZeilen: 8 } as const;
+/**
+ * Harte Obergrenzen (Nutzer-Vorgabe): das Dokument darf mit der Datenmenge nicht
+ * mitwachsen. `findings` folgt dem Anzeige-Deckel aus D273 — acht je Seite sind
+ * die Grenze, ab der niemand mehr weiß, was wirklich wichtig ist.
+ */
+export const GRENZEN = {
+  matrix: 10,
+  textMassnahmen: 6,
+  bildMassnahmen: 5,
+  findings: 8,
+  usps: 6,
+  blocker: 8,
+  ballast: 6,
+} as const;
 
 const MOTIV_TEXT = {
   kern: "Kernmotiv",
@@ -115,10 +154,16 @@ export type ReportEingabe = {
   driver: ConversionDriverPayload;
   insights: ReviewInsightsPayload | null;
   analysis: ListingAnalysis | null;
-  /** Verdichtete Karten ohne positive Tendenz — Erwartungs-Management. */
-  risikoKarten: InsightCard[];
+  /** Belegbare USPs aus der Produkt-Wahrheit (D277) — eigenes Kapitel im Dokument. */
+  usps: string[];
   amazonTotals: { reviewsTotal: number | null; ratingAvg: number | null } | null;
   wettbewerberAsins: number;
+  /**
+   * Bild-Audit — NUR noch als Quelle für „wieBesser“ in den Bild-Maßnahmen.
+   * Die Noten-Tabelle je Bild ist aus dem Dokument raus (D277, Nutzer: „Auch die
+   * Analyse der aktuellen Bilder muss nicht zu finden sein“); die Empfehlung,
+   * die daraus folgt, bleibt — sie ist der handlungsrelevante Teil.
+   */
   bilder: Array<{ slot: number; design: number | null; botschaft: number | null; klarheit: number | null; wieBesser?: string }>;
   keywordsMitVolumen: number;
 };
@@ -173,10 +218,33 @@ export function baueInsightsReport(e: ReportEingabe): InsightsReportPayload {
       };
     });
 
-  const grenzen: string[] = [...d.hinweise];
-  if (e.insights?.qualitaetsNotizen?.length) grenzen.push(...e.insights.qualitaetsNotizen);
-  if (!e.analysis) grenzen.push("Die Listing-Kontrolle lag zum Zeitpunkt dieses Dokuments nicht vor — die Score-Zeilen fehlen deshalb.");
-  if (e.bilder.length === 0) grenzen.push("Es lag keine Bildanalyse vor — Bildbeweise sind nicht bewertet, es wird keine Bildlücke behauptet.");
+  /**
+   * Roh-Findings fürs Kunden-Dokument (D277). Ausgewählt wie im Tool (D273):
+   * die wichtigsten nach verifizierten Fundstellen, der Code entscheidet.
+   * `nurFremd` markiert Befunde, die es NUR bei Wettbewerbern gibt (D275) —
+   * beim Kunden ist das ein Marktsignal, kein Vorwurf an sein Produkt.
+   */
+  const findingsAus = (liste: ReviewInsightsPayload["painPoints"]) =>
+    [...liste]
+      .map((f, i) => ({ f, i }))
+      .sort((a, b) => (b.f.mentionCount ?? -1) - (a.f.mentionCount ?? -1) || a.i - b.i)
+      .slice(0, GRENZEN.findings)
+      .map(({ f }) => ({
+        label: f.label,
+        nennungen: f.mentionCount,
+        zitat: f.quotes.find((q) => q.trim())?.trim().slice(0, 180) ?? null,
+        nurFremd: Boolean(f.herkunft && f.herkunft.eigene === 0 && f.herkunft.fremde > 0),
+      }));
+
+  // Blocker als eigenes Kapitel: der Resultat-Text macht aus einer ID einen Satz,
+  // den ein Kunde ohne Matrix-Blick versteht.
+  const resultatVon = new Map(d.driver.map((drv) => [drv.id, drv.resultat]));
+  const blocker = d.blocker.slice(0, GRENZEN.blocker).map((b) => ({
+    titel: b.titel,
+    driverId: b.driverId,
+    resultat: resultatVon.get(b.driverId) ?? null,
+    art: (istBildFall(b.fall) ? "bild" : "text") as "text" | "bild",
+  }));
 
   const kennzahlen: Array<{ label: string; wert: string }> = [];
   if (e.analysis?.overall !== null && e.analysis?.overall !== undefined) {
@@ -203,6 +271,11 @@ export function baueInsightsReport(e: ReportEingabe): InsightsReportPayload {
     },
     kernThese: e.insights?.kernThese ?? null,
     kennzahlen,
+    findings: {
+      positiv: findingsAus(e.insights?.buyingTriggers ?? []),
+      negativ: findingsAus(e.insights?.painPoints ?? []),
+    },
+    usps: e.usps.map((u) => u.trim()).filter(Boolean).slice(0, GRENZEN.usps),
     matrix,
     listing: {
       overall: e.analysis?.overall ?? null,
@@ -212,18 +285,10 @@ export function baueInsightsReport(e: ReportEingabe): InsightsReportPayload {
         score: dim.measured ? dim.score : null,
         befund: dim.findings[0] ?? null,
       })),
-      bilder: e.bilder.map(({ slot, design, botschaft, klarheit }) => ({ slot, design, botschaft, klarheit })),
-      ballast: d.ballast.map((b) => ({ feature: b.feature, prominent: b.fundstelle === "prominent" })),
     },
+    blocker,
+    ballast: d.ballast.slice(0, GRENZEN.ballast).map((b) => ({ feature: b.feature, prominent: b.fundstelle === "prominent" })),
     handlungsplan: { text: textMassnahmen, bild: bildMassnahmen },
-    risiken: [
-      ...e.risikoKarten.map((k) => ({ titel: k.titel, beschreibung: k.beschreibung })),
-      ...d.produktFeedback.map((f) => ({
-        titel: f.label,
-        beschreibung: "Betrifft Produkt oder Verpackung — über den Listing-Text nicht lösbar.",
-      })),
-    ].slice(0, GRENZEN.risiken),
-    grenzen: [...new Set(grenzen)].slice(0, GRENZEN.grenzenZeilen),
   };
 }
 

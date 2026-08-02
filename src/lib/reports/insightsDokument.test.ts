@@ -42,7 +42,13 @@ const driverPayload = (over: Partial<ConversionDriverPayload> = {}): ConversionD
 const insights = {
   sources: [],
   stats: { reviewsTotal: 182, ratingAvg: 4.3 },
-  painPoints: [],
+  // Absteigend gemischt, damit der Sortier-Test wirklich etwas prüft (D277).
+  painPoints: [
+    { label: "Anleitung unklar", frequencyPct: null, mentionCount: 4, quotes: ["Die Anleitung ist kaum zu verstehen"] },
+    { label: "Tischplatte verkratzt geliefert", frequencyPct: null, mentionCount: 11, quotes: ["Kratzer schon beim Auspacken"] },
+    // Nur bei Wettbewerbern belegt (D275) — im Dokument als Marktsignal markiert.
+    { label: "Wackelt bei voller Höhe", frequencyPct: null, mentionCount: 6, quotes: [], herkunft: { eigene: 0, fremde: 6, jeAsin: { B0FREMD01: 6 } } },
+  ],
   buyingTriggers: [
     { label: "Motor angenehm leise", frequencyPct: null, mentionCount: 14, quotes: ["Absolut leise, ich höre den Motor kaum"] },
   ],
@@ -68,7 +74,7 @@ const eingabe = (over: Partial<ReportEingabe> = {}): ReportEingabe => ({
     sov: null,
     recommendations: [],
   },
-  risikoKarten: [{ titel: "Aufbau braucht Geduld", beschreibung: "Mehrere Käufer berichten von unklarer Anleitung.", relevanz: 3, quellen: [], bildIdeen: [], belegAspekte: [] }],
+  usps: ["Sitz-Steh-Wechsel ohne Werkzeug", "Tragkraft 80 kg"],
   amazonTotals: { reviewsTotal: 1343, ratingAvg: 4.3 },
   wettbewerberAsins: 3,
   bilder: [{ slot: 3, design: 4, botschaft: 2, klarheit: 3, wieBesser: "Sitz-Steh-Wechsel im echten Arbeitstag zeigen" }],
@@ -130,20 +136,72 @@ describe("Insights-Dokument — Projektion (D267)", () => {
     expect(p.listing.dimensionen.find((d) => d.label === "Titel")?.score).toBe(70);
   });
 
-  it("Grenzen werden entdoppelt und um Qualitäts-Notizen ergänzt", () => {
+  /**
+   * D277 (Nutzer-Vorgabe 02.08.2026): Grenzen der Analyse, „Erwartungen, die wir
+   * ehrlich setzen sollten" und die Noten-Tabelle der aktuellen Bilder gehoeren
+   * NICHT ins Kunden-Dokument. Intern bleibt alles erhalten — hier ist es
+   * Ballast, der von den Befunden ablenkt.
+   */
+  it("Grenzen, Erwartungs-Risiken und Bild-Noten stehen NICHT mehr im Dokument", () => {
     const p = baueInsightsReport(eingabe());
-    expect(p.grenzen.filter((g) => g.includes("aplus"))).toHaveLength(1);
-    expect(p.grenzen.join(" ")).toContain("Signifikanz-Gate");
+    expect(p).not.toHaveProperty("grenzen");
+    expect(p).not.toHaveProperty("risiken");
+    expect(p.listing).not.toHaveProperty("bilder");
   });
 
-  it("ohne Bildanalyse wird keine Bildlücke behauptet, sondern eine Grenze benannt", () => {
-    const p = baueInsightsReport(eingabe({ bilder: [] }));
-    expect(p.grenzen.join(" ")).toContain("keine Bildanalyse");
+  /**
+   * D277: Die Roh-Findings waren im Kunden-Dokument gar nicht vorhanden — nur
+   * als einzelnes Zitat in einer Matrix-Zeile. Damit fehlte dem Kunden genau die
+   * Ebene, die er selbst nachlesen kann.
+   */
+  it("Findings aus Bewertungen sind nach gut und schlecht aufgeschluesselt, mit Beleg", () => {
+    const p = baueInsightsReport(eingabe());
+    expect(p.findings.positiv.length).toBeGreaterThan(0);
+    expect(p.findings.negativ.length).toBeGreaterThan(0);
+    // Belegt heisst: Zaehlwert und, wo vorhanden, ein O-Ton.
+    for (const f of [...p.findings.positiv, ...p.findings.negativ]) {
+      expect(f.label.length).toBeGreaterThan(0);
+      expect(f).toHaveProperty("nennungen");
+      expect(f).toHaveProperty("zitat");
+    }
   });
 
-  it("Risiken bündeln Erwartungs-Karten und Produkt-Feedback", () => {
+  it("Findings sind nach verifizierten Fundstellen sortiert — das Wichtigste zuerst", () => {
     const p = baueInsightsReport(eingabe());
-    expect(p.risiken.map((r) => r.titel)).toEqual(["Aufbau braucht Geduld", "Karton eingedrückt"]);
+    const zahlen = p.findings.negativ.map((f) => f.nennungen ?? -1);
+    expect([...zahlen].sort((a, b) => b - a)).toEqual(zahlen);
+  });
+
+  /**
+   * D275 + D277: Ein Befund, den es nur bei Wettbewerbern gibt, darf im
+   * Kunden-Dokument nicht wie Kritik an SEINEM Produkt aussehen. Er bleibt drin
+   * (Marktsignal), wird aber markiert.
+   */
+  it("Findings nur aus Wettbewerbs-Bewertungen sind als solche markiert", () => {
+    const p = baueInsightsReport(eingabe());
+    const fremd = p.findings.negativ.find((f) => f.label === "Wackelt bei voller Höhe");
+    expect(fremd?.nurFremd).toBe(true);
+    const eigen = p.findings.negativ.find((f) => f.label === "Anleitung unklar");
+    expect(eigen?.nurFremd).toBe(false);
+  });
+
+  it("USPs kommen aus der Produkt-Wahrheit ins Dokument", () => {
+    const p = baueInsightsReport(eingabe());
+    expect(p.usps).toContain("Tragkraft 80 kg");
+  });
+
+  it("Blocker sind ein eigenes Kapitel und tragen den Kaufgrund im Klartext", () => {
+    const p = baueInsightsReport(eingabe());
+    expect(p.blocker.length).toBeGreaterThan(0);
+    for (const b of p.blocker) {
+      expect(b.driverId.length).toBeGreaterThan(0);
+      expect(["text", "bild"]).toContain(b.art);
+    }
+  });
+
+  it("Ballast steht beim Blocker-Kapitel, nicht mehr unter Listing", () => {
+    const p = baueInsightsReport(eingabe());
+    expect(Array.isArray(p.ballast)).toBe(true);
   });
 
   it("harte Obergrenzen greifen — das Dokument wächst nicht mit der Datenmenge", () => {

@@ -384,10 +384,50 @@ details > summary:hover {
    Dieselbe Seite ist der Ausdruck: EIN Layout für Bildschirm und Papier, damit
    beide nie auseinanderlaufen. Kein Server-PDF, kein zweiter Renderer.        */
 .dok-seite {
-  padding: 1.5rem 0;
+  padding: 1.75rem 0;
 }
 .dok-seite + .dok-seite {
   border-top: 1px solid var(--hair);
+}
+
+/* Kapitel-Kopf (D277): laufende Nummer links, Titel rechts — gibt dem Dokument
+   über alle Seiten denselben Rhythmus und macht im PDF sofort sichtbar, wo ein
+   neues Kapitel beginnt. */
+.dok-kapitelkopf {
+  display: flex;
+  align-items: baseline;
+  gap: 0.85rem;
+}
+.dok-nummer {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--primary);
+  opacity: 0.35;
+}
+
+/* Dokument-Tabelle: ruhige Linien statt Kästchen — im Druck zählt Lesbarkeit,
+   nicht Rahmen. Zellen-Padding steht hier zentral, damit es in jeder Tabelle
+   des Dokuments gleich ist. */
+.dok-tabelle th {
+  padding: 0 0.5rem 0.4rem 0;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--hair);
+}
+.dok-tabelle td {
+  padding: 0.6rem 0.5rem 0.6rem 0;
+  border-bottom: 1px solid var(--hair);
+}
+.dok-tabelle th:last-child,
+.dok-tabelle td:last-child {
+  padding-right: 0;
 }
 
 @media print {
@@ -405,20 +445,55 @@ details > summary:hover {
     color: #000 !important;
   }
   .dok-seite {
-    /* Jedes Kapitel beginnt auf einer neuen Seite und wird nicht zerrissen */
+    /* Jedes Kapitel beginnt auf einer neuen Seite.
+       KEIN `break-inside: avoid` mehr (D277, Nutzer-Befund „nicht schön
+       aufbereitet, besonders als PDF"): Ein Kapitel mit zehn Matrix-Zeilen ist
+       länger als eine A4-Seite. `avoid` zwingt den Renderer dann, den Block
+       trotzdem umzubrechen — nur eben unkontrolliert, mitten in einer Zeile und
+       teils mit abgeschnittenem Inhalt. Lange Kapitel DÜRFEN umbrechen; was
+       zusammenbleiben muss, ist unten einzeln geschützt. */
     break-before: page;
-    break-inside: avoid;
     border-top: 0 !important;
     padding: 0 !important;
   }
   .dok-seite:first-of-type {
     break-before: auto;
   }
-  /* Tabellenzeilen nie über den Seitenumbruch trennen */
+  /* Eine Überschrift allein am Seitenfuß ist der häufigste hässliche Umbruch. */
+  h1,
+  h2,
+  h3,
+  .dok-kapitelkopf {
+    break-after: avoid;
+    break-inside: avoid;
+  }
+  /* Kleine Sinneinheiten nie zerreißen: Tabellenzeilen, Listenpunkte,
+     Finding-Karten, Zitate. */
   tr,
   li,
-  blockquote {
+  blockquote,
+  .dok-finding {
     break-inside: avoid;
+  }
+  /* Kopfzeile einer umbrechenden Tabelle auf jeder Folgeseite wiederholen. */
+  thead {
+    display: table-header-group;
+  }
+  tfoot {
+    display: table-footer-group;
+  }
+  /* Keine Schusterjungen/Hurenkinder in Fließtext. */
+  p,
+  ul,
+  ol {
+    orphans: 3;
+    widows: 3;
+  }
+  /* Flächen drucken sonst je nach Browser gar nicht — Ampeln und Balken
+     verlieren dadurch ihre Aussage. */
+  .dok {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   a[href]::after {
     content: "";
