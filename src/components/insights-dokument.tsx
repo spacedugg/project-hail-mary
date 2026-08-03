@@ -6,18 +6,19 @@ import type { Ampel, InsightsReportPayload } from "@/lib/reports/insightsDokumen
  * in `globals.css` (`.dok-seite`), damit Bildschirm und Papier nie
  * auseinanderlaufen.
  *
- * Kapitelfolge (Nutzer-Vorgabe 02.08.2026) — vom Befund zur Maßnahme:
- *   1 Titelblock: Produkt, Kernthese, Kennzahlen, Datenbasis
+ * Kapitelfolge (Nutzer-Vorgabe, Stand D283):
+ *   1 Titelblock: Marke, Produkt, Kernthese, Zielgruppe/Positionierung, Datenbasis
  *   2 Was Kunden sagen — positive und negative Findings mit Beleg
  *   3 Was das Produkt auszeichnet — belegbare USPs
- *   4 Warum Kunden kaufen — die Kaufgrund-Matrix mit Abdeckungs-Ampel
- *   5 Was den Kauf heute blockiert — Blocker + Merkmale ohne Kaufgrund
- *   6 Was wir konkret ändern — Handlungsplan
+ *   4 Warum Kunden kaufen — Kaufgrund-Matrix mit Abdeckungs-Ampel
+ *   5 Was den Kauf heute blockiert — Blocker mit Kaufgrund-Bezug
  *
- * RAUS (Nutzer-Vorgabe): „Grenzen dieser Analyse“, „Erwartungen, die wir ehrlich
- * setzen sollten“ und die Noten-Tabelle der aktuellen Bilder. Alles drei ist
- * intern weiter vorhanden — im Kunden-Dokument war es Ballast, der von den
- * Befunden ablenkte.
+ * RAUS, jeweils auf Nutzer-Vorgabe: Grenzen der Analyse, Erwartungs-Risiken und
+ * Bild-Noten (D277) · Kennzahlen-Kacheln, Handlungsplan, Merkmale ohne
+ * Kaufgrund, Versionsnummer, Quellen-Fussnote und Fusszeile (D283). Ein
+ * Handlungsplan naegelt auf Massnahmen fest, die sich beim Gestalten aendern;
+ * ein Score kommt erst wieder, wenn er am Sales Room haengt. Alles bleibt intern
+ * im Analyse-Reiter sichtbar.
  *
  * Server-Komponente, kein Client-JS. Der Druck-Knopf lebt in der Kunden-Seite.
  */
@@ -100,7 +101,7 @@ function FindingListe({
   );
 }
 
-export function InsightsDokument({ p, version }: { p: InsightsReportPayload; version: number }) {
+export function InsightsDokument({ p }: { p: InsightsReportPayload }) {
   const db = p.datenbasis;
   const stand = new Date(p.kopf.stand);
   const hatFindings = p.findings.positiv.length > 0 || p.findings.negativ.length > 0;
@@ -109,12 +110,24 @@ export function InsightsDokument({ p, version }: { p: InsightsReportPayload; ver
     <article className="dok mx-auto max-w-3xl">
       {/* ── 1 · Titelblock ────────────────────────────────────────────────── */}
       <section className="dok-seite">
-        <div className="text-[11px] uppercase tracking-[0.18em] text-muted">Listing-Analyse · {p.kopf.marktplatz}</div>
+        {/* Markenkopf (D283, Nutzer): Bildmarke links, „temoa" daneben — nicht
+            „temoa OS · Listing-Insights". Der Kunde sieht die Marke, nicht den
+            Produktnamen unseres Werkzeugs. */}
+        <div className="flex items-center gap-2.5">
+          <span className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-xl bg-gradient-to-br from-[#8f6dff] to-[#5b3fd4] text-white">
+            <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden>
+              <path d="M12 2l2.2 6.1L20 10l-5.8 1.9L12 18l-2.2-6.1L4 10l5.8-1.9z" />
+            </svg>
+          </span>
+          <span className="text-lg font-semibold tracking-tight">temoa</span>
+        </div>
+
+        <div className="mt-7 text-[11px] uppercase tracking-[0.18em] text-muted">Listing-Analyse · {p.kopf.marktplatz}</div>
         <h1 className="mt-1.5 text-3xl font-semibold leading-tight">{p.kopf.produktName}</h1>
         <p className="mt-1.5 text-xs text-muted">
           {p.kopf.asin && <span className="font-mono">{p.kopf.asin}</span>}
           {p.kopf.asin && " · "}
-          Stand {stand.toLocaleDateString("de-DE")} · Version {version}
+          Stand {stand.toLocaleDateString("de-DE")}
         </p>
 
         {p.kernThese && (
@@ -123,36 +136,53 @@ export function InsightsDokument({ p, version }: { p: InsightsReportPayload; ver
           </blockquote>
         )}
 
-        {p.kennzahlen.length > 0 && (
-          <div className="mt-6 grid grid-cols-3 gap-3">
-            {p.kennzahlen.map((k, i) => (
-              <div key={i} className="rounded-xl border border-hair p-4">
-                <div className="text-2xl font-semibold tabular-nums">{k.wert}</div>
-                <div className="mt-0.5 text-[11px] leading-snug text-muted">{k.label}</div>
+        {/* Zielgruppe & Positionierung (D283): der Rahmen, in dem alles Folgende
+            gelesen wird. Ohne Quellen-Klammer — den Kunden interessiert die
+            Aussage, nicht woher wir sie haben. */}
+        {(p.zielgruppe || p.positionierung) && (
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            {p.zielgruppe && (
+              <div className="rounded-xl border-l-[3px] border-l-[var(--primary)] border border-hair p-4">
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary-strong">Zielgruppe</div>
+                <p className="mt-1.5 text-sm leading-snug">{p.zielgruppe}</p>
               </div>
-            ))}
+            )}
+            {p.positionierung && (
+              <div className="rounded-xl border-l-[3px] border-l-[var(--primary)] border border-hair p-4">
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary-strong">Positionierung</div>
+                <p className="mt-1.5 text-sm leading-snug">{p.positionierung}</p>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Datenbasis als Fußzeile des Titelblocks: Vertrauensanker, aber nicht
-            die Hauptbotschaft — deshalb klein und unten, kein eigenes Kapitel. */}
-        <div className="mt-6 border-t border-hair pt-3">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-muted">Datenbasis</div>
-          <p className="mt-1 text-[11px] leading-relaxed text-muted">
-            {db.reviewsAmazon !== null ? (
-              <>
-                {fmt(db.reviewsAmazon)} Bewertungen auf Amazon
-                {db.ratingAvg !== null && <> (Ø {db.ratingAvg.toLocaleString("de-DE", { maximumFractionDigits: 1 })} ★)</>}
-                {db.reviewsAnalysiert > 0 && <>, davon {fmt(db.reviewsAnalysiert)} im Detail ausgewertet</>}
-              </>
-            ) : (
-              <>{fmt(db.reviewsAnalysiert)} Bewertungen im Detail ausgewertet</>
-            )}
-            {db.wettbewerberAsins > 0 && <> · Bewertungen aus {db.wettbewerberAsins} Vergleichsprodukt(en)</>}
-            {db.wettbewerberListings > 0 && <> · {db.wettbewerberListings} Wettbewerber-Listing(s) im Vergleich</>}
-            {db.bilderAnalysiert > 0 && <> · {db.bilderAnalysiert} Bilder inhaltlich ausgewertet</>}
-            {db.keywordsMitVolumen > 0 && <> · {fmt(db.keywordsMitVolumen)} Suchbegriffe mit Suchvolumen</>}.
-          </p>
+        {/* Datenbasis als Kacheln statt Fussnote (D283, Nutzer: „das ist
+            vielleicht gar nicht so schlecht … stell es ein bisschen besser dar").
+            Sie beantwortet die erste Frage jedes Kunden: Worauf beruht das? */}
+        <div className="mt-6 border-t border-hair pt-4">
+          <div className="text-[10px] uppercase tracking-[0.18em] text-muted">Worauf diese Analyse beruht</div>
+          <div className="mt-2.5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              db.reviewsAmazon !== null
+                ? { wert: fmt(db.reviewsAmazon), label: "Bewertungen auf Amazon" }
+                : { wert: fmt(db.reviewsAnalysiert), label: "Bewertungen erfasst" },
+              db.ratingAvg !== null
+                ? { wert: `${db.ratingAvg.toLocaleString("de-DE", { maximumFractionDigits: 1 })} ★`, label: "Durchschnitt" }
+                : null,
+              db.reviewsAnalysiert > 0 ? { wert: fmt(db.reviewsAnalysiert), label: "im Detail ausgewertet" } : null,
+              db.wettbewerberAsins > 0 ? { wert: String(db.wettbewerberAsins), label: "Vergleichsprodukte" } : null,
+              db.bilderAnalysiert > 0 ? { wert: String(db.bilderAnalysiert), label: "Bilder ausgewertet" } : null,
+              db.keywordsMitVolumen > 0 ? { wert: fmt(db.keywordsMitVolumen), label: "Suchbegriffe" } : null,
+            ]
+              .filter((x): x is { wert: string; label: string } => x !== null)
+              .slice(0, 4)
+              .map((k, i) => (
+                <div key={i} className="rounded-xl border border-hair p-3">
+                  <div className="text-xl font-semibold tabular-nums">{k.wert}</div>
+                  <div className="mt-0.5 text-[11px] leading-snug text-muted">{k.label}</div>
+                </div>
+              ))}
+          </div>
         </div>
       </section>
 
@@ -253,11 +283,11 @@ export function InsightsDokument({ p, version }: { p: InsightsReportPayload; ver
       </Kapitel>
 
       {/* ── 5 · Blocker ───────────────────────────────────────────────────── */}
-      {(p.blocker.length > 0 || p.ballast.length > 0) && (
+      {p.blocker.length > 0 && (
         <Kapitel
           nr={5}
           titel="Was den Kauf heute blockiert"
-          unter="Kaufgründe, für die das Listing keinen Beweis liefert — und Merkmale, die Platz belegen, ohne einen Kaufgrund zu stützen."
+          unter="Kaufgründe, für die das Listing heute keinen Beweis liefert — in Text oder Bild."
         >
           {p.blocker.length > 0 && (
             <ul className="mt-4 space-y-3">
@@ -280,65 +310,9 @@ export function InsightsDokument({ p, version }: { p: InsightsReportPayload; ver
             </ul>
           )}
 
-          {p.ballast.length > 0 && (
-            <>
-              <h3 className="mt-6 text-sm font-semibold">Merkmale ohne Kaufgrund</h3>
-              <p className="mt-1 text-[11px] leading-snug text-muted">
-                Sie kosten Aufmerksamkeit an einer Stelle, an der ein Kaufgrund stehen könnte.
-              </p>
-              <ul className="mt-2 space-y-1">
-                {p.ballast.map((b, i) => (
-                  <li key={i} className="dok-finding text-sm leading-snug">
-                    · {b.feature}
-                    {b.prominent && <span className="ml-1.5 text-[11px] text-bad">an prominenter Stelle</span>}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
         </Kapitel>
       )}
 
-      {/* ── 6 · Handlungsplan ─────────────────────────────────────────────── */}
-      <Kapitel nr={6} titel="Was wir konkret ändern" unter="Jede Maßnahme verweist auf den Kaufgrund, den sie belegt — nichts steht ohne Begründung im Plan.">
-        {p.handlungsplan.text.length > 0 && (
-          <>
-            <h3 className="mt-4 text-sm font-semibold">Texte</h3>
-            <ol className="mt-2 space-y-2">
-              {p.handlungsplan.text.map((m, i) => (
-                <li key={i} className="dok-finding text-sm leading-snug">
-                  <span className="mr-1.5 font-mono text-[11px] text-primary-strong">{m.driverIds.join(", ")}</span>
-                  {m.massnahme}
-                </li>
-              ))}
-            </ol>
-          </>
-        )}
-
-        {p.handlungsplan.bild.length > 0 && (
-          <>
-            <h3 className="mt-6 text-sm font-semibold">Bilder</h3>
-            <ol className="mt-2 space-y-2">
-              {p.handlungsplan.bild.map((m, i) => (
-                <li key={i} className="dok-finding text-sm leading-snug">
-                  <span className="mr-1.5 font-mono text-[11px] text-primary-strong">{m.driverIds.join(", ")}</span>
-                  {m.slot !== null && <span className="mr-1 text-muted">Bild {m.slot}:</span>}
-                  {m.massnahme}
-                </li>
-              ))}
-            </ol>
-          </>
-        )}
-
-        {p.handlungsplan.text.length === 0 && p.handlungsplan.bild.length === 0 && (
-          <p className="mt-4 text-sm">✓ Jeder belegte Kaufgrund ist im Listing bewiesen — kein Handlungsbedarf aus dieser Analyse.</p>
-        )}
-
-        <p className="mt-8 border-t border-hair pt-3 text-[10px] leading-relaxed text-muted">
-          Alle Zahlen stammen aus den genannten Quellen. Wo eine Angabe fehlt, steht „nicht bewertbar“ — geschätzte Werte
-          enthält dieses Dokument nicht.
-        </p>
-      </Kapitel>
     </article>
   );
 }

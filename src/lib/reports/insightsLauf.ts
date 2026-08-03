@@ -25,7 +25,7 @@ export async function erzeugeInsightsReport(productId: string): Promise<LaufErge
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId) });
   if (!product) return { ok: false, grund: "Produkt nicht gefunden." };
 
-  const [driverLauf, insightRow, snapshot, scrape, versionen, kws, vorhandene] = await Promise.all([
+  const [driverLauf, insightRow, snapshot, scrape, versionen, kws, vorhandene, deepAudit] = await Promise.all([
     db.query.conversionDrivers.findFirst({
       where: eq(schema.conversionDrivers.productId, productId),
       orderBy: desc(schema.conversionDrivers.createdAt),
@@ -47,6 +47,11 @@ export async function erzeugeInsightsReport(productId: string): Promise<LaufErge
     db.query.insightsReports.findMany({
       where: eq(schema.insightsReports.productId, productId),
       orderBy: desc(schema.insightsReports.version),
+    }),
+    // D283: Zielgruppe und Positionierung fuer den Titelblock.
+    db.query.deepAudits.findFirst({
+      where: eq(schema.deepAudits.productId, productId),
+      orderBy: desc(schema.deepAudits.createdAt),
     }),
   ]);
 
@@ -104,6 +109,9 @@ export async function erzeugeInsightsReport(productId: string): Promise<LaufErge
      * Damit gibt es EINE Quelle statt zweier konkurrierender Listen.
      */
     usps: product.facts.usps ?? [],
+    // D283: Rahmen des Dokuments — aus dem Tiefen-Audit, das die beiden ableitet.
+    zielgruppe: deepAudit?.payload.derived.zielgruppe ?? null,
+    positionierung: deepAudit?.payload.derived.positionierung ?? null,
     amazonTotals: scrape?.amazonTotals
       ? { reviewsTotal: scrape.amazonTotals.reviewsTotal, ratingAvg: scrape.amazonTotals.ratingAvg }
       : snapshot

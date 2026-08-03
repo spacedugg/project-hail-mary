@@ -439,10 +439,38 @@ details > summary:hover {
     size: A4;
     margin: 16mm 14mm;
   }
+  /**
+   * DIE Ursache dafuer, dass nur EINE halb gefuellte Seite gedruckt wurde
+   * (D283, Nutzer-Befund 03.08.): Das Root-Layout haelt die App als App-Shell
+   * zusammen — `body` traegt `h-dvh overflow-hidden`, der Inhalt liegt in einem
+   * eigenen `overflow-y-auto`-Container. Am Bildschirm richtig, im Druck fatal:
+   * Der Renderer sieht einen Container mit fester Viewport-Hoehe und
+   * abgeschnittenem Ueberlauf und druckt genau diesen einen Ausschnitt.
+   *
+   * Im Druck muessen daher ALLE Hoehen- und Overflow-Fesseln fallen — auf
+   * html, body und jedem Zwischen-Container bis zum Dokument.
+   */
   html,
   body {
     background: #fff !important;
     color: #000 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+  body > * {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    flex: none !important;
+  }
+  /* Auch verschachtelte Scroll-Container zwischen Layout und Dokument. */
+  main,
+  .dok,
+  .dok * {
+    overflow: visible !important;
+    max-height: none !important;
   }
   .dok-seite {
     /* Jedes Kapitel beginnt auf einer neuen Seite.

@@ -112,27 +112,63 @@ describe("Insights-Dokument — Projektion (D267)", () => {
     expect(baueInsightsReport(eingabe({ driver: d })).matrix[0].zitat).toBeNull();
   });
 
-  it("der Handlungsplan entsteht aus den Blockern und trennt Text von Bild", () => {
+  /**
+   * D283 (Nutzer-Vorgabe 03.08.): Der Handlungsplan ist aus dem Kundendokument
+   * raus — „bitte nichts einbauen, was wir konkret aendern werden, weil sich das
+   * bei der Gestaltung eines Listings immer wieder aendern kann. Dementsprechend
+   * wollen wir uns auf nichts festnageln lassen." Ebenso die Kennzahlen-Kacheln
+   * (Listing-Score, belegte Kaufgruende, ohne Beweis), die Merkmale ohne
+   * Kaufgrund und die Versionsnummer. Intern bleibt alles sichtbar.
+   */
+  it("Handlungsplan, Kennzahlen und Ballast sind NICHT im Kundendokument", () => {
+    const p = baueInsightsReport(eingabe());
+    expect(p).not.toHaveProperty("handlungsplan");
+    expect(p).not.toHaveProperty("kennzahlen");
+    expect(p).not.toHaveProperty("ballast");
+  });
+
+  it("Blocker bleiben — sie sind der Befund, nicht die Massnahme", () => {
     const d = driverPayload();
     d.blocker = [
       { driverId: "CD1", nutzen: "x", fall: "nur_kleingedruckt", titel: "Steht nur in der Beschreibung", score: 55 },
       { driverId: "CD1", nutzen: "y", fall: "beweis_schwach", titel: "Unzureichender Bildbeweis", score: 31, bildSlot: 3, bildNote: 2 },
     ];
     const p = baueInsightsReport(eingabe({ driver: d }));
-    expect(p.handlungsplan.text.map((m) => m.massnahme)).toEqual(["Steht nur in der Beschreibung"]);
-    // Bild-Maßnahme wird mit „wie besser“ aus dem Bild-Audit angereichert
-    expect(p.handlungsplan.bild[0].massnahme).toContain("Sitz-Steh-Wechsel im echten Arbeitstag zeigen");
-    expect(p.handlungsplan.bild[0].slot).toBe(3);
+    expect(p.blocker.map((b) => b.titel)).toEqual(["Steht nur in der Beschreibung", "Unzureichender Bildbeweis"]);
+    expect(p.blocker.map((b) => b.art)).toEqual(["text", "bild"]);
   });
 
-  it("jede Maßnahme trägt ihre Kaufgrund-Referenz", () => {
+  it("Zielgruppe und Positionierung stehen im Titelblock (D283)", () => {
+    const p = baueInsightsReport(eingabe({ zielgruppe: "Homeoffice-Arbeitende", positionierung: "Preis-Leistung" }));
+    expect(p.zielgruppe).toBe("Homeoffice-Arbeitende");
+    expect(p.positionierung).toBe("Preis-Leistung");
+  });
+
+  /**
+   * D283: Nur Titel und Bullets — Beschreibung und Backend-Keywords sind nicht
+   * scrapebar, ueber sie laesst sich keine Aussage treffen.
+   */
+  it("die Listing-Bewertung zeigt nur Titel und Bullets", () => {
     const p = baueInsightsReport(eingabe());
-    for (const m of [...p.handlungsplan.text, ...p.handlungsplan.bild]) expect(m.driverIds).toEqual(["CD1"]);
+    expect(p.listing.dimensionen.map((d) => d.label)).toEqual(["Titel"]);
   });
 
   it("nicht messbare Dimensionen tragen score null, nie 0 (D70)", () => {
-    const p = baueInsightsReport(eingabe());
-    expect(p.listing.dimensionen.find((d) => d.label === "Backend-Keywords")?.score).toBeNull();
+    // Bullets sind gefuehrt, aber nicht messbar → null statt 0.
+    const p = baueInsightsReport(
+      eingabe({
+        analysis: {
+          overall: 58,
+          dimensions: [
+            { key: "title", label: "Titel", score: 70, measured: true, evidence: "deterministic", findings: [], issues: [] },
+            { key: "bullets", label: "Bullet Points", score: 0, measured: false, evidence: "deterministic", findings: [], issues: [] },
+          ],
+          sov: null,
+          recommendations: [],
+        },
+      }),
+    );
+    expect(p.listing.dimensionen.find((d) => d.label === "Bullet Points")?.score).toBeNull();
     expect(p.listing.dimensionen.find((d) => d.label === "Titel")?.score).toBe(70);
   });
 
@@ -199,18 +235,13 @@ describe("Insights-Dokument — Projektion (D267)", () => {
     }
   });
 
-  it("Ballast steht beim Blocker-Kapitel, nicht mehr unter Listing", () => {
-    const p = baueInsightsReport(eingabe());
-    expect(Array.isArray(p.ballast)).toBe(true);
-  });
-
   it("harte Obergrenzen greifen — das Dokument wächst nicht mit der Datenmenge", () => {
     const d = driverPayload();
     d.driver = Array.from({ length: 14 }, (_, i) => ({ ...d.driver[0], id: `CD${i + 1}` }));
     d.blocker = Array.from({ length: 14 }, (_, i) => ({ driverId: `CD${i + 1}`, nutzen: "x", fall: "fehlt_komplett" as const, titel: `Lücke ${i}`, score: 50 }));
     const p = baueInsightsReport(eingabe({ driver: d }));
     expect(p.matrix).toHaveLength(GRENZEN.matrix);
-    expect(p.handlungsplan.text).toHaveLength(GRENZEN.textMassnahmen);
+    expect(p.blocker).toHaveLength(GRENZEN.blocker);
   });
 });
 
@@ -239,9 +270,9 @@ describe("Auslieferungs-Gate (D267)", () => {
     expect(r.verstoesse.join(" ")).toContain("ohne Beleg-Quelle");
   });
 
-  it("eine Maßnahme ohne gültige Kaufgrund-Referenz blockt — keine zweite, unverbundene Liste", () => {
+  it("ein Blocker ohne gültige Kaufgrund-Referenz blockt — keine unverbundene zweite Liste", () => {
     const p = baueInsightsReport(eingabe());
-    p.handlungsplan.text.push({ massnahme: "Irgendwas verbessern", driverIds: ["CD99"] });
+    p.blocker.push({ titel: "Irgendein Befund", driverId: "CD99", resultat: null, art: "text", begruendung: null });
     const r = pruefeInsightsReport(p);
     expect(r.ok).toBe(false);
     expect(r.verstoesse.join(" ")).toContain("ohne gültige Kaufgrund-Referenz");

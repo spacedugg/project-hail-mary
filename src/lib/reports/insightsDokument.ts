@@ -62,7 +62,12 @@ export type InsightsReportPayload = {
     keywordsMitVolumen: number;
   };
   kernThese: string | null;
-  kennzahlen: Array<{ label: string; wert: string }>;
+  /**
+   * Zielgruppe und Positionierung (D283) — der Rahmen, in dem alles Folgende
+   * gelesen wird, deshalb direkt hinter dem Titelblock.
+   */
+  zielgruppe: string | null;
+  positionierung: string | null;
   /** Das Herzstück: jede Erkenntnis genau einmal. */
   matrix: Array<{
     id: string;
@@ -114,27 +119,27 @@ export type InsightsReportPayload = {
      */
     begruendung: string | null;
   }>;
-  ballast: Array<{ feature: string; prominent: boolean }>;
-  handlungsplan: {
-    text: Array<{ massnahme: string; driverIds: string[] }>;
-    bild: Array<{ slot: number | null; massnahme: string; driverIds: string[] }>;
-  };
 };
+
+/*
+ * NICHT (mehr) im Kundendokument — jeweils auf Nutzer-Vorgabe (D283):
+ *  · Kennzahlen-Kacheln (Listing-Score, belegte Kaufgruende, ohne Beweis):
+ *    „Diese drei Kennzahlen kannst du bitte komplett streichen." Ein Score
+ *    kommt spaeter wieder, wenn er an den Sales Room gekoppelt ist.
+ *  · Handlungsplan („Was wir konkret aendern"): „bitte nichts einbauen, was wir
+ *    konkret aendern werden … dann wollen wir uns auf nichts festnageln lassen."
+ *  · Merkmale ohne Kaufgrund: die Einordnung wird gerade ueberarbeitet (D282),
+ *    bis dahin gehoert sie nicht vor den Kunden.
+ *  · Version, „Alle Zahlen stammen aus den genannten Quellen", Fusszeile.
+ * Alles davon bleibt INTERN im Analyse-Reiter sichtbar.
+ */
 
 /**
  * Harte Obergrenzen (Nutzer-Vorgabe): das Dokument darf mit der Datenmenge nicht
  * mitwachsen. `findings` folgt dem Anzeige-Deckel aus D273 — acht je Seite sind
  * die Grenze, ab der niemand mehr weiß, was wirklich wichtig ist.
  */
-export const GRENZEN = {
-  matrix: 10,
-  textMassnahmen: 6,
-  bildMassnahmen: 5,
-  findings: 8,
-  usps: 6,
-  blocker: 8,
-  ballast: 6,
-} as const;
+export const GRENZEN = { matrix: 10, findings: 8, usps: 6, blocker: 8 } as const;
 
 const MOTIV_TEXT = {
   kern: "Kernmotiv",
@@ -170,6 +175,9 @@ export type ReportEingabe = {
   analysis: ListingAnalysis | null;
   /** Belegbare USPs aus der Produkt-Wahrheit (D277) — eigenes Kapitel im Dokument. */
   usps: string[];
+  /** Aus dem Tiefen-Audit (D283) — Rahmen des Dokuments, ohne Quellen-Klammer. */
+  zielgruppe?: string | null;
+  positionierung?: string | null;
   amazonTotals: { reviewsTotal: number | null; ratingAvg: number | null } | null;
   wettbewerberAsins: number;
   /**
@@ -215,25 +223,6 @@ export function baueInsightsReport(e: ReportEingabe): InsightsReportPayload {
   });
 
   const istBildFall = (f: string) => f === "bildbeweis_fehlt" || f === "beweis_schwach";
-  const wieBesserFuer = (slot: number | undefined) =>
-    slot === undefined ? undefined : e.bilder.find((b) => b.slot === slot)?.wieBesser?.trim() || undefined;
-
-  const textMassnahmen = d.blocker
-    .filter((b) => !istBildFall(b.fall))
-    .slice(0, GRENZEN.textMassnahmen)
-    .map((b) => ({ massnahme: b.titel, driverIds: [b.driverId] }));
-
-  const bildMassnahmen = d.blocker
-    .filter((b) => istBildFall(b.fall))
-    .slice(0, GRENZEN.bildMassnahmen)
-    .map((b) => {
-      const besser = wieBesserFuer(b.bildSlot);
-      return {
-        slot: b.bildSlot ?? null,
-        massnahme: besser ? `${b.titel} — Empfehlung: ${besser}` : b.titel,
-        driverIds: [b.driverId],
-      };
-    });
 
   /**
    * Roh-Findings fürs Kunden-Dokument (D277). Ausgewählt wie im Tool (D273):
@@ -264,13 +253,6 @@ export function baueInsightsReport(e: ReportEingabe): InsightsReportPayload {
     begruendung: b.begruendung?.trim() || null,
   }));
 
-  const kennzahlen: Array<{ label: string; wert: string }> = [];
-  if (e.analysis?.overall !== null && e.analysis?.overall !== undefined) {
-    kennzahlen.push({ label: "Listing-Score", wert: `${e.analysis.overall}/100` });
-  }
-  kennzahlen.push({ label: "Belegte Kaufgründe", wert: String(d.driver.length) });
-  kennzahlen.push({ label: "Davon ohne Beweis im Listing", wert: String(new Set(d.blocker.map((b) => b.driverId)).size) });
-
   return {
     kopf: {
       produktName: e.produktName,
@@ -288,7 +270,8 @@ export function baueInsightsReport(e: ReportEingabe): InsightsReportPayload {
       keywordsMitVolumen: e.keywordsMitVolumen,
     },
     kernThese: e.insights?.kernThese ?? null,
-    kennzahlen,
+    zielgruppe: e.zielgruppe?.trim() || null,
+    positionierung: e.positionierung?.trim() || null,
     findings: {
       positiv: findingsAus(e.insights?.buyingTriggers ?? []),
       negativ: findingsAus(e.insights?.painPoints ?? []),
@@ -297,22 +280,24 @@ export function baueInsightsReport(e: ReportEingabe): InsightsReportPayload {
     matrix,
     listing: {
       overall: e.analysis?.overall ?? null,
-      // Nicht messbare Dimensionen tragen score null — „nicht bewertbar“ statt 0 (D70).
-      dimensionen: (e.analysis?.dimensions ?? []).map((dim) => ({
-        label: dim.label,
-        score: dim.measured ? dim.score : null,
-        befund: dim.findings[0] ?? null,
-      })),
+      /**
+       * NUR Titel und Bullets (D283, Nutzer): Beschreibung und Backend-Keywords
+       * sind nicht scrapebar — ueber sie laesst sich beim Kunden keine Aussage
+       * treffen, also steht auch keine im Dokument. Nicht messbare Dimensionen
+       * tragen score null („nicht bewertbar" statt 0, D70).
+       */
+      dimensionen: (e.analysis?.dimensions ?? [])
+        .filter((dim) => dim.key === "title" || dim.key === "bullets")
+        .map((dim) => ({
+          label: dim.label,
+          score: dim.measured ? dim.score : null,
+          befund: dim.findings[0] ?? null,
+        })),
     },
     blocker,
     // D282: NUR was die Einordnung als zweckfrei erkennt. `d.ballast` traegt
     // seit D282 alle Merkmale mit Klasse — ungefiltert stuende hier die halbe
     // Merkmalsliste als angeblicher Ballast, inklusive Pflichtangaben.
-    ballast: d.ballast
-      .filter((b) => b.klasse === "ballast")
-      .slice(0, GRENZEN.ballast)
-      .map((b) => ({ feature: b.feature, prominent: b.fundstelle === "prominent" })),
-    handlungsplan: { text: textMassnahmen, bild: bildMassnahmen },
   };
 }
 
@@ -336,17 +321,22 @@ export function pruefeInsightsReport(p: InsightsReportPayload): { ok: boolean; v
 
   if (p.matrix.length === 0) verstoesse.push("Keine Kaufgründe in der Matrix — ohne sie hat das Dokument keinen Inhalt.");
   for (const z of p.matrix) {
-    if (!z.id.trim()) verstoesse.push("Matrix-Zeile ohne ID — der Handlungsplan könnte nicht darauf verweisen.");
+    if (!z.id.trim()) verstoesse.push("Matrix-Zeile ohne ID — Blocker könnten nicht darauf verweisen.");
     if (z.quellen.length === 0) verstoesse.push(`„${z.resultat}“ ohne Beleg-Quelle.`);
     if (z.relevanz < 1 || z.relevanz > 5) verstoesse.push(`„${z.resultat}“ mit unmöglicher Relevanz ${z.relevanz}.`);
   }
 
-  // Jede Maßnahme MUSS auf eine Matrix-Zeile verweisen — sonst entsteht genau die
-  // zweite, unverbundene Liste, die dieses Dokument vermeiden soll.
+  /**
+   * Der Handlungsplan ist raus (D283) — damit auch seine Prüfung. Die Bindung
+   * „nichts ohne Kaufgrund-Referenz" gilt jetzt für die BLOCKER: Sie sind die
+   * einzige Stelle, die noch auf die Matrix verweist, und ein Blocker ohne
+   * gültigen Kaufgrund wäre genau die unverbundene zweite Liste, die dieses
+   * Dokument vermeiden soll.
+   */
   const ids = new Set(p.matrix.map((z) => z.id));
-  for (const m of [...p.handlungsplan.text, ...p.handlungsplan.bild]) {
-    if (m.driverIds.length === 0 || m.driverIds.some((x) => !ids.has(x))) {
-      verstoesse.push(`Maßnahme ohne gültige Kaufgrund-Referenz: „${m.massnahme.slice(0, 60)}“.`);
+  for (const b of p.blocker) {
+    if (!ids.has(b.driverId)) {
+      verstoesse.push(`Blocker ohne gültige Kaufgrund-Referenz: „${b.titel.slice(0, 60)}“.`);
     }
   }
 

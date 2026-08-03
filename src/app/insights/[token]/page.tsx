@@ -34,16 +34,15 @@ export default async function InsightsSeite({ params }: { params: Promise<{ toke
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-8 sm:px-10">
-      <div className="kein-druck mb-6 flex flex-wrap items-center justify-between gap-3">
-        <span className="text-[11px] uppercase tracking-wide text-muted">temoa OS · Listing-Insights</span>
+      {/* D283: Kein „temoa OS · Listing-Insights" mehr — der Markenkopf steht im
+          Dokument selbst (Logo + „temoa"). Hier bleibt nur der Druck-Knopf, und
+          der ist im Ausdruck ohnehin unsichtbar. */}
+      <div className="kein-druck mb-6 flex justify-end">
         <DruckKnopf />
       </div>
 
-      <InsightsDokument p={res.payload} version={res.version} />
+      <InsightsDokument p={res.payload} />
 
-      <p className="kein-druck mt-10 text-center text-[11px] text-muted">
-        temoa OS · Dieses Dokument ist ein eingefrorener Stand. Ein neuer Analyse-Lauf erzeugt eine neue Version.
-      </p>
     </main>
   );
 }

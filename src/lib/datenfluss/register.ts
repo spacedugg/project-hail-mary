@@ -227,7 +227,10 @@ export const DATENFLUSS: Datenpunkt[] = [
       // Die Darstellung bekommt den Payload als Prop — gelesen wird er beim Laden
       // und in der öffentlichen Route. Der Test prüft das ehrlich am Vorkommen.
       { feld: "insights_reports.payload", consumer: ["src/lib/reports/insightsLauf.ts", "src/app/insights/[token]/page.tsx"] },
-      { feld: "insights_reports.version", consumer: ["src/app/insights/[token]/page.tsx", "src/app/(app)/produkte/[id]/page.tsx"] },
+      // D283: Die Versionsnummer steht NICHT mehr im Kundendokument („Version 4 ist
+      // nichts, was wir dem Kunden zeigen wollen") — sie bleibt intern als
+      // Versions-Historie im Analyse-Reiter.
+      { feld: "insights_reports.version", consumer: ["src/app/(app)/produkte/[id]/page.tsx"] },
     ],
   },
   {
