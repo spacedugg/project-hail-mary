@@ -111,8 +111,25 @@ export type ConversionBlockerNeu = {
   bildNote?: number | null;
 };
 
-/** Merkmal im Listing, das keinem Resultat zuarbeitet — belegt Fläche ohne Wirkung. */
-export type BallastFeature = { feature: string; fundstelle: AbdeckungsStufe };
+/**
+ * Ein Merkmal im Listing mit seiner Einordnung (D282).
+ *
+ * Vorher hiess dieser Typ „Ballast" und meinte „zahlt auf kein Resultat ein,
+ * belegt also Flaeche ohne Wirkung". Beides war falsch: Der Abgleich lief ueber
+ * exakte Token-Schluessel (praktisch nie ein Treffer), und die Praemisse
+ * uebersah, dass Passungs- und Mengenangaben im Listing stehen MUESSEN, auch
+ * wenn sie keinen Kaufgrund stuetzen.
+ *
+ * `klasse` ist optional, weil Alt-Laeufe sie nicht haben — ohne Klasse wird
+ * NICHTS behauptet.
+ */
+export type BallastFeature = {
+  feature: string;
+  fundstelle: AbdeckungsStufe;
+  klasse?: import("@/lib/analysis/merkmalKlasse").MerkmalKlasse;
+  /** Ein Satz aus der Einordnung — warum diese Klasse. */
+  begruendung?: string;
+};
 
 /**
  * Seller-Sache, aber nicht über den Listing-Text lösbar (Produktverpackung,

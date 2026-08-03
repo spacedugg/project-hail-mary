@@ -26,7 +26,7 @@ import { TabLeiste } from "@/components/tab-leiste";
 import { KopierFeld } from "@/components/kopier-feld";
 import { ListingKontrolle, MassnahmenBlock } from "@/components/listing-kontrolle";
 import { ZielgruppeUndPositionierung, MarktPosition } from "@/components/analyse-hintergrund";
-import { VierBlock, ReviewTrichter, BallastListe, driverEintraege, blockerEintraege, kartenEintraege } from "@/components/analyse-vier";
+import { VierBlock, ReviewTrichter, MerkmalEinordnung, driverEintraege, blockerEintraege, kartenEintraege } from "@/components/analyse-vier";
 import { analyzeListing, wirksamesListing } from "@/lib/analysis/listingAudit";
 import { snapshotBildBelege } from "@/lib/analysis/bildAuslese";
 import { dbTypFuer, geplanteVorgaenger, wirksamerPlan, SEKTIONS_LABEL } from "@/lib/content/plan";
@@ -721,7 +721,7 @@ export default async function ProductPage({
                 claim="What shoppers don’t see but care about."
                 erklaerung="Die Lücke zwischen Interesse und Listing: Themen, die für die Kaufentscheidung zählen, die Text und Bilder heute aber nicht beantworten. Jeder Eintrag nennt den Kaufgrund, an dem er hängt — das sind die größten Hebel für die Conversion."
                 eintraege={blockerEintr}
-                fussZusatz={driverLauf ? <BallastListe ballast={driverLauf.payload.ballast} /> : undefined}
+                fussZusatz={driverLauf ? <MerkmalEinordnung merkmale={driverLauf.payload.ballast} /> : undefined}
                 leerText={
                   driverLauf
                     ? "✓ Kein Blocker gefunden — jeder belegte Kaufgrund ist im Listing bewiesen."

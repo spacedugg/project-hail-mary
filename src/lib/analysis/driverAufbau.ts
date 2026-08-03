@@ -58,6 +58,12 @@ export type AufbauKontext = {
   /** Features des Listings (Feature-Ranking) — Basis der Ballast-Bestimmung. */
   featureBegriffe: string[];
   /**
+   * Einordnung der Listing-Merkmale (D282, optional): stützt einen Kaufgrund ·
+   * notwendige Angabe · ohne erkennbaren Zweck. Fehlt sie, wird keine Klasse
+   * behauptet.
+   */
+  merkmalUrteile?: import("@/lib/analysis/merkmalKlasse").MerkmalUrteil[];
+  /**
    * Verifizierte semantische Treffer (D281, optional). Sie loesen falsche
    * Luecken auf, die der reine Wortstamm-Abgleich erzeugt — „praezise
    * Sonnenausrichtung" im Listing deckt „optimale Ausrichtung zur Sonne" ab.
@@ -390,16 +396,31 @@ export function baueDriver(kandidaten: DriverKandidat[], kontext: AufbauKontext)
   }
 
   // Ballast: Merkmal im Listing, das keinem Resultat zuarbeitet.
-  const genutzteFeatures = new Set(
-    driver.flatMap((d) => d.bausteine).flatMap((b) => b.features).map(nutzenSchluessel).filter(Boolean),
-  );
+  /**
+   * Merkmal-Einordnung (D282) — ERSETZT die frühere Ballast-Differenzmenge.
+   *
+   * Vorher: alle Feature-Titel minus die Features, die in einem Driver-Baustein
+   * vorkommen, verglichen über exakte Token-Schlüssel. Der Vergleich traf
+   * praktisch nie, deshalb landeten fast alle Merkmale im „Ballast" — im
+   * Referenz-Fall sieben von neun, darunter „Erwärmt Aufstellpool mit
+   * Sonnenkraft" bei einem Kaufgrund „Poolwasser wird angenehm warm zum Baden".
+   *
+   * Jetzt trägt JEDES Merkmal seine Klasse aus der inhaltlichen Einordnung
+   * (`kontext.merkmalUrteile`). Liegt keine Einordnung vor, bleibt die Klasse
+   * offen — die Anzeige behauptet dann nichts (D145: keine Lücke behaupten, wo
+   * nicht hingesehen wurde).
+   */
+  const urteilZu = new Map((kontext.merkmalUrteile ?? []).map((u) => [u.merkmal.toLowerCase().trim(), u]));
   const ballast: BallastFeature[] = kontext.featureBegriffe
     .filter((f) => f.trim())
-    .filter((f) => {
-      const schluessel = nutzenSchluessel(f);
-      return schluessel && !genutzteFeatures.has(schluessel);
+    .map((f) => {
+      const u = urteilZu.get(f.toLowerCase().trim());
+      return {
+        feature: f,
+        fundstelle: textAbdeckung(kontext.quellen, f).stufe,
+        ...(u ? { klasse: u.klasse, begruendung: u.begruendung } : {}),
+      };
     })
-    .map((f) => ({ feature: f, fundstelle: textAbdeckung(kontext.quellen, f).stufe }))
     // Nur was im Listing wirklich steht, belegt auch Fläche.
     .filter((b) => b.fundstelle === "prominent" || b.fundstelle === "erwaehnt");
 

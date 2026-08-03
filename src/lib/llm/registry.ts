@@ -143,6 +143,9 @@ export const RECIPE_MODELS: Record<string, { provider: string; model: string }> 
   // Wortstamm-Abgleich scheitert. Liefert nur Treffer MIT wörtlichem Zitat,
   // das der Code gegen den Quelltext verifiziert.
   "listing.semantische-abdeckung": { provider: "anthropic", model: "claude-opus-4-8" },
+  // D282: Merkmal-Einordnung — trennt notwendige Spezifikation von echtem
+  // Ballast. Diese Grenze ist eine Bedeutungsfrage, kein Mengenvergleich.
+  "listing.merkmal-klasse": { provider: "anthropic", model: "claude-opus-4-8" },
   // Bild-Audit (D211): 4-Faktoren-Einschätzung bestehender Listing-Bilder (Vision)
   "listing.bild-audit": { provider: "anthropic", model: "claude-opus-4-8" },
   "listing.blocker": { provider: "anthropic", model: "claude-opus-4-8" },

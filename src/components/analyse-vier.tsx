@@ -295,32 +295,64 @@ export function kartenEintraege(karten: InsightCard[], mitSentiment = false): Vi
 }
 
 /**
- * Ballast: Merkmale im Listing, die keinem Kaufgrund zuarbeiten (D280).
+ * Merkmal-Einordnung unter den Blockern (D282) — ERSETZT die frühere
+ * „Merkmale ohne Kaufgrund"-Liste.
  *
- * Steht bewusst IM Blocker-Block statt als eigene Kachel (Nutzer-Frage: „Was
- * sagt uns die Kachel ‚Ballast im Listing'?"): Ein Merkmal, das Platz belegt,
- * ohne einen Kaufgrund zu stützen, ist dieselbe Art von Problem wie ein
- * unbewiesener Kaufgrund — es kostet Aufmerksamkeit an einer Stelle, an der ein
- * Kaufargument stehen könnte. Allein stehend sagte die Kachel niemandem, was sie
- * bedeutet.
+ * Die alte Liste behauptete, sieben von neun Merkmalen kosteten nur
+ * Aufmerksamkeit — darunter „Erwärmt Aufstellpool mit Sonnenkraft" bei einem
+ * Kaufgrund „Poolwasser wird angenehm warm zum Baden". Ursache war ein exakter
+ * Token-Vergleich UND eine falsche Prämisse: Passungs- und Mengenangaben zahlen
+ * auf keinen Kaufgrund ein, MÜSSEN aber im Listing stehen.
+ *
+ * Jetzt zählt nur noch als Befund, was die Einordnung ausdrücklich als
+ * zweckfrei erkennt. Notwendige Angaben werden neutral daneben gestellt — als
+ * Bestätigung, nicht als Mangel. Merkmale ohne Klasse (Alt-Läufe) erscheinen
+ * gar nicht: keine Einordnung, keine Behauptung.
  */
-export function BallastListe({ ballast }: { ballast: ConversionDriverPayload["ballast"] }) {
-  if (ballast.length === 0) return null;
+export function MerkmalEinordnung({ merkmale }: { merkmale: ConversionDriverPayload["ballast"] }) {
+  const ballast = merkmale.filter((m) => m.klasse === "ballast");
+  const notwendig = merkmale.filter((m) => m.klasse === "notwendige_spezifikation");
+  if (ballast.length === 0 && notwendig.length === 0) return null;
+
   return (
     <div className="mt-5 border-t border-hair pt-4">
-      <h3 className="text-sm font-semibold">Merkmale ohne Kaufgrund</h3>
-      <p className="mt-1 text-xs leading-relaxed text-muted">
-        Diese Angaben stehen im Listing, zahlen aber auf keinen der Kaufgründe oben ein. Sie kosten Aufmerksamkeit an
-        einer Stelle, an der ein Kaufargument stehen könnte — besonders, wenn sie prominent platziert sind.
-      </p>
-      <ul className="mt-2 space-y-1">
-        {ballast.map((b, i) => (
-          <li key={i} className="text-sm leading-snug">
-            · {b.feature}
-            {b.fundstelle === "prominent" && <span className="ml-1.5 text-[11px] text-bad">an prominenter Stelle</span>}
-          </li>
-        ))}
-      </ul>
+      {ballast.length > 0 ? (
+        <>
+          <h3 className="text-sm font-semibold">Angaben ohne erkennbaren Zweck</h3>
+          <p className="mt-1 text-xs leading-relaxed text-muted">
+            Diese Angaben stützen keinen Kaufgrund und sind auch keine Pflichtinformation — hier ließe sich Platz für ein
+            Kaufargument gewinnen.
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {ballast.map((m, i) => (
+              <li key={i} className="text-sm leading-snug">
+                · {m.feature}
+                {m.fundstelle === "prominent" && <span className="ml-1.5 text-[11px] text-bad">an prominenter Stelle</span>}
+                {m.begruendung && <span className="mt-0.5 block text-[11px] text-muted">{m.begruendung}</span>}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p className="text-sm">✓ Keine überflüssigen Angaben im Listing — jedes Merkmal stützt einen Kaufgrund oder ist eine notwendige Information.</p>
+      )}
+
+      {notwendig.length > 0 && (
+        <details className="mt-4">
+          <summary className="cursor-pointer text-xs text-muted hover:text-foreground">
+            Notwendige Angaben ohne Kaufgrund-Bezug ({notwendig.length}) — kein Mangel
+          </summary>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
+            Passung, Mengen, Material, Anwendungshinweise: Sie zahlen auf keinen Kaufgrund ein, müssen aber im Listing
+            stehen — ohne sie kann niemand prüfen, ob das Produkt zur eigenen Situation passt.
+          </p>
+          <ul className="mt-2 space-y-1">
+            {notwendig.map((m, i) => (
+              <li key={i} className="text-[11px] leading-snug text-muted">· {m.feature}</li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   );
 }

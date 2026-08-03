@@ -255,20 +255,43 @@ describe("Vollständiger Aufbau (D265)", () => {
     expect(p.hinweise.join(" ")).toContain("Pflicht-Driver");
   });
 
-  it("Ballast: Merkmale im Listing, die keinem Resultat zuarbeiten", () => {
+  /**
+   * D282: `ballast` traegt jetzt ALLE Listing-Merkmale mit ihrer Klasse, nicht
+   * mehr eine Differenzmenge. Der Feldname bleibt, weil gespeicherte Payloads
+   * ihn tragen — die Bedeutung steht im Typ.
+   */
+  it("alle Listing-Merkmale kommen mit — die Klasse entscheidet, nicht eine Mengendifferenz", () => {
     const p = baueDriver([kern], KONTEXT);
-    const ballast = p.ballast.map((b) => b.feature);
-    expect(ballast).toContain("Display-Sleep-Funktion");
-    expect(ballast).toContain("Kindersicherung");
+    const merkmale = p.ballast.map((b) => b.feature);
+    expect(merkmale).toContain("Display-Sleep-Funktion");
+    expect(merkmale).toContain("Kindersicherung");
   });
 
-  it("ein Merkmal, das einem Driver-Baustein zuarbeitet, ist kein Ballast", () => {
-    const mitMotoren: DriverKandidat = {
-      ...kern,
-      bausteine: [{ ...kern.bausteine[0], features: [...kern.bausteine[0].features!, "2 Motoren"] }],
-    };
-    const p = baueDriver([mitMotoren], KONTEXT);
-    expect(p.ballast.map((b) => b.feature)).not.toContain("2 Motoren");
+  it("ohne Einordnung wird KEINE Klasse behauptet — die Anzeige zeigt dann nichts", () => {
+    const p = baueDriver([kern], KONTEXT);
+    // KONTEXT traegt keine merkmalUrteile: kein Merkmal darf als Ballast gelten.
+    expect(p.ballast.every((b) => b.klasse === undefined)).toBe(true);
+    expect(p.ballast.filter((b) => b.klasse === "ballast")).toHaveLength(0);
+  });
+
+  /**
+   * Der Referenz-Fall des Nutzer-Befunds: „Erwaermt Aufstellpool mit
+   * Sonnenkraft" landete im Ballast, obwohl ein Kaufgrund „Poolwasser wird
+   * angenehm warm" existierte. Mit Einordnung traegt es die richtige Klasse.
+   */
+  it("die Einordnung entscheidet die Klasse je Merkmal (D282)", () => {
+    const p = baueDriver([kern], {
+      ...KONTEXT,
+      merkmalUrteile: [
+        { merkmal: "Display-Sleep-Funktion", klasse: "ballast", begruendung: "Kein Kaufgrund, keine Pflichtangabe." },
+        { merkmal: "Kindersicherung", klasse: "notwendige_spezifikation", begruendung: "Sicherheitsangabe." },
+      ],
+    });
+    const zu = (f: string) => p.ballast.find((b) => b.feature === f);
+    expect(zu("Display-Sleep-Funktion")?.klasse).toBe("ballast");
+    expect(zu("Kindersicherung")?.klasse).toBe("notwendige_spezifikation");
+    // Nur echter Ballast ist ein Befund — die Pflichtangabe nicht.
+    expect(p.ballast.filter((b) => b.klasse === "ballast").map((b) => b.feature)).toEqual(["Display-Sleep-Funktion"]);
   });
 
   it("ohne Bildanalyse wird keine Bildlücke behauptet", () => {

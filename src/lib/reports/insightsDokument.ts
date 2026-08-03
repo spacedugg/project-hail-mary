@@ -305,7 +305,13 @@ export function baueInsightsReport(e: ReportEingabe): InsightsReportPayload {
       })),
     },
     blocker,
-    ballast: d.ballast.slice(0, GRENZEN.ballast).map((b) => ({ feature: b.feature, prominent: b.fundstelle === "prominent" })),
+    // D282: NUR was die Einordnung als zweckfrei erkennt. `d.ballast` traegt
+    // seit D282 alle Merkmale mit Klasse — ungefiltert stuende hier die halbe
+    // Merkmalsliste als angeblicher Ballast, inklusive Pflichtangaben.
+    ballast: d.ballast
+      .filter((b) => b.klasse === "ballast")
+      .slice(0, GRENZEN.ballast)
+      .map((b) => ({ feature: b.feature, prominent: b.fundstelle === "prominent" })),
     handlungsplan: { text: textMassnahmen, bild: bildMassnahmen },
   };
 }

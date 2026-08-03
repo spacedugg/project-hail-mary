@@ -1559,7 +1559,20 @@ async function driverKern(
       product.contentSprache,
     );
 
+    /**
+     * Merkmal-Einordnung (D282): Trennt notwendige Spezifikationen von echtem
+     * Ballast — eine Bedeutungsfrage, die kein Mengenvergleich beantwortet.
+     * Laeuft NACH der Ernte, weil sie die Kaufgruende als Bezug braucht.
+     */
+    const { ordneMerkmaleEin } = await import("@/lib/analysis/merkmalKlasse");
+    const merkmalLauf = await ordneMerkmaleEin(
+      featureRanking?.payload.cards.map((c) => c.titel) ?? [],
+      ernte.kandidaten.map((k) => k.resultat),
+      product.contentSprache,
+    );
+
     const payload = baueDriver(ernte.kandidaten, {
+      merkmalUrteile: merkmalLauf?.urteile ?? [],
       semantisch: semantischLauf?.treffer ?? [],
       quellen,
       bilder: bildBelegeAusSnapshot(snapshot.bilderText),
@@ -1578,6 +1591,11 @@ async function driverKern(
     } else if (semantischLauf.treffer.length > 0) {
       payload.hinweise.push(
         `Inhaltliche Abdeckungs-Pruefung: ${semantischLauf.treffer.length} Nutzen sind sinngemaess im Listing belegt, obwohl der Wortabgleich sie nicht fand.`,
+      );
+    }
+    if (!merkmalLauf) {
+      payload.hinweise.push(
+        "Die Merkmal-Einordnung lief nicht — es wird nicht behauptet, welche Listing-Angaben ueberfluessig sind.",
       );
     }
     payload.produktFeedback = zustaendig.produktFeedback;
