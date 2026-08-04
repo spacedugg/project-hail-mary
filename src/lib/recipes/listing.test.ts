@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { generateSection, sectionPrompt, einseitigeAspekte, QmBlockFehler, SECTION_ORDER, type RecipeInputs } from "./listing";
+import { generateSection, sectionPrompt, prueferKontext, einseitigeAspekte, QmBlockFehler, SECTION_ORDER, type RecipeInputs } from "./listing";
 
 /**
  * Recipe-Pipeline im Mock-Modus (LLM_FORCE_MOCK): deterministischer Template-Pfad.
@@ -49,6 +49,114 @@ describe("listing recipes (mock)", () => {
     // Feature ohne Kunden-Echo landet im nachrangigen Block, nicht im Kern
     expect(prompt).toContain("OHNE KUNDEN-ECHO");
   });
+  /**
+   * D285 (Nutzer-Befund 04.08.2026): Die Kaufgründe waren die einzige
+   * Analyse-Stufe ohne Draht in die Generierung — Bullet 1 eröffnete deshalb mit
+   * einem Zusatz-Feature statt mit dem Haupt-Nutzen.
+   */
+  it("Kern-Kaufgründe fließen in den Bullet-Prompt und sind das Leitmotiv (D285)", () => {
+    const mitDriver: RecipeInputs = {
+      ...inputs,
+      conversionDriver: [
+        { resultat: "Getränke bleiben 24 h eiskalt", nutzen: ["doppelwandige Vakuum-Isolierung"], motiv: "kern", relevanz: 5 },
+        { resultat: "Nichts läuft in der Tasche aus", nutzen: ["Silikondichtung im Schraubdeckel"], motiv: "entscheidung", relevanz: 4 },
+      ],
+    };
+    const prompt = sectionPrompt("bullets", mitDriver);
+    expect(prompt).toContain("KERN-KAUFGRÜNDE");
+    expect(prompt).toContain("Getränke bleiben 24 h eiskalt");
+    // Der stärkste Kaufgrund wird ausdrücklich als Leitmotiv für Bullet 1 benannt
+    expect(prompt).toContain("LEITMOTIV DES LISTINGS");
+    // Und die Slot-Logik verlangt ihn im ERSTEN Bullet, nicht ein Zusatz-Feature
+    expect(prompt).toContain("BULLET 1 = HAUPT-NUTZEN");
+  });
+
+  /**
+   * D285: Ohne die Bewertungs-Analyse im Prüfer-Kontext konnte der Prüfer nicht
+   * erkennen, dass ein Bullet ein belegtes Problem dementiert.
+   */
+  it("Prüfer-Kontext enthält Pain Points und Kaufgründe (D285)", () => {
+    const kontext = prueferKontext({
+      ...inputs,
+      reviewInsights: {
+        sources: [],
+        stats: { reviewsTotal: 120, ratingAvg: 4.1 },
+        painPoints: [{ label: "Deckel undicht bei Kohlensäure", frequencyPct: null, mentionCount: 19, quotes: ["tropft"] }],
+        buyingTriggers: [{ label: "hält wirklich 24 h kalt", frequencyPct: null, mentionCount: 11, quotes: ["eiskalt"] }],
+        languageToBorrow: [],
+        languageToAvoid: [],
+      },
+      conversionDriver: [{ resultat: "Getränke bleiben 24 h eiskalt", nutzen: [], motiv: "kern", relevanz: 5 }],
+    });
+    expect(kontext).toContain("Deckel undicht bei Kohlensäure");
+    expect(kontext).toContain("19× belegt");
+    expect(kontext).toContain("Dementi");
+    expect(kontext).toContain("Getränke bleiben 24 h eiskalt");
+  });
+
+  it("Pain-Point-Ehrlichkeit und Haupt-Nutzen stehen als Gesetze im Bullet-Prompt (D285)", () => {
+    const prompt = sectionPrompt("bullets", inputs);
+    expect(prompt).toContain("[bullets.hauptnutzen]");
+    expect(prompt).toContain("[inhalt.pain-point-ehrlich]");
+    expect(prompt).toContain("NIE DEMENTIEREN");
+  });
+
+  /**
+   * D286 (Nutzer-Audit 04.08.2026): Drei Analyse-Ergebnisse hatten keine Wirkung
+   * auf den Content. Diese Tests halten die Verdrahtung fest.
+   */
+  it("Blocker tragen Kaufgrund und zu beweisenden Nutzen in den Prompt (D286)", () => {
+    const prompt = sectionPrompt("bullets", {
+      ...inputs,
+      conversionBlocker: [
+        {
+          titel: "Kein Bildbeweis für die Dichtigkeit",
+          beschreibung: "Das Listing zeigt nirgends, dass der Deckel bei Kohlensäure hält.",
+          kaufgrund: "Nichts läuft in der Tasche aus",
+          nutzen: "Silikondichtung im Schraubdeckel",
+        },
+      ],
+    });
+    expect(prompt).toContain("CONVERSION-BLOCKER");
+    expect(prompt).toContain("gehört zum Kaufgrund: Nichts läuft in der Tasche aus");
+    expect(prompt).toContain("zu beweisen: Silikondichtung im Schraubdeckel");
+  });
+
+  it("Audit-Befunde erreichen die Generierung — gefiltert auf die eigene Sektion (D286)", () => {
+    const mitBefunden: RecipeInputs = {
+      ...inputs,
+      listingBefunde: {
+        positionierung: "Die robuste Alltagsflasche für Sport und Büro",
+        dimensionen: [
+          { key: "bullets", label: "Bullet Points", score10: 4, probleme: ["Kein Bullet nennt die Isolierdauer"], empfehlung: "Isolierdauer in Bullet 1" },
+          { key: "title", label: "Titel", score10: 7, probleme: ["Zielgruppe fehlt im Titel"], empfehlung: "Zielgruppe ergänzen" },
+        ],
+        topActions: ["Isolierdauer prominent belegen"],
+      },
+    };
+    const bulletPrompt = sectionPrompt("bullets", mitBefunden);
+    expect(bulletPrompt).toContain("BEFUNDE AM BISHERIGEN BULLET POINTS");
+    expect(bulletPrompt).toContain("Kein Bullet nennt die Isolierdauer");
+    expect(bulletPrompt).toContain("EMPFEHLUNG DER ANALYSE");
+    expect(bulletPrompt).toContain("POSITIONIERUNG");
+    expect(bulletPrompt).toContain("TOP-MASSNAHMEN DER ANALYSE");
+    // Fremde Sektion bleibt draußen — sonst schreibt der Bullet-Lauf am Titel herum
+    expect(bulletPrompt).not.toContain("Zielgruppe fehlt im Titel");
+    // …und erscheint beim Titel-Lauf
+    expect(sectionPrompt("title", mitBefunden)).toContain("Zielgruppe fehlt im Titel");
+  });
+
+  it("Merkmal-Einordnung steuert, was zurückkehren darf (D286)", () => {
+    const prompt = sectionPrompt("bullets", {
+      ...inputs,
+      merkmalEinordnung: { ohneZweck: ["Top-Qualität für höchste Ansprüche"], notwendig: ["Fassungsvermögen 750 ml"] },
+    });
+    expect(prompt).toContain("OHNE ERKENNBAREN ZWECK");
+    expect(prompt).toContain("Top-Qualität für höchste Ansprüche");
+    expect(prompt).toContain("NOTWENDIGE ANGABEN");
+    expect(prompt).toContain("Fassungsvermögen 750 ml");
+  });
+
   it("alle Sektionen liefern Payloads", async () => {
     for (const section of SECTION_ORDER) {
       const res = await generateSection(section, inputs);

@@ -257,6 +257,10 @@ export const DATENFLUSS: Datenpunkt[] = [
       // D276: Bild-URLs und Vision-Auslese der Vergleichs-ASINs. Beide werden in
       // actions.ts geschrieben UND gelesen (wettbewerbsBilderKern füllt sie,
       // wettbewerbsTexteKern gibt sie in den Abgleich-Prompt).
+      // D284: `bilderText` fließt zusätzlich als MARKT-UMFELD in den Tiefen-Audit
+      // (auditKern → deepAudit.wettbewerbsKontext) und schärft dort Zielgruppe und
+      // Positionierung. Vorher endete die Auslese im Text-Abgleich — das
+      // Produktverständnis des Audits wuchs durch sie nicht mit.
       { feld: "competitor_listings.imageUrls", consumer: ["src/app/actions.ts"] },
       { feld: "competitor_listings.bilderText", consumer: ["src/app/actions.ts"] },
     ],
@@ -396,6 +400,191 @@ export const DATENFLUSS: Datenpunkt[] = [
 ];
 
 /**
+ * ═══ Wirkungs-Register: Analyse-Ergebnis → Content (D286) ═══════════════════
+ *
+ * Warum es das braucht (Nutzer-Audit 04.08.2026: „ob bei uns im Tool im Prozess
+ * alle Sachen, die bei der Analyse rauskommen, irgendeine Art Einfluss auf das
+ * Endergebnis des Contents nehmen"):
+ *
+ * Die Prüfungen oben erzwingen, dass DEKLARIERTE Felder gelesen werden. Ein
+ * Analyse-Ergebnis, das NIRGENDS deklariert ist, fällt durch — und genau so sind
+ * drei Ergebnisse ohne Wirkung geblieben, jedes unentdeckt bis zu einem
+ * Nutzer-Befund am fertigen Text:
+ *  - `conversion_drivers.driver` (die Kaufgründe) — nie in der Generierung (D285)
+ *  - `conversion_drivers.blocker` — die Generierung las die Alt-Tabelle
+ *    `conversion_blockers`, die seit D266 niemand mehr füllt: Prompt-Block leer
+ *  - `deep_audits.dimensions/topActions` — die Befunde am alten Listing kannte
+ *    der Generator nicht; er schrieb an denselben Mängeln vorbei
+ *
+ * Deshalb hier die vollständige Liste JEDES Analyse-Ergebnisses mit seiner
+ * Content-Wirkung. `art: "keine"` ist erlaubt, aber nur mit Begründung — ein
+ * Ergebnis ohne Wirkung und ohne Begründung bricht den Build (register.test.ts).
+ */
+export type ContentWirkung =
+  | {
+      /** Fließt in die Text-Generierung (Prompt) bzw. ins Gate. */
+      art: "input" | "gate";
+      /** Über welchen Weg — RecipeInputs-Feld, Gate-Kontext, Fakten-Übernahme. */
+      ueber: string;
+      /** Zeichenfolge, die in JEDEM Consumer vorkommen MUSS (Feld-/Funktionsname). */
+      marker: string;
+      consumer: string[];
+    }
+  | {
+      /** Bewusst ohne Content-Wirkung — Begründung ist Pflicht. */
+      art: "keine";
+      grund: string;
+    };
+
+export type AnalyseErgebnis = {
+  /** DB-Tabelle bzw. Payload-Zweig — so genau, dass es eindeutig ist. */
+  ergebnis: string;
+  /** Welche Analyse-Etappe es erzeugt. */
+  entsteht: string;
+  wirkung: ContentWirkung;
+};
+
+export const ANALYSE_WIRKUNG: AnalyseErgebnis[] = [
+  {
+    ergebnis: "listing_snapshots (Titel, Bullets, Beschreibung, Attribute, Preis)",
+    entsteht: "Listing-Import",
+    wirkung: { art: "input", ueber: "RecipeInputs.listingIst + facts (Produkt-Wahrheit)", marker: "listingIst", consumer: ["src/app/actions.ts", "src/lib/recipes/listing.ts"] },
+  },
+  {
+    ergebnis: "listing_snapshots.bilderText (eigene Bild-/A+-Auslese)",
+    entsteht: "Bildanalyse (Vision)",
+    wirkung: { art: "input", ueber: "RecipeInputs.bildBelege — Bild-Aussagen gelten als belegt (D230)", marker: "bildBelege", consumer: ["src/app/actions.ts", "src/lib/recipes/listing.ts"] },
+  },
+  {
+    ergebnis: "listing_snapshots.bildBefunde",
+    entsteht: "Bild-Auslese (Rest-Feld)",
+    wirkung: {
+      art: "keine",
+      grund:
+        "Seit D165 sind die Regel-Urteile der Bild-Auslese abgeschafft; das Feld wird mit einer LEEREN Liste beschrieben und trägt keinen Inhalt mehr. Es geht also keine Analyse verloren — das Feld ist ein Schema-Rest und Kandidat zum Entfernen (eigene Migration).",
+    },
+  },
+  {
+    ergebnis: "review_insights.payload (Pain Points, Kaufauslöser, Kundensprache, Kern-These, Erkenntnis-Karten)",
+    entsteht: "Roh-Analyse + Verdichtung",
+    wirkung: { art: "input", ueber: "RecipeInputs.reviewInsights — strategische Blöcke nach Herkunft × Übertragbarkeit; seit D285 auch im Prüfer-Kontext", marker: "reviewInsights", consumer: ["src/app/actions.ts", "src/lib/recipes/listing.ts"] },
+  },
+  {
+    ergebnis: "review_insights.payload.produktFeedback",
+    entsteht: "Zuständigkeits-Gate",
+    wirkung: {
+      art: "keine",
+      grund:
+        "Seller-Sache, aber nicht über den Listing-Text lösbar (Verpackung, Transportschaden). Würde es in die Prompts fließen, entstünde eine Text-Maßnahme für ein Problem, das kein Text löst (D266). Anzeige im Produkt-Feedback-Block.",
+    },
+  },
+  {
+    ergebnis: "review_scrapes (Roh-Reviews, Amazon-Gesamtzahlen)",
+    entsteht: "Review-Scrape",
+    wirkung: {
+      art: "keine",
+      grund:
+        "Rohmaterial. Es wirkt ausschließlich über die verifizierte Analyse (review_insights) — Roh-Zitate direkt in die Generierung zu geben, wäre eine Zahlen-/Spec-Quelle aus fremden Produkten und ist durch die Fakten-Sperre verboten (D114).",
+    },
+  },
+  {
+    ergebnis: "feature_rankings.payload.cards",
+    entsteht: "Feature-Ranking",
+    wirkung: { art: "input", ueber: "RecipeInputs.featureRanking — belegte Features nach Kunden-Relevanz", marker: "featureRanking", consumer: ["src/app/actions.ts", "src/lib/recipes/listing.ts"] },
+  },
+  {
+    ergebnis: "conversion_drivers.payload.driver (Kern-Kaufgründe)",
+    entsteht: "Driver-Lauf",
+    wirkung: { art: "input", ueber: "RecipeInputs.conversionDriver — Leitmotiv für Titel, Bullet 1, Beschreibungs-Einstieg (D285)", marker: "conversionDriver", consumer: ["src/app/actions.ts", "src/lib/recipes/listing.ts"] },
+  },
+  {
+    ergebnis: "conversion_drivers.payload.driver → Gate-Prüfung Bullet 1",
+    entsteht: "Driver-Lauf",
+    wirkung: { art: "gate", ueber: "Ctx.kernKaufgrund → pruefeHauptnutzen (D285)", marker: "kernKaufgrund", consumer: ["src/app/actions.ts", "src/lib/validation/gate.ts", "src/lib/recipes/listing.ts"] },
+  },
+  {
+    ergebnis: "conversion_drivers.payload.blocker (Beweislücken)",
+    entsteht: "Driver-Lauf",
+    wirkung: { art: "input", ueber: "RecipeInputs.conversionBlocker — mit Kaufgrund-Bezug und zu beweisendem Nutzen (D286)", marker: "conversionBlocker", consumer: ["src/app/actions.ts", "src/lib/recipes/listing.ts"] },
+  },
+  {
+    ergebnis: "conversion_drivers.payload.ballast (Merkmal-Einordnung D282)",
+    entsteht: "Driver-Lauf + Merkmal-Einordnung",
+    wirkung: { art: "input", ueber: "RecipeInputs.merkmalEinordnung — „ohne Zweck“ kehrt nicht zurück, Pflichtangaben bleiben (D286)", marker: "merkmalEinordnung", consumer: ["src/app/actions.ts", "src/lib/recipes/listing.ts"] },
+  },
+  {
+    ergebnis: "conversion_drivers.payload.hinweise + stats",
+    entsteht: "Driver-Lauf",
+    wirkung: {
+      art: "keine",
+      grund:
+        "Ehrlichkeits-Metadaten über die Analyse selbst (Stichprobe, Pflicht-Driver, nicht erfasste Kanäle, Gate-Ausschlüsse). Sie gehören in die Anzeige „Grenzen der Analyse“; im Text-Prompt würden sie zu Aussagen über unsere Datenlage verleiten, die im Listing nichts zu suchen haben.",
+    },
+  },
+  {
+    ergebnis: "conversion_blockers (Alt-Tabelle, D167)",
+    entsteht: "Alt-Blocker-Lauf (läuft seit D266 nicht mehr mit)",
+    wirkung: { art: "input", ueber: "RecipeInputs.conversionBlocker — nur als Rückfall für Produkte ohne Driver-Lauf (D286)", marker: "conversionBlockers", consumer: ["src/app/actions.ts"] },
+  },
+  {
+    ergebnis: "deep_audits.payload.derived (USPs, Zielgruppe, Positionierung)",
+    entsteht: "Tiefen-Audit",
+    wirkung: { art: "input", ueber: "Übernahme in LEERE Fakten-Felder (usps, targetAudience) + RecipeInputs.listingBefunde.positionierung (D286)", marker: "listingBefunde", consumer: ["src/app/actions.ts", "src/lib/recipes/listing.ts"] },
+  },
+  {
+    ergebnis: "deep_audits.payload.dimensions + topActions (Befunde am alten Listing)",
+    entsteht: "Tiefen-Audit",
+    wirkung: { art: "input", ueber: "RecipeInputs.listingBefunde — Mängel der eigenen Sektion sind der Arbeitsauftrag (D286)", marker: "listingBefunde", consumer: ["src/app/actions.ts", "src/lib/recipes/listing.ts"] },
+  },
+  {
+    ergebnis: "competitor_listings (Texte der Vergleichs-ASINs)",
+    entsteht: "Wettbewerber-Scrape",
+    wirkung: {
+      art: "keine",
+      grund:
+        "Fremde Listing-Texte sind kein Beleg für unser Produkt und dürfen nie als Quelle in die Generierung (Fakten-Sperre D114/D115). Ihre Substanz wirkt geprüft über competitor_info_gaps (übertragbar ja/unbekannt) und als Markt-Umfeld im Tiefen-Audit (D284).",
+    },
+  },
+  {
+    ergebnis: "competitor_listings.bilderText (Wettbewerber-Bildauslese)",
+    entsteht: "Wettbewerber-Bildanalyse",
+    wirkung: {
+      art: "keine",
+      grund:
+        "Wie die Texte: Claims der Konkurrenz sind kein Beleg für uns. Wirkung läuft über den Wettbewerber-Abgleich (competitor_info_gaps) und über das Markt-Umfeld des Tiefen-Audits, das Zielgruppe und Positionierung schärft (D284) — und von dort in listingBefunde.",
+    },
+  },
+  {
+    ergebnis: "competitor_info_gaps.payload.gaps",
+    entsteht: "Wettbewerber-Text-Abgleich",
+    wirkung: { art: "input", ueber: "RecipeInputs.wettbewerbsInfos — nur Urteil ja/unbekannt, formuliert mit UNSEREN Angaben (D199)", marker: "wettbewerbsInfos", consumer: ["src/app/actions.ts", "src/lib/recipes/listing.ts"] },
+  },
+  {
+    ergebnis: "keywords (Tier, Suchvolumen, Relevanz-Urteil)",
+    entsteht: "Keyword-Analyse (Cerebro-Upload oder manuell)",
+    wirkung: { art: "input", ueber: "RecipeInputs.keywords (primary/secondary/tertiary/backendPool) + Gate-Keyword-Checks", marker: "keywords", consumer: ["src/app/actions.ts", "src/lib/recipes/listing.ts", "src/lib/validation/gate.ts"] },
+  },
+  {
+    ergebnis: "report_uploads (Cerebro, SQP, Searchterm, Ads, Business)",
+    entsteht: "Bericht-Uploads",
+    wirkung: {
+      art: "keine",
+      grund:
+        "Wirken nicht als Text-Input, sondern über abgeleitete Größen: Suchvolumen und Tiering der Keywords (die in die Prompts gehen) sowie Umsatzlücken im Tiefen-Audit, dessen Befunde seit D286 in listingBefunde fließen. Roh-Berichtszeilen im Prompt wären Zahlen ohne Produkt-Beleg.",
+    },
+  },
+  {
+    ergebnis: "insights_reports (Kundendokument) + bild_briefings (Designer-Brief)",
+    entsteht: "Projektionen bestehender Analyse-Zeilen",
+    wirkung: {
+      art: "keine",
+      grund:
+        "Sie sind AUSGABEN der Analyse, keine Eingaben: das Kundendokument erklärt die Optimierung, das Bild-Briefing beauftragt Bilder. Sie in die Text-Generierung zurückzuspeisen, würde dieselbe Aussage über eine zweite Kette einschleifen und die Herkunft verwischen.",
+    },
+  },
+];
+
+/**
  * Herkunfts-Deklaration jedes Content-Inputs (compile-erzwungen vollständig):
  * Jedes Feld, das in die Text-Generierung fließt, MUSS hier einem Datenpunkt
  * zugeordnet sein — ein neues RecipeInputs-Feld ohne Herkunft bricht den Build.
@@ -420,4 +609,12 @@ export const RECIPE_INPUT_HERKUNFT: Record<keyof RecipeInputs, string> = {
   conversionBlocker: "reviews",
   wettbewerbsInfos: "wettbewerber-listings",
   featureRanking: "reviews",
+  // Kern-Kaufgründe (D285): aus dem Driver-Lauf über die Bewertungs-Analyse —
+  // seit D285 Pflicht-Input der Text-Erstellung (Leitmotiv des Listings).
+  conversionDriver: "reviews",
+  // Audit-Befunde am alten Listing (D286): Positionierung, Mängel je Sektion,
+  // Top-Maßnahmen — der Arbeitsauftrag der Neufassung.
+  listingBefunde: "listing-import",
+  // Merkmal-Einordnung (D282/D286): was nicht zurückkehren darf, was bleiben muss.
+  merkmalEinordnung: "reviews",
 };

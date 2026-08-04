@@ -3,6 +3,7 @@ import type { ConversionDriverPayload } from "@/lib/analysis/driverTypen";
 import { MOTIV_LABELS } from "@/lib/analysis/motive";
 import { kartenTendenz } from "@/lib/reviews/verdichtung";
 import { QUELL_LABEL } from "@/lib/analysis/driverTypen";
+import type { FeatureOrdnung } from "@/lib/analysis/featureAnzeige";
 
 /**
  * Die VIER Hauptaspekte des Analyse-Reiters (D278, Nutzer-Vorgabe 02.08.2026)
@@ -51,7 +52,13 @@ export type VierEintrag = {
    * dasselbe Thema zweimal da), bekommt aber ein klares Vorzeichen statt eines
    * Achselzuckens.
    */
-  sentiment?: { richtung: "positiv" | "negativ" | "ausgeglichen"; positiv: number; negativ: number };
+  sentiment?: {
+    richtung: "positiv" | "negativ" | "ausgeglichen";
+    positiv: number;
+    negativ: number;
+    /** Nur bei belastbaren Zählwerten stehen Zahlen im Badge (D284). */
+    zahlenBekannt: boolean;
+  };
 };
 
 function Eintrag({ e, rang }: { e: VierEintrag; rang: number }) {
@@ -77,15 +84,25 @@ function Eintrag({ e, rang }: { e: VierEintrag; rang: number }) {
                   ? "bg-[rgb(220_38_38/0.14)] text-bad"
                   : "bg-hair text-muted"
             }`}
-            title={`${e.sentiment.positiv} positive vs. ${e.sentiment.negativ} negative Fundstellen`}
+            title={
+              e.sentiment.zahlenBekannt
+                ? `${e.sentiment.positiv} positive vs. ${e.sentiment.negativ} negative Fundstellen`
+                : "Richtung aus den Beleg-Aspekten — für diese Karte liegen keine Zählwerte vor"
+            }
           >
             {/* D281: Klartext statt Kleinschreibung — der Nutzer will auf einen
-                Blick sehen, ob ein Insight positiv oder negativ ist. */}
+                Blick sehen, ob ein Insight positiv oder negativ ist.
+                D284: Das gilt für JEDE Karte — einseitige Karten blieben vorher
+                ohne Vorzeichen, also gerade die eindeutigen Fälle. */}
             {e.sentiment.richtung === "positiv" ? "▲ Positiv" : e.sentiment.richtung === "negativ" ? "▼ Negativ" : "= Ausgeglichen"}
-            {" "}
-            <span className="font-normal tabular-nums opacity-75">
-              {e.sentiment.positiv}+ / {e.sentiment.negativ}−
-            </span>
+            {e.sentiment.zahlenBekannt && (
+              <>
+                {" "}
+                <span className="font-normal tabular-nums opacity-75">
+                  {e.sentiment.positiv}+ / {e.sentiment.negativ}−
+                </span>
+              </>
+            )}
           </span>
         )}
         {e.notiz && <span className="flex-none text-[11px] tabular-nums text-muted">{e.notiz}</span>}
@@ -292,6 +309,62 @@ export function kartenEintraege(karten: InsightCard[], mitSentiment = false): Vi
       }),
     };
   });
+}
+
+/**
+ * Product Features → Eintrag (D284). Die Ordnung und die Klasse kommen
+ * deterministisch aus `ordneFeatures` — hier wird nur dargestellt.
+ *
+ * Die Klasse steht als Randnotiz NEBEN der Beleg-Zahl: „notwendige Angabe" ist
+ * die Antwort auf den Nutzer-Befund, dass ein Anschlussmaß auf Platz 1 stand —
+ * es bleibt sichtbar, aber es ist sichtbar EINGEORDNET.
+ */
+export function featureEintraege(ordnung: FeatureOrdnung): VierEintrag[] {
+  return ordnung.merkmale.map((f) => {
+    const anzahl = f.karte.belegAspekte.length;
+    return {
+      titel: f.karte.titel,
+      text: [f.karte.beschreibung, f.begruendung ? `Einordnung: ${f.begruendung}` : ""].filter(Boolean).join(" "),
+      relevanz: f.karte.relevanz,
+      notiz: [f.klasseLabel, anzahl ? `${anzahl} Beleg${anzahl === 1 ? "" : "e"}` : ""].filter(Boolean).join(" · ") || undefined,
+      belege: f.karte.belegAspekte.map((b) => {
+        const zahl = b.mentionCount !== null ? ` (${b.mentionCount}×)` : "";
+        // Herkunft bleibt sichtbar (D275) — ein nur bei Wettbewerbern belegtes
+        // Thema ist kein Befund am eigenen Produkt.
+        const fremd = b.herkunft && b.herkunft.eigene === 0 && b.herkunft.fremde > 0 ? " — nur bei Wettbewerbern belegt" : "";
+        return `${b.typ === "painPoint" ? "−" : "+"} ${b.label}${zahl}${fremd}`;
+      }),
+    };
+  });
+}
+
+/**
+ * Was aus der Merkmals-Liste HERAUSGENOMMEN wurde (D284): Einträge, die die
+ * Einordnung als Kaufgrund erkannt hat. Sie verschwinden nicht still (D133) —
+ * sie werden benannt, mit dem Verweis, wo sie hingehören.
+ */
+export function ErgebnisHinweis({ ordnung }: { ordnung: FeatureOrdnung }) {
+  if (ordnung.ergebnisse.length === 0) return null;
+  return (
+    <div className="mt-5 border-t border-hair pt-4">
+      <h3 className="text-sm font-semibold">
+        Nicht als Merkmal gelistet: {ordnung.ergebnisse.length} Kaufgrund-Formulierung
+        {ordnung.ergebnisse.length === 1 ? "" : "en"}
+      </h3>
+      <p className="mt-1 text-xs leading-relaxed text-muted">
+        Diese Einträge beschreiben das Ergebnis beim Kunden, nicht das Merkmal, das es erzeugt — sie gehören zu den
+        Conversion Drivers (01) und stehen deshalb hier nicht als Produkt-Merkmal.
+      </p>
+      <ul className="mt-2 space-y-1.5">
+        {ordnung.ergebnisse.map((f, i) => (
+          <li key={i} className="text-sm leading-snug">
+            · {f.karte.titel}
+            {f.begruendung && <span className="mt-0.5 block text-[11px] text-muted">{f.begruendung}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 /**

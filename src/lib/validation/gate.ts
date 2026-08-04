@@ -23,6 +23,13 @@ type Ctx = {
    * fremden Produkten stammen). Fehlt der Kontext, prüft die Regel nicht.
    */
   zahlenQuellen?: string;
+  /**
+   * Stärkster Kern-Kaufgrund (D285): Basis des Haupt-Nutzen-Checks für Bullet 1.
+   * `resultat` = das Kunden-Ergebnis, `nutzen` = die belegten Bausteine dahinter.
+   * Fehlt er (kein Driver-Lauf), prüft die Regel NICHT — ohne bekannten Kaufgrund
+   * gibt es keinen Maßstab, und geraten wird nicht (D145).
+   */
+  kernKaufgrund?: { resultat: string; nutzen: string[] } | null;
 };
 
 // ── Zahlen-Herkunfts-Check (D114) ────────────────────────────────────────────
@@ -429,6 +436,46 @@ export function pruefeBulletDopplung(bullets: string[]): ValidationIssue[] {
   return issues;
 }
 
+// ── Haupt-Nutzen im ersten Bullet (D285, Nutzer-Befund 04.08.2026) ───────────
+// Bullet 1 eröffnete mit „ERWEITERBAR FÜR JEDE POOLGRÖSSE" — einem Zusatz-
+// Feature — bei einem Produkt, dessen Kaufgrund warmes Poolwasser durch
+// Sonnenkraft ist. Deterministisch fassbar ist die HEADLINE: Sie muss das
+// Thema des stärksten Kaufgrunds treffen (Wortstamm-Abdeckung, Komposita
+// eingeschlossen). Ob der Bullet den Nutzen inhaltlich TRÄGT, beurteilt der
+// LLM-Prüfer über bullets.hauptnutzen — hier steht nur die harte Untergrenze:
+// Die Headline darf nicht von etwas ganz anderem sprechen.
+
+/** Inhaltswort-Stämme (≥4 Zeichen) eines Textes — Basis der Themen-Berührung. */
+function themenStaemme(s: string): string[] {
+  return [...inhaltsStaemme(s)].filter((t) => t.length >= 4 && !/^\d/.test(t));
+}
+
+/** Berührt der Text eines der Themen-Stämme? Komposita zählen beidseitig. */
+function beruehrtThema(text: string, staemme: string[]): boolean {
+  const eigene = themenStaemme(text);
+  return staemme.some((s) => eigene.some((e) => e === s || e.includes(s) || s.includes(e)));
+}
+
+export function pruefeHauptnutzen(
+  bullets: string[],
+  kernKaufgrund: { resultat: string; nutzen: string[] } | null | undefined,
+): ValidationIssue[] {
+  const erster = bullets[0]?.trim();
+  if (!erster || !kernKaufgrund?.resultat.trim()) return [];
+  const headline = erster.includes(":") ? erster.split(":")[0] : erster;
+  // Beleg-Raum absichtlich WEIT: Resultat + alle Nutzen-Bausteine. Eine
+  // Headline, die keinen dieser Stämme berührt, spricht über ein anderes Thema.
+  const staemme = [...new Set([kernKaufgrund.resultat, ...kernKaufgrund.nutzen].flatMap(themenStaemme))];
+  if (staemme.length === 0 || beruehrtThema(headline, staemme)) return [];
+  return [
+    issue(
+      "bullets.hauptnutzen",
+      "error",
+      `Bullet 1: Die Headline „${headline.trim().slice(0, 60)}" trifft den stärksten Kaufgrund nicht („${kernKaufgrund.resultat}"). Der erste Bullet muss den Haupt-Nutzen tragen — Zusatz-Themen (Erweiterbarkeit, Kompatibilität, Zubehör, Maße, Lieferumfang) gehören in Bullet 2–5.`,
+    ),
+  ];
+}
+
 function findBanned(text: string, list: readonly string[], rulePrefix: string): ValidationIssue[] {
   const lower = text.toLowerCase();
   return list
@@ -562,6 +609,8 @@ export function validateBullets(bullets: string[], ctx: Ctx = {}): ValidationIss
     issues.push(...pruefeKeywordEcho(b, ctx.alleKeywords ?? [], "bullets").map((x) => ({ ...x, message: `Bullet ${n}: ${x.message}` })));
   });
   issues.push(...pruefeBulletDopplung(bullets));
+  // Haupt-Nutzen im ersten Bullet (D285) — prüft nur, wenn ein Kaufgrund vorliegt.
+  issues.push(...pruefeHauptnutzen(bullets, ctx.kernKaufgrund));
 
   // USP-Einmaligkeit über alle Bullets (Cross-Content-Regel — Kern des USP-Problems)
   const usps = ctx.facts?.usps ?? [];

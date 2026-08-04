@@ -122,15 +122,23 @@ export function normalisiereFeatureKarten(
     cards.push({
       titel: titel.slice(0, 120),
       beschreibung: beschreibung.slice(0, 800),
-      relevanz: belegRelevanz(beleg.length),
+      // D284 (Nutzer-Befund 04.08.2026): Relevanz aus dem ZUSTIMMENDEN Echo,
+      // nicht aus der Menge aller Treffer. Vorher zählte jeder zugeordnete
+      // Aspekt gleich — auch Pain Points. Genau deshalb stand „Anschluss Ø 38 mm
+      // mit Lieferumfang" auf Platz 1: Das Merkmal sammelte die Beschwerden über
+      // undichte Anschlüsse ein und wurde dadurch zum angeblich wichtigsten
+      // Kaufargument. Die Rubrik heißt „Merkmale, die zur Kaufentscheidung
+      // BEITRAGEN" — Kritik gehört in Review Insights und Blocker, nicht hierher.
+      relevanz: belegRelevanz(beleg.filter((b) => b.typ === "buyingTrigger").length),
       quellen: quellTags,
       bildIdeen,
       belegAspekte: beleg,
     });
   }
 
-  const erwaehnungenVon = (c: InsightCard) => c.belegAspekte.reduce((s, b) => s + (b.mentionCount ?? 0), 0);
-  cards.sort((a, b) => b.relevanz - a.relevanz || erwaehnungenVon(b) - erwaehnungenVon(a));
+  const zustimmung = (c: InsightCard) =>
+    c.belegAspekte.filter((b) => b.typ === "buyingTrigger").reduce((s, b) => s + (b.mentionCount ?? 0), 0);
+  cards.sort((a, b) => b.relevanz - a.relevanz || zustimmung(b) - zustimmung(a));
   return { cards: cards.slice(0, 10), verworfen };
 }
 
@@ -154,8 +162,14 @@ ROH-THEMEN AUS DEN KUNDENREZENSIONEN (ausgezählt):
 ${aspektBlock || "(keine — Review-Analyse fehlt)"}
 
 AUFGABE: Extrahiere die PRODUKT-FEATURES (KEINE Mindest- oder Zielmenge, D266 — nur was wirklich im Listing steht) aus den Listing-Quelltexten (Sprache "${sprache}") und ordne jedem die passenden Kunden-Themen zu.
+
+WAS EIN FEATURE IST — UND WAS NICHT (D284, Nutzer-Befund 04.08.2026):
+Ein Feature ist eine EIGENSCHAFT des Produkts: was es IST, HAT, KANN, woraus es besteht, wie es aufgebaut ist, was mitgeliefert wird, welche Maße/Mengen/Normen es hat.
+Ein ERGEBNIS beim Kunden ist KEIN Feature. Das Ergebnis („Poolwasser wird angenehm warm", "Spürbar wärmeres Wasser durch Sonnenkraft", "spart Heizkosten", "mehr Badespaß") ist ein KAUFGRUND und wird in einer EIGENEN Rubrik ausgewertet — hier wäre es ein Duplikat und verdrängt ein echtes Merkmal.
+Faustregel: Steht im Titel ein Zustand, der beim KUNDEN eintritt (wärmer, sauberer, leiser, günstiger, angenehmer), dann ist es ein Ergebnis — benenne stattdessen das MERKMAL, das dieses Ergebnis erzeugt (also z. B. "Solar-Absorber mit schwarzer HDPE-Fläche", nicht "wärmeres Poolwasser").
+
 REGELN:
-1. titel: das Feature in Klartext (max. 8 Wörter, z. B. "Gezielte Wirkung bei Sodbrennen & Grasfressen") — nur Features, die WIRKLICH im Listing stehen.
+1. titel: das Merkmal in Klartext (max. 8 Wörter, z. B. "Wirkstoffkombination gegen Sodbrennen") — nur Merkmale, die WIRKLICH im Listing stehen, und NIE das Ergebnis beim Kunden.
 2. beschreibung: 2–3 Sätze, was das Feature ist und leistet — nur Belegtes, keine Erfindungen.
 3. belege: je Quelle, in der das Feature vorkommt, ein Objekt {"quelle": "title|bullets|description|attributes|important_info|aplus|bilder", "zitat": "WORTWÖRTLICHER Ausschnitt (3–12 Wörter) aus GENAU dieser Quelle"}. Der Ausschnitt wird programmatisch geprüft — paraphrasieren lässt den Beleg platzen.
 4. passendeAspekte: die WORTGLEICHEN Labels der Roh-Themen oben, die dieses Feature betreffen (leer lassen, wenn Kunden es nicht erwähnen — das ist ein ehrliches, wichtiges Signal).

@@ -147,19 +147,34 @@ describe("kartenTendenz — Gegensatz-Gewichtung rechnet der Code (D171)", () =>
         { label: "Hund frisst die Drops gerne", typ: "buyingTrigger", mentionCount: 8 },
       ],
     });
-    expect(t).toEqual({ positiv: 8, negativ: 19, richtung: "negativ" });
+    expect(t).toEqual({ positiv: 8, negativ: 19, richtung: "negativ", zahlenBekannt: true, beidseitig: true });
   });
 
-  it("nur eine Seite oder ohne Zählwerte → null (keine erfundene Tendenz)", () => {
-    expect(kartenTendenz({ belegAspekte: [{ label: "x", typ: "painPoint", mentionCount: 19 }] })).toBeNull();
+  it("einseitige Karte trägt die Richtung ihrer Seite (D284) — nie mehr ohne Vorzeichen", () => {
+    expect(kartenTendenz({ belegAspekte: [{ label: "x", typ: "painPoint", mentionCount: 19 }] })).toEqual({
+      positiv: 0,
+      negativ: 19,
+      richtung: "negativ",
+      zahlenBekannt: true,
+      beidseitig: false,
+    });
     expect(
-      kartenTendenz({
-        belegAspekte: [
-          { label: "x", typ: "painPoint", mentionCount: null },
-          { label: "y", typ: "buyingTrigger", mentionCount: 8 },
-        ],
-      }),
-    ).toBeNull();
+      kartenTendenz({ belegAspekte: [{ label: "y", typ: "buyingTrigger", mentionCount: 4 }] })?.richtung,
+    ).toBe("positiv");
+  });
+
+  it("beide Seiten, aber eine ohne Zählwert → keine Zahlen-Behauptung (D284)", () => {
+    const t = kartenTendenz({
+      belegAspekte: [
+        { label: "x", typ: "painPoint", mentionCount: null },
+        { label: "y", typ: "buyingTrigger", mentionCount: 8 },
+      ],
+    });
+    expect(t).toMatchObject({ richtung: "ausgeglichen", zahlenBekannt: false, beidseitig: true });
+  });
+
+  it("ohne Beleg-Aspekte gibt es keine Tendenz", () => {
+    expect(kartenTendenz({ belegAspekte: [] })).toBeNull();
   });
 
   it("Gleichstand → ausgeglichen", () => {

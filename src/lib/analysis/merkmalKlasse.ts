@@ -20,7 +20,15 @@ import { parseLlmJson } from "@/lib/llm/json";
  *    Aufmerksamkeit, das ist Kaufvoraussetzung (Nutzer: „Natürlich zahlen sie
  *    nicht auf die Conversion-Driver ein, aber sie müssen da stehen").
  *
- * Deshalb drei Klassen statt einer Differenzmenge. Die Grenze zwischen
+ * Vierte Klasse „ergebnis" (D284, Nutzer-Befund 04.08.2026): In der
+ * Merkmals-Liste landete „Spürbar wärmeres Poolwasser durch Sonnenkraft" — das
+ * ist kein Merkmal, sondern der Kaufgrund selbst („das ist das gewünschte
+ * Endergebnis, aber kein Product Feature an sich"). Ob ein Satz eine Eigenschaft
+ * oder ein Ergebnis benennt, ist wieder eine Bedeutungsfrage — also urteilt das
+ * Modell, und der Code nimmt solche Einträge aus der Merkmals-Liste heraus,
+ * statt sie nur anders zu sortieren.
+ *
+ * Deshalb vier Klassen statt einer Differenzmenge. Die Grenze zwischen
  * „notwendige Spezifikation" und „echter Ballast" ist eine BEDEUTUNGSFRAGE —
  * Code kann sie nicht ziehen, also urteilt das Modell (wie bei der semantischen
  * Abdeckung, D281). Es liefert je Merkmal Klasse und Begründung; der Code
@@ -30,14 +38,31 @@ import { parseLlmJson } from "@/lib/llm/json";
  * keine Anzeige. Eine falsche Ballast-Behauptung ist schlimmer als keine.
  */
 
-export const MERKMAL_KLASSEN = ["stuetzt_kaufgrund", "notwendige_spezifikation", "ballast"] as const;
+export const MERKMAL_KLASSEN = ["stuetzt_kaufgrund", "notwendige_spezifikation", "ballast", "ergebnis"] as const;
 export type MerkmalKlasse = (typeof MERKMAL_KLASSEN)[number];
 
 export const KLASSE_LABEL: Record<MerkmalKlasse, string> = {
   stuetzt_kaufgrund: "stützt einen Kaufgrund",
   notwendige_spezifikation: "notwendige Angabe",
   ballast: "ohne erkennbaren Zweck",
+  ergebnis: "Kaufgrund, kein Merkmal",
 };
+
+/**
+ * Anzeige-Rang der Klassen (D284) — der Code sortiert, nicht das Modell.
+ * Ohne Einordnung (Alt-Läufe, Modell-Ausfall) steht ein Merkmal in der Mitte:
+ * nach den belegten Kaufargumenten, aber vor den Pflichtangaben — eine
+ * Behauptung in die eine oder andere Richtung wäre nicht gedeckt.
+ */
+export const KLASSE_RANG: Record<MerkmalKlasse, number> = {
+  stuetzt_kaufgrund: 0,
+  notwendige_spezifikation: 2,
+  ballast: 3,
+  // Ergebnisse gehören nicht in die Merkmals-Liste — sie werden dort gar nicht
+  // gelistet, der Rang greift nur, falls doch einmal jemand sortiert.
+  ergebnis: 4,
+};
+export const KLASSE_RANG_OHNE = 1;
 
 export type MerkmalUrteil = {
   merkmal: string;
@@ -55,9 +80,11 @@ ${kaufgruende.map((k, i) => `${i + 1}. ${k}`).join("\n") || "(keine ermittelt)"}
 DIE MERKMALE IM LISTING:
 ${merkmale.map((m, i) => `${i + 1}. ${m}`).join("\n")}
 
-AUFGABE: Ordne JEDES Merkmal in GENAU EINE der drei Klassen ein.
+AUFGABE: Ordne JEDES Merkmal in GENAU EINE der vier Klassen ein.
 
-"stuetzt_kaufgrund" — das Merkmal trägt zu mindestens einem Kaufgrund oben bei, auch indirekt oder mit anderen Worten. Beispiel: „Erwärmt Aufstellpool mit Sonnenkraft" stützt „Poolwasser wird angenehm warm zum Baden".
+"ergebnis" — der Eintrag beschreibt gar kein Merkmal, sondern das ERGEBNIS beim Kunden: einen Zustand, der beim Käufer eintritt (wärmer, sauberer, leiser, günstiger, angenehmer, mehr/weniger von etwas). Das ist ein Kaufgrund und wird an anderer Stelle ausgewertet. Beispiel: „Spürbar wärmeres Poolwasser durch Sonnenkraft" ist ein Ergebnis; das Merkmal dahinter wäre „Solar-Absorber mit schwarzer HDPE-Fläche". Prüfe DIESE Klasse ZUERST — sie sticht die anderen drei.
+
+"stuetzt_kaufgrund" — das Merkmal ist eine Eigenschaft des Produkts (was es ist, hat, kann, woraus es besteht) und trägt zu mindestens einem Kaufgrund oben bei, auch indirekt oder mit anderen Worten. Beispiel: „Absorberfläche aus schwarzem HDPE" stützt „Poolwasser wird angenehm warm zum Baden".
 
 "notwendige_spezifikation" — zahlt auf keinen Kaufgrund ein, MUSS aber im Listing stehen, damit Käufer überhaupt kaufen können. Dazu gehören:
 · Passung und Kompatibilität (Anschlussmaße, Gewinde, Abmessungen, Gewicht)
@@ -73,7 +100,7 @@ WICHTIG: „ballast" ist die AUSNAHME, nicht der Normalfall. Ein technisches Dat
 Je Merkmal eine "begruendung": EIN kurzer Satz, warum diese Klasse.
 
 JSON-Schema (NUR dieses JSON):
-{"urteile":[{"merkmal":"wortgleich aus der Liste oben","klasse":"stuetzt_kaufgrund|notwendige_spezifikation|ballast","begruendung":"..."}]}`;
+{"urteile":[{"merkmal":"wortgleich aus der Liste oben","klasse":"ergebnis|stuetzt_kaufgrund|notwendige_spezifikation|ballast","begruendung":"..."}]}`;
 }
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();

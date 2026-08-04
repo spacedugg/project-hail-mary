@@ -41,6 +41,23 @@ export const WERKE_REIHENFOLGE: readonly Werk[] = [
   "wettbewerber-bilder",
 ] as const;
 
+/**
+ * Analyse-Optionen (D284, Nutzer-Befund 04.08.2026): Werke, die KEIN Deliverable
+ * sind, sondern die Tiefe des ANALYSE-Laufs bestimmen.
+ *
+ * Warum die Trennung nötig war: Die Wettbewerber-Bildanalyse stand unter
+ * „Was soll erstellt werden?" zwischen A+ Content und Brand Store — sie sah
+ * damit aus wie etwas, das erst bei der Content-Erstellung passiert („wohl die
+ * Bilder von Konkurrenten erst analysiert werden, wenn ich Content erstellen
+ * will"). Tatsächlich läuft sie als Etappe des Analyse-Laufs, VOR Verdichtung,
+ * Features und Drivern. Die Auswahl bleibt dieselbe Liste (eine Quelle), die
+ * Darstellung trennt jetzt Deliverable von Analyse-Tiefe.
+ */
+export const ANALYSE_WERKE: readonly Werk[] = ["wettbewerber-bilder"] as const;
+
+/** Die eigentlichen Liefergegenstände — alles, was kein Analyse-Schalter ist. */
+export const DELIVERABLE_WERKE: readonly Werk[] = WERKE_REIHENFOLGE.filter((w) => !ANALYSE_WERKE.includes(w));
+
 export const WERK_LABEL: Record<Werk, string> = {
   listing: "Listing-Texte",
   "bilder-briefing": "Bilder-Briefing",
@@ -63,7 +80,7 @@ export const WERK_HINWEIS: Record<Werk, string> = {
    * neun Vision-Auslesen — und deshalb eine bewusste Entscheidung verdient.
    */
   "wettbewerber-bilder":
-    "Alle Bilder der Vergleichs-ASINs per Vision auslesen — zeigt, was die Konkurrenz in Infografiken kommuniziert. Kostet je Wettbewerber bis zu neun Auslesen.",
+    "Läuft im ANALYSE-Lauf (Standard: an), nicht bei der Content-Erstellung: Alle Bilder der Vergleichs-ASINs werden per Vision ausgelesen, bevor Insights, Merkmale und Kaufgründe entstehen — Infografiken der Konkurrenz sind für Text-Scrapes unsichtbar. Abwählen spart je Wettbewerber bis zu neun Auslesen, kostet aber Analyse-Tiefe.",
 };
 
 /**

@@ -13,6 +13,12 @@ import type { ValidationIssue } from "@/db/schema";
  *  - "llm": der LLM-Prüfer beurteilt sie mit Prüfprotokoll (bestanden/verletzt + Beleg).
  * Beide Arten stehen im Prompt — der Prüfer bekommt nur die llm-Regeln,
  * Doppelprüfung deterministischer Regeln wäre verschenkte Tokens.
+ *
+ * Ausnahme mit Absicht (D285): `bullets.hauptnutzen` ist als "llm" deklariert,
+ * hat aber zusätzlich eine deterministische UNTERGRENZE im Gate
+ * (`pruefeHauptnutzen`: Berührt die Headline von Bullet 1 überhaupt das Thema des
+ * stärksten Kaufgrunds?). Der Code entscheidet, was er entscheiden kann (D184);
+ * ob der Bullet den Haupt-Nutzen wirklich TRÄGT, bleibt eine Bedeutungsfrage.
  */
 
 export type RegelSektion = "title" | "bullets" | "highlights" | "backend" | "description" | "qa" | "familie";
@@ -125,6 +131,44 @@ export const REGELN: Regel[] = [
     severity: "error",
     text:
       "Die VERSALIEN-Headline trägt einen KAUFGRUND — ideal als Benefit-Aussage („BLEIBT JAHRELANG SCHARF“); eine begründete Abweichung (Wirkstoff-Kombination, Marken-Versprechen) ist zulässig. VERLETZT ist NUR eine reine Mengen-/Spec-Angabe ohne Kaufgrund („350 G MIT 160 DROPS“, „PRO KAPSEL 610 MG“) — Zahlen/Dosierung allein sind kein Kaufgrund. Im Zweifel (Wirkstoff, Marke, Nutzen erkennbar) gilt BESTANDEN.",
+  },
+  {
+    /**
+     * D285 (Nutzer-Befund 04.08.2026, Screenshot): Bullet 1 eröffnete mit
+     * „ERWEITERBAR FÜR JEDE POOLGRÖSSE" — einem Zusatz-Feature. Der Kaufgrund
+     * (warmes Poolwasser durch Sonnenkraft, ohne Strom und Gas) kam nirgends
+     * zuerst. Ursache: Die Conversion Driver flossen nie in die Generierung
+     * (jetzt behoben), und die Slot-Logik nannte für Slot 1 nur „stärkster USP" —
+     * ein USP kann auch ein Zusatz-Feature sein.
+     *
+     * Deterministisch geprüft wird die HEADLINE (Stamm-Abdeckung gegen den
+     * stärksten Kaufgrund, gate.ts); ob der Bullet den Haupt-Nutzen wirklich
+     * TRÄGT, ist eine Bedeutungsfrage und bleibt beim Prüfer.
+     */
+    id: "bullets.hauptnutzen",
+    sektionen: ["bullets"],
+    art: "llm",
+    severity: "error",
+    text:
+      "Der ERSTE Bullet trägt den Haupt-Nutzen: Er sagt, WAS das Produkt ist und WAS es für den Kunden bewirkt (stärkster Kern-Kaufgrund), und zwar bereits in der VERSALIEN-Headline. Wer nur diesen Bullet liest, muss wissen, was er kauft und was er davon hat. VERLETZT ist ein erster Bullet, der mit einem Zusatz-Thema einsteigt — Erweiterbarkeit, Kombinierbarkeit, Kompatibilität, Zubehör, Maße, Mengen, Lieferumfang, Montage — oder der den Kaufgrund erst in einem Nebensatz nennt. Beispiel VERLETZT: „ERWEITERBAR FÜR JEDE POOLGRÖSSE …“ bei einer Solar-Poolheizung, deren Kaufgrund warmes Poolwasser durch Sonnenkraft ist. Beispiel BESTANDEN: „WARMES POOLWASSER ALLEIN DURCH SONNENKRAFT: …“.",
+  },
+  {
+    /**
+     * D285 (Nutzer-Befund 04.08.2026): Bullet 2 versprach „DICHTER ANSCHLUSS
+     * OHNE ADAPTER-SUCHE … vermeidet undichte Übergänge" — während „undichte
+     * Anschlüsse" der häufigste Pain Point der Reviews war (Nutzer: „komplett
+     * darauf abgeht, als würde es dort nie Probleme geben").
+     *
+     * Der Prüfer konnte das nicht sehen: `prueferKontext` enthielt die
+     * Bewertungs-Analyse gar nicht. Diese Regel ist deshalb nur zusammen mit
+     * dem erweiterten Prüfer-Kontext wirksam (beides in D285).
+     */
+    id: "inhalt.pain-point-ehrlich",
+    sektionen: ["bullets", "description", "qa"],
+    art: "llm",
+    severity: "error",
+    text:
+      "Ein in den Reviews belegter Pain Point darf NICHT dementiert werden. VERLETZT ist jede pauschale Entwarnung zu genau dem Thema, das die Kundenstimmen als Problem belegen („dichter Anschluss ohne Adapter-Suche“, „vermeidet undichte Übergänge“, „passt problemlos“, „kein Nachdichten nötig“, wenn undichte Anschlüsse der häufigste Pain Point sind). Zulässig und gewollt ist die ehrliche Rahmung: benennen, was das Produkt konkret dafür mitbringt (Bauteil, Maß, Material, Lieferumfang) UND welche Bedingung dafür gilt (Montage, Zubehör, Prüfen der Passung) — Erwartungsmanagement statt Dementi. Beleg für ein „verletzt“-Verdikt ist das Zitat der Entwarnung plus der Pain Point aus dem Kontext, den sie leugnet.",
   },
   {
     id: "bullets.headline-echo",

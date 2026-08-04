@@ -21,6 +21,7 @@ const base: DeepAuditInput = {
   imageCount: 5,
   bildBelege: "",
   fixeBegriffe: [],
+  wettbewerbsKontext: "",
   basics: { reviewsTotal: 1343, ratingAvg: 4.6, dist: { "5": 70, "4": 15, "3": 6, "2": 3, "1": 6 } },
   priceEur: null,
   reviewInsights: ri,

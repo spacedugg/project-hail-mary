@@ -53,7 +53,12 @@ export function InsightKarte({
             className={`flex-none text-[11px] tabular-nums ${tendenz.richtung === "positiv" ? "text-good" : tendenz.richtung === "negativ" ? "text-bad" : "text-muted"}`}
             title="Verifizierte Fundstellen: positiv vs. negativ"
           >
-            {tendenz.richtung === "ausgeglichen" ? "ausgeglichen" : `überwiegend ${tendenz.richtung}`} · {tendenz.positiv}× vs. {tendenz.negativ}×
+            {tendenz.richtung === "ausgeglichen"
+              ? "ausgeglichen"
+              : `${tendenz.beidseitig ? "überwiegend " : ""}${tendenz.richtung}`}
+            {/* D284: Zahlen nur, wenn beide vertretenen Seiten Zählwerte haben —
+                sonst stand hier „0× vs. 0×" als erfundene Bilanz. */}
+            {tendenz.zahlenBekannt ? ` · ${tendenz.positiv}× vs. ${tendenz.negativ}×` : ""}
           </span>
         )}
         <span className="flex-none text-[11px] tabular-nums text-muted">{beleg.text}</span>

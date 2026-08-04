@@ -1,7 +1,7 @@
 import { saveContentPlan } from "@/app/actions";
 import { SubmitButton } from "@/components/submit-button";
 import { SEKTIONS_REIHENFOLGE, SEKTIONS_LABEL, wirksamerPlan } from "@/lib/content/plan";
-import { WERKE_REIHENFOLGE, WERK_LABEL, WERK_HINWEIS, wirksameWerke, type Werk } from "@/lib/content/werke";
+import { ANALYSE_WERKE, DELIVERABLE_WERKE, WERK_LABEL, WERK_HINWEIS, wirksameWerke, type Werk } from "@/lib/content/werke";
 import type { ListingSection } from "@/lib/recipes/listing";
 
 /**
@@ -38,10 +38,12 @@ export function WerkAuswahl({
       <p className="text-xs font-semibold">{ueberschrift}</p>
       <p className="mt-0.5 text-[11px] text-muted">
         Nur Angehaktes wird erzeugt — auswählen, speichern, dann erzeugen.
-        {werkePlan == null ? " Noch nicht festgelegt: aktuell nur Listing-Texte." : ""}
+        {/* D284: Der Standard umfasst seit D281 auch die Wettbewerber-Bildanalyse —
+            „aktuell nur Listing-Texte" war seitdem falsch. */}
+        {werkePlan == null ? " Noch nicht festgelegt: aktuell Listing-Texte, plus Wettbewerber-Bilder in der Analyse." : ""}
       </p>
       <div className="mt-2 space-y-2">
-        {WERKE_REIHENFOLGE.map((w) => (
+        {DELIVERABLE_WERKE.map((w) => (
           <div key={w}>
             <label className="flex items-baseline gap-1.5 text-xs">
               <input type="checkbox" name="werke" value={w} defaultChecked={werkeAktiv.includes(w)} />
@@ -60,6 +62,24 @@ export function WerkAuswahl({
             )}
           </div>
         ))}
+      </div>
+
+      {/* Analyse-Tiefe getrennt von den Deliverables (D284): Diese Haken erzeugen
+          nichts, sie bestimmen, wie tief der ANALYSE-Lauf gräbt. In derselben
+          Liste zu stehen ließ sie wie Content-Bausteine aussehen. */}
+      <div className="mt-4 border-t border-hair pt-3">
+        <p className="text-xs font-semibold">Analyse-Tiefe — läuft im Analyse-Lauf, nicht bei der Content-Erstellung</p>
+        <div className="mt-2 space-y-2">
+          {ANALYSE_WERKE.map((w) => (
+            <div key={w}>
+              <label className="flex items-baseline gap-1.5 text-xs">
+                <input type="checkbox" name="werke" value={w} defaultChecked={werkeAktiv.includes(w)} />
+                <span className="font-medium">{WERK_LABEL[w]}</span>
+              </label>
+              <p className="ml-5 text-[11px] text-muted">{WERK_HINWEIS[w]}</p>
+            </div>
+          ))}
+        </div>
       </div>
       <SubmitButton className="btn-dark mt-2 text-xs">Auswahl speichern</SubmitButton>
     </form>

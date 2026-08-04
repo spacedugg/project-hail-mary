@@ -26,7 +26,8 @@ import { TabLeiste } from "@/components/tab-leiste";
 import { KopierFeld } from "@/components/kopier-feld";
 import { ListingKontrolle, MassnahmenBlock } from "@/components/listing-kontrolle";
 import { ZielgruppeUndPositionierung, MarktPosition } from "@/components/analyse-hintergrund";
-import { VierBlock, ReviewTrichter, MerkmalEinordnung, driverEintraege, blockerEintraege, kartenEintraege } from "@/components/analyse-vier";
+import { VierBlock, ReviewTrichter, MerkmalEinordnung, ErgebnisHinweis, driverEintraege, blockerEintraege, kartenEintraege, featureEintraege } from "@/components/analyse-vier";
+import { ordneFeatures } from "@/lib/analysis/featureAnzeige";
 import { analyzeListing, wirksamesListing } from "@/lib/analysis/listingAudit";
 import { snapshotBildBelege } from "@/lib/analysis/bildAuslese";
 import { dbTypFuer, geplanteVorgaenger, wirksamerPlan, SEKTIONS_LABEL } from "@/lib/content/plan";
@@ -677,6 +678,17 @@ export default async function ProductPage({
           const blockerEintr = driverLauf
             ? blockerEintraege(driverLauf.payload)
             : kartenEintraege(blockerLauf?.payload.cards ?? []);
+          /**
+           * Merkmals-Ordnung (D284): Das Feature-Ranking liefert die Karten, die
+           * Merkmal-Einordnung des Driver-Laufs (D282) urteilt über genau diese
+           * Titel. Erst beide zusammen ergeben eine sinnvolle Reihenfolge —
+           * Kaufargumente vor Pflichtangaben — und nehmen Kaufgrund-Formulierungen
+           * („Spürbar wärmeres Poolwasser") aus der Merkmals-Liste heraus.
+           */
+          const featureOrdnung = ordneFeatures(
+            featureRanking?.payload.cards ?? [],
+            driverLauf?.payload.ballast ?? null,
+          );
           return (
             <div className="space-y-4">
               <VierBlock
@@ -709,8 +721,9 @@ export default async function ProductPage({
                 kuerzel="Product Features"
                 titel="Merkmale, die zur Kaufentscheidung beitragen"
                 claim="Features that drive purchase decisions."
-                erklaerung="Nüchtern aufgezählt, was das Produkt mitbringt — nach Kunden-Relevanz sortiert. Hier steht bewusst keine Zufriedenheits-Bewertung: Ein Merkmal ist ein Merkmal, wie es ankommt, steht in den Review Insights."
-                eintraege={kartenEintraege(featureRanking?.payload.cards ?? [])}
+                erklaerung="Nüchtern aufgezählt, was das Produkt mitbringt: Eigenschaften — was es ist, hat, kann. Oben stehen die Merkmale, die einen Kaufgrund tragen, darunter die notwendigen Angaben (Maße, Mengen, Kompatibilität), die kein Kaufargument sind, aber im Listing stehen müssen. Die Punkte zeigen, wie stark Kunden ein Merkmal BESTÄTIGEN; Kritik daran steht in den Review Insights, nicht hier."
+                eintraege={featureEintraege(featureOrdnung)}
+                fussZusatz={<ErgebnisHinweis ordnung={featureOrdnung} />}
                 leerText="Noch keine Features gerankt — läuft als Etappe des Analyse-Laufs."
               />
 

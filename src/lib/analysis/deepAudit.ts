@@ -40,6 +40,23 @@ export type DeepAuditInput = {
    * gab damit eine Empfehlung, die nie umsetzbar wäre.
    */
   fixeBegriffe: string[];
+  /**
+   * Markt-Umfeld aus den Vergleichs-ASINs (D284, Nutzer-Vorgabe 04.08.2026):
+   * Titel/Bullets der Wettbewerber UND der ausgelesene Text ihrer Bilder
+   * („damit das Produktverständnis wächst und die Analysedaten besser werden").
+   *
+   * Die Wettbewerber-Bildauslese lief bisher im Analyse-Lauf mit, ihr Ergebnis
+   * landete aber NUR im Wettbewerber-Text-Abgleich — Zielgruppe, Positionierung
+   * und USPs entstanden ohne jede Kenntnis davon, was die Konkurrenz auf ihren
+   * Infografiken behauptet.
+   *
+   * STRIKTE Grenze (D114/D115): Das ist Kontext für Positionierung und
+   * Abgrenzung, NIE ein Beleg für unser Produkt. Kein Wettbewerber-Inhalt darf
+   * als USP oder als vorhandener Listing-Inhalt gewertet werden — deshalb geht
+   * dieser Text auch NICHT in die Beleg-Räume des Wahrheits-Filters ein.
+   * Leer = keine Wettbewerber erfasst.
+   */
+  wettbewerbsKontext: string;
   basics: { reviewsTotal: number | null; ratingAvg: number | null; dist: Record<string, number> | null } | null;
   priceEur: number | null;
   reviewInsights: ReviewInsightsPayload;
@@ -117,6 +134,14 @@ Kaufauslöser:
 ${trigs || "(keine)"}
 Kundensprache: ${ri.languageToBorrow.slice(0, 8).map((w) => `„${w}"`).join(", ") || "—"}
 
+${
+  input.wettbewerbsKontext
+    ? `MARKT-UMFELD (Vergleichs-ASINs: Listing-Texte und ausgelesene BILD-Inhalte der Konkurrenz):
+${input.wettbewerbsKontext.slice(0, 4000)}
+ACHTUNG — Verwendung streng begrenzt: Dieser Block dient AUSSCHLIESSLICH dem Marktbild (Zielgruppe, Positionierung, Abgrenzung: was kommuniziert die Kategorie, wo unterscheidet sich unser Produkt). Er ist KEIN Beleg für unser Produkt: Nichts daraus darf als unser USP, als unsere Eigenschaft oder als vorhandener Inhalt UNSERES Listings gewertet werden.`
+    : "MARKT-UMFELD: (keine Vergleichs-ASINs erfasst — Positionierung nur aus eigenen Daten, keine Marktaussagen behaupten)"
+}
+
 ${input.primaryKeywords.length ? `PRIMÄR-KEYWORDS: ${input.primaryKeywords.slice(0, 15).join(", ")}` : ""}
 ${input.topGaps.length ? `TOP-UMSATZLÜCKEN (SOV): ${input.topGaps.slice(0, 5).map((g) => `„${g.keyword}" (SV ${g.sv}, ~${Math.round(g.fullRevGap)} €/Mo)`).join("; ")}` : ""}
 
@@ -129,7 +154,7 @@ ${input.fixeBegriffe.length ? `- FESTE EIGENNAMEN (D253): ${input.fixeBegriffe.m
 - SPRACHE: Behaupte „Text ist nicht auf Deutsch" nur, wenn der Text tatsächlich überwiegend fremdsprachig ist.
 
 AUFGABE:
-1. LEITE aus Listing + Kundenstimmen her (nicht erfinden): 3–6 USPs (belegbare Produkteigenschaften aus Listing/Daten — NICHT bloß umformulierte Kaufauslöser, die existieren separat als eigene Liste), Zielgruppe (wer kauft wirklich, laut Reviews), Positionierung (1 Satz: wofür steht das Produkt im Markt).
+1. LEITE aus Listing + Kundenstimmen her (nicht erfinden): 3–6 USPs (belegbare Produkteigenschaften aus Listing/Daten UNSERES Produkts — NICHT bloß umformulierte Kaufauslöser, die existieren separat als eigene Liste, und NIE etwas aus dem Markt-Umfeld), Zielgruppe (wer kauft wirklich, laut Reviews), Positionierung (1 Satz: wofür steht das Produkt im Markt — hier darf das Markt-Umfeld die Abgrenzung schärfen).
 2. Bewerte NUR diese Dimensionen: ${dimList}. Je Dimension: score10 (0–10, ehrlich), aktuell (2–3 Sätze Ist-Stand), probleme (2–4 konkrete Punkte, mit Bezug auf Keywords/Pain Points wo passend), empfehlung (1–2 Sätze, umsetzbar).
    Für die Bewertungs-Basis gilt: Benenne Sterne-Klassen IMMER explizit (negativ = 1–2 ★, neutral = 3 ★, positiv = 4–5 ★) und nutze ausschließlich die gelieferte Verteilung — keine Prozentwerte erfinden oder zusammenfassen, ohne zu sagen, welche Klassen gemeint sind.
 3. topActions: die 3–5 wichtigsten Maßnahmen über alle Dimensionen, priorisiert nach Hebel.

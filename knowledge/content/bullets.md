@@ -18,13 +18,17 @@
 
 Default-Slots (temoa-os), jeder beantwortet eine RUFUS-Frage (marketplaceadpros) und wird **datengetrieben umsortiert**:
 
-1. **HOOK** — stärkster USP + Hauptnutzen („Was ist anders?")
+1. **HAUPT-NUTZEN** — der stärkste **Kern-Kaufgrund** (Conversion Driver #1): WAS das Produkt ist und WAS es für den Kunden bewirkt, bereits in der Headline („Was bringt mir das?")
 2. **PROBLEM → BENEFIT** — der **häufigste Pain Point aus den Review-Insights**, direkt adressiert („Ist das richtig für mich?")
 3. **TRUST** — Material / Norm / Zertifikat / Herkunft, mit Beleg
 4. **USAGE** — Anwendung, Kompatibilität, Pflege („Wie benutze ich es?")
 5. **CLOSE** — Lieferumfang, Erwartungsmanagement, Varianten-Hinweis
 
 **Umsortier-Regel (Blog 25):** Die drängendste Käuferfrage rückt nach vorn. Wenn `review-insights.pain_points[0].frequency_pct` hoch ist (z. B. „ist sie dicht?"), wird PROBLEM→BENEFIT Slot 1 oder fließt in den HOOK („garantiert auslaufsicher" prominent). Die Slot-Logik ist Default, nicht Dogma — **die Reihenfolge kommt aus den Daten, nicht aus dem Bauchgefühl.**
+
+**Bullet 1 ist der Haupt-Nutzen, nicht das interessanteste Detail (D285, Nutzer-Befund 04.08.2026).** Am Referenz-Fall (Solar-Poolheizung) eröffnete Bullet 1 mit „ERWEITERBAR FÜR JEDE POOLGRÖSSE" — einem Zusatz-Feature. Der Kaufgrund (warmes Poolwasser durch Sonnenkraft, ohne Strom und Gas) stand nirgends zuerst. Der Titel erklärt den Nutzen NICHT (er nennt Bezeichnung und Attribute), also ist Bullet 1 die erste und einzige Stelle, an der ein Käufer erfährt, was er kauft. Verboten als Bullet 1: Erweiterbarkeit, Kombinierbarkeit, Kompatibilität, Zubehör, Maße, Mengen, Lieferumfang, Montage — sie gehören in Bullet 2–5. Maschinenwirksam: Regel `bullets.hauptnutzen` (Register), deterministische Headline-Prüfung gegen Conversion Driver #1 (`pruefeHauptnutzen`, gate.ts).
+
+**Belegte Probleme werden gerahmt, nie dementiert (D285).** Dasselbe Listing versprach „DICHTER ANSCHLUSS OHNE ADAPTER-SUCHE … vermeidet undichte Übergänge", während undichte Anschlüsse der häufigste Pain Point der Reviews waren. Eine pauschale Entwarnung zu genau dem Thema, das die Bewertungen als Problem belegen, verbrennt Vertrauen bei jedem Käufer, der die Reviews gelesen hat. Richtig: die belegte Eigenschaft nennen (Bauteil, Maß, Material, Lieferumfang) UND die Bedingung, unter der sie trägt (Montage, Zubehör, Passung prüfen). Maschinenwirksam: Regel `inhalt.pain-point-ehrlich` (Register) — geprüft vom LLM-Prüfer, der dafür seit D285 die Pain Points mit Zählwerten im Kontext hat.
 
 Weitere Recipe-Regeln:
 - **Benefit vor Feature** — Feature ist der Beleg, Nutzen die Aussage (Blog, sales-room-Presets: „Feature-first statt Benefit-first" ist Top-Issue).

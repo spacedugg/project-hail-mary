@@ -848,14 +848,102 @@ async function generiereSektionKern(
     bildBelege,
     zusatzKontext: product.zusatzKontext,
     sprache: product.contentSprache,
-    // Conversion-Blocker in die Content-Prompts (D194, Nutzer 23.07.):
-    // unbeantwortete Kunden-Themen sind Pflicht-Input der Text-Erstellung.
+    /**
+     * Conversion-Blocker in die Content-Prompts (D194) — QUELLE KORRIGIERT (D286).
+     *
+     * Hier stand ausschließlich die Alt-Tabelle `conversion_blockers`. Die füllt
+     * seit D266 NIEMAND mehr: Die Blocker-Etappe läuft nicht mehr mit, die
+     * Blocker entstehen im Driver-Lauf (`conversion_drivers.payload.blocker`).
+     * Für jedes seither analysierte Produkt war dieser Prompt-Block also LEER —
+     * der Prompt behauptete „die neuen Texte MÜSSEN sie adressieren", und es kam
+     * nichts an. Jetzt gilt der Driver-Lauf, die Alt-Tabelle nur noch als
+     * Rückfall für Produkte, die nie einen Driver-Lauf hatten.
+     */
     conversionBlocker: await (async () => {
-      const blocker = await db.query.conversionBlockers.findFirst({
+      const lauf = await db.query.conversionDrivers.findFirst({
+        where: eq(schema.conversionDrivers.productId, productId),
+        orderBy: desc(schema.conversionDrivers.createdAt),
+      });
+      if (lauf?.payload.blocker.length) {
+        const resultatVon = new Map(lauf.payload.driver.map((d) => [d.id, d.resultat]));
+        return [...lauf.payload.blocker]
+          .sort((a, b) => b.score - a.score)
+          .map((b) => ({
+            titel: b.titel,
+            beschreibung: [b.begruendung?.trim(), b.praezisierung?.trim() ? `Aus Kundenstimmen: ${b.praezisierung.trim()}` : ""]
+              .filter(Boolean)
+              .join(" "),
+            kaufgrund: resultatVon.get(b.driverId),
+            nutzen: b.nutzen,
+          }));
+      }
+      const alt = await db.query.conversionBlockers.findFirst({
         where: eq(schema.conversionBlockers.productId, productId),
         orderBy: desc(schema.conversionBlockers.createdAt),
       });
-      return blocker?.payload.cards.map((c) => ({ titel: c.titel, beschreibung: c.beschreibung })) ?? null;
+      return alt?.payload.cards.map((c) => ({ titel: c.titel, beschreibung: c.beschreibung })) ?? null;
+    })(),
+    /**
+     * Audit-Befunde am bisherigen Listing (D286): Positionierung, die Mängel je
+     * Sektion und die Top-Maßnahmen. Der Tiefen-Audit war bis hier reine
+     * Anzeige- und Kundendokument-Ware — die Generierung kannte seine Befunde
+     * nicht und schrieb an denselben Mängeln vorbei.
+     */
+    listingBefunde: await (async () => {
+      const audit = await db.query.deepAudits.findFirst({
+        where: eq(schema.deepAudits.productId, productId),
+        orderBy: desc(schema.deepAudits.createdAt),
+      });
+      if (!audit) return null;
+      const p = audit.payload;
+      return {
+        positionierung: p.derived.positionierung || null,
+        // Nur bewertete Dimensionen tragen einen Auftrag; „nicht bewertbar" ist keiner.
+        dimensionen: p.dimensions
+          .filter((d) => d.probleme.length > 0 || d.empfehlung.trim())
+          .map((d) => ({ key: d.key, label: d.label, score10: d.score10, probleme: d.probleme, empfehlung: d.empfehlung })),
+        topActions: p.topActions,
+      };
+    })(),
+    /**
+     * Merkmal-Einordnung (D282; verdrahtet D286): „ohne Zweck" darf nicht
+     * zurückkehren, Pflichtangaben müssen bleiben — aber nie als Kaufargument.
+     */
+    merkmalEinordnung: await (async () => {
+      const lauf = await db.query.conversionDrivers.findFirst({
+        where: eq(schema.conversionDrivers.productId, productId),
+        orderBy: desc(schema.conversionDrivers.createdAt),
+      });
+      const merkmale = lauf?.payload.ballast ?? [];
+      const ohneZweck = merkmale.filter((m) => m.klasse === "ballast").map((m) => m.feature);
+      const notwendig = merkmale.filter((m) => m.klasse === "notwendige_spezifikation").map((m) => m.feature);
+      return ohneZweck.length || notwendig.length ? { ohneZweck, notwendig } : null;
+    })(),
+    /**
+     * Conversion Driver in die Content-Prompts (D285, Nutzer-Befund 04.08.2026).
+     *
+     * Die Kaufgründe waren die einzige Analyse-Stufe ohne Draht in die
+     * Generierung: Der Generator kannte Features, Blocker und Pain Points, aber
+     * nicht den Haupt-Nutzen — deshalb eröffnete Bullet 1 mit einem
+     * Zusatz-Feature („ERWEITERBAR FÜR JEDE POOLGRÖSSE") statt mit dem Grund,
+     * aus dem gekauft wird. Reihenfolge = Relevanz absteigend; [0] ist das
+     * Leitmotiv und wird im Gate gegen Bullet 1 geprüft.
+     */
+    conversionDriver: await (async () => {
+      const lauf = await db.query.conversionDrivers.findFirst({
+        where: eq(schema.conversionDrivers.productId, productId),
+        orderBy: desc(schema.conversionDrivers.createdAt),
+      });
+      const driver = lauf?.payload.driver ?? [];
+      if (driver.length === 0) return null;
+      return [...driver]
+        .sort((a, b) => b.relevanz - a.relevanz || b.score - a.score)
+        .map((d) => ({
+          resultat: d.resultat,
+          nutzen: d.bausteine.map((b) => b.nutzen).filter(Boolean),
+          motiv: d.motivKlasse,
+          relevanz: d.relevanz,
+        }));
     })(),
     // Feature-Ranking (D205): die belegten Listing-Features nach Kunden-Relevanz
     // fließen in die Text-Generierung — bisher nur in der UI, jetzt Content-Input.
@@ -2313,6 +2401,43 @@ async function auditKern(
   );
   const sovAudit = (sovUpload?.parsed as { audit?: import("@/lib/sov/audit").SovAudit })?.audit ?? null;
 
+  /**
+   * Markt-Umfeld für das Audit (D284, Nutzer-Vorgabe 04.08.2026): Wettbewerber-
+   * Listings MIT ihrer Bildauslese. Die Auslese lief längst im Analyse-Lauf, ihr
+   * Ergebnis erreichte aber nur den Text-Abgleich — Zielgruppe, Positionierung
+   * und USPs entstanden blind gegenüber dem, was die Konkurrenz auf ihren
+   * Infografiken kommuniziert.
+   */
+  const wettbewerber = await db.query.competitorListings.findMany({
+    where: eq(schema.competitorListings.productId, productId),
+    orderBy: desc(schema.competitorListings.createdAt),
+  });
+  const jeAsin = wettbewerber.filter((z, i, arr) => arr.findIndex((x) => x.asin === z.asin) === i);
+  const wettbewerbsKontext = jeAsin
+    .slice(0, 5)
+    .map((l) => {
+      const bilder = (l.bilderText ?? [])
+        .slice(0, 9)
+        .map((b) => `  Bild ${b.slot}: ${[b.inhalt, b.textImBild.join(" | "), ...b.claims].filter(Boolean).join(" — ").slice(0, 300)}`)
+        .join("\n");
+      return [
+        `WETTBEWERBER ${l.asin}: ${l.title ?? "(kein Titel)"}`,
+        (l.bullets ?? []).slice(0, 5).map((b) => `  • ${b.slice(0, 200)}`).join("\n"),
+        bilder ? `  Bild-Inhalte (ausgelesen):\n${bilder}` : "  Bild-Inhalte: (nicht ausgelesen)",
+      ]
+        .filter(Boolean)
+        .join("\n");
+    })
+    .join("\n\n");
+  /**
+   * Fingerabdruck des Markt-Umfelds für den Redundanz-Guard. Zeitstempel reichen
+   * hier NICHT: Die Bildauslese schreibt `bilderText` per UPDATE in die
+   * bestehende Zeile, `createdAt` bleibt also stehen. Ohne diesen Abgleich würde
+   * ein nachgeholtes Auslesen („Nächste ASIN auslesen") das Audit nie erreichen —
+   * es hieße „Datenbasis unverändert", obwohl neue Bild-Inhalte vorliegen.
+   */
+  const wettbewerbsBasis = `Wettbewerber-Umfeld (${jeAsin.length} ASIN(s), ${jeAsin.reduce((s, l) => s + (l.bilderText?.length ?? 0), 0)} ausgelesene Bilder)`;
+
   // Redundanz-Guard (D81): dieselbe Datenbasis wird nicht doppelt auditiert —
   // erst neuer Import/Scrape/Analyse/Content schaltet „Neu bewerten" frei.
   const lastAudit = await db.query.deepAudits.findFirst({
@@ -2326,8 +2451,11 @@ async function auditKern(
       versions[0]?.createdAt.getTime() ?? 0,
       scrape?.createdAt.getTime() ?? 0,
       sovUpload?.createdAt.getTime() ?? 0,
+      ...jeAsin.map((l) => l.createdAt.getTime()),
     );
-    if (newestInput <= lastAudit.createdAt.getTime()) {
+    // D284: Neues Markt-Umfeld (weitere ASIN oder nachgeholte Bildauslese) ist
+    // eine neue Datenbasis, auch wenn kein Zeitstempel sich bewegt hat.
+    if (newestInput <= lastAudit.createdAt.getTime() && (lastAudit.dataBasis ?? []).includes(wettbewerbsBasis)) {
       return "Die Datenbasis ist seit der letzten KI-Bewertung unverändert.";
     }
   }
@@ -2358,6 +2486,9 @@ async function auditKern(
       fixeBegriffe: [product.marke ?? "", ...Object.values(product.variantAxisValues ?? {})]
         .map((s) => s.trim())
         .filter(Boolean),
+      // Markt-Umfeld inkl. ausgelesener Wettbewerber-Bilder (D284) — Kontext für
+      // Positionierung/Abgrenzung, ausdrücklich KEIN Beleg für unser Produkt.
+      wettbewerbsKontext,
       basics,
       priceEur: product.price !== null ? product.price / 100 : null,
       reviewInsights: insights!.payload,
@@ -2371,6 +2502,9 @@ async function auditKern(
       ...(basics ? ["Amazon-Basics (Bewertungen gesamt, Ø)"] : []),
       ...(kws.length ? [`${kws.length} Keywords`] : []),
       ...(sovAudit ? ["SOV-Audit"] : []),
+      // Immer mitschreiben (auch bei 0): Der Guard oben vergleicht diesen String,
+      // und „0 ausgelesene Bilder" ist eine echte, prüfbare Aussage.
+      wettbewerbsBasis,
     ];
     await db.insert(schema.deepAudits).values({ id: id(), productId, payload, dataBasis });
 
@@ -2833,9 +2967,33 @@ export async function saveContentManual(formData: FormData) {
   const latest = (t: string) => versions.find((v) => v.type === t)?.payload as Record<string, unknown> | undefined;
   const manuBrand = await db.query.brands.findFirst({ where: eq(schema.brands.id, product.brandId) });
   const { snapshotBildBelege } = await import("@/lib/analysis/bildAuslese");
+  /**
+   * Gate-Kontext der HANDARBEIT (D285-Befund): Der Knopf heißt „läuft durchs
+   * Gate" — dann muss es dasselbe Gate sein wie bei der Generierung. Hier fehlten
+   * drei Kontext-Felder, und ohne Kontext prüfen die zugehörigen Regeln
+   * stillschweigend NICHT:
+   *  - `alleKeywords` → der Keyword-Echo-Check lief gegen eine leere Liste
+   *  - `freigegebenerTitel` → die Titel-Dopplung der Item Highlights (D197) lief nie
+   *  - `kernKaufgrund` → der Haupt-Nutzen-Check für Bullet 1 (D285) lief nie
+   * Eine Regel, die auf einem Pfad nicht greift, ist keine Regel (D181).
+   */
+  const manuDriver = await db.query.conversionDrivers.findFirst({
+    where: eq(schema.conversionDrivers.productId, productId),
+    orderBy: desc(schema.conversionDrivers.createdAt),
+  });
+  const manuStaerksterDriver = [...(manuDriver?.payload.driver ?? [])].sort(
+    (a, b) => b.relevanz - a.relevanz || b.score - a.score,
+  )[0];
   const ctx = {
     facts: product.facts,
     primaryKeywords: kws.filter((k) => k.tier === "primary").map((k) => k.keyword),
+    alleKeywords: kws.map((k) => k.keyword),
+    freigegebenerTitel:
+      (versions.find((v) => v.type === "title" && v.status === "approved")?.payload as { text?: string } | undefined)?.text ??
+      undefined,
+    kernKaufgrund: manuStaerksterDriver
+      ? { resultat: manuStaerksterDriver.resultat, nutzen: manuStaerksterDriver.bausteine.map((b) => b.nutzen).filter(Boolean) }
+      : null,
     // Auch Handarbeit läuft gegen die Fremdmarken-Blacklist (D97) — Marken-Kontext D149
     competitorBrands: contentMarkenKontext(manuBrand ?? undefined, manuSnapshot?.title, fremdmarkenAusKeywords(alleKws), product.marke).fremdmarken,
     // … und gegen den Zahlen-Herkunfts-Check (D114) — gleiche Quellen wie die Generierung,

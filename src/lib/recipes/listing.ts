@@ -79,8 +79,40 @@ export type RecipeInputs = {
   /**
    * Conversion-Blocker (D167/D194): unbeantwortete Kunden-Themen mit Gewicht —
    * die neuen Texte MÜSSEN sie adressieren, sonst bleibt die Conversion-Lücke.
+   *
+   * D286: `kaufgrund` kommt dazu, weil die Blocker seit D266 aus dem Driver-Lauf
+   * stammen und dort JEDER Blocker an einem Kaufgrund hängt — ohne diesen Bezug
+   * schrieb der Generator ins Blaue („Thema erwähnen" statt „diesen Kaufgrund
+   * beweisen"). `nutzen` ist der Baustein, an dem die Beweislücke sitzt.
    */
-  conversionBlocker?: Array<{ titel: string; beschreibung: string }> | null;
+  conversionBlocker?: Array<{ titel: string; beschreibung: string; kaufgrund?: string; nutzen?: string }> | null;
+  /**
+   * BEFUNDE DES TIEFEN-AUDITS am bisherigen Listing (D286, Nutzer-Audit
+   * 04.08.2026): Positionierung plus die konkreten Mängel und Empfehlungen je
+   * Sektion sowie die Top-Maßnahmen.
+   *
+   * Sie erreichten die Generierung NIE: Das Tool sagte dem Kunden „die Bullets
+   * bekommen 4/10, weil X fehlt" — und schrieb die neuen Bullets, ohne X zu
+   * kennen. Nur `usps` und `zielgruppe` sickerten indirekt durch (sie werden in
+   * LEERE Fakten-Felder kopiert).
+   */
+  listingBefunde?: {
+    positionierung?: string | null;
+    /**
+     * Je Audit-Dimension: was beanstandet wurde und was empfohlen ist. Der Key
+     * ist der Dimensions-Key des Audits (title · bullets · description · backend ·
+     * images · aplus · reviews · price) — nur die, die einer Content-Sektion
+     * entsprechen, werden beim Schreiben dieser Sektion eingeblendet.
+     */
+    dimensionen?: Array<{ key: string; label: string; score10: number | null; probleme: string[]; empfehlung: string }>;
+    topActions?: string[];
+  } | null;
+  /**
+   * Merkmal-Einordnung des Driver-Laufs (D282; verdrahtet D286): Welche Angaben
+   * des alten Listings keinen Zweck hatten (nicht wieder aufnehmen) und welche
+   * Pflichtangaben sind (müssen irgendwo stehen, aber nie als Kaufargument).
+   */
+  merkmalEinordnung?: { ohneZweck: string[]; notwendig: string[] } | null;
   /**
    * Übertragbare Wettbewerber-Informationen (D199): Infos, die die Konkurrenz
    * nennt und uns fehlen, geprüft übertragbar gegen unsere Produkt-Wahrheit.
@@ -94,6 +126,23 @@ export type RecipeInputs = {
    * Features ohne Kunden-Echo sind nachrangig (Prüf-Kandidaten, nichts erfinden).
    */
   featureRanking?: Array<{ titel: string; beschreibung: string; relevanz: number; kundenEcho: boolean }> | null;
+  /**
+   * CONVERSION DRIVER (D265/D278; verdrahtet in D285, Nutzer-Befund 04.08.2026).
+   *
+   * Die Kern-Kaufgründe — das Ergebnis, wegen dem gekauft wird, nach Relevanz.
+   * Sie waren die einzige Analyse-Stufe, die NIE in die Text-Erstellung floss:
+   * Der Generator kannte Features, Blocker, Pain Points und Kaufauslöser, aber
+   * nicht den Haupt-Nutzen des Produkts. Ergebnis im Referenz-Fall (Solar-
+   * Poolheizung): Bullet 1 eröffnete mit „ERWEITERBAR FÜR JEDE POOLGRÖSSE" —
+   * einem Zusatz-Feature — statt damit, dass das Produkt den Pool mit
+   * Sonnenenergie erwärmt (Nutzer: „Erst mal musst du noch sagen, dass es eine
+   * Poolheizung ist, die den Pool warm macht … dann kannst du davon erzählen,
+   * dass es erweiterbar ist").
+   *
+   * `resultat` ist das Kunden-Ergebnis, `nutzen` die belegten Bausteine dahinter.
+   * Reihenfolge = Relevanz absteigend; [0] ist das Leitmotiv des Listings.
+   */
+  conversionDriver?: Array<{ resultat: string; nutzen: string[]; motiv: string; relevanz: number }> | null;
 };
 
 export type TitleRationale = Array<{ part: string; source: string; verified: boolean }>;
@@ -148,7 +197,11 @@ function herkunftsKlasse(a: { herkunft?: { eigene: number; fremde: number } }): 
   return "kategorie";
 }
 
-function contextBlock(inputs: RecipeInputs): string {
+/**
+ * Kontext-Block. `section` steuert nur, WELCHE Audit-Befunde gezeigt werden
+ * (D286) — die Befunde zur eigenen Sektion sind Auftrag, der Rest wäre Rauschen.
+ */
+function contextBlock(inputs: RecipeInputs, section?: ListingSection): string {
   const f = inputs.facts;
   const ri = inputs.reviewInsights;
   // MARKE (D149): Ein leerer Marken-Slot heißt Werkbank-Auftrag — dann ist
@@ -251,6 +304,20 @@ function contextBlock(inputs: RecipeInputs): string {
           .join("\n")}`,
       );
   }
+  /**
+   * KERN-KAUFGRÜNDE ganz oben in den Analyse-Blöcken (D285): Sie sind das
+   * Leitmotiv, nicht ein Detail unter vielen. Vorher fehlten sie komplett —
+   * der Generator wusste, was das Produkt HAT, aber nicht, wofür man es KAUFT.
+   */
+  if (inputs.conversionDriver?.length) {
+    const d = inputs.conversionDriver;
+    lines.push(
+      `KERN-KAUFGRÜNDE (Conversion Driver — das ERGEBNIS, wegen dem gekauft wird, wichtigster zuerst):\n${d
+        .slice(0, 5)
+        .map((x, i) => `${i + 1}. ${x.resultat}${x.nutzen.length ? ` — getragen von: ${x.nutzen.slice(0, 3).join("; ")}` : ""}`)
+        .join("\n")}\nDER STÄRKSTE KAUFGRUND IST DAS LEITMOTIV DES LISTINGS: „${d[0].resultat}". Er MUSS im Titel, im ERSTEN Bullet und im Einstieg der Beschreibung tragend vorkommen — ausschließlich mit unseren belegten Eigenschaften formuliert, nie als neue Wirkzusage. Zusatz-Features (Erweiterbarkeit, Kompatibilität, Zubehör, Maße) kommen NACH dem Haupt-Nutzen, nie davor.`,
+    );
+  }
   if (inputs.featureRanking?.length) {
     const mitEcho = inputs.featureRanking.filter((x) => x.kundenEcho).slice(0, 6);
     const ohneEcho = inputs.featureRanking.filter((x) => !x.kundenEcho).slice(0, 4);
@@ -267,11 +334,56 @@ function contextBlock(inputs: RecipeInputs): string {
   }
   if (inputs.conversionBlocker?.length)
     lines.push(
-      `CONVERSION-BLOCKER (Kunden-Themen, die das bisherige Listing NICHT beantwortet — die neuen Texte MÜSSEN sie adressieren, D167):\n${inputs.conversionBlocker
+      `CONVERSION-BLOCKER (Beweislücken: Themen, die für die Kaufentscheidung zählen und die das bisherige Listing NICHT beantwortet — die neuen Texte MÜSSEN sie beantworten, D167):\n${inputs.conversionBlocker
         .slice(0, 5)
-        .map((b) => `- ${b.titel}: ${b.beschreibung.slice(0, 160)}`)
+        .map(
+          (b) =>
+            `- ${b.titel}: ${b.beschreibung.slice(0, 160)}${b.kaufgrund ? ` [gehört zum Kaufgrund: ${b.kaufgrund}]` : ""}${b.nutzen ? ` [zu beweisen: ${b.nutzen}]` : ""}`,
+        )
         .join("\n")}`,
     );
+  /**
+   * Audit-Befunde am ALTEN Listing (D286): der eigentliche Arbeitsauftrag.
+   * Gefiltert auf die Sektion, die gerade geschrieben wird — plus Positionierung
+   * und Top-Maßnahmen, die für jede Sektion gelten.
+   */
+  if (inputs.listingBefunde) {
+    const b = inputs.listingBefunde;
+    if (b.positionierung?.trim())
+      lines.push(`POSITIONIERUNG (aus der Analyse hergeleitet — der Rahmen, in den JEDER Satz passen muss): ${b.positionierung.trim()}`);
+    const eigene = (b.dimensionen ?? []).filter((d) => section && d.key === section);
+    for (const d of eigene) {
+      const mangel = d.probleme.filter(Boolean).slice(0, 4);
+      if (mangel.length === 0 && !d.empfehlung.trim()) continue;
+      lines.push(
+        `BEFUNDE AM BISHERIGEN ${d.label.toUpperCase()} (Bewertung${d.score10 !== null ? ` ${d.score10}/10` : ""} — DIESE Mängel MUSS die neue Fassung beheben, sie sind der Auftrag):\n${mangel
+          .map((p) => `- ${p}`)
+          .join("\n")}${d.empfehlung.trim() ? `\nEMPFEHLUNG DER ANALYSE: ${d.empfehlung.trim()}` : ""}`,
+      );
+    }
+    if (b.topActions?.length)
+      lines.push(
+        `TOP-MASSNAHMEN DER ANALYSE (über alle Sektionen, nach Hebel — was hierher gehört, umsetzen):\n${b.topActions
+          .slice(0, 5)
+          .map((a) => `- ${a}`)
+          .join("\n")}`,
+      );
+  }
+  /**
+   * Merkmal-Einordnung (D282; verdrahtet D286): Was im alten Listing Platz ohne
+   * Zweck belegte, darf nicht zurückkehren; Pflichtangaben müssen bleiben.
+   */
+  if (inputs.merkmalEinordnung) {
+    const m = inputs.merkmalEinordnung;
+    if (m.ohneZweck.length)
+      lines.push(
+        `ANGABEN OHNE ERKENNBAREN ZWECK IM ALTEN LISTING (NICHT wieder aufnehmen — der Platz gehört einem Kaufargument): ${m.ohneZweck.slice(0, 8).join(" | ")}`,
+      );
+    if (m.notwendig.length)
+      lines.push(
+        `NOTWENDIGE ANGABEN (Passung, Menge, Material, Anwendung — MÜSSEN im Listing stehen, damit Käufer die Eignung prüfen können, sind aber KEIN Kaufargument: nie als Haupt-Nutzen und nie in einer Headline): ${m.notwendig.slice(0, 8).join(" | ")}`,
+      );
+  }
   if (inputs.wettbewerbsInfos?.length)
     lines.push(
       `ÜBERTRAGBARE WETTBEWERBER-INFORMATIONEN (D199 — Infos, die die Konkurrenz abbildet und unser Listing NICHT; gegen unsere Produkt-Wahrheit geprüft. Aufnehmen, wo sie zum Produkt passen — aber NUR mit UNSEREN belegten Angaben formulieren, NIE fremde Zahlen/Specs übernehmen. „prüfen" = nur nutzen, wenn die Produkt-Wahrheit es stützt):\n${inputs.wettbewerbsInfos
@@ -317,6 +429,10 @@ const BEHEBUNGS_STRATEGIEN: Array<[RegExp, string]> = [
   [/^title\.budget$/, "Ergänze ein weiteres BELEGTES Attribut (Maß, Menge, Material, Eigenschaft) aus Produkt-Wahrheit oder Original-Listing — keine Füllwörter."],
   [/wirkversprechen$/, "Formuliere nur Wirkaussagen, die wörtlich in Original-Listing, Produkt-Wahrheit oder Zusatz-Infos stehen — alles andere streichen."],
   [/titel-dopplung$/, "Ersetze jedes Titel-Echo durch einen NEUEN belegten Fakt (Wirkstoff, Herkunft, Anwendungsdauer, Zertifikat) — die Highlights stehen direkt neben dem Titel und ergänzen ihn."],
+  // D285: Bullet 1 muss den Haupt-Nutzen tragen, nicht ein Zusatz-Feature.
+  [/hauptnutzen$/, "Schreibe Bullet 1 komplett neu, ausgehend vom STÄRKSTEN Kern-Kaufgrund: Headline = das Ergebnis für den Kunden, erster Satz = die belegte Eigenschaft, die es leistet, dann der Use Case. Das bisherige Thema des ersten Bullets (Erweiterbarkeit, Kompatibilität, Zubehör, Maße, Lieferumfang) wandert in einen der Bullets 2–5 oder fällt weg — der Haupt-Nutzen steht NIE hinter einem Zusatz-Feature."],
+  // D285: Ein belegtes Problem wird gerahmt, nicht dementiert.
+  [/pain-point-ehrlich$/, "Streiche die pauschale Entwarnung und formuliere den Punkt ehrlich: Nenne die belegte Eigenschaft (Bauteil, Maß, Material, Lieferumfang) UND die Bedingung, unter der sie trägt (Montage, Zubehör, Passung vorab prüfen). Aus „vermeidet undichte Übergänge“ wird „für dauerhaft dichte Verbindungen die mitgelieferten Schlauchschellen an beiden Enden festziehen“. Nie behaupten, das belegte Problem existiere nicht."],
 ];
 
 function behebungFuer(rule: string): string | null {
@@ -399,7 +515,7 @@ export function sectionPrompt(
  * bestanden hat; kann die geprüfte Copy also nicht mehr verschlechtern.
  */
 export function rationalePrompt(section: ListingSection, inputs: RecipeInputs, finalText: string): string {
-  return `${contextBlock(inputs)}
+  return `${contextBlock(inputs, section)}
 
 FERTIGER TEXT — Sektion „${SECTION_LABEL[section]}" (bereits final und geprüft — NICHT verändern, nur erklären):
 ${finalText}
@@ -410,7 +526,7 @@ AUSGABE: Antworte AUSSCHLIESSLICH mit diesem JSON, kein Markdown:
 }
 
 function basePrompt(section: ListingSection, inputs: RecipeInputs): string {
-  const ctx = contextBlock(inputs);
+  const ctx = contextBlock(inputs, section);
   const kw = inputs.keywords;
   switch (section) {
     case "title":
@@ -431,11 +547,18 @@ REGELN (knowledge/content/bullets.md + Blog 07/2026):
 - DREI-POSITIONEN-ANATOMIE (Schaubild Blog 07/2026) — jeder Bullet in dieser Reihenfolge: POSITION 1 = Benefit zuerst (Headline + erste 5–8 Wörter). POSITION 2 = das Feature dahinter als Beleg, mit dem Secondary Keyword NATÜRLICH integriert. POSITION 3 = Use Case + konkrete Details: für wen/wann geeignet + Material, Maß, Prüfnorm oder Garantie. Beispiel: „Bleibt jahrelang scharf im täglichen Einsatz. Gehärteter Edelstahl mit dreifach geschliffener Klinge. Kein Nachschärfen nötig. 20 cm Klinge. 10 Jahre Garantie."
 - DREI JOBS je Bullet: einen wahrscheinlichen Einwand entkräften + einen konkreten Use Case bestätigen + ein Secondary Keyword NATÜRLICH unterbringen. Keyword-Stapeln auf Kosten der Lesbarkeit verliert alle drei — Kunden scannen in 2 Sekunden.
 - BUDGET AUSNUTZEN: Ziel ≥${RULES.bullets.utilizationMinBytes} Bytes pro Bullet, hartes Max ${RULES.bullets.hardMaxChars} Zeichen — so viel Substanz wie möglich, kein Füllwort-Padding.
-- Slot-Logik: 1 HOOK (stärkster USP) · 2 PROBLEM→BENEFIT (häufigster Pain Point!) · 3 TRUST (Material/Norm mit Beleg) · 4 USAGE · 5 CLOSE (Lieferumfang/Erwartungsmanagement). Häufigster Pain Point darf nach vorn rücken.
+- Slot-Logik: 1 HAUPT-NUTZEN (stärkster Kern-Kaufgrund) · 2 PROBLEM→BENEFIT (häufigster Pain Point!) · 3 TRUST (Material/Norm mit Beleg) · 4 USAGE · 5 CLOSE (Lieferumfang/Erwartungsmanagement).
+- BULLET 1 = HAUPT-NUTZEN, HARTE REGEL (wird geprüft): Der erste Bullet sagt, WAS das Produkt ist und WAS es für den Kunden TUT — der stärkste Kern-Kaufgrund, in der Headline. Wer nur diesen einen Bullet liest, muss wissen, was er kauft und was er davon hat. VERBOTEN als Bullet 1: Erweiterbarkeit, Kombinierbarkeit, Kompatibilität, Zubehör, Maße, Mengen, Lieferumfang, Montage — das sind Zusatz-Themen und gehören in Bullet 2–5. Auch der Titel erklärt den Nutzen NICHT: er nennt nur Bezeichnung und Attribute.
+  FALSCH (Solar-Poolheizung): „ERWEITERBAR FÜR JEDE POOLGRÖSSE: Reicht ein Kollektor nicht aus, lassen sich mehrere Elemente in Serie verbinden." → steigt mit einem Zusatz-Feature ein; der Kaufgrund (warmes Poolwasser durch Sonne) fehlt.
+  RICHTIG: „WARMES POOLWASSER ALLEIN DURCH SONNENKRAFT: Der Solarkollektor erwärmt das Wasser Ihres Aufstellpools um 1 bis 3 °C pro Tag, ohne Strom- oder Gasheizung. Angeschlossen an die vorhandene Filterpumpe verlängert er die Badesaison." → Kaufgrund in der Headline, Feature als Beleg, Use Case konkret.
 - Jede USP aus dem USP-SET genau EINMAL über alle Bullets. Keine Emojis.
 - SECONDARY-Keywords über die fünf Bullets VERTEILEN (je Bullet ein bis drei, KEIN Keyword in zwei Bullets), grammatisch natürlich integriert — die Verteilung folgt den Themen: Keywords und Kunden-Nutzen so aufteilen, dass kein Bullet einen anderen inhaltlich wiederholt: ${kw.secondary.join(", ")}
 - PRODUKT-FOKUS (härteste Regel, wird blockierend geprüft): Jeder Satz beschreibt das PRODUKT und seinen konkreten Nutzen — NIE das Listing, die Kennzeichnung/Auszeichnung, die Produktbilder oder euren Anbieter-Standpunkt. Verbotene Meta-Floskeln: „wir weisen … aus“, „ein Foto finden Sie in unseren Produktbildern“, „diese Transparenz ist uns wichtig(er als …)“.
 - HEADLINE = KAUFGRUND, nie eine nackte Menge/Dosierung (wird blockierend geprüft). Erlaubt: Benefit-Aussage, Wirkstoff-Kombination, Marken-Versprechen. Falsch: „PRO KAPSEL 610 MG“, „350 G MIT 160 DROPS“.
+- PAIN POINTS EHRLICH RAHMEN, NIE DEMENTIEREN (harte Regel, wird geprüft): Ein Problem, das die Reviews belegen, darf NICHT als nicht existent dargestellt werden. Verboten ist die pauschale Entwarnung („dichter Anschluss ohne Adapter-Suche", „vermeidet undichte Übergänge", „passt problemlos", „kein Nachdichten nötig"), wenn genau das der häufigste Pain Point ist — Käufer, die die Bewertungen gelesen haben, erkennen darin eine Lüge, und der Bullet verbrennt Vertrauen statt es aufzubauen.
+  SO GEHT ES: (1) benenne, was das Produkt konkret dafür mitbringt (Bauteil, Maß, Material, Lieferumfang), (2) sage, was der Kunde dafür tun oder prüfen muss (Montage, Zubehör, Schlauchschellen, Bypass, Passung vorab prüfen) — Erwartungsmanagement statt Dementi.
+  FALSCH: „DICHTER ANSCHLUSS OHNE ADAPTER-SUCHE: Der genormte Anschluss Ø 38 mm … vermeidet undichte Übergänge." (Reviews: undichte Anschlüsse sind das Hauptärgernis)
+  RICHTIG: „ANSCHLUSS Ø 38 MM RICHTIG ABDICHTEN: Der genormte Anschluss passt an gängige Filteranlagen; für dauerhaft dichte Verbindungen ziehen Sie die mitgelieferten Schlauchschellen an beiden Enden fest an. Prüfen Sie vor der ersten Saison den Sitz der Schläuche." → nennt das Feature, verschweigt die Bedingung nicht.
 - VORHER→NACHHER — lerne den Unterschied an einem echten Fall:
   SCHLECHT: „PRO KAPSEL 610 MG, KLAR AUSGEWIESEN: Sie wissen genau, was Sie einnehmen. Wir weisen beide Werte getrennt aus.“ → Headline = nur Menge; Text = Meta über die Kennzeichnung; kein Nutzen, kein Keyword, Budget verschenkt.
   GUT: „HOCHDOSIERT FÜR DIE TÄGLICHE BALLASTSTOFFZUFUHR: 610 mg indischer Flohsamen (Psyllium Husk) pro Kapsel liefern konzentrierte Ballaststoffe für eine sanfte Verdauung. Ideal für Erwachsene, die ohne Anrühren von losem Pulver dosieren möchten.“ → Headline = Nutzen; die Zahl 610 mg dient als Beleg; Keyword integriert; konkreter Use Case; Budget genutzt.`;
@@ -697,11 +820,39 @@ function textFuerPruefer(result: SectionResult): string {
  * konnte der Prüfer belegte Wirkaussagen („gegen Sodbrennen" steht im
  * Original-Titel) nicht von erfundenen unterscheiden und flaggte Belegtes.
  */
-function prueferKontext(inputs: RecipeInputs): string {
+export function prueferKontext(inputs: RecipeInputs): string {
+  const ri = inputs.reviewInsights;
+  // Ein-Seiten-Zuordnung wie im Autor-Prompt (D196): Der Prüfer muss dieselben
+  // Listen sehen wie der Autor, sonst beurteilt er gegen andere Daten.
+  const seiten = ri ? einseitigeAspekte(ri) : null;
   return [
     `MARKE: ${inputs.brand || inputs.eigenmarkeAusListing || "unbekannt"}`,
     `PRODUKT: ${inputs.productName}`,
     `PRODUKT-FAKTEN (Beleg-Quelle): ${JSON.stringify(inputs.facts)}`,
+    /**
+     * Bewertungs-Analyse für den Prüfer (D285, Nutzer-Befund 04.08.2026).
+     *
+     * Sie fehlte hier komplett — der Prüfer konnte deshalb NICHT erkennen, dass
+     * ein Bullet ein belegtes Problem dementiert („dichter Anschluss ohne
+     * Adapter-Suche", während undichte Anschlüsse der häufigste Pain Point
+     * waren). Ohne diesen Block sind `inhalt.pain-point-ehrlich` und
+     * `bullets.hauptnutzen` nicht prüfbar.
+     */
+    seiten?.painPoints.length
+      ? `PAIN POINTS AUS ECHTEN REVIEWS (belegte Probleme — eine pauschale Entwarnung zu einem dieser Themen ist ein Dementi und damit ein Verstoß):\n${seiten.painPoints
+          .slice(0, 6)
+          .map((p) => `- ${p.label}${p.mentionCount !== null ? ` (${p.mentionCount}× belegt)` : ""}`)
+          .join("\n")}`
+      : "",
+    seiten?.buyingTriggers.length
+      ? `KAUFAUSLÖSER AUS ECHTEN REVIEWS: ${seiten.buyingTriggers.slice(0, 6).map((t) => t.label).join(" | ")}`
+      : "",
+    inputs.conversionDriver?.length
+      ? `KERN-KAUFGRÜNDE (wichtigster zuerst — der erste Bullet muss den STÄRKSTEN tragen):\n${inputs.conversionDriver
+          .slice(0, 5)
+          .map((d, i) => `${i + 1}. ${d.resultat}`)
+          .join("\n")}`
+      : "",
     inputs.listingIst?.title || inputs.listingIst?.bullets?.length
       ? `ORIGINAL-LISTING (Beleg-Quelle — dort stehende Aussagen und Wirkangaben gelten als BELEGT):${inputs.listingIst.title ? `\nTitel: ${inputs.listingIst.title}` : ""}${inputs.listingIst.bullets?.length ? `\nBullets: ${inputs.listingIst.bullets.join(" • ")}` : ""}`
       : "",
@@ -797,6 +948,10 @@ export async function generateSection(
     // Erkannte Fremdmarken (Relevanz-Filter) — das Gate flaggt jedes Vorkommen (D97)
     competitorBrands: inputs.competitorBrands ?? [],
     zahlenQuellen,
+    // Haupt-Nutzen-Check für Bullet 1 (D285): der stärkste Kern-Kaufgrund.
+    kernKaufgrund: inputs.conversionDriver?.length
+      ? { resultat: inputs.conversionDriver[0].resultat, nutzen: inputs.conversionDriver[0].nutzen }
+      : null,
   };
 
   // QM-Schleife (D182): generieren → Kontrakt (D183) → Fixer + Gate → LLM-Prüfer

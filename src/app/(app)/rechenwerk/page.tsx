@@ -1,6 +1,6 @@
 import { OsShell } from "@/components/shell";
 import { RECHENWERK, BERICHTE, KOMBI_KENNZAHLEN } from "@/lib/rechenwerk";
-import { DATENFLUSS } from "@/lib/datenfluss/register";
+import { ANALYSE_WIRKUNG, DATENFLUSS } from "@/lib/datenfluss/register";
 import { BerichteSuche, KpiSuche } from "@/components/register-suche";
 import { RULES } from "@/lib/validation/rules";
 import { desc, eq } from "drizzle-orm";
@@ -109,6 +109,57 @@ export default async function RechenwerkPage() {
                 </div>
               </details>
             ))}
+          </div>
+        </section>
+
+        {/* Wirkungs-Register (D286): Nimmt jedes Analyse-Ergebnis Einfluss auf den
+            Content — oder ist begründet, warum nicht? Dieselbe Datenstruktur, die
+            der Test erzwingt; hier nur sichtbar gemacht. */}
+        <section className="mt-3 card p-4">
+          <div className="flex items-center gap-2.5">
+            <span className="icon-chip chip-violet"><IconCheck /></span>
+            <div>
+              <h2 className="text-sm font-semibold">Wirkung der Analyse auf den Content — Ergebnis für Ergebnis</h2>
+              <p className="text-xs text-muted">
+                Jedes Analyse-Ergebnis mit seinem Weg in die Text-Erstellung. Testgesichert: eine deklarierte Wirkung
+                muss im Code wirklich gelesen werden, und „ohne Wirkung“ gilt nur mit Begründung.
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-hair text-left text-[11px] uppercase text-neutral-500">
+                  <th className="py-1 pr-3">Analyse-Ergebnis</th>
+                  <th className="pr-3">entsteht in</th>
+                  <th className="pr-3">Wirkung auf den Content</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ANALYSE_WIRKUNG.map((e) => (
+                  <tr key={e.ergebnis} className="border-b border-hair align-top last:border-0">
+                    <td className="py-1.5 pr-3 font-medium">{e.ergebnis}</td>
+                    <td className="pr-3 text-muted">{e.entsteht}</td>
+                    <td className="pr-3">
+                      {e.wirkung.art === "keine" ? (
+                        <>
+                          <span className="pill">ohne Wirkung — bewusst</span>
+                          <span className="mt-1 block text-muted">{e.wirkung.grund}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="pill pill-good">{e.wirkung.art === "gate" ? "✓ Gate-Prüfung" : "✓ Prompt-Input"}</span>
+                          <span className="mt-1 block">{e.wirkung.ueber}</span>
+                          <span className="mt-0.5 block text-[11px] text-muted">
+                            gelesen in: {e.wirkung.consumer.map((c) => c.replace("src/", "")).join(" · ")}
+                          </span>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
 

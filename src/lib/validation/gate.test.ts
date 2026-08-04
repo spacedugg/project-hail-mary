@@ -9,6 +9,7 @@ import {
   validateItemHighlights,
   entferneUnbelegteZahlSaetze,
   pruefeZahlenTreue,
+  pruefeHauptnutzen,
 } from "./gate";
 
 const VALID_BULLET = (head: string, body: string) => `${head}: ${body}`;
@@ -425,5 +426,49 @@ describe("Fakten-Fixer: erfundene Zahl-Sätze streichen (D198)", () => {
     const { text, entfernt } = entferneUnbelegteZahlSaetze(bullet, quellen);
     expect(text).toBe(bullet);
     expect(entfernt).toEqual([]);
+  });
+});
+
+// ── Haupt-Nutzen im ersten Bullet (D285, Nutzer-Befund 04.08.2026) ────────────
+
+describe("pruefeHauptnutzen — Bullet 1 trägt den stärksten Kaufgrund", () => {
+  const kernKaufgrund = {
+    resultat: "Poolwasser wird angenehm warm zum Baden",
+    nutzen: ["Wasser erwärmt sich ohne Strom- oder Gasheizung"],
+  };
+  const zusatzFeature = VALID_BULLET(
+    "ERWEITERBAR FÜR JEDE POOLGRÖSSE",
+    "Reicht ein Kollektor nicht aus, lassen sich mehrere Elemente in Serie verbinden.",
+  );
+  const hauptnutzen = VALID_BULLET(
+    "WARMES POOLWASSER ALLEIN DURCH SONNENKRAFT",
+    "Der Solarkollektor erwärmt das Wasser um 1 bis 3 °C pro Tag.",
+  );
+
+  it("flaggt einen ersten Bullet, dessen Headline ein Zusatz-Feature ist", () => {
+    const issues = pruefeHauptnutzen([zusatzFeature, hauptnutzen], kernKaufgrund);
+    expect(issues.map((i) => i.rule)).toEqual(["bullets.hauptnutzen"]);
+    expect(issues[0].severity).toBe("error");
+    // Der Befund nennt den erwarteten Kaufgrund — sonst kann die Korrektur nicht greifen
+    expect(issues[0].message).toContain("Poolwasser wird angenehm warm zum Baden");
+  });
+
+  it("lässt eine Headline durch, die den Kaufgrund trifft (Komposita zählen)", () => {
+    expect(pruefeHauptnutzen([hauptnutzen, zusatzFeature], kernKaufgrund)).toEqual([]);
+    // „erwärmt den Pool" trifft über den Stamm „warm"/„pool" ebenfalls
+    expect(
+      pruefeHauptnutzen([VALID_BULLET("ERWÄRMT DEN POOL MIT SONNENENERGIE", "Ohne Strom und Gas."), zusatzFeature], kernKaufgrund),
+    ).toEqual([]);
+  });
+
+  it("prüft NICHT ohne bekannten Kaufgrund (D145: keine Behauptung ohne Maßstab)", () => {
+    expect(pruefeHauptnutzen([zusatzFeature], null)).toEqual([]);
+    expect(pruefeHauptnutzen([zusatzFeature], { resultat: "   ", nutzen: [] })).toEqual([]);
+    expect(pruefeHauptnutzen([], kernKaufgrund)).toEqual([]);
+  });
+
+  it("hängt im Bullet-Gate (validateBullets), nicht nur als Einzelfunktion", () => {
+    const issues = validateBullets([zusatzFeature, ...goodBullets.slice(1)], { kernKaufgrund });
+    expect(issues.some((i) => i.rule === "bullets.hauptnutzen")).toBe(true);
   });
 });

@@ -102,37 +102,70 @@ export function findeAspekt(ref: string, aspekte: RoheAspekte): BelegAspekt | nu
 }
 
 /**
- * Tendenz einer gemischten Erkenntnis (D171): Rechnet der CODE aus den
- * verifizierten Zählwerten beider Seiten — nie die KI. Nur sinnvoll, wenn
- * die Karte Beleg-Aspekte BEIDER Typen mit Zählwerten bündelt (Gegensatz-
- * Zusammenführung); sonst null.
+ * Tendenz einer Erkenntnis (D171, erweitert in D284 nach Nutzer-Befund
+ * 04.08.2026): Rechnet der CODE aus den verifizierten Zählwerten — nie die KI.
+ *
+ * Vorher gab es die Tendenz NUR für gemischte Karten (Beleg-Aspekte BEIDER
+ * Typen mit Zählwerten); einseitige Karten bekamen `null` und in der Anzeige
+ * damit GAR KEIN Vorzeichen. Ergebnis im Referenz-Fall: „Undichte Anschlüsse &
+ * abrutschende Schläuche als Hauptärgernis" stand ohne jede Kennzeichnung neben
+ * zwei Karten mit „▼ NEGATIV" — also gerade die eindeutigen Fälle ohne Urteil,
+ * die uneindeutigen mit. Umgekehrt wäre eine rein positive Erkenntnis nie als
+ * positiv erkennbar gewesen.
+ *
+ * Jetzt trägt JEDE Karte mit Beleg-Aspekten eine Richtung:
+ * - nur eine Seite belegt → diese Seite IST die Richtung (kein Rechnen nötig)
+ * - beide Seiten mit Zählwerten → die Seite mit mehr Fundstellen gewinnt
+ * - beide Seiten, aber Zählwerte fehlen (Altbestand) → „ausgeglichen" mit
+ *   `zahlenBekannt: false`; die Anzeige nennt dann KEINE Zahlen, statt „0+ / 0−"
+ *   zu behaupten.
  */
 export function kartenTendenz(karte: Pick<InsightCard, "belegAspekte">): {
   positiv: number;
   negativ: number;
   richtung: "positiv" | "negativ" | "ausgeglichen";
+  /** Sind die Fundstellen-Zahlen belastbar? Nur dann dürfen sie angezeigt werden. */
+  zahlenBekannt: boolean;
+  /** Bündelt die Karte beide Seiten? Nur dann ist „überwiegend" die richtige Ansage. */
+  beidseitig: boolean;
 } | null {
+  if (karte.belegAspekte.length === 0) return null;
+  const seite = (typ: BelegAspekt["typ"]) => karte.belegAspekte.filter((b) => b.typ === typ);
   const summe = (typ: BelegAspekt["typ"]) =>
-    karte.belegAspekte.filter((b) => b.typ === typ && b.mentionCount !== null).reduce((s, b) => s + (b.mentionCount ?? 0), 0);
-  const hatBeide =
-    karte.belegAspekte.some((b) => b.typ === "buyingTrigger" && b.mentionCount !== null) &&
-    karte.belegAspekte.some((b) => b.typ === "painPoint" && b.mentionCount !== null);
-  if (!hatBeide) return null;
+    seite(typ).filter((b) => b.mentionCount !== null).reduce((s, b) => s + (b.mentionCount ?? 0), 0);
   const positiv = summe("buyingTrigger");
   const negativ = summe("painPoint");
-  return { positiv, negativ, richtung: positiv > negativ ? "positiv" : negativ > positiv ? "negativ" : "ausgeglichen" };
+  const hatPos = seite("buyingTrigger").length > 0;
+  const hatNeg = seite("painPoint").length > 0;
+  // Zahlen sind nur belastbar, wenn JEDE vertretene Seite mindestens einen
+  // Zählwert hat — sonst würde eine Seite mit 0 in den Vergleich gehen.
+  const zahlenBekannt =
+    (!hatPos || seite("buyingTrigger").some((b) => b.mentionCount !== null)) &&
+    (!hatNeg || seite("painPoint").some((b) => b.mentionCount !== null));
+
+  const richtung = !hatNeg
+    ? "positiv"
+    : !hatPos
+      ? "negativ"
+      : !zahlenBekannt
+        ? "ausgeglichen"
+        : positiv > negativ
+          ? "positiv"
+          : negativ > positiv
+            ? "negativ"
+            : "ausgeglichen";
+  return { positiv, negativ, richtung, zahlenBekannt, beidseitig: hatPos && hatNeg };
 }
 
 /**
  * Karten-Klasse (D178): positiv/negativ/gemischt — deterministisch aus den
- * Beleg-Aspekten (Tendenz-Zählwerte, sonst Aspekt-Typen), nie von der KI.
+ * Beleg-Aspekten, nie von der KI. Seit D284 fällt sie direkt aus der Tendenz;
+ * der frühere Typ-Fallback ist dort aufgegangen.
  */
 export function kartenKlasse(karte: Pick<InsightCard, "belegAspekte">): "positiv" | "negativ" | "gemischt" {
   const t = kartenTendenz(karte);
-  if (t) return t.richtung === "ausgeglichen" ? "gemischt" : t.richtung;
-  const typen = new Set(karte.belegAspekte.map((b) => b.typ));
-  if (typen.size === 1) return typen.has("buyingTrigger") ? "positiv" : "negativ";
-  return "gemischt";
+  if (!t) return "gemischt";
+  return t.richtung === "ausgeglichen" ? "gemischt" : t.richtung;
 }
 
 /**
