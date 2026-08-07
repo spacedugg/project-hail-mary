@@ -7,7 +7,7 @@
 | Regel | Wert | Quelle / Konfliktauflösung |
 |---|---|---|
 | Anzahl | **genau 5** | alle Quellen einig |
-| Länge pro Bullet | **Ziel ≥300 Bytes (Ausschöpfungs-Prinzip 07/2026)**, hartes Max **500 Zeichen** | Nutzer 07/2026: Budget bestmöglich nutzen (kein Muss → Warnung). Ersetzt das alte 200–300-B-Ziel. Bytes via `TextEncoder` |
+| Länge pro Bullet | **Ziel ≥220 Bytes**, hartes Max **255 Zeichen** | Nutzer-Vorgabe 04.08.2026 (D287): Obergrenze von 500 auf 255 Zeichen. Das Ausschöpfungs-Ziel wandert mit (300 B wären unter 255 Zeichen nicht erreichbar — Dauerwarnung bei jedem regelkonformen Bullet). Ausschöpfung bleibt Warnung, kein Muss; Bytes via `TextEncoder` |
 | Aufbau | **HEADLINE IN VERSALIEN (3–5 Wörter) + Doppelpunkt + max. 3 Sätze** | temoa-os-Muster; 3 statt 2 Sätze wegen Ausschöpfungs-Prinzip |
 | Emojis | max. 1 pro Bullet, Default 0 | temoa-audit („Emoji-Spam" ist Preset-Issue) |
 | Verboten | Preise/Versand/Aktionen, Garantieversprechen über Amazon-Policy hinaus, Wettbewerber-Marken, unbelegte Superlative („hochwertig" → konkretes Material/Zahl), medizinische/verbotene Claims (Banned-Claims-Liste) | sales-room-Presets + marketplaceadpros + Blog 07 |
@@ -37,7 +37,7 @@ Weitere Recipe-Regeln:
 - **Drei Jobs je Bullet** (Blog 07/2026): jeder Bullet entkräftet einen wahrscheinlichen Einwand, bestätigt einen konkreten Use Case UND bringt ein Secondary Keyword natürlich unter — für Kunden (Kauf-Fragen), Algorithmus (Keyword-Einordnung) und Rufus (Use Case). Keyword-Stapeln auf Kosten der Lesbarkeit verliert alle drei.
 - **EIN Bullet = EIN Thema** (Nutzer-Feedback 20.07., Northpoint-Fall): Jeder Satz belegt die Kernaussage der Headline — fachfremde Fakten (Farbtemperatur im Stoßfestigkeits-Bullet) gehören in einen anderen Bullet oder fallen weg.
 - **Fakten-Sperre** (Northpoint-Fall): Zahlen, Materialien, Normen und Messwerte NUR aus den Quellen (Produkt-Wahrheit, Listing-IST, Zusatz-Infos, Keywords); fehlende Angaben weglassen statt schätzen; nie Tests/Belege behaupten; Kundenstimmen sind NIE Spec-Quelle. Deterministisch erzwungen durch den Zahlen-Herkunfts-Check im Gate (D114).
-- **Zeichenlimit ist kategorieabhängig** (Blog 07/2026) — unser hartes Max (500 Zeichen) ist die konservative Obergrenze; das Prinzip (Benefit → Feature → Konkretes) gilt in jeder Kategorie.
+- **Zeichenlimit ist kategorieabhängig** (Blog 07/2026) — unser hartes Max (255 Zeichen, D287) ist die konservative Obergrenze; das Prinzip (Benefit → Feature → Konkretes) gilt in jeder Kategorie. Der Wert ist über den Regelstand pro Kategorie überschreibbar (`bullets.hardMaxChars`), ohne Code-Änderung.
 - **Kundensprache übernehmen:** Formulierungen nah an `language_to_borrow_from_real_reviews` (verbatim-nah), vermeiden was in `language_to_avoid` steht.
 - **2-Sekunden-Scanbarkeit:** Headline allein muss die Botschaft tragen (sales-room-Preset-Issue).
 - Konkrete Zahlen statt Adjektive („hält 24 h kalt" statt „lange kalt").

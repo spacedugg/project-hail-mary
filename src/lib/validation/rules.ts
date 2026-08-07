@@ -22,8 +22,20 @@ export const RULES = {
    */
   bullets: {
     count: 5,
-    utilizationMinBytes: 300, // darunter: "Budget nicht ausgenutzt"
-    hardMaxChars: 500,
+    /**
+     * Ausschöpfungs-Ziel in BYTES, hartes Max in ZEICHEN (D287, Nutzer-Vorgabe
+     * 04.08.2026: max. 255 Zeichen pro Bullet — vorher 500).
+     *
+     * Das Ziel muss mit der Obergrenze zusammenpassen: Bei 255 Zeichen deutschem
+     * Text mit Umlauten sind ~265–275 Bytes möglich. Ein Ziel von 300 Bytes
+     * (Stand 500-Zeichen-Ära) wäre unter dem neuen Deckel UNERREICHBAR — jedes
+     * regelkonforme Bullet trüge dauerhaft die Warnung „Budget nicht ausgenutzt",
+     * und das Modell würde beim Nachbessern in den Hard-Max laufen. 220 Bytes
+     * (≈ 210–220 Zeichen) fordern rund 86 % des Budgets und lassen dem Satzbau
+     * Luft bis zur Grenze.
+     */
+    utilizationMinBytes: 220, // darunter: "Budget nicht ausgenutzt"
+    hardMaxChars: 255,
     maxSentences: 3, // bei ausgeschöpften Bullets realistisch (vorher 2)
     maxEmoji: 1,
   },
