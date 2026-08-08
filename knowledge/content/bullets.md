@@ -7,7 +7,7 @@
 | Regel | Wert | Quelle / Konfliktauflösung |
 |---|---|---|
 | Anzahl | **genau 5** | alle Quellen einig |
-| Länge pro Bullet | **Ziel ≥220 Bytes**, hartes Max **255 Zeichen** | Nutzer-Vorgabe 04.08.2026 (D287): Obergrenze von 500 auf 255 Zeichen. Das Ausschöpfungs-Ziel wandert mit (300 B wären unter 255 Zeichen nicht erreichbar — Dauerwarnung bei jedem regelkonformen Bullet). Ausschöpfung bleibt Warnung, kein Muss; Bytes via `TextEncoder` |
+| Länge pro Bullet | **Ziel ≥230 Zeichen**, hartes Max **255 Zeichen** — beides INKLUSIVE Leerzeichen | Nutzer-Vorgabe 04.08.2026 (D287): Obergrenze von 500 auf 255. Bullets zählen ZEICHEN, nicht Bytes — Ober- wie Untergrenze über `charLength` (Grapheme, Leerzeichen zählen mit). Ausschöpfung bleibt Warnung, kein Muss. Bytes gelten nur dort, wo Amazon Bytes zählt: Backend-Keywords und Beschreibung |
 | Aufbau | **HEADLINE IN VERSALIEN (3–5 Wörter) + Doppelpunkt + max. 3 Sätze** | temoa-os-Muster; 3 statt 2 Sätze wegen Ausschöpfungs-Prinzip |
 | Emojis | max. 1 pro Bullet, Default 0 | temoa-audit („Emoji-Spam" ist Preset-Issue) |
 | Verboten | Preise/Versand/Aktionen, Garantieversprechen über Amazon-Policy hinaus, Wettbewerber-Marken, unbelegte Superlative („hochwertig" → konkretes Material/Zahl), medizinische/verbotene Claims (Banned-Claims-Liste) | sales-room-Presets + marketplaceadpros + Blog 07 |

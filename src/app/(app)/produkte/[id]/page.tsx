@@ -24,6 +24,7 @@ import { IconUpload, IconSearch, IconReviews, IconContent, IconEuro, IconSparkle
 import { AnalyseStart } from "@/components/analyse-start";
 import { TabLeiste } from "@/components/tab-leiste";
 import { KopierFeld } from "@/components/kopier-feld";
+import { RULES } from "@/lib/validation/rules";
 import { ListingKontrolle, MassnahmenBlock } from "@/components/listing-kontrolle";
 import { ZielgruppeUndPositionierung, MarktPosition } from "@/components/analyse-hintergrund";
 import { VierBlock, ReviewTrichter, MerkmalEinordnung, ErgebnisHinweis, driverEintraege, blockerEintraege, kartenEintraege, featureEintraege } from "@/components/analyse-vier";
@@ -1077,9 +1078,21 @@ export default async function ProductPage({
                       neutral, rot NUR über dem harten Amazon-Maximum */}
                   {payload?.text && (
                     <div className="mt-2">
+                      {/* Grenzen aus dem Regelwerk, nicht aus der Ansicht (D287):
+                          hier standen 75/125/250 als Literale — 250 wich schon von
+                          den echten 249 Backend-Bytes ab. Eine Grenze, zwei Zahlen
+                          ist genau die Sorte Fehler, die niemand bemerkt. */}
                       <KopierFeld
                         text={payload.text}
-                        max={key === "title" ? 75 : key === "highlights" ? 125 : key === "backend" ? 250 : undefined}
+                        max={
+                          key === "title"
+                            ? RULES.title.maxChars
+                            : key === "highlights"
+                              ? RULES.itemHighlights.maxChars
+                              : key === "backend"
+                                ? RULES.backendKeywords.maxBytes
+                                : undefined
+                        }
                         bytes={key === "backend"}
                         mono={key === "backend"}
                       />
@@ -1107,7 +1120,10 @@ export default async function ProductPage({
                   {payload?.items && (
                     <div className="mt-2 space-y-1.5">
                       {payload.items.map((b, i) => (
-                        <KopierFeld key={i} label={`Bullet ${i + 1}`} text={b} />
+                        // D287: Bullets tragen jetzt sichtbar ihr Limit (255
+                        // Zeichen inkl. Leerzeichen) — vorher lief die Zahl
+                        // neutral mit und wurde nie rot, egal wie lang der Text war.
+                        <KopierFeld key={i} label={`Bullet ${i + 1}`} text={b} max={RULES.bullets.hardMaxChars} />
                       ))}
                     </div>
                   )}

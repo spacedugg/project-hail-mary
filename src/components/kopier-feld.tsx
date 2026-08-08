@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { charLength } from "@/lib/text/bytes";
 
 /**
  * Kopierbares Einzel-Feld (D175, Nutzer-Vorgabe 22.07.): jeder Content-Teil
@@ -24,7 +25,10 @@ export function KopierFeld({
   mono?: boolean;
 }) {
   const [kopiert, setKopiert] = useState(false);
-  const menge = bytes ? new TextEncoder().encode(text).length : text.length;
+  // Dieselbe Zählung wie das Gate (D287): Graphem-Zeichen inklusive Leerzeichen.
+  // `text.length` zählt UTF-16-Einheiten und wiche bei Emoji/kombinierten Zeichen
+  // von der Zahl ab, gegen die geprüft wird — zwei Zahlen für dieselbe Grenze.
+  const menge = bytes ? new TextEncoder().encode(text).length : charLength(text);
   const einheit = bytes ? "B" : "";
   const ueberMax = max !== undefined && menge > max;
   return (

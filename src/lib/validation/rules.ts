@@ -23,18 +23,20 @@ export const RULES = {
   bullets: {
     count: 5,
     /**
-     * Ausschöpfungs-Ziel in BYTES, hartes Max in ZEICHEN (D287, Nutzer-Vorgabe
-     * 04.08.2026: max. 255 Zeichen pro Bullet — vorher 500).
+     * Bullets rechnen in ZEICHEN INKLUSIVE LEERZEICHEN — Ober- UND Untergrenze
+     * (D287, Nutzer-Vorgabe 04.08.2026: „255 Zeichen inklusive Leerzeichen …
+     * Es geht bei den Bullet Points nicht um Bytes, sondern Zeichen").
      *
-     * Das Ziel muss mit der Obergrenze zusammenpassen: Bei 255 Zeichen deutschem
-     * Text mit Umlauten sind ~265–275 Bytes möglich. Ein Ziel von 300 Bytes
-     * (Stand 500-Zeichen-Ära) wäre unter dem neuen Deckel UNERREICHBAR — jedes
-     * regelkonforme Bullet trüge dauerhaft die Warnung „Budget nicht ausgenutzt",
-     * und das Modell würde beim Nachbessern in den Hard-Max laufen. 220 Bytes
-     * (≈ 210–220 Zeichen) fordern rund 86 % des Budgets und lassen dem Satzbau
-     * Luft bis zur Grenze.
+     * Vorher stand das Ausschöpfungs-Ziel in Bytes und die Obergrenze in Zeichen:
+     * zwei Maßeinheiten für dasselbe Feld. Das ist nicht nur unsauber, es ist
+     * unvergleichbar — Umlaute zählen in Bytes doppelt, ein Text mit vielen
+     * Umlauten galt also als „ausgenutzter" als derselbe Inhalt ohne. Beide
+     * Grenzen zählen jetzt Graphem-Zeichen (`charLength`, Leerzeichen zählen mit).
+     *
+     * Bytes bleiben dort, wo Amazon wirklich Bytes zählt: Backend-Keywords
+     * (249 B) und Beschreibung.
      */
-    utilizationMinBytes: 220, // darunter: "Budget nicht ausgenutzt"
+    utilizationMinChars: 230, // darunter: "Budget nicht ausgenutzt" (Warnung)
     hardMaxChars: 255,
     maxSentences: 3, // bei ausgeschöpften Bullets realistisch (vorher 2)
     maxEmoji: 1,

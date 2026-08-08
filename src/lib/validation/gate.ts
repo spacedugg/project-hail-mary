@@ -554,12 +554,15 @@ export function validateBullets(bullets: string[], ctx: Ctx = {}): ValidationIss
       issues.push(issue("bullets.empty", "error", `Bullet ${n} ist leer.`));
       return;
     }
-    const bytes = byteLength(t);
-    if (charLength(t) > RULES.bullets.hardMaxChars)
-      issues.push(issue("bullets.hard-max", "error", `Bullet ${n} überschreitet ${RULES.bullets.hardMaxChars} Zeichen.`));
-    else if (bytes < RULES.bullets.utilizationMinBytes)
+    // Bullets zählen ZEICHEN inkl. Leerzeichen — Ober- wie Untergrenze (D287).
+    // Bytes bleiben Backend-Keywords und Beschreibung vorbehalten, wo Amazon
+    // wirklich Bytes zählt.
+    const zeichen = charLength(t);
+    if (zeichen > RULES.bullets.hardMaxChars)
+      issues.push(issue("bullets.hard-max", "error", `Bullet ${n}: ${zeichen} Zeichen — max. ${RULES.bullets.hardMaxChars} Zeichen inkl. Leerzeichen.`));
+    else if (zeichen < RULES.bullets.utilizationMinChars)
       issues.push(
-        issue("bullets.budget", "warning", `Bullet ${n}: nur ${bytes} B — Budget nicht ausgenutzt (Ziel ≥${RULES.bullets.utilizationMinBytes} B, max. ${RULES.bullets.hardMaxChars} Zeichen).`),
+        issue("bullets.budget", "warning", `Bullet ${n}: nur ${zeichen} Zeichen — Budget nicht ausgenutzt (Ziel ≥${RULES.bullets.utilizationMinChars}, max. ${RULES.bullets.hardMaxChars} Zeichen inkl. Leerzeichen).`),
       );
 
     // Headline-Pattern: VERSALIEN (3–5 Wörter) + Doppelpunkt
